@@ -1,0 +1,245 @@
+replicaCount: 3
+
+image:
+  repository: docker.io/your-dockerhub-namespace/your-repo
+  tag: "latest"
+  pullPolicy: IfNotPresent
+
+imagePullSecrets: []  # e.g. [{ name: dockerhub-cred }]
+
+nameOverride: ""
+fullnameOverride: ""
+
+serviceAccount:
+  create: true
+  name: ""                          # leave empty to auto-name
+  automount: true                   # required for IRSA
+  irsa:
+    enabled: true                   # <— turn on IRSA
+    roleArn: arn:aws:iam::123456789012:role/referral-pulse-svc-role  # <— set your IAM role ARN
+    audience: sts.amazonaws.com     # default audience
+  annotations:
+    # add any extra annotations you need here
+    # example: foo: "bar"
+  imagePullSecrets: [ ]                   # e.g. [{ name: dockerhub-cred }]
+
+rbac:
+  enabled: true                     # <— create Role/RoleBinding if app calls K8s API
+  # Minimal read to ConfigMaps/Secrets. Adjust if needed.
+  rules:
+    - apiGroups: [""]
+      resources: ["configmaps"]
+      verbs: ["get","list","watch"]
+    - apiGroups: [""]
+      resources: ["secrets"]
+      verbs: ["get","list","watch"]
+
+podAnnotations: {}
+podLabels: {}
+
+podSecurityContext:
+  runAsNonRoot: true
+  seccompProfile: { type: RuntimeDefault }
+
+containerSecurityContext:
+  allowPrivilegeEscalation: false
+  readOnlyRootFilesystem: true
+  capabilities:
+    drop: ["ALL"]
+
+service:
+  type: ClusterIP
+  port: 8080
+  metricsPort: 8080
+  annotations:
+    prometheus.io/scrape: "true"
+    prometheus.io/path: "/metrics"
+    prometheus.io/port: "8080"
+
+ingress:
+  enabled: true
+  className: "alb"
+  annotations:
+    alb.ingress.kubernetes.io/scheme: internet-facing        # or "internal"
+    alb.ingress.kubernetes.io/target-type: ip
+    alb.ingress.kubernetes.io/healthcheck-path: /health
+    alb.ingress.kubernetes.io/healthcheck-port: traffic-port
+    alb.ingress.kubernetes.io/listen-ports: '[{"HTTP": 80},{"HTTPS":443}]'
+    alb.ingress.kubernetes.io/ssl-redirect: "443"
+    alb.ingress.kubernetes.io/backend-protocol: HTTP
+    alb.ingress.kubernetes.io/success-codes: "200-399"
+    # Optional shared group
+    # alb.ingress.kubernetes.io/group.name: referral-shared
+    # ExternalDNS (optional)
+    # external-dns.alpha.kubernetes.io/hostname: api.example.com
+  hosts:
+    - host: api.example.com
+      paths:
+        - path: /
+          pathType: Prefix
+  tls:
+    - secretName: tls-acm-placeholder   # create empty secret if using ACM; ALB attaches cert by annotation
+      hosts:
+        - api.example.com
+
+# ---- NetworkPolicy tuning
+networkPolicy:
+  enabled: true
+  # allow only the ALB/ingress-controller to reach the Service
+  allowFromIngressController:
+    enabled: true
+    namespaceSelector:
+      matchLabels:
+        app.kubernetes.io/name: ingress-nginx  # change to your controller's ns labels
+    podSelector:
+      matchLabels: {}                           # or target controller pods by label
+
+  # allow Prometheus to scrape /metrics
+  allowFromPrometheus:
+    enabled: true
+    namespaceSelector:
+      matchLabels:
+        release: kube-prometheus-stack          # adapt to your Prometheus ns labels
+    podSelector:
+      matchLabels: {}
+
+  # egress control
+  egress:
+    allowDns: true
+    kubeDnsNamespace: kube-system
+    kubeDnsSelector:
+      k8s-app: kube-dns
+    # allow OTEL collector (namespace/labels)
+    allowOtel: true
+    otelNamespaceSelector:
+      matchLabels:
+        name: otel
+    otelPodSelector:
+      matchLabels:
+        app.kubernetes.io/name: otel-collector
+    # If you need general outbound (e.g., S3/SQS/SNS), keep this true
+    allowInternet: true
+
+resources:
+  limits:
+    cpu: 500m
+    memory: 512Mi
+  requests:
+    cpu: 200m
+    memory: 256Mi
+
+autoscaling:
+  enabled: true
+  minReplicas: 3
+  maxReplicas: 20
+  targetCPUUtilizationPercentage: 70
+  targetMemoryUtilizationPercentage: 85
+
+pdb:
+  enabled: true
+  minAvailable: 1
+
+nodeSelector: {}
+tolerations: []
+affinity: {}
+topologySpreadConstraints: []
+migrations:
+  enabled: true
+  backoffLimit: 1
+  ttlSecondsAfterFinished: 300
+  # Optional: set to true if DB can take time to accept connections
+  waitForDb: false
+  # extra env (merged on top of envFrom)
+  extraEnv: []
+
+# -------- ConfigMap (non-sensitive env) --------
+envVars:
+  NODE_ENV: "production"
+  APP_PORT: "8080"
+  FRONTEND_DOMAIN: "https://app.example.com"
+  BACKEND_DOMAIN: "https://api.example.com"
+  API_PREFIX: "api"
+  APP_FALLBACK_LANGUAGE: "en"
+  APP_HEADER_LANGUAGE: "x-custom-lang"
+
+  INTRA_HTTP_BASE_URL: "http://gateway.internal:3000"
+  INTRA_HTTP_TIMEOUT_MS: "3000"
+  INTRA_TENANT_HEADER: "x-tenant-id"
+  INTRA_JWT_HEADER_NAME: "authorization"
+  INTRA_HTTP_RETRIES: "3"
+  INTRA_HTTP_RETRY_BASE_DELAY_MS: "200"
+  INTRA_HTTP_RETRY_STATUSES: "429,502,503,504"
+
+  TP_HTTP_BASE_URL: "https://thirdparty.example.com"
+  TP_HTTP_TIMEOUT_MS: "5000"
+  TP_HTTP_UA: "referral-pulse-svc/1.0"
+  TP_HTTP_RETRIES: "2"
+  TP_HTTP_RETRY_BASE_DELAY_MS: "400"
+  TP_HTTP_RETRY_STATUSES: "429,500,502,503,504"
+
+  INTRA_CB_TIMEOUT_MS: "2500"
+  INTRA_CB_VOLUME_THRESHOLD: "20"
+  INTRA_CB_ERR_PCT: "50"
+  INTRA_CB_RESET_TIMEOUT_MS: "10000"
+
+  TP_CB_TIMEOUT_MS: "3500"
+  TP_CB_VOLUME_THRESHOLD: "20"
+  TP_CB_ERR_PCT: "50"
+  TP_CB_RESET_TIMEOUT_MS: "15000"
+
+  METRICS_ENABLED: "true"
+  METRICS_ENDPOINT: "/metrics"
+
+  OTEL_ENABLED: "true"
+  OTEL_SERVICE_NAME: "referral-pulse-svc"
+  OTEL_ENVIRONMENT: "staging"
+  OTEL_EXPORTER_OTLP_TRACES_ENDPOINT: "http://otel-collector.otel.svc.cluster.local:4318/v1/traces"
+  OTEL_PROPAGATOR: "w3c"
+  OTEL_SAMPLER_RATIO: "1"
+
+  REDIS_MODE: "cluster"
+  REDIS_NODES: "mycluster.xxxx.cache.amazonaws.com:6379"
+  REDIS_DB: "0"
+  REDIS_TLS: "true"
+  REDIS_TLS_SERVERNAME: "mycluster.xxxx.cache.amazonaws.com"
+  REDIS_MAX_RETRIES_PER_REQUEST: "3"
+  REDIS_RECONNECT_BACKOFF_MS: "200"
+  REDIS_CONNECTION_TIMEOUT_MS: "5000"
+  REDIS_ENABLE_AUTOPIPELINING: "true"
+  REDIS_LAZY_CONNECT: "true"
+  REDIS_SUBSCRIBER_CREATE: "true"
+  REDIS_AUTH_MODE: "acl"
+  REDIS_KEY_PREFIX: "my-svc"
+
+  S3_BUCKET: "referral-pulse"
+  S3_REGION: "us-east-1"
+  S3_FORCE_PATH_STYLE: "false"
+  S3_ACCELERATE: "false"
+  S3_KEY_PREFIX: "my-svc"
+  S3_SSE: "none"
+  S3_PRESIGN_EXPIRES_SEC: "900"
+  S3_ENDPOINT: ""
+
+  SQS_REGION: "us-east-1"
+  SQS_ENDPOINT: ""
+  SQS_CONSUMERS_JSON: '[{"name":"orders","queueUrl":"https://sqs.us-east-1.amazonaws.com/123456789012/orders.fifo","fifo":true,"waitTimeSeconds":20,"visibilityTimeout":60,"batchSize":10}]'
+  SQS_PRODUCERS_JSON: '[{"name":"orders","queueUrl":"https://sqs.us-east-1.amazonaws.com/123456789012/orders.fifo","fifo":true}]'
+  SQS_DEFAULT_WAIT: "20"
+  SQS_DEFAULT_VISIBILITY: "30"
+  SQS_DEFAULT_BATCH: "10"
+
+  CH_URL: "http://clickhouse:8123"
+  CH_USERNAME: "sa"
+  CH_DATABASE: "analytics"
+
+# -------- Secret (sensitive env) --------
+secretVars:
+  CH_PASSWORD: "sa"
+  REDIS_USERNAME: "appuser"
+  REDIS_PASSWORD: "super-secret"
+  TP_API_KEY: ""
+  AWS_ACCESS_KEY_ID: ""         # leave empty if using IRSA
+  AWS_SECRET_ACCESS_KEY: ""     # leave empty if using IRSA
+
+# Extra manual envs (merged over envFrom)
+extraEnv: []

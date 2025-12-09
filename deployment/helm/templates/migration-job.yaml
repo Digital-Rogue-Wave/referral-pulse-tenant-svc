@@ -1,0 +1,48 @@
+{{- if .Values.migrations.enabled }}
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ include "referral-svc.fullname" . }}-migrate
+  labels:
+    {{- include "referral-svc.labels" . | nindent 4 }}
+  annotations:
+    "helm.sh/hook": pre-install,pre-upgrade
+    "helm.sh/hook-delete-policy": before-hook-creation,hook-succeeded
+spec:
+  backoffLimit: {{ .Values.migrations.backoffLimit | default 1 }}
+  ttlSecondsAfterFinished: {{ .Values.migrations.ttlSecondsAfterFinished | default 300 }}
+  template:
+    metadata:
+      labels:
+        {{- include "referral-svc.selectorLabels" . | nindent 8 }}
+    spec:
+      serviceAccountName: {{ default (include "referral-svc.fullname" .) .Values.serviceAccount.name }}
+      restartPolicy: OnFailure
+      containers:
+        - name: migrate
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          envFrom:
+            - configMapRef:
+                name: {{ include "referral-svc.fullname" . }}-config
+            - secretRef:
+                name: {{ include "referral-svc.fullname" . }}-secret
+          env:
+            {{- with .Values.migrations.extraEnv }}
+            {{- toYaml . | nindent 12 }}
+            {{- end }}
+          command: ["node"]
+          args:
+            - "dist/database/run-migrations.js"
+          {{- if .Values.migrations.waitForDb }}
+          # optional tiny wait loop if your DB needs a few seconds
+          lifecycle:
+            postStart:
+              exec:
+                command:
+                  - /bin/sh
+                  - -c
+                  - |
+                    echo "waiting 5s for DB..." && sleep 5
+          {{- end }}
+{{- end }}

@@ -1,0 +1,122 @@
+### Environments ###############################################################
+# Uses http-client.env.json (see below)
+
+### Public — Referral click (path code)
+GET {{baseUrl}}/r/ABC123?tenant={{tenant}}&to={{tenantUrl}}/landing&cmp={{campaignId}}&ref={{referrerId}}
+
+### Public — Referral click (query)
+GET {{baseUrl}}/r?tenant={{tenant}}&to={{tenantUrl}}/landing&code=ABC123&cmp={{campaignId}}&ref={{referrerId}}
+
+### Public — Email open pixel (saves GIF)
+GET {{baseUrl}}/email/open.gif?tenant={{tenant}}&mid={{messageId}}&cmp={{campaignId}}&rcp={{recipient}}
+> ./open.gif
+
+### Public — Email click redirect
+GET {{baseUrl}}/email/click?tenant={{tenant}}&mid={{messageId}}&to={{tenantUrl}}/welcome&cmp={{campaignId}}&rcp={{recipient}}
+
+### SDK — Batch
+POST {{baseUrl}}/v1/ingest/batch
+Content-Type: application/json
+X-Publishable-Key: {{pk}}
+Idempotency-Key: {{idem}}
+
+{
+  "batch": [
+    {
+      "event": "Page Viewed",
+      "properties": { "path": "/pricing" },
+      "timestamp": "{{now}}",
+      "context": { "url": "{{tenantUrl}}/pricing", "r_cid": "{{clickId}}" },
+      "anonymousId": "anon-{{guid}}",
+      "messageId": "{{idem}}"
+    }
+  ]
+}
+
+### SDK — Identify
+POST {{baseUrl}}/v1/ingest/identify
+Content-Type: application/json
+X-Publishable-Key: {{pk}}
+Idempotency-Key: {{idem}}
+
+{
+  "traits": { "email": "alice@example.com", "plan": "pro" },
+  "timestamp": "{{now}}",
+  "context": { "url": "{{tenantUrl}}/account", "r_cid": "{{clickId}}" },
+  "anonymousId": "anon-{{guid}}",
+  "externalUserId": "u_1234",
+  "messageId": "{{idem}}"
+}
+
+### SDK — Referral (UI action)
+POST {{baseUrl}}/v1/ingest/referral
+Content-Type: application/json
+X-Publishable-Key: {{pk}}
+Idempotency-Key: {{idem}}
+
+{
+  "action": "share",
+  "referralCode": "ABC123",
+  "referrerId": "u_1234",
+  "properties": { "channel": "twitter" },
+  "context": { "url": "{{tenantUrl}}/refer", "r_cid": "{{clickId}}" },
+  "anonymousId": "anon-{{guid}}",
+  "messageId": "{{idem}}"
+}
+
+### SDK — Feedback
+POST {{baseUrl}}/v1/ingest/feedback
+Content-Type: application/json
+X-Publishable-Key: {{pk}}
+Idempotency-Key: {{idem}}
+
+{
+  "platform": "custom",
+  "title": "Loving it",
+  "comment": "Switched from X",
+  "rating": 5,
+  "properties": { "survey": "nps", "score": 9 },
+  "context": { "url": "{{tenantUrl}}/feedback", "r_cid": "{{clickId}}" },
+  "anonymousId": "anon-{{guid}}",
+  "messageId": "{{idem}}"
+}
+
+### S2S — Signup (with HMAC)
+# Pre-request script to compute timestamp
+> {% client.global.set("ts", Math.floor(Date.now()/1000)); %}
+
+POST {{baseUrl}}/v1/ingest/s2s/signup
+Content-Type: application/json
+X-Publishable-Key: {{serverPk}}
+X-Signature-Timestamp: {{ts}}
+X-Signature: {{hmac ts}}.{{hmac body}}  # See http-client.env.json script section
+Idempotency-Key: {{idem}}
+
+{
+  "clickId": "{{clickId}}",
+  "subjectId": "sub_abcdef",
+  "externalUserId": "u_1234",
+  "properties": { "plan": "trial" },
+  "timestamp": "{{now}}",
+  "messageId": "{{idem}}"
+}
+
+### S2S — Purchase (with HMAC)
+> {% client.global.set("ts", Math.floor(Date.now()/1000)); %}
+
+POST {{baseUrl}}/v1/ingest/s2s/purchase
+Content-Type: application/json
+X-Publishable-Key: {{serverPk}}
+X-Signature-Timestamp: {{ts}}
+X-Signature: {{hmac ts}}.{{hmac body}}
+Idempotency-Key: {{idem}}
+
+{
+  "clickId": "{{clickId}}",
+  "orderId": "ord_987",
+  "amount": { "value": 49.0, "currency": "USD" },
+  "firstPurchase": true,
+  "properties": { "source": "stripe" },
+  "timestamp": "{{now}}",
+  "messageId": "{{idem}}"
+}

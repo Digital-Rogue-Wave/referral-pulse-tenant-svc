@@ -1,0 +1,152 @@
+name: CI/CD - Build & Deploy (Helm → EKS, Docker Hub)
+
+on:
+  push:
+    branches: [ main, develop ]
+  workflow_dispatch: {}
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  id-token: write
+  contents: read
+  packages: read
+
+env:
+  AWS_REGION: ${{ vars.AWS_REGION }}                    # e.g. eu-west-1
+  EKS_CLUSTER_NAME: ${{ vars.EKS_CLUSTER_NAME }}        # e.g. referral-eks
+  DOCKERFILE_PATH: ${{ vars.DOCKERFILE_PATH || 'Dockerfile' }}
+  DOCKERHUB_NAMESPACE: ${{ vars.DOCKERHUB_NAMESPACE || secrets.DOCKERHUB_USERNAME }}
+  DOCKERHUB_REPO: ${{ vars.DOCKERHUB_REPO }}            # e.g. referral/pulse-svc
+  HELM_CHART_PATH: ${{ vars.HELM_CHART_PATH || 'charts/referral-svc' }}
+  K8S_RELEASE: ${{ vars.K8S_RELEASE || 'pulse-svc' }}    # Helm release name
+  K8S_IMAGE_PULL_SECRET: ${{ vars.K8S_IMAGE_PULL_SECRET || 'dockerhub-cred' }}
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    environment: ${{ github.ref_name == 'main' && 'production' || 'staging' }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Select environment (namespace, role, OTEL env)
+        shell: bash
+        run: |
+          if [ "${GITHUB_REF_NAME}" = "main" ]; then
+            echo "NAMESPACE=prod" >> "$GITHUB_ENV"
+            echo "ENVIRONMENT=production" >> "$GITHUB_ENV"
+            echo "AWS_ROLE_TO_ASSUME=${{ vars.AWS_ROLE_ARN_PROD }}" >> "$GITHUB_ENV"
+          else
+            echo "NAMESPACE=staging" >> "$GITHUB_ENV"
+            echo "ENVIRONMENT=staging" >> "$GITHUB_ENV"
+            echo "AWS_ROLE_TO_ASSUME=${{ vars.AWS_ROLE_ARN_STAGING }}" >> "$GITHUB_ENV"
+          fi
+
+      - name: Configure AWS credentials (OIDC)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ env.AWS_ROLE_TO_ASSUME }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Install kubectl
+        uses: azure/setup-kubectl@v4
+        with:
+          version: latest
+
+      - name: Install Helm
+        uses: azure/setup-helm@v4
+        with:
+          version: latest
+
+      - name: Login to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Setup Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Compute image tags
+        shell: bash
+        run: |
+          IMAGE="docker.io/${DOCKERHUB_NAMESPACE}/${DOCKERHUB_REPO}"
+          echo "IMAGE=${IMAGE}" >> "$GITHUB_ENV"
+          echo "SHA_TAG=${IMAGE}:${GITHUB_SHA}" >> "$GITHUB_ENV"
+          echo "TRACK_TAG=${IMAGE}:${NAMESPACE}-latest" >> "$GITHUB_ENV"
+
+      - name: Build & Push image to Docker Hub
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ${{ env.DOCKERFILE_PATH }}
+          push: true
+          tags: |
+            ${{ env.SHA_TAG }}
+            ${{ env.TRACK_TAG }}
+          cache-from: type=registry,ref=${{ env.IMAGE }}:buildcache
+          cache-to: type=registry,ref=${{ env.IMAGE }}:buildcache,mode=max
+          provenance: false
+
+      - name: Update kubeconfig
+        shell: bash
+        run: |
+          aws eks update-kubeconfig --name "${EKS_CLUSTER_NAME}" --region "${AWS_REGION}"
+
+      - name: Ensure namespace exists
+        shell: bash
+        run: |
+          kubectl get ns "${NAMESPACE}" >/dev/null 2>&1 || kubectl create ns "${NAMESPACE}"
+
+      - name: (Optional) Create/Update Docker Hub imagePullSecret
+        if: ${{ secrets.DOCKERHUB_USERNAME && secrets.DOCKERHUB_TOKEN }}
+        shell: bash
+        run: |
+          kubectl -n "${NAMESPACE}" create secret docker-registry "${K8S_IMAGE_PULL_SECRET}" \
+            --docker-server="https://index.docker.io/v1/" \
+            --docker-username="${{ secrets.DOCKERHUB_USERNAME }}" \
+            --docker-password="${{ secrets.DOCKERHUB_TOKEN }}" \
+            --dry-run=client -o yaml | kubectl apply -f -
+
+      - name: Determine env-specific values file (optional)
+        id: valuesfile
+        shell: bash
+        run: |
+          FILE="${HELM_CHART_PATH}/values-${NAMESPACE}.yaml"
+          if [ -f "${FILE}" ]; then
+            echo "EXTRA_VALUES=-f ${FILE}" >> "$GITHUB_ENV"
+          else
+            echo "EXTRA_VALUES=" >> "$GITHUB_ENV"
+          fi
+
+      - name: Helm upgrade (atomic)
+        shell: bash
+        run: |
+          # If your chart uses .Values.serviceAccount.imagePullSecrets, pass it here when private images are used:
+          EXTRA_SET=""
+          if kubectl -n "${NAMESPACE}" get secret "${K8S_IMAGE_PULL_SECRET}" >/dev/null 2>&1; then
+            EXTRA_SET="${EXTRA_SET} --set serviceAccount.imagePullSecrets[0].name=${K8S_IMAGE_PULL_SECRET}"
+          fi
+
+          helm upgrade --install "${K8S_RELEASE}" "${HELM_CHART_PATH}" \
+            --namespace "${NAMESPACE}" --create-namespace \
+            --set image.repository="${IMAGE}" \
+            --set image.tag="${GITHUB_SHA}" \
+            --set envVars.OTEL_ENVIRONMENT="${ENVIRONMENT}" \
+            ${EXTRA_SET} \
+            $EXTRA_VALUES \
+            --atomic --wait --timeout 5m
+
+      - name: Annotate Deployment
+        if: always()
+        shell: bash
+        run: |
+          kubectl -n "${NAMESPACE}" annotate --overwrite deployment/${K8S_RELEASE} \
+            "app.git.sha=${GITHUB_SHA}" \
+            "app.git.branch=${GITHUB_REF_NAME}" \
+            "app.deploy.actor=${GITHUB_ACTOR}" \
+            "app.image=${SHA_TAG}"

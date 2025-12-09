@@ -1,0 +1,119 @@
+{{- if .Values.networkPolicy.enabled }}
+# Default: allow NO ingress unless explicitly allowed below
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ include "referral-svc.fullname" . }}-deny-all-ingress
+  labels:
+    {{- include "referral-svc.labels" . | nindent 4 }}
+spec:
+  podSelector:
+    matchLabels:
+      {{- include "referral-svc.selectorLabels" . | nindent 6 }}
+  policyTypes: ["Ingress"]
+
+---
+# Allow ingress ONLY from the Ingress Controller pods (ALB target)
+{{- if .Values.networkPolicy.allowFromIngressController.enabled }}
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ include "referral-svc.fullname" . }}-allow-ingress-from-controller
+  labels:
+    {{- include "referral-svc.labels" . | nindent 4 }}
+spec:
+  podSelector:
+    matchLabels:
+      {{- include "referral-svc.selectorLabels" . | nindent 6 }}
+  policyTypes: ["Ingress"]
+  ingress:
+    - from:
+        - namespaceSelector:
+            {{- toYaml .Values.networkPolicy.allowFromIngressController.namespaceSelector | nindent 12 }}
+          {{- if .Values.networkPolicy.allowFromIngressController.podSelector }}
+          podSelector:
+            {{- toYaml .Values.networkPolicy.allowFromIngressController.podSelector | nindent 12 }}
+          {{- end }}
+      ports:
+        - protocol: TCP
+          port: {{ .Values.service.port }}
+{{- end }}
+
+---
+# Allow Prometheus scrape to /metrics
+{{- if .Values.networkPolicy.allowFromPrometheus.enabled }}
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ include "referral-svc.fullname" . }}-allow-prom-scrape
+  labels:
+    {{- include "referral-svc.labels" . | nindent 4 }}
+spec:
+  podSelector:
+    matchLabels:
+      {{- include "referral-svc.selectorLabels" . | nindent 6 }}
+  policyTypes: ["Ingress"]
+  ingress:
+    - from:
+        - namespaceSelector:
+            {{- toYaml .Values.networkPolicy.allowFromPrometheus.namespaceSelector | nindent 12 }}
+          {{- if .Values.networkPolicy.allowFromPrometheus.podSelector }}
+          podSelector:
+            {{- toYaml .Values.networkPolicy.allowFromPrometheus.podSelector | nindent 12 }}
+          {{- end }}
+      ports:
+        - protocol: TCP
+          port: {{ .Values.service.metricsPort }}
+{{- end }}
+
+---
+# Egress controls
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ include "referral-svc.fullname" . }}-egress
+  labels:
+    {{- include "referral-svc.labels" . | nindent 4 }}
+spec:
+  podSelector:
+    matchLabels:
+      {{- include "referral-svc.selectorLabels" . | nindent 6 }}
+  policyTypes: ["Egress"]
+  egress:
+    {{- if .Values.networkPolicy.egress.allowDns }}
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: {{ .Values.networkPolicy.egress.kubeDnsNamespace | quote }}
+          podSelector:
+            matchLabels:
+              {{- toYaml .Values.networkPolicy.egress.kubeDnsSelector | nindent 14 }}
+      ports:
+        - protocol: UDP
+          port: 53
+        - protocol: TCP
+          port: 53
+    {{- end }}
+    {{- if .Values.networkPolicy.egress.allowOtel }}
+    - to:
+        - namespaceSelector:
+            {{- toYaml .Values.networkPolicy.egress.otelNamespaceSelector | nindent 12 }}
+          podSelector:
+            {{- toYaml .Values.networkPolicy.egress.otelPodSelector | nindent 12 }}
+      ports:
+        - protocol: TCP
+          port: 4318
+        - protocol: TCP
+          port: 4317
+    {{- end }}
+    {{- if .Values.networkPolicy.egress.allowInternet }}
+    - to:
+        - ipBlock:
+            cidr: 0.0.0.0/0
+      ports:
+        - protocol: TCP
+          port: 443
+        - protocol: TCP
+          port: 80
+    {{- end }}
+{{- end }}

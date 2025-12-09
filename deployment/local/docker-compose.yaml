@@ -1,0 +1,75 @@
+services:
+  # -----------------------------
+  # Redis (standalone for local)
+  # -----------------------------
+  redis:
+    image: redis:7-alpine
+    container_name: rp-redis
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  # -----------------------------
+  # Postgres
+  # -----------------------------
+  postgres:
+    image: postgres:16-alpine
+    container_name: rp-postgres
+    environment:
+      POSTGRES_DB: referral-db   # pick ONE name and reuse it everywhere
+      POSTGRES_USER: root
+      POSTGRES_PASSWORD: root
+    ports: [ "5432:5432" ]
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: [ "CMD-SHELL", "pg_isready -U root -d referral-db" ]
+      interval: 5s
+      timeout: 3s
+      retries: 30
+
+  # -----------------------------
+  # ClickHouse
+  # -----------------------------
+  clickhouse:
+    image: clickhouse/clickhouse-server:23
+    container_name: rp-clickhouse
+    ports:
+      - "8123:8123"   # HTTP
+      - "9000:9000"   # Native (optional)
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:8123/ping | grep -q 'Ok'"]
+      interval: 5s
+      timeout: 3s
+      retries: 40
+
+  # -----------------------------
+  # LocalStack (S3, SQS, SNS)
+  # -----------------------------
+  localstack:
+    image: localstack/localstack:3
+    container_name: rp-localstack
+    environment:
+      SERVICES: s3,sqs,sns
+      AWS_DEFAULT_REGION: us-east-1
+      LS_LOG: warn
+      DOCKER_HOST: unix:///var/run/docker.sock
+    ports:
+      - "4566:4566"   # edge port
+    volumes:
+      - "/var/run/docker.sock:/var/run/docker.sock"
+      - ./docker/localstack-init:/etc/localstack/init/ready.d
+    healthcheck:
+      test: ["CMD-SHELL", "awslocal sqs list-queues >/dev/null 2>&1 || exit 1"]
+      interval: 7s
+      timeout: 5s
+      retries: 30
+    depends_on:
+      - redis
+
+volumes:
+  pgdata:

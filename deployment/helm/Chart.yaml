@@ -1,0 +1,6 @@
+apiVersion: v2
+name: referral-svc
+description: Referral Pulse microservice Helm chart (NestJS + Prometheus + OTEL)
+type: application
+version: 0.2.0
+appVersion: "0.0.0"
