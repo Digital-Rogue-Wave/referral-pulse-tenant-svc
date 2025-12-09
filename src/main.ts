@@ -35,15 +35,13 @@ async function bootstrap() {
 
     app.enableShutdownHooks();
     app.setGlobalPrefix(configService.getOrThrow('app.apiPrefix', { infer: true }), {
-        exclude: ['/']
+        exclude: ['/', '/live', '/ready', '/startup']
     });
     app.enableVersioning({
         type: VersioningType.URI
     });
     app.useGlobalPipes(new ValidationPipe(validationOptions));
-    app.useGlobalInterceptors(
-        new ClassSerializerInterceptor(app.get(Reflector)),
-    );
+    app.useGlobalInterceptors(new ClassSerializerInterceptor(app.get(Reflector)));
 
     const options = new DocumentBuilder()
         .setTitle('Referral Pulse Campaign API')
@@ -58,7 +56,7 @@ async function bootstrap() {
 
     const document = SwaggerModule.createDocument(app, options);
     app.use(
-        '/campaign-docs',
+        '/tenant-docs',
         apiReference({
             spec: {
                 content: document

@@ -1,10 +1,7 @@
 import { Global, Module, OnApplicationBootstrap } from '@nestjs/common';
 import { InjectDataSource } from '@nestjs/typeorm';
 import { DataSource } from 'typeorm';
-import {
-    initializeTransactionalContext,
-    addTransactionalDataSource,
-} from 'typeorm-transactional';
+import { initializeTransactionalContext, addTransactionalDataSource } from 'typeorm-transactional';
 
 let transactionalRegistered = false;
 
@@ -22,8 +19,7 @@ export class TransactionalOrmModule implements OnApplicationBootstrap {
         try {
             addTransactionalDataSource(this.dataSource); // registers the Nest-managed DataSource ("default")
         } catch (error) {
-            const isDuplicate =
-                error instanceof Error && /DataSource with name ".*" has already added/i.test(error.message);
+            const isDuplicate = error instanceof Error && /DataSource with name ".*" has already added/i.test(error.message);
             if (!isDuplicate) throw error;
         }
 

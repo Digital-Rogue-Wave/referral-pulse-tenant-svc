@@ -11,24 +11,21 @@ import { HttpClientsModule } from '@mod/common/http/http-clients.module';
 
 @Global()
 @Module({
-    imports: [
-        PassportModule.register({ defaultStrategy: 'jwt' }),
-        ConfigModule.forFeature(oryConfig),
-        HttpClientsModule.register(),
-    ],
+    imports: [PassportModule.register({ defaultStrategy: 'jwt' }), ConfigModule.forFeature(oryConfig), HttpClientsModule.register()],
     providers: [
         JwtStrategy,
         KetoService,
+        KetoGuard,
         // Guards (order matters: JWT first, then Keto)
         {
             provide: APP_GUARD,
-            useClass: JwtAuthGuard,
+            useClass: JwtAuthGuard
         },
         {
             provide: APP_GUARD,
-            useClass: KetoGuard,
-        },
+            useExisting: KetoGuard
+        }
     ],
-    exports: [PassportModule, KetoService],
+    exports: [PassportModule, KetoService]
 })
 export class AuthModule {}

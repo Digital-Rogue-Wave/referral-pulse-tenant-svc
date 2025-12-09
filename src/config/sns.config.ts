@@ -9,26 +9,37 @@ export type TopicDef = {
 };
 
 class SnsEnvValidator {
-    @IsString() @IsOptional()
+    @IsString()
+    @IsOptional()
     SNS_CAMPAIGN_EVENTS_TOPIC_ARN?: string;
 
-    @IsString() @IsOptional()
+    @IsString()
+    @IsOptional()
     SNS_REWARD_EVENTS_TOPIC_ARN?: string;
 
-    @IsString() @IsOptional()
+    @IsString()
+    @IsOptional()
     SNS_ANALYTICS_EVENTS_TOPIC_ARN?: string;
 
-    @IsString() @IsOptional()
+    @IsString()
+    @IsOptional()
     SNS_CONTENT_EVENTS_TOPIC_ARN?: string;
 
-    @IsString() @IsOptional()
+    @IsString()
+    @IsOptional()
     SNS_WORKFLOW_EVENTS_TOPIC_ARN?: string;
 
-    @IsString() @IsOptional()
+    @IsString()
+    @IsOptional()
     SNS_SDK_CONFIG_EVENTS_TOPIC_ARN?: string;
 
-    @IsString() @IsOptional()
+    @IsString()
+    @IsOptional()
     SNS_CLIENT_IDENTITY_EVENTS_TOPIC_ARN?: string;
+
+    @IsString()
+    @IsOptional()
+    SNS_TENANT_EVENTS_TOPIC_ARN?: string;
 }
 
 export default registerAs('snsConfig', () => {
@@ -39,38 +50,43 @@ export default registerAs('snsConfig', () => {
             {
                 name: 'campaign-events',
                 topicArn: process.env.SNS_CAMPAIGN_EVENTS_TOPIC_ARN || '',
-                fifo: true,
+                fifo: true
             },
             {
                 name: 'reward-events',
                 topicArn: process.env.SNS_REWARD_EVENTS_TOPIC_ARN || '',
-                fifo: true,
+                fifo: true
             },
             {
                 name: 'analytics-events',
                 topicArn: process.env.SNS_ANALYTICS_EVENTS_TOPIC_ARN || '',
-                fifo: true,
+                fifo: true
             },
             {
                 name: 'content-events',
                 topicArn: process.env.SNS_CONTENT_EVENTS_TOPIC_ARN || '',
-                fifo: true,
+                fifo: true
             },
             {
                 name: 'workflow-events',
                 topicArn: process.env.SNS_WORKFLOW_EVENTS_TOPIC_ARN || '',
-                fifo: true,
+                fifo: true
             },
             {
                 name: 'sdk-config-events',
                 topicArn: process.env.SNS_SDK_CONFIG_EVENTS_TOPIC_ARN || '',
-                fifo: true,
+                fifo: true
             },
             {
                 name: 'client-identity-events',
                 topicArn: process.env.SNS_CLIENT_IDENTITY_EVENTS_TOPIC_ARN || '',
-                fifo: true,
+                fifo: true
             },
-        ],
+            {
+                name: 'tenant-events',
+                topicArn: process.env.SNS_TENANT_EVENTS_TOPIC_ARN || '',
+                fifo: true
+            }
+        ]
     };
 });

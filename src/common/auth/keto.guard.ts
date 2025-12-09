@@ -1,10 +1,4 @@
-import {
-    Injectable,
-    CanActivate,
-    ExecutionContext,
-    ForbiddenException,
-    SetMetadata
-} from '@nestjs/common';
+import { Injectable, CanActivate, ExecutionContext, ForbiddenException, SetMetadata, Inject, Logger } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
 import { Request } from 'express';
 import { ClsService } from 'nestjs-cls';
@@ -12,22 +6,25 @@ import { KetoService } from './keto.service';
 import { JwtPayload, KetoPermission } from '@mod/types/app.interface';
 
 export const KETO_PERMISSION_KEY = 'ketoPermission';
-export const RequirePermission = (permission: KetoPermission) =>
-    SetMetadata(KETO_PERMISSION_KEY, permission);
+export const RequirePermission = (permission: KetoPermission) => SetMetadata(KETO_PERMISSION_KEY, permission);
 
 @Injectable()
 export class KetoGuard implements CanActivate {
+    private readonly logger = new Logger(KetoGuard.name);
+
     constructor(
-        private readonly reflector: Reflector,
+        @Inject(Reflector) private readonly reflector: Reflector,
         private readonly keto: KetoService,
-        private readonly cls: ClsService,
-    ) {}
+        private readonly cls: ClsService
+    ) {
+        this.logger.log('KetoGuard initialized');
+        this.logger.log(`Reflector: ${!!this.reflector}`);
+        this.logger.log(`KetoService: ${!!this.keto}`);
+        this.logger.log(`ClsService: ${!!this.cls}`);
+    }
 
     async canActivate(context: ExecutionContext): Promise<boolean> {
-        const permission = this.reflector.getAllAndOverride<KetoPermission>(
-            KETO_PERMISSION_KEY,
-            [context.getHandler(), context.getClass()],
-        );
+        const permission = this.reflector.getAllAndOverride<KetoPermission>(KETO_PERMISSION_KEY, [context.getHandler(), context.getClass()]);
 
         if (!permission) {
             return true;
@@ -61,19 +58,12 @@ export class KetoGuard implements CanActivate {
         }
 
         // Use sub for users, client_id for services
-        const subjectId = isServiceToken ? (user.client_id || user.sub) : user.sub;
+        const subjectId = isServiceToken ? user.client_id || user.sub : user.sub;
 
-        const allowed = await this.keto.check(
-            permission.namespace,
-            object,
-            permission.relation,
-            subjectId,
-        );
+        const allowed = await this.keto.check(permission.namespace, object, permission.relation, subjectId);
 
         if (!allowed) {
-            throw new ForbiddenException(
-                `Missing permission: ${permission.namespace}:${object}#${permission.relation}`
-            );
+            throw new ForbiddenException(`Missing permission: ${permission.namespace}:${object}#${permission.relation}`);
         }
 
         return true;

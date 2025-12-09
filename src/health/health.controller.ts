@@ -3,23 +3,25 @@ import { HealthCheck, HealthCheckService, TypeOrmHealthIndicator } from '@nestjs
 import { ConfigService } from '@nestjs/config';
 import { DataSource } from 'typeorm';
 import { RedisHealthIndicator } from '@mod/health/redis.health';
+import { Public } from '@mod/common/auth/jwt-auth.guard';
 
-@Controller()
+@Controller({ path: 'health', version: '1' })
+@Public()
 export class HealthController {
     constructor(
         private readonly health: HealthCheckService,
         private readonly configService: ConfigService,
         private readonly db: TypeOrmHealthIndicator,
         private readonly dataSource: DataSource,
-        private readonly redis: RedisHealthIndicator,
+        private readonly redis: RedisHealthIndicator
     ) {}
 
-    @Get('/live')
+    @Get('live')
     live() {
         return { status: 'ok' };
     }
 
-    @Get('/startup')
+    @Get('startup')
     startup() {
         return { status: 'ok' };
     }

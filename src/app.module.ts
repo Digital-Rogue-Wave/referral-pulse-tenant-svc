@@ -1,10 +1,8 @@
 // NestJs built-in imports
 import { MiddlewareConsumer, Module, NestModule, RequestMethod } from '@nestjs/common';
-import { ConfigModule, ConfigService } from '@nestjs/config';
+import { ConfigModule } from '@nestjs/config';
 // typeorm related imports
 import { TypeOrmModule } from '@nestjs/typeorm';
-import { DataSource, DataSourceOptions } from 'typeorm';
-import { addTransactionalDataSource } from 'typeorm-transactional';
 import { TypeOrmConfigService } from './database/typeorm-config.service';
 import { HealthModule } from '@mod/health/health.module';
 
@@ -31,7 +29,7 @@ import { IdempotencyModule } from '@mod/common/idempotency/idempotency.module';
 import { RequestIdMiddleware } from '@mod/common/middleware/request-id.middleware';
 import { HttpLoggingInterceptor } from '@mod/common/logger/http-logging.interceptor';
 import { RpcLoggingInterceptor } from '@mod/common/logger/rpc-logging.interceptor';
-
+import { WebhookModule } from './webhook/webhook.module';
 
 @Module({
     imports: [
@@ -46,20 +44,19 @@ import { RpcLoggingInterceptor } from '@mod/common/logger/rpc-logging.intercepto
         TransactionalOrmModule,
         CommonModule,
         TerminusModule,
-        HealthModule
+        HealthModule,
+        WebhookModule
     ],
     providers: [
         // Order matters: enrich spans, then record metrics
         { provide: APP_INTERCEPTOR, useClass: TracingEnrichmentInterceptor },
         { provide: APP_INTERCEPTOR, useClass: HttpMetricsInterceptor },
         { provide: APP_INTERCEPTOR, useClass: HttpLoggingInterceptor }, // KEEP
-        { provide: APP_INTERCEPTOR, useClass: RpcLoggingInterceptor },
-    ],
+        { provide: APP_INTERCEPTOR, useClass: RpcLoggingInterceptor }
+    ]
 })
 export class AppModule implements NestModule {
     configure(consumer: MiddlewareConsumer) {
-        consumer
-            .apply(RequestIdMiddleware)
-            .forRoutes({ path: '*', method: RequestMethod.ALL });
+        consumer.apply(RequestIdMiddleware).forRoutes({ path: '*', method: RequestMethod.ALL });
     }
 }

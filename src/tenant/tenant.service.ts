@@ -1,76 +1,88 @@
-import { Injectable } from '@nestjs/common';
-import { ClsService } from 'nestjs-cls';
-import { KetoService } from '@mod/common/auth/keto.service';
-import { TenantAwareRepository } from '@mod/common/tenant/tenant-aware.repository';
-import { Campaign } from '@mod/tenant/tenant.entity';
-import { SqsManager } from '@mod/common/aws-sqs/sqs.manager';
-import { CampaignEvents } from '@domains/commons/domain.event';
+import { Injectable, ConflictException } from '@nestjs/common';
+import { InjectRepository } from '@nestjs/typeorm';
+import slugify from 'slugify';
+import { DeleteResult, Repository } from 'typeorm';
+import { TenantEntity } from './tenant.entity';
+import { CreateTenantDto } from './dto/create-tenant.dto';
+import { UpdateTenantDto } from './dto/update-tenant.dto';
+import { SnsPublisher } from '@mod/common/aws-sqs/sns.publisher';
+import { NullableType } from '@mod/types/nullable.type';
 
 @Injectable()
-export class CampaignService {
+export class TenantService {
     constructor(
-        private readonly campaignRepo: TenantAwareRepository<Campaign>,
-        private readonly keto: KetoService,
-        private readonly cls: ClsService,
-        private readonly sqs: SqsManager
+        @InjectRepository(TenantEntity)
+        private readonly tenantRepository: Repository<TenantEntity>,
+        private readonly sns: SnsPublisher
     ) {}
 
-    async create(dto: {}) {
-        const userId = this.cls.get('userId') as string;
+    async create(createTenantDto: CreateTenantDto): Promise<TenantEntity> {
+        const { name, slug } = createTenantDto;
 
-        // Create campaign
-        const campaign = this.campaignRepo.create(dto);
-        await this.campaignRepo.save(campaign);
+        let tenantSlug = slug;
+        if (!tenantSlug) {
+            tenantSlug = slugify(name, { lower: true, strict: true });
+        }
 
-        // Grant creator full permissions in Keto
-        await Promise.all([
-            this.keto.createTuple({
-                namespace: 'campaigns',
-                object: campaign.id!,
-                relation: 'owner',
-                subject_id: userId
-            }),
-            this.keto.createTuple({
-                namespace: 'campaigns',
-                object: campaign.id!,
-                relation: 'editor',
-                subject_id: userId
-            })
-        ]);
+        const existing = await this.tenantRepository.findOne({ where: { slug: tenantSlug } });
+        if (existing) {
+            throw new ConflictException('Tenant with this slug already exists');
+        }
 
-        return campaign;
-    }
+        const tenant = this.tenantRepository.create({
+            ...createTenantDto,
+            slug: tenantSlug,
+            settings: this.getDefaultSettings()
+        });
+        const savedTenant = await this.tenantRepository.save(tenant);
 
-    async delete(id: string) {
-        const campaign = await this.campaignRepo.findOneOrFailTenantContext({ id });
-
-        // Delete from DB
-        await this.campaignRepo.deleteTenantContext({ id });
-
-        // Clean up Keto permissions
-        // (In production, use Keto's cascade delete or background job)
-
-        return { deleted: true };
-    }
-
-    async createCampaign(dto: { userId: string }) {
-        const campaign = await this.campaignRepo.create();
-
-        // RequestId from HTTP request automatically propagated
-        await this.sqs.sendEvent<CampaignEvents.Created>(
-            'campaign.created',
+        await this.sns.publish(
             {
-                campaignId: campaign.id!,
-                name: campaign.name!,
-                type: campaign.type!,
-                createdBy: dto.userId
+                eventId: savedTenant.id,
+                eventType: 'tenant.created',
+                data: {
+                    ...savedTenant,
+                    ownerId: createTenantDto.ownerId
+                } as unknown as any,
+                timestamp: new Date().toISOString()
             },
             {
-                producer: 'campaign-events',
-                groupId: `campaign-${campaign.id}`
+                topic: 'tenant-events',
+                groupId: savedTenant.id,
+                deduplicationId: savedTenant.id
             }
         );
 
-        return campaign;
+        return savedTenant;
+    }
+
+    async findAll(): Promise<TenantEntity[]> {
+        return await this.tenantRepository.find();
+    }
+
+    async findOne(id: string): Promise<NullableType<TenantEntity>> {
+        return this.tenantRepository.findOne({ where: { id } });
+    }
+
+    async findOneOrFail(id: string): Promise<TenantEntity> {
+        return this.tenantRepository.findOneOrFail({ where: { id } });
+    }
+
+    async update(id: string, updateTenantDto: UpdateTenantDto): Promise<TenantEntity> {
+        await this.tenantRepository.update(id, updateTenantDto);
+        return this.findOneOrFail(id);
+    }
+
+    async remove(id: string): Promise<DeleteResult> {
+        return await this.tenantRepository.delete(id);
+    }
+
+    private getDefaultSettings() {
+        return {
+            theme: 'light',
+            notifications: {
+                email: true
+            }
+        };
     }
 }
