@@ -15,8 +15,8 @@ export interface SendEventOptions {
     producer: string;
     groupId?: string;
     delaySeconds?: number;
-    correlationId?: string;  // ADD: For replies
-    replyTo?: string;        // ADD: Queue to send reply to
+    correlationId?: string; // ADD: For replies
+    replyTo?: string; // ADD: Queue to send reply to
 }
 
 @Injectable()
@@ -29,7 +29,7 @@ export class SqsManager {
         private readonly eventIdempotency: EventIdempotencyService,
         private readonly configService: ConfigService,
         private readonly cls: ClsService,
-        @Optional() @Inject(TenantContext) private readonly tenant?: TenantContext,
+        @Optional() @Inject(TenantContext) private readonly tenant?: TenantContext
     ) {
         const cfg = this.configService.getOrThrow<ConfigType<typeof sqsConfig>>('sqsConfig', { infer: true });
         this.producers = cfg.producers as ReadonlyArray<ProducerDef>;
@@ -57,11 +57,7 @@ export class SqsManager {
         return Boolean(def.fifo) || def.queueUrl.endsWith('.fifo');
     }
 
-    private buildEventEnvelope<T>(
-        eventType: string,
-        payload: T,
-        causationId?: string,
-    ): EventEnvelope<T> {
+    private buildEventEnvelope<T>(eventType: string, payload: T, causationId?: string): EventEnvelope<T> {
         const eventId = randomUUID();
 
         const metadata: EventMetadata = {
@@ -72,17 +68,13 @@ export class SqsManager {
             requestId: this.getRequestId(),
             causationId,
             timestamp: new Date().toISOString(),
-            version: 'v1',
+            version: 'v1'
         };
 
         return { metadata, payload };
     }
 
-    async sendEvent<T>(
-        eventType: string,
-        payload: T,
-        options: SendEventOptions,
-    ): Promise<string> {
+    async sendEvent<T>(eventType: string, payload: T, options: SendEventOptions): Promise<string> {
         const def = this.findProducer(options.producer);
         const envelope = this.buildEventEnvelope(eventType, payload);
         const eventId = envelope.metadata.eventId;
@@ -91,16 +83,14 @@ export class SqsManager {
 
         // Check if already sent
         if (await this.eventIdempotency.wasSent(eventId, def.name)) {
-            this.logger.warn(
-                `SQS event already sent - eventId: ${eventId}, eventType: ${eventType}, producer: ${def.name}, tenantId: ${tenantId}`,
-            );
+            this.logger.warn(`SQS event already sent - eventId: ${eventId}, eventType: ${eventType}, producer: ${def.name}, tenantId: ${tenantId}`);
             return eventId;
         }
 
         const messageAttributes: Record<string, MessageAttributeValue> = {
             eventType: { DataType: 'String', StringValue: eventType },
             eventId: { DataType: 'String', StringValue: eventId },
-            tenantId: { DataType: 'String', StringValue: tenantId },
+            tenantId: { DataType: 'String', StringValue: tenantId }
         };
 
         if (envelope.metadata.userId) {
@@ -120,7 +110,7 @@ export class SqsManager {
             const deduplicationId = eventId;
 
             this.logger.info(
-                `SQS publish event - queue: ${def.name}, eventType: ${eventType}, eventId: ${eventId}, requestId: ${requestId || 'none'}, fifo: true, groupId: ${groupId}, tenantId: ${tenantId}`,
+                `SQS publish event - queue: ${def.name}, eventType: ${eventType}, eventId: ${eventId}, requestId: ${requestId || 'none'}, fifo: true, groupId: ${groupId}, tenantId: ${tenantId}`
             );
 
             await this.sqs.send(def.name, {
@@ -129,18 +119,18 @@ export class SqsManager {
                 messageAttributes,
                 groupId,
                 deduplicationId,
-                delaySeconds: options.delaySeconds,
+                delaySeconds: options.delaySeconds
             });
         } else {
             this.logger.info(
-                `SQS publish event - queue: ${def.name}, eventType: ${eventType}, eventId: ${eventId}, requestId: ${requestId || 'none'}, fifo: false, tenantId: ${tenantId}`,
+                `SQS publish event - queue: ${def.name}, eventType: ${eventType}, eventId: ${eventId}, requestId: ${requestId || 'none'}, fifo: false, tenantId: ${tenantId}`
             );
 
             await this.sqs.send(def.name, {
                 id: eventId,
                 body,
                 messageAttributes,
-                delaySeconds: options.delaySeconds,
+                delaySeconds: options.delaySeconds
             });
         }
 
@@ -149,10 +139,7 @@ export class SqsManager {
         return eventId;
     }
 
-    async sendEventBatch<T>(
-        events: Array<{ eventType: string; payload: T; groupId?: string }>,
-        producer: string,
-    ): Promise<string[]> {
+    async sendEventBatch<T>(events: Array<{ eventType: string; payload: T; groupId?: string }>, producer: string): Promise<string[]> {
         if (events.length === 0) return [];
         if (events.length > 10) throw new Error('[SQS] sendEventBatch max 10 messages');
 
@@ -161,15 +148,13 @@ export class SqsManager {
         for (const event of events) {
             const eventId = await this.sendEvent(event.eventType, event.payload, {
                 producer,
-                groupId: event.groupId,
+                groupId: event.groupId
             });
             eventIds.push(eventId);
         }
 
         const tenantId = this.getTenantId();
-        this.logger.info(
-            `SQS publish event batch - producer: ${producer}, count: ${events.length}, tenantId: ${tenantId}`,
-        );
+        this.logger.info(`SQS publish event batch - producer: ${producer}, count: ${events.length}, tenantId: ${tenantId}`);
 
         return eventIds;
     }

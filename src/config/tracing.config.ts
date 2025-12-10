@@ -1,21 +1,21 @@
 import { registerAs } from '@nestjs/config';
 import validateConfig from '@mod/common/validators/validate-config';
 import type { MaybeType } from '@mod/types/maybe.type';
-import { IsEnum, IsInt, IsNumberString, IsOptional, IsString, IsUrl, Max, Min } from 'class-validator';
+import { IsEnum, IsNumberString, IsOptional, IsString, IsUrl } from 'class-validator';
 
 export enum OtelPropagator {
     W3C = 'w3c',
-    B3 = 'b3',
+    B3 = 'b3'
 }
 
 export type TracingConfig = {
     enabled: boolean;
     serviceName: string;
     environment: string;
-    otlpEndpoint: string;         // e.g. http://otel-collector:4318/v1/traces
+    otlpEndpoint: string; // e.g. http://otel-collector:4318/v1/traces
     otlpHeaders?: Record<string, string>;
-    samplerRatio: number;         // 0..1
-    propagator: OtelPropagator;   // w3c|b3
+    samplerRatio: number; // 0..1
+    propagator: OtelPropagator; // w3c|b3
 };
 
 class EnvValidator {
@@ -43,11 +43,11 @@ export default registerAs<TracingConfig>('tracingConfig', () => {
     validateConfig(process.env, EnvValidator);
     return {
         enabled: (process.env.OTEL_ENABLED ?? 'true') === 'true',
-        serviceName: process.env.OTEL_SERVICE_NAME ?? (process.env.APP_NAME ?? 'app'),
-        environment: process.env.OTEL_ENVIRONMENT ?? (process.env.NODE_ENV ?? 'development'),
+        serviceName: process.env.OTEL_SERVICE_NAME ?? process.env.APP_NAME ?? 'app',
+        environment: process.env.OTEL_ENVIRONMENT ?? process.env.NODE_ENV ?? 'development',
         otlpEndpoint: process.env.OTEL_EXPORTER_OTLP_TRACES_ENDPOINT ?? 'http://otel-collector:4318/v1/traces',
         otlpHeaders: parseHeaders(process.env.OTEL_EXPORTER_OTLP_HEADERS),
         samplerRatio: process.env.OTEL_SAMPLER_RATIO ? Number(process.env.OTEL_SAMPLER_RATIO) : 1,
-        propagator: (process.env.OTEL_PROPAGATOR as OtelPropagator) ?? OtelPropagator.W3C,
+        propagator: (process.env.OTEL_PROPAGATOR as OtelPropagator) ?? OtelPropagator.W3C
     };
 });

@@ -13,7 +13,7 @@ export class DlqMonitorService {
     constructor(
         private readonly logger: AppLoggingService,
         private readonly metrics: MonitoringService,
-        private readonly config: ConfigService,
+        private readonly config: ConfigService
     ) {
         const awsRegion = this.config.getOrThrow<string>('awsConfig.region', { infer: true });
         this.sqsClient = new SQSClient({ region: awsRegion });
@@ -45,14 +45,10 @@ export class DlqMonitorService {
 
                 // Alert if DLQ has messages
                 if (depth > 0) {
-                    this.logger.warn(
-                        `DLQ has messages - queue: ${queueName}, dlqDepth: ${depth}, dlqUrl: ${dlqUrl}`,
-                    );
+                    this.logger.warn(`DLQ has messages - queue: ${queueName}, dlqDepth: ${depth}, dlqUrl: ${dlqUrl}`);
                 }
             } catch (error) {
-                this.logger.error(
-                    `Failed to check DLQ - queue: ${queueName}, error: ${(error as Error).message}`,
-                );
+                this.logger.error(`Failed to check DLQ - queue: ${queueName}, error: ${(error as Error).message}`);
             }
         }
 
@@ -65,7 +61,7 @@ export class DlqMonitorService {
     private async getDlqDepth(dlqUrl: string): Promise<number> {
         const command = new GetQueueAttributesCommand({
             QueueUrl: dlqUrl,
-            AttributeNames: ['ApproximateNumberOfMessages'],
+            AttributeNames: ['ApproximateNumberOfMessages']
         });
 
         const response = await this.sqsClient.send(command);

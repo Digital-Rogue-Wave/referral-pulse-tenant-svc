@@ -12,7 +12,7 @@ export function SqsLogged(queueName: string, batch: boolean) {
     return function (
         _target: unknown,
         _propertyKey: string | symbol,
-        descriptor: TypedPropertyDescriptor<(msg: Message | Message[]) => Promise<unknown> | unknown>,
+        descriptor: TypedPropertyDescriptor<(msg: Message | Message[]) => Promise<unknown> | unknown>
     ) {
         const original = descriptor.value!;
         descriptor.value = async function (this: HasLoggerAndCls, arg: Message | Message[]) {
@@ -33,13 +33,11 @@ export function SqsLogged(queueName: string, batch: boolean) {
                     logger?.info('sqs_consume', {
                         queue: queueName,
                         messageId: m.MessageId ?? 'n/a',
-                        receiveCount: m.Attributes?.ApproximateReceiveCount
-                            ? Number(m.Attributes.ApproximateReceiveCount)
-                            : undefined,
+                        receiveCount: m.Attributes?.ApproximateReceiveCount ? Number(m.Attributes.ApproximateReceiveCount) : undefined,
                         tenantId,
                         userId,
                         requestId,
-                        durationMs,
+                        durationMs
                     });
                 } else {
                     const batchMsgs = arg as Message[];
@@ -50,7 +48,7 @@ export function SqsLogged(queueName: string, batch: boolean) {
                         tenantId,
                         userId,
                         requestId,
-                        durationMs,
+                        durationMs
                     });
                 }
 
@@ -68,9 +66,9 @@ export function SqsLogged(queueName: string, batch: boolean) {
                             tenantId,
                             userId,
                             requestId,
-                            durationMs,
+                            durationMs
                         },
-                        caughtError,
+                        caughtError
                     );
                 } else {
                     logger?.fatal(
@@ -80,9 +78,9 @@ export function SqsLogged(queueName: string, batch: boolean) {
                             tenantId,
                             userId,
                             requestId,
-                            durationMs,
+                            durationMs
                         },
-                        caughtError,
+                        caughtError
                     );
                 }
 

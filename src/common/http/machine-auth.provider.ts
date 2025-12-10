@@ -14,7 +14,7 @@ export class MachineAuthProvider implements ServiceAuthProvider {
 
     constructor(
         private readonly http: HttpService,
-        private readonly cfg: ConfigService,
+        private readonly cfg: ConfigService
     ) {
         this.baseURL = this.cfg.getOrThrow<string>('cacheConfig.tokenBroker.baseURL', { infer: true });
         this.timeoutMs = this.cfg.getOrThrow<number>('cacheConfig.tokenBroker.timeoutMs', { infer: true });
@@ -26,7 +26,7 @@ export class MachineAuthProvider implements ServiceAuthProvider {
             max: maxEntries,
             maxSize: maxBytes,
             sizeCalculation: (token: string) => Buffer.byteLength(token, 'utf8'),
-            ttlAutopurge: true,
+            ttlAutopurge: true
         });
     }
 
@@ -34,7 +34,7 @@ export class MachineAuthProvider implements ServiceAuthProvider {
         const token = await this.getToken(audience, tenantId);
         return {
             authorization: `Bearer ${token}`,
-            ...(tenantId ? { 'x-tenant-id': tenantId } : {}),
+            ...(tenantId ? { 'x-tenant-id': tenantId } : {})
         };
     }
 
@@ -55,7 +55,7 @@ export class MachineAuthProvider implements ServiceAuthProvider {
         const { data } = await this.http.axiosRef.post<BrokerTokenResponse>(
             '/internal/oauth2/token',
             { audience, tenantId, grant_type: 'client_credentials' },
-            { baseURL: this.baseURL, timeout: this.timeoutMs },
+            { baseURL: this.baseURL, timeout: this.timeoutMs }
         );
 
         const token = data.access_token;

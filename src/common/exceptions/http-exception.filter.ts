@@ -114,9 +114,9 @@ export class HttpExceptionFilter implements ExceptionFilter {
                 description: request?.url,
                 path: request?.url,
                 class: exceptionType,
-                function: 'exception',
+                function: 'exception'
             },
-            exception,
+            exception
         );
     }
 }

@@ -11,18 +11,17 @@ import { SqsConfig } from '@mod/config/sqs.config';
 import { SnsConfig } from '@mod/config/sns.config';
 import { TracingConfig } from '@mod/config/tracing.config';
 
-
 export type AllConfigType = {
-    app: AppConfig;
-    database: DatabaseConfig;
-    ory: OryConfig;
-    redis: RedisConfig;
-    logger: LoggerConfig;
-    metrics: MetricsConfig;
-    tracing: TracingConfig;
-    httpclient: HttpClientConfig;
-    aws: AwsConfig;
-    s3: S3Config;
-    sqs: SqsConfig;
-    sns: SnsConfig;
+    appConfig: AppConfig;
+    databaseConfig: DatabaseConfig;
+    oryConfig: OryConfig;
+    redisConfig: RedisConfig;
+    loggerConfig: LoggerConfig;
+    metricsConfig: MetricsConfig;
+    tracingConfig: TracingConfig;
+    httpClientConfig: HttpClientConfig;
+    awsConfig: AwsConfig;
+    s3Config: S3Config;
+    sqsConfig: SqsConfig;
+    snsConfig: SnsConfig;
 };

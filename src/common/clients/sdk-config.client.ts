@@ -9,21 +9,15 @@ export class SdkConfigClient {
 
     constructor(
         private readonly http: HttpClient,
-        private readonly config: ConfigService,
+        private readonly config: ConfigService
     ) {
-        const services = this.config.getOrThrow<ConfigType<typeof servicesConfig>>(
-            'servicesConfig',
-            { infer: true }
-        );
+        const services = this.config.getOrThrow<ConfigType<typeof servicesConfig>>('servicesConfig', { infer: true });
 
         this.baseUrl = services.sdkConfig;
     }
 
     async getCampaign(req: { userId: string; campaignId: string }) {
-        const { data } = await this.http.post(
-            `${this.baseUrl}/internal/sdk-config/{campaignId}/`,
-            req
-        );
+        const { data } = await this.http.post(`${this.baseUrl}/internal/sdk-config/{campaignId}/`, req);
 
         return data;
     }

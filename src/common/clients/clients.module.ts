@@ -11,25 +11,8 @@ import { AnalyticsClient } from '@mod/common/clients/analytics.client';
 
 @Global()
 @Module({
-    imports: [
-        ConfigModule.forFeature(servicesConfig),
-        HttpClientsModule.register(),
-    ],
-    providers: [
-        WorkflowOrchestrationClient,
-        ContentAiClient,
-        RewardsClient,
-        CampaignsClient,
-        SdkConfigClient,
-        AnalyticsClient,
-    ],
-    exports: [
-        WorkflowOrchestrationClient,
-        ContentAiClient,
-        RewardsClient,
-        CampaignsClient,
-        SdkConfigClient,
-        AnalyticsClient,
-    ],
+    imports: [ConfigModule.forFeature(servicesConfig), HttpClientsModule.register()],
+    providers: [WorkflowOrchestrationClient, ContentAiClient, RewardsClient, CampaignsClient, SdkConfigClient, AnalyticsClient],
+    exports: [WorkflowOrchestrationClient, ContentAiClient, RewardsClient, CampaignsClient, SdkConfigClient, AnalyticsClient]
 })
 export class ClientsModule {}

@@ -27,8 +27,8 @@ export class HttpMetricsInterceptor implements NestInterceptor {
                     const end = process.hrtime.bigint();
                     const seconds = Number(end - start) / 1_000_000_000;
                     this.metrics.observeHttpServer(method, route, status, seconds);
-                },
-            }),
+                }
+            })
         );
     }
 }

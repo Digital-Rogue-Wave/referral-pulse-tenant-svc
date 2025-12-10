@@ -33,7 +33,7 @@ export class KetoService {
 
     constructor(
         private readonly http: HttpClient,
-        private readonly config: ConfigService,
+        private readonly config: ConfigService
     ) {
         const oryCfg = this.config.getOrThrow<ConfigType<typeof oryConfig>>('oryConfig', { infer: true });
         this.readUrl = oryCfg.keto.readUrl;
@@ -44,22 +44,14 @@ export class KetoService {
      * Check if subject has permission
      * Example: check('campaigns', 'campaign-123', 'view', 'user-456')
      */
-    async check(
-        namespace: string,
-        object: string,
-        relation: string,
-        subjectId: string,
-    ): Promise<boolean> {
+    async check(namespace: string, object: string, relation: string, subjectId: string): Promise<boolean> {
         try {
-            const { data } = await this.http.post<KetoCheckResponse>(
-                `${this.readUrl}/relation-tuples/check`,
-                {
-                    namespace,
-                    object,
-                    relation,
-                    subject_id: subjectId,
-                } as KetoCheckRequest,
-            );
+            const { data } = await this.http.post<KetoCheckResponse>(`${this.readUrl}/relation-tuples/check`, {
+                namespace,
+                object,
+                relation,
+                subject_id: subjectId
+            } as KetoCheckRequest);
 
             return data.allowed;
         } catch (error) {
@@ -74,18 +66,15 @@ export class KetoService {
     /**
      * Batch check multiple permissions
      */
-    async checkBatch(
-        checks: Array<{ namespace: string; object: string; relation: string }>,
-        subjectId: string,
-    ): Promise<Record<string, boolean>> {
+    async checkBatch(checks: Array<{ namespace: string; object: string; relation: string }>, subjectId: string): Promise<Record<string, boolean>> {
         const results = await Promise.all(
             checks.map(async ({ namespace, object, relation }) => {
                 const allowed = await this.check(namespace, object, relation, subjectId);
                 return { key: `${namespace}:${object}#${relation}`, allowed };
-            }),
+            })
         );
 
-        return Object.fromEntries(results.map(r => [r.key, r.allowed]));
+        return Object.fromEntries(results.map((r) => [r.key, r.allowed]));
     }
 
     /**
@@ -104,8 +93,8 @@ export class KetoService {
                 namespace: tuple.namespace,
                 object: tuple.object,
                 relation: tuple.relation,
-                'subject_id': tuple.subject_id,
-            },
+                subject_id: tuple.subject_id
+            }
         });
     }
 }

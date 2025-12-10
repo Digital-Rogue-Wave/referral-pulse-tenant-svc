@@ -1,9 +1,4 @@
-import {
-    Injectable,
-    NestInterceptor,
-    ExecutionContext,
-    CallHandler
-} from '@nestjs/common';
+import { Injectable, NestInterceptor, ExecutionContext, CallHandler } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
 import { Observable, of } from 'rxjs';
 import { tap } from 'rxjs/operators';
@@ -18,7 +13,7 @@ export class IdempotencyInterceptor implements NestInterceptor {
     constructor(
         private readonly redis: RedisService,
         private readonly keys: RedisKeyBuilder,
-        private readonly reflector: Reflector,
+        private readonly reflector: Reflector
     ) {}
 
     async intercept(context: ExecutionContext, next: CallHandler): Promise<Observable<any>> {
@@ -26,10 +21,7 @@ export class IdempotencyInterceptor implements NestInterceptor {
             return next.handle();
         }
 
-        const options = this.reflector.get<IdempotencyOptions>(
-            IDEMPOTENCY_KEY,
-            context.getHandler(),
-        );
+        const options = this.reflector.get<IdempotencyOptions>(IDEMPOTENCY_KEY, context.getHandler());
 
         if (!options) {
             return next.handle();
@@ -66,11 +58,11 @@ export class IdempotencyInterceptor implements NestInterceptor {
                 if (res.statusCode >= 200 && res.statusCode < 300) {
                     const toCache: CachedResponse = {
                         statusCode: res.statusCode,
-                        body: responseBody,
+                        body: responseBody
                     };
                     await this.redis.set(key, JSON.stringify(toCache), ttl);
                 }
-            }),
+            })
         );
     }
 }

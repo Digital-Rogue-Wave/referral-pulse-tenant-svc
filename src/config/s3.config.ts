@@ -1,12 +1,12 @@
 import { registerAs } from '@nestjs/config';
 import validateConfig from '@mod/common/validators/validate-config';
 import type { MaybeType } from '@mod/types/maybe.type';
-import { IsBooleanString, IsEnum, IsInt, IsNumberString, IsOptional, IsString, IsUrl, Max, Min } from 'class-validator';
+import { IsBooleanString, IsEnum, IsNumberString, IsOptional, IsString, IsUrl } from 'class-validator';
 
 export enum S3SseMode {
     None = 'none',
     AES256 = 'AES256',
-    Kms = 'aws:kms',
+    Kms = 'aws:kms'
 }
 
 export type S3Config = {
@@ -26,6 +26,13 @@ export type S3Config = {
 
     /** Presign defaults (seconds) */
     presignExpiresSeconds: number;
+
+    /** Maximum file size in bytes */
+    maxFileSize: number;
+
+    /** Optional AWS credentials for S3-compatible services */
+    accessKeyId?: string;
+    secretAccessKey?: string;
 };
 
 class S3EnvValidator {
@@ -59,6 +66,18 @@ class S3EnvValidator {
     @IsNumberString()
     @IsOptional()
     S3_PRESIGN_EXPIRES_SEC!: MaybeType<number>;
+
+    @IsNumberString()
+    @IsOptional()
+    S3_MAX_FILE_SIZE!: MaybeType<number>;
+
+    @IsString()
+    @IsOptional()
+    S3_ACCESS_KEY_ID!: MaybeType<string>;
+
+    @IsString()
+    @IsOptional()
+    S3_SECRET_ACCESS_KEY!: MaybeType<string>;
 }
 
 export default registerAs<S3Config>('s3Config', () => {
@@ -73,5 +92,8 @@ export default registerAs<S3Config>('s3Config', () => {
         sse: (process.env.S3_SSE as S3SseMode) ?? S3SseMode.None,
         kmsKeyId: process.env.S3_KMS_KEY_ID || undefined,
         presignExpiresSeconds: process.env.S3_PRESIGN_EXPIRES_SEC ? Number(process.env.S3_PRESIGN_EXPIRES_SEC) : 900,
+        maxFileSize: process.env.S3_MAX_FILE_SIZE ? Number(process.env.S3_MAX_FILE_SIZE) : 10485760, // 10MB default
+        accessKeyId: process.env.S3_ACCESS_KEY_ID || undefined,
+        secretAccessKey: process.env.S3_SECRET_ACCESS_KEY || undefined
     };
 });

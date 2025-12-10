@@ -1,3 +1,4 @@
+// eslint-disable-next-line @typescript-eslint/no-namespace
 export namespace CampaignEvents {
     export interface Created {
         campaignId: string;
@@ -23,6 +24,7 @@ export namespace CampaignEvents {
     }
 }
 
+// eslint-disable-next-line @typescript-eslint/no-namespace
 export namespace RewardEvents {
     export interface Granted {
         rewardId: string;
@@ -38,6 +40,7 @@ export namespace RewardEvents {
     }
 }
 
+// eslint-disable-next-line @typescript-eslint/no-namespace
 export namespace AnalyticsEvents {
     export interface MetricRecorded {
         metricName: string;
@@ -51,4 +54,3 @@ export namespace AnalyticsEvents {
         generatedAt: string;
     }
 }
-

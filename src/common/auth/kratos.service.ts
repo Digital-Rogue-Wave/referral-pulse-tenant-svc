@@ -10,16 +10,14 @@ export class KratosService {
 
     constructor(
         private readonly http: HttpClient,
-        private readonly config: ConfigService,
+        private readonly config: ConfigService
     ) {
         const oryCfg = this.config.getOrThrow<ConfigType<typeof oryConfig>>('oryConfig', { infer: true });
         this.adminUrl = oryCfg.kratos?.adminUrl || 'http://kratos:4434';
     }
 
     async getIdentity(identityId: string): Promise<KratosIdentity> {
-        const { data } = await this.http.get<KratosIdentity>(
-            `${this.adminUrl}/admin/identities/${identityId}`
-        );
+        const { data } = await this.http.get<KratosIdentity>(`${this.adminUrl}/admin/identities/${identityId}`);
         return data;
     }
 
@@ -31,10 +29,7 @@ export class KratosService {
             params['metadata_public.tenant_id'] = tenantId;
         }
 
-        const { data } = await this.http.get<KratosIdentity[]>(
-            `${this.adminUrl}/admin/identities`,
-            { params }
-        );
+        const { data } = await this.http.get<KratosIdentity[]>(`${this.adminUrl}/admin/identities`, { params });
 
         return data;
     }

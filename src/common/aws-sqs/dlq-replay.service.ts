@@ -1,12 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { ConfigService, ConfigType } from '@nestjs/config';
-import {
-    SQSClient,
-    ReceiveMessageCommand,
-    DeleteMessageCommand,
-    SendMessageCommand,
-    GetQueueAttributesCommand,
-} from '@aws-sdk/client-sqs';
+import { SQSClient, ReceiveMessageCommand, DeleteMessageCommand, SendMessageCommand, GetQueueAttributesCommand } from '@aws-sdk/client-sqs';
 import { AppLoggingService } from '@mod/common/logger/app-logging.service';
 import { MonitoringService } from '@mod/common/monitoring/monitoring.service';
 import sqsConfig from '@mod/config/sqs.config';
@@ -26,7 +20,7 @@ export class DlqReplayService {
     constructor(
         private readonly logger: AppLoggingService,
         private readonly metrics: MonitoringService,
-        private readonly config: ConfigService,
+        private readonly config: ConfigService
     ) {
         const awsRegion = this.config.getOrThrow<string>('awsConfig.region', { infer: true });
         this.sqsClient = new SQSClient({ region: awsRegion });
@@ -38,7 +32,7 @@ export class DlqReplayService {
             if (consumer.dlqUrl) {
                 this.dlqMap.set(consumer.name, {
                     dlqUrl: consumer.dlqUrl,
-                    mainQueueUrl: consumer.queueUrl,
+                    mainQueueUrl: consumer.queueUrl
                 });
             }
         }
@@ -55,7 +49,7 @@ export class DlqReplayService {
 
         const command = new GetQueueAttributesCommand({
             QueueUrl: queueInfo.dlqUrl,
-            AttributeNames: ['ApproximateNumberOfMessages'],
+            AttributeNames: ['ApproximateNumberOfMessages']
         });
 
         const response = await this.sqsClient.send(command);
@@ -67,10 +61,7 @@ export class DlqReplayService {
     /**
      * Replay messages from DLQ back to main queue
      */
-    async replayDlqMessages(
-        queueName: string,
-        maxMessages: number = 10,
-    ): Promise<ReplayResult> {
+    async replayDlqMessages(queueName: string, maxMessages: number = 10): Promise<ReplayResult> {
         const queueInfo = this.dlqMap.get(queueName);
         if (!queueInfo) {
             throw new Error(`No DLQ configured for queue: ${queueName}`);
@@ -80,12 +71,10 @@ export class DlqReplayService {
             totalProcessed: 0,
             successful: 0,
             failed: 0,
-            errors: [],
+            errors: []
         };
 
-        this.logger.info(
-            `Starting DLQ replay - queue: ${queueName}, maxMessages: ${maxMessages}, dlqUrl: ${queueInfo.dlqUrl}`,
-        );
+        this.logger.info(`Starting DLQ replay - queue: ${queueName}, maxMessages: ${maxMessages}, dlqUrl: ${queueInfo.dlqUrl}`);
 
         // Receive messages from DLQ
         const receiveCommand = new ReceiveMessageCommand({
@@ -93,7 +82,7 @@ export class DlqReplayService {
             MaxNumberOfMessages: Math.min(maxMessages, 10), // SQS max is 10
             WaitTimeSeconds: 0,
             MessageAttributeNames: ['All'],
-            AttributeNames: ['All'],
+            AttributeNames: ['All']
         });
 
         const receiveResponse = await this.sqsClient.send(receiveCommand);
@@ -113,7 +102,7 @@ export class DlqReplayService {
                 const sendCommand = new SendMessageCommand({
                     QueueUrl: queueInfo.mainQueueUrl,
                     MessageBody: message.Body,
-                    MessageAttributes: message.MessageAttributes,
+                    MessageAttributes: message.MessageAttributes
                 });
 
                 await this.sqsClient.send(sendCommand);
@@ -121,25 +110,23 @@ export class DlqReplayService {
                 // Delete from DLQ after successful replay
                 const deleteCommand = new DeleteMessageCommand({
                     QueueUrl: queueInfo.dlqUrl,
-                    ReceiptHandle: message.ReceiptHandle!,
+                    ReceiptHandle: message.ReceiptHandle!
                 });
 
                 await this.sqsClient.send(deleteCommand);
 
                 result.successful++;
 
-                this.logger.info(
-                    `Replayed DLQ message - queue: ${queueName}, messageId: ${message.MessageId}`,
-                );
+                this.logger.info(`Replayed DLQ message - queue: ${queueName}, messageId: ${message.MessageId}`);
             } catch (error) {
                 result.failed++;
                 result.errors.push({
                     messageId: message.MessageId || 'unknown',
-                    error: (error as Error).message,
+                    error: (error as Error).message
                 });
 
                 this.logger.error(
-                    `Failed to replay DLQ message - queue: ${queueName}, messageId: ${message.MessageId}, error: ${(error as Error).message}`,
+                    `Failed to replay DLQ message - queue: ${queueName}, messageId: ${message.MessageId}, error: ${(error as Error).message}`
                 );
             }
         }
@@ -147,18 +134,18 @@ export class DlqReplayService {
         // Record metrics
         this.metrics.incrementCounter('sqs_dlq_replayed', result.successful, {
             queue: queueName,
-            status: 'success',
+            status: 'success'
         });
 
         if (result.failed > 0) {
             this.metrics.incrementCounter('sqs_dlq_replayed', result.failed, {
                 queue: queueName,
-                status: 'failed',
+                status: 'failed'
             });
         }
 
         this.logger.info(
-            `DLQ replay completed - queue: ${queueName}, processed: ${result.totalProcessed}, successful: ${result.successful}, failed: ${result.failed}`,
+            `DLQ replay completed - queue: ${queueName}, processed: ${result.totalProcessed}, successful: ${result.successful}, failed: ${result.failed}`
         );
 
         return result;
@@ -172,7 +159,7 @@ export class DlqReplayService {
             totalProcessed: 0,
             successful: 0,
             failed: 0,
-            errors: [],
+            errors: []
         };
 
         let hasMoreMessages = true;
@@ -209,7 +196,7 @@ export class DlqReplayService {
             WaitTimeSeconds: 0,
             MessageAttributeNames: ['All'],
             AttributeNames: ['All'],
-            VisibilityTimeout: 0, // Make visible immediately after peek
+            VisibilityTimeout: 0 // Make visible immediately after peek
         });
 
         const response = await this.sqsClient.send(command);
@@ -229,14 +216,10 @@ export class DlqReplayService {
 
                 // Warn if DLQ has messages
                 if (depth > 0) {
-                    this.logger.warn(
-                        `DLQ has messages - queue: ${queueName}, depth: ${depth}`,
-                    );
+                    this.logger.warn(`DLQ has messages - queue: ${queueName}, depth: ${depth}`);
                 }
             } catch (error) {
-                this.logger.error(
-                    `Failed to get DLQ depth - queue: ${queueName}, error: ${(error as Error).message}`,
-                );
+                this.logger.error(`Failed to get DLQ depth - queue: ${queueName}, error: ${(error as Error).message}`);
             }
         }
 

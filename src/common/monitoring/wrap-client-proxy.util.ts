@@ -11,11 +11,7 @@ function nowSeconds(): number {
  * Usage:
  *   const client = wrapClientProxy(factory.create(...), metrics, 'rmq');
  */
-export function wrapClientProxy<T extends ClientProxy>(
-    client: T,
-    metrics: RpcMetricsService,
-    transport: string,
-): T {
+export function wrapClientProxy<T extends ClientProxy>(client: T, metrics: RpcMetricsService, transport: string): T {
     const proxy = new Proxy(client, {
         get(target, prop, receiver) {
             if (prop === 'send') {
@@ -28,7 +24,7 @@ export function wrapClientProxy<T extends ClientProxy>(
                         finalize(() => {
                             const duration = nowSeconds() - startedAt;
                             metrics.observeServerDuration(transport, patternLabel, 'ok', duration);
-                        }),
+                        })
                     );
                 };
             }
@@ -42,12 +38,12 @@ export function wrapClientProxy<T extends ClientProxy>(
                         finalize(() => {
                             const duration = nowSeconds() - startedAt;
                             metrics.observeServerDuration(transport, patternLabel, 'ok', duration);
-                        }),
+                        })
                     );
                 };
             }
             return Reflect.get(target, prop, receiver);
-        },
+        }
     });
 
     return proxy as T;

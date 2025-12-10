@@ -37,8 +37,7 @@ export class HelperService {
             shouldResetTimeout: true,
             retryDelay: (count, error) => axiosRetry.exponentialDelay(count, error, retryCfg.baseDelayMs),
             retryCondition: (error) =>
-                axiosRetry.isNetworkOrIdempotentRequestError(error) ||
-                (!!error.response && retryCfg.retryOnStatuses.includes(error.response.status)),
+                axiosRetry.isNetworkOrIdempotentRequestError(error) || (!!error.response && retryCfg.retryOnStatuses.includes(error.response.status))
         });
     }
 
@@ -52,11 +51,11 @@ export class HelperService {
                         options: {
                             colorize: true,
                             singleLine: true,
-                            translateTime: 'UTC:yyyy-mm-dd"T"HH:MM:ss.l"Z"',
+                            translateTime: 'UTC:yyyy-mm-dd"T"HH:MM:ss.l"Z"'
                         },
-                        level: cfg.level,
-                    },
-                ],
+                        level: cfg.level
+                    }
+                ]
             };
         }
 
@@ -64,8 +63,7 @@ export class HelperService {
             return undefined; // JSON to stdout
         }
 
-        const shouldUseLoki =
-            cfg.transportMode === 'loki' || (cfg.transportMode === 'auto' && !!cfg.lokiUrl);
+        const shouldUseLoki = cfg.transportMode === 'loki' || (cfg.transportMode === 'auto' && !!cfg.lokiUrl);
 
         if (shouldUseLoki && cfg.lokiUrl) {
             return {
@@ -78,10 +76,10 @@ export class HelperService {
                             interval: 1000,
                             labels: { service: cfg.serviceName, env: cfg.environment },
                             host: cfg.lokiUrl,
-                            basicAuth: cfg.lokiBasicAuth,
-                        },
-                    },
-                ],
+                            basicAuth: cfg.lokiBasicAuth
+                        }
+                    }
+                ]
             };
         }
 
@@ -92,21 +90,34 @@ export class HelperService {
         const rpcContext = context.switchToRpc().getContext<unknown>();
         const ctorName =
             typeof (rpcContext as Partial<{ constructor: { name?: string } }>)?.constructor?.name === 'string'
-                ? ((rpcContext as { constructor: { name: string } }).constructor.name)
+                ? (rpcContext as { constructor: { name: string } }).constructor.name
                 : undefined;
 
         switch (ctorName) {
-            case 'RmqContext': return 'rmq';
-            case 'KafkaContext': return 'kafka';
-            case 'NatsContext': return 'nats';
-            case 'RedisContext': return 'redis';
-            case 'MqttContext': return 'mqtt';
-            case 'GrpcContext': return 'grpc';
-            case 'TcpContext': return 'tcp';
-            default: return 'unknown';
+            case 'RmqContext':
+                return 'rmq';
+            case 'KafkaContext':
+                return 'kafka';
+            case 'NatsContext':
+                return 'nats';
+            case 'RedisContext':
+                return 'redis';
+            case 'MqttContext':
+                return 'mqtt';
+            case 'GrpcContext':
+                return 'grpc';
+            case 'TcpContext':
+                return 'tcp';
+            default:
+                return 'unknown';
         }
     }
     hasGetPattern(value: unknown): value is { getPattern: () => unknown } {
-        return typeof value === 'object' && value !== null && 'getPattern' in value && typeof (value as { getPattern: unknown }).getPattern === 'function';
+        return (
+            typeof value === 'object' &&
+            value !== null &&
+            'getPattern' in value &&
+            typeof (value as { getPattern: unknown }).getPattern === 'function'
+        );
     }
 }

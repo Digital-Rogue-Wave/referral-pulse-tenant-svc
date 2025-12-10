@@ -1,38 +1,31 @@
-import { Entity, Column, PrimaryGeneratedColumn, CreateDateColumn, UpdateDateColumn, DeleteDateColumn } from 'typeorm';
+import EntityHelper from '@mod/common/entities/entity-helper';
+import { TenantStatusEnum } from '@mod/common/enums/tenant.enum';
+import { FileEntity } from '@mod/files/file.entity';
+import { Entity, Column, PrimaryGeneratedColumn, ManyToOne } from 'typeorm';
 
-export enum TenantStatus {
-    ACTIVE = 'active',
-    SUSPENDED = 'suspended',
-    PENDING = 'pending'
-}
-
-@Entity('tenants')
-export class TenantEntity {
+@Entity({ name: 'tenants' })
+export class TenantEntity extends EntityHelper {
     @PrimaryGeneratedColumn('uuid')
-    id!: string;
+    id: string;
 
     @Column()
-    name!: string;
+    name: string;
 
     @Column({ unique: true })
-    slug!: string;
+    slug: string;
+
+    @ManyToOne(() => FileEntity, {
+        eager: true
+    })
+    image?: FileEntity | null;
 
     @Column({
         type: 'enum',
-        enum: TenantStatus,
-        default: TenantStatus.ACTIVE
+        enum: TenantStatusEnum,
+        default: TenantStatusEnum.ACTIVE
     })
-    status!: TenantStatus;
+    status: TenantStatusEnum;
 
     @Column({ type: 'jsonb', default: {} })
-    settings!: Record<string, any>;
-
-    @CreateDateColumn()
-    createdAt!: Date;
-
-    @UpdateDateColumn()
-    updatedAt!: Date;
-
-    @DeleteDateColumn()
-    deletedAt!: Date;
+    settings: Record<string, any>;
 }

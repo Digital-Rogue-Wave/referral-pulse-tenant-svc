@@ -1,22 +1,29 @@
-import { Injectable, ConflictException } from '@nestjs/common';
+import { Injectable, HttpStatus, HttpException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import slugify from 'slugify';
-import { DeleteResult, Repository } from 'typeorm';
+import { DeleteResult, FindOptionsRelations, FindOptionsWhere, Repository } from 'typeorm';
 import { TenantEntity } from './tenant.entity';
 import { CreateTenantDto } from './dto/create-tenant.dto';
 import { UpdateTenantDto } from './dto/update-tenant.dto';
-import { SnsPublisher } from '@mod/common/aws-sqs/sns.publisher';
 import { NullableType } from '@mod/types/nullable.type';
+import { FilesService } from '@mod/files/files.service';
+import { KetoService } from '@mod/common/auth/keto.service';
+import slugify from 'slugify';
+import { KetoNamespace, KetoPermission } from '@mod/common/auth/keto.constants';
+import { EventEmitter2 } from '@nestjs/event-emitter';
+import { TenantCreatedEvent } from './events/tenant-created.event';
+import { TenantUpdatedEvent } from './events/tenant-updated.event';
 
 @Injectable()
 export class TenantService {
     constructor(
         @InjectRepository(TenantEntity)
         private readonly tenantRepository: Repository<TenantEntity>,
-        private readonly sns: SnsPublisher
+        private readonly filesService: FilesService,
+        private readonly ketoService: KetoService,
+        private readonly eventEmitter: EventEmitter2
     ) {}
 
-    async create(createTenantDto: CreateTenantDto): Promise<TenantEntity> {
+    async create(createTenantDto: CreateTenantDto, file?: Express.Multer.File | Express.MulterS3.File): Promise<TenantEntity> {
         const { name, slug } = createTenantDto;
 
         let tenantSlug = slug;
@@ -26,7 +33,7 @@ export class TenantService {
 
         const existing = await this.tenantRepository.findOne({ where: { slug: tenantSlug } });
         if (existing) {
-            throw new ConflictException('Tenant with this slug already exists');
+            throw new HttpException({ message: 'Tenant with this slug already exists', code: HttpStatus.CONFLICT }, HttpStatus.CONFLICT);
         }
 
         const tenant = this.tenantRepository.create({
@@ -34,24 +41,15 @@ export class TenantService {
             slug: tenantSlug,
             settings: this.getDefaultSettings()
         });
+
+        if (file) {
+            tenant.image = await this.filesService.uploadFile(file);
+        }
+
         const savedTenant = await this.tenantRepository.save(tenant);
 
-        await this.sns.publish(
-            {
-                eventId: savedTenant.id,
-                eventType: 'tenant.created',
-                data: {
-                    ...savedTenant,
-                    ownerId: createTenantDto.ownerId
-                } as unknown as any,
-                timestamp: new Date().toISOString()
-            },
-            {
-                topic: 'tenant-events',
-                groupId: savedTenant.id,
-                deduplicationId: savedTenant.id
-            }
-        );
+        // Emit tenant.created event for side effects (Keto, Audit, SNS)
+        this.eventEmitter.emit('tenant.created', new TenantCreatedEvent(savedTenant, createTenantDto.ownerId!));
 
         return savedTenant;
     }
@@ -60,17 +58,51 @@ export class TenantService {
         return await this.tenantRepository.find();
     }
 
-    async findOne(id: string): Promise<NullableType<TenantEntity>> {
-        return this.tenantRepository.findOne({ where: { id } });
+    async findOne(field: FindOptionsWhere<TenantEntity>, relations?: FindOptionsRelations<TenantEntity>): Promise<NullableType<TenantEntity>> {
+        return this.tenantRepository.findOne({
+            where: field,
+            relations
+        });
     }
 
-    async findOneOrFail(id: string): Promise<TenantEntity> {
-        return this.tenantRepository.findOneOrFail({ where: { id } });
+    async findOneOrFail(field: FindOptionsWhere<TenantEntity>, relations?: FindOptionsRelations<TenantEntity>): Promise<TenantEntity> {
+        return this.tenantRepository.findOneOrFail({ where: field, relations });
     }
 
-    async update(id: string, updateTenantDto: UpdateTenantDto): Promise<TenantEntity> {
+    async update(
+        id: string,
+        updateTenantDto: UpdateTenantDto,
+        file?: Express.Multer.File | Express.MulterS3.File,
+        userId?: string,
+        userEmail?: string,
+        ipAddress?: string
+    ): Promise<TenantEntity> {
+        // Verify permission if userId is provided
+        if (userId) {
+            const allowed = await this.ketoService.check(KetoNamespace.TENANT, id, KetoPermission.UPDATE, userId);
+            if (!allowed) {
+                throw new HttpException(
+                    { message: 'You do not have permission to update this tenant', code: HttpStatus.FORBIDDEN },
+                    HttpStatus.FORBIDDEN
+                );
+            }
+        }
+
+        const existingTenant = await this.findOneOrFail({ id });
+        // Create a shallow copy for "old" state reference
+        const oldTenant = { ...existingTenant } as TenantEntity;
+
+        if (file) {
+            existingTenant.image = await this.filesService.uploadFile(file);
+        }
+
         await this.tenantRepository.update(id, updateTenantDto);
-        return this.findOneOrFail(id);
+        const updatedTenant = await this.findOneOrFail({ id });
+
+        // Emit tenant.updated event for side effects (Audit, SNS)
+        this.eventEmitter.emit('tenant.updated', new TenantUpdatedEvent(updatedTenant, oldTenant, updateTenantDto, userId, userEmail, ipAddress));
+
+        return updatedTenant;
     }
 
     async remove(id: string): Promise<DeleteResult> {

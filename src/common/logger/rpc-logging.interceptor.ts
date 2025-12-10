@@ -13,7 +13,7 @@ export class RpcLoggingInterceptor implements NestInterceptor {
         private readonly logger: AppLoggingService,
         private readonly helper: HelperService,
         private readonly reflector: Reflector,
-        private readonly cls: ClsService<ClsRequestContext>,
+        private readonly cls: ClsService<ClsRequestContext>
     ) {}
 
     intercept(context: ExecutionContext, next: CallHandler): Observable<unknown> {
@@ -28,12 +28,7 @@ export class RpcLoggingInterceptor implements NestInterceptor {
                 rawPattern = transportContext.getPattern();
             }
         }
-        const pattern =
-            typeof rawPattern === 'string'
-                ? rawPattern
-                : rawPattern != null
-                    ? JSON.stringify(rawPattern)
-                    : 'unknown';
+        const pattern = typeof rawPattern === 'string' ? rawPattern : rawPattern != null ? JSON.stringify(rawPattern) : 'unknown';
 
         const requestId = this.cls.get('requestId');
         const tenantId = this.cls.get('tenantId');
@@ -45,11 +40,7 @@ export class RpcLoggingInterceptor implements NestInterceptor {
             catchError((caughtError: unknown) => {
                 const durationMs = Number(process.hrtime.bigint() - startedAt) / 1_000_000;
 
-                this.logger.fatal(
-                    'rpc_message_error',
-                    { transport, pattern, durationMs, requestId, tenantId, userId },
-                    caughtError,
-                );
+                this.logger.fatal('rpc_message_error', { transport, pattern, durationMs, requestId, tenantId, userId }, caughtError);
 
                 return throwError(() => caughtError);
             }),
@@ -61,9 +52,9 @@ export class RpcLoggingInterceptor implements NestInterceptor {
                     durationMs,
                     requestId,
                     tenantId,
-                    userId,
+                    userId
                 });
-            }),
+            })
         );
     }
 }

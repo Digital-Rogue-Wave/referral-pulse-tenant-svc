@@ -18,8 +18,8 @@ export class RedisHealthIndicator {
                 redis: {
                     status: 'down',
                     latencyMs: Number(process.hrtime.bigint() - started) / 1_000_000,
-                    error: caught instanceof Error ? caught.message : String(caught),
-                },
+                    error: caught instanceof Error ? caught.message : String(caught)
+                }
             };
         }
     }

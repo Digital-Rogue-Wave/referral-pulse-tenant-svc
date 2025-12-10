@@ -10,7 +10,7 @@ export class RedisKeyBuilder {
 
     constructor(
         private readonly configService: ConfigService,
-        @Optional() @Inject(TenantContext) private readonly tenant?: TenantContext,
+        @Optional() @Inject(TenantContext) private readonly tenant?: TenantContext
     ) {
         this.prefix = this.configService.getOrThrow<string>('redisConfig.keyPrefix', { infer: true });
     }

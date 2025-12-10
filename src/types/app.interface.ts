@@ -74,5 +74,3 @@ export interface EventEnvelope<TPayload = unknown> {
     metadata: EventMetadata;
     payload: TPayload;
 }
-
-

@@ -18,9 +18,7 @@ export class RedisService {
     }
 
     async set(key: string, value: string, ttlSeconds?: number): Promise<'OK' | null> {
-        return ttlSeconds && ttlSeconds > 0
-            ? this.client.set(key, value, 'EX', ttlSeconds)
-            : this.client.set(key, value);
+        return ttlSeconds && ttlSeconds > 0 ? this.client.set(key, value, 'EX', ttlSeconds) : this.client.set(key, value);
     }
 
     async del(key: string): Promise<number> {

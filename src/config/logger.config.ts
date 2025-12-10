@@ -1,6 +1,6 @@
 import { registerAs } from '@nestjs/config';
 import validateConfig from '@mod/common/validators/validate-config';
-import { IsBooleanString, IsEnum, IsIn, IsInt, IsOptional, IsString, IsUrl, Max, Min } from 'class-validator';
+import { IsBooleanString, IsEnum, IsIn, IsOptional, IsString, IsUrl } from 'class-validator';
 import type { MaybeType } from '@mod/types/maybe.type';
 import { AppEnvironment } from '@mod/config/app.config';
 
@@ -13,9 +13,9 @@ export type LoggerConfig = {
 
     // behavior
     level: 'trace' | 'debug' | 'info' | 'warn' | 'error' | 'fatal';
-    pretty: boolean;                  // enable pino-pretty
-    transportMode: TransportMode;     // 'auto'|'console'|'json'|'loki'
-    requireTransport: boolean;        // if true and mode unmet => throw during boot
+    pretty: boolean; // enable pino-pretty
+    transportMode: TransportMode; // 'auto'|'console'|'json'|'loki'
+    requireTransport: boolean; // if true and mode unmet => throw during boot
 
     // direct Loki (optional). If undefined, we rely on stdout JSON for your Loki/S3 shippers.
     lokiUrl?: string;
@@ -109,19 +109,15 @@ export default registerAs<LoggerConfig>('loggerConfig', () => {
         k8sNamespace: process.env.K8S_NAMESPACE || undefined,
         podName: process.env.POD_NAME || process.env.HOSTNAME || undefined,
         nodeName: process.env.NODE_NAME || undefined,
-        region: process.env.AWS_REGION || process.env.AWS_DEFAULT_REGION || undefined,
+        region: process.env.AWS_REGION || process.env.AWS_DEFAULT_REGION || undefined
     };
 
     // enforce transport if requested
     if (cfg.requireTransport) {
-        const needs =
-            cfg.transportMode === 'loki' ||
-            (cfg.transportMode === 'auto' && cfg.environment === AppEnvironment.Production);
+        const needs = cfg.transportMode === 'loki' || (cfg.transportMode === 'auto' && cfg.environment === AppEnvironment.Production);
 
         if (needs && !cfg.lokiUrl) {
-            throw new Error(
-                '[logger] Transport required but not configured: set LOKI_URL or choose LOG_TRANSPORT_MODE=console/json',
-            );
+            throw new Error('[logger] Transport required but not configured: set LOKI_URL or choose LOG_TRANSPORT_MODE=console/json');
         }
     }
 

@@ -8,7 +8,7 @@ import {
     ListObjectsV2Command,
     PutObjectCommand,
     S3Client,
-    ServerSideEncryption,
+    ServerSideEncryption
 } from '@aws-sdk/client-s3';
 import { Upload } from '@aws-sdk/lib-storage';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
@@ -17,13 +17,7 @@ import { ConfigService } from '@nestjs/config';
 import { S3SseMode } from '@mod/config/s3.config';
 import { S3Factory } from './s3.factory';
 import { S3KeyBuilder } from './s3-key.builder';
-import {
-    GetObjectResult,
-    ListResult,
-    PresignGetOptions,
-    PresignPutOptions,
-    PutObjectInput,
-} from '@mod/types/app.type';
+import { GetObjectResult, ListResult, PresignGetOptions, PresignPutOptions, PutObjectInput } from '@mod/types/app.type';
 
 @Injectable()
 export class S3Service {
@@ -36,7 +30,7 @@ export class S3Service {
     constructor(
         factory: S3Factory,
         private readonly configService: ConfigService,
-        private readonly keys: S3KeyBuilder,
+        private readonly keys: S3KeyBuilder
     ) {
         this.s3 = factory.getClient();
 
@@ -46,13 +40,9 @@ export class S3Service {
         const rawSse = this.configService.getOrThrow<string>('s3Config.sse', { infer: true });
         this.defaultSseMode = this.normalizeSseMode(rawSse);
 
-        this.defaultKmsKeyId =
-            this.configService.get<string>('s3Config.kmsKeyId', { infer: true }) ?? undefined;
+        this.defaultKmsKeyId = this.configService.get<string>('s3Config.kmsKeyId', { infer: true }) ?? undefined;
 
-        this.presignExpiresSeconds = this.configService.getOrThrow<number>(
-            's3Config.presignExpiresSeconds',
-            { infer: true },
-        );
+        this.presignExpiresSeconds = this.configService.getOrThrow<number>('s3Config.presignExpiresSeconds', { infer: true });
     }
 
     // ----------------- Put (small/medium)
@@ -69,7 +59,7 @@ export class S3Service {
             ContentEncoding: input.contentEncoding,
             Metadata: input.metadata,
             ServerSideEncryption: sse.sseAlg,
-            SSEKMSKeyId: sse.kmsKeyId,
+            SSEKMSKeyId: sse.kmsKeyId
         });
         const out = await this.s3.send(cmd);
         return out.ETag ?? '';
@@ -91,11 +81,11 @@ export class S3Service {
                 ContentEncoding: input.contentEncoding,
                 Metadata: input.metadata,
                 ServerSideEncryption: sse.sseAlg,
-                SSEKMSKeyId: sse.kmsKeyId,
+                SSEKMSKeyId: sse.kmsKeyId
             },
             queueSize: 4,
             partSize: 8 * 1024 * 1024, // 8MB parts
-            leavePartsOnError: false,
+            leavePartsOnError: false
         });
 
         return uploader.done();
@@ -112,14 +102,12 @@ export class S3Service {
             contentType: out.ContentType ?? undefined,
             etag: out.ETag ?? undefined,
             metadata: (out.Metadata ?? undefined) as Record<string, string> | undefined,
-            lastModified: out.LastModified ?? undefined,
+            lastModified: out.LastModified ?? undefined
         };
     }
 
     // ----------------- Head
-    async headObject(
-        key: string,
-    ): Promise<{
+    async headObject(key: string): Promise<{
         exists: boolean;
         size?: number;
         contentType?: string;
@@ -136,7 +124,7 @@ export class S3Service {
                 contentType: out.ContentType ?? undefined,
                 lastModified: out.LastModified ?? undefined,
                 etag: out.ETag ?? undefined,
-                metadata: (out.Metadata ?? undefined) as Record<string, string> | undefined,
+                metadata: (out.Metadata ?? undefined) as Record<string, string> | undefined
             };
         } catch {
             return { exists: false };
@@ -157,12 +145,12 @@ export class S3Service {
                 Bucket: this.bucket,
                 Prefix,
                 MaxKeys: maxKeys,
-                ContinuationToken: continuationToken,
-            }),
+                ContinuationToken: continuationToken
+            })
         );
         return {
             keys: (out.Contents ?? []).map((o) => o.Key as string),
-            nextContinuationToken: out.IsTruncated ? out.NextContinuationToken : undefined,
+            nextContinuationToken: out.IsTruncated ? out.NextContinuationToken : undefined
         };
     }
 
@@ -178,8 +166,8 @@ export class S3Service {
                 CopySource: Source,
                 ServerSideEncryption: sse.sseAlg,
                 SSEKMSKeyId: sse.kmsKeyId,
-                MetadataDirective: 'COPY', // keep original metadata
-            }),
+                MetadataDirective: 'COPY' // keep original metadata
+            })
         );
         return out.CopyObjectResult?.ETag ?? '';
     }
@@ -197,7 +185,7 @@ export class S3Service {
             Bucket: this.bucket,
             Key,
             ResponseContentType: opts.responseContentType,
-            ResponseContentDisposition: opts.responseContentDisposition,
+            ResponseContentDisposition: opts.responseContentDisposition
         });
         return getSignedUrl(this.s3, cmd, { expiresIn: expires });
     }
@@ -212,7 +200,7 @@ export class S3Service {
             ContentType: opts.contentType,
             ContentLength: opts.contentLength,
             ServerSideEncryption: sse.sseAlg,
-            SSEKMSKeyId: sse.kmsKeyId,
+            SSEKMSKeyId: sse.kmsKeyId
         });
         return getSignedUrl(this.s3, cmd, { expiresIn: expires });
     }
@@ -228,10 +216,7 @@ export class S3Service {
         throw new Error(`Invalid s3Config.sse value: "${value}"`);
     }
 
-    private resolveSse(
-        sseMode?: S3SseMode,
-        kmsKeyId?: string,
-    ): { sseAlg?: ServerSideEncryption; kmsKeyId?: string } {
+    private resolveSse(sseMode?: S3SseMode, kmsKeyId?: string): { sseAlg?: ServerSideEncryption; kmsKeyId?: string } {
         const mode = sseMode ?? this.defaultSseMode;
         if (mode === S3SseMode.None) return {};
         if (mode === S3SseMode.AES256) return { sseAlg: 'AES256' };

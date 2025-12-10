@@ -34,7 +34,7 @@ async function bootstrap() {
     app.useLogger(app.get(Logger));
 
     app.enableShutdownHooks();
-    app.setGlobalPrefix(configService.getOrThrow('app.apiPrefix', { infer: true }), {
+    app.setGlobalPrefix(configService.getOrThrow('appConfig.apiPrefix', { infer: true }), {
         exclude: ['/', '/live', '/ready', '/startup']
     });
     app.enableVersioning({
@@ -48,7 +48,7 @@ async function bootstrap() {
         .setDescription('API List fro campaign microservice')
         .setVersion('1.0')
         .addGlobalParameters({
-            name: configService.getOrThrow('app.headerLanguage', { infer: true }),
+            name: configService.getOrThrow('appConfig.headerLanguage', { infer: true }),
             required: true,
             in: 'header'
         })
@@ -65,11 +65,11 @@ async function bootstrap() {
         })
     );
 
-    await app.listen(configService.getOrThrow('app.port', { infer: true }), () => {
+    await app.listen(configService.getOrThrow('appConfig.port', { infer: true }), () => {
         Logger.log(
-            `${configService.getOrThrow('app.name', {
+            `${configService.getOrThrow('appConfig.name', {
                 infer: true
-            })} Server is listening to port ${configService.getOrThrow('app.port', {
+            })} Server is listening to port ${configService.getOrThrow('appConfig.port', {
                 infer: true
             })}...`
         );

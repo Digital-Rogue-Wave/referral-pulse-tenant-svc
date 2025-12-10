@@ -1,6 +1,6 @@
 import { Injectable, UnprocessableEntityException } from '@nestjs/common';
 import { ValidatorConstraint, ValidatorConstraintInterface, ValidationArguments } from 'class-validator';
-import { DataSource, EntityTarget, ObjectLiteral } from 'typeorm';
+import { DataSource, ObjectLiteral } from 'typeorm';
 import { InjectDataSource } from '@nestjs/typeorm';
 import { HttpResponseException } from '../exceptions/http-response.exception';
 import { ExistsConstraintTuple } from '@mod/types/app.type';
@@ -37,18 +37,12 @@ export class IsExist implements ValidatorConstraintInterface {
 
             // use query builder to avoid loose FindOptions typing
             const alias = repository.metadata.tableName || repository.metadata.name.toLowerCase();
-            const found = await repository
-                .createQueryBuilder(alias)
-                .where(`${alias}.${dbColumn} = :value`, { value: lookupValue })
-                .limit(1)
-                .getOne();
+            const found = await repository.createQueryBuilder(alias).where(`${alias}.${dbColumn} = :value`, { value: lookupValue }).limit(1).getOne();
 
             return Boolean(found);
-        } catch (_caughtError) {
+        } catch (error) {
             // Do not mutate unknown; throw a proper HttpException wrapped in your domain exception
-            throw new HttpResponseException(
-                new UnprocessableEntityException('Validation failed while checking entity existence')
-            );
+            throw new HttpResponseException(new UnprocessableEntityException(`Validation failed while checking entity existence ${error}`));
         }
     }
 }

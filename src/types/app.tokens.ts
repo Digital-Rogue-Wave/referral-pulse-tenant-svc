@@ -5,7 +5,7 @@ export const REDIS_SUBSCRIBER = 'REDIS_SUBSCRIBER';
 export const REDIS_IAM_AUTH_PROVIDER = 'REDIS_IAM_AUTH_PROVIDER';
 export interface RedisIamAuthProvider {
     getToken(): Promise<string>; // short-lived token used as "password"
-    getUsername(): string;       // IAM-enabled ElastiCache user
+    getUsername(): string; // IAM-enabled ElastiCache user
 }
 
 export const S3_KEY_BUILDER = 'S3_KEY_BUILDER';

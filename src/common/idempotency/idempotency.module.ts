@@ -10,7 +10,7 @@ import { EventIdempotencyService } from '@mod/common/idempotency/event-idempoten
     providers: [
         {
             provide: APP_INTERCEPTOR,
-            useClass: IdempotencyInterceptor,
+            useClass: IdempotencyInterceptor
         },
         EventIdempotencyService
     ],

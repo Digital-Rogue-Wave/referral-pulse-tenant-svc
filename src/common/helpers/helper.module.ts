@@ -4,6 +4,6 @@ import { HelperService } from '@mod/common/helpers/helper.service';
 @Module({
     imports: [],
     providers: [HelperService],
-    exports: [HelperService],
+    exports: [HelperService]
 })
 export class HelperModule {}

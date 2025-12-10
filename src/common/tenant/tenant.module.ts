@@ -5,6 +5,6 @@ import { TenantContext } from '@mod/types/app.interface';
 @Global()
 @Module({
     providers: [{ provide: TenantContext, useClass: ClsTenantContext }],
-    exports: [ClsTenantContext],
+    exports: [ClsTenantContext]
 })
 export class TenantModule {}

@@ -41,14 +41,14 @@ export class MonitoringService {
 
         @Optional()
         @Inject('PrometheusCounter_ingestion_rejected_bytes_total')
-        private readonly ingestionRejectedBytes?: Counter<string>,
+        private readonly ingestionRejectedBytes?: Counter<string>
     ) {
         this.counters = {
             sqs_messages_processed_total: this.sqsProcessed,
             ingestion_valid_total: this.ingestionValid,
             ingestion_invalid_total: this.ingestionInvalid,
             ingestion_duplicate_total: this.ingestionDuplicate,
-            ingestion_rejected_bytes_total: this.ingestionRejectedBytes,
+            ingestion_rejected_bytes_total: this.ingestionRejectedBytes
         };
     }
 

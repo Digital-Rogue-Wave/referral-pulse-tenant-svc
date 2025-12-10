@@ -20,19 +20,16 @@ import loggerConfig from '@mod/config/logger.config';
  */
 @Global()
 @Module({
-    imports: [
-        ConfigModule.forFeature(loggerConfig),
-        HelperModule,
-    ],
+    imports: [ConfigModule.forFeature(loggerConfig), HelperModule],
     providers: [
         AppLoggingService,
         OutboundLoggingService,
         EventLoggingService,
         { provide: APP_INTERCEPTOR, useClass: HttpLoggingInterceptor },
         { provide: APP_INTERCEPTOR, useClass: RpcLoggingInterceptor },
-        { provide: Logger, useExisting: AppLoggingService },
+        { provide: Logger, useExisting: AppLoggingService }
     ],
-    exports: [Logger, AppLoggingService, OutboundLoggingService, EventLoggingService],
+    exports: [Logger, AppLoggingService, OutboundLoggingService, EventLoggingService]
 })
 export class LoggingModule {}
 

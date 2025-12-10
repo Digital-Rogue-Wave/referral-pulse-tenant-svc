@@ -83,17 +83,17 @@ export type HttpEndMeta = HttpStartMeta & {
 };
 
 export type PublishOptions = {
-    topic: string;              // logical topic name (must exist in config)
+    topic: string; // logical topic name (must exist in config)
     subject?: string;
-    groupId?: string;           // FIFO only
-    deduplicationId?: string;   // FIFO only
+    groupId?: string; // FIFO only
+    deduplicationId?: string; // FIFO only
     attributes?: Record<string, string>; // MessageAttributes as string map (will add tenantId)
 };
 
 export type SendOptions = {
     producer: string;
-    groupId?: string;                   // FIFO
-    deduplicationId?: string;           // FIFO
+    groupId?: string; // FIFO
+    deduplicationId?: string; // FIFO
     attributes?: Record<string, MessageAttributeValue>;
     delaySeconds?: number;
 };
@@ -111,20 +111,9 @@ export type Attrs = Record<string, MessageAttributeValue>;
 
 export type ValidationEntity = { id?: number | string } | undefined;
 
-export type RpcTransport =
-    | 'rmq'
-    | 'kafka'
-    | 'nats'
-    | 'redis'
-    | 'mqtt'
-    | 'grpc'
-    | 'tcp'
-    | 'unknown';
+export type RpcTransport = 'rmq' | 'kafka' | 'nats' | 'redis' | 'mqtt' | 'grpc' | 'tcp' | 'unknown';
 
-export type ExistsConstraintTuple<E extends ObjectLiteral> = [
-    entity: EntityTarget<E>,
-    pathToProperty?: string
-];
+export type ExistsConstraintTuple<E extends ObjectLiteral> = [entity: EntityTarget<E>, pathToProperty?: string];
 
 export type ExecFn<T = unknown> = () => Promise<T>;
 export type Breaker<T = unknown> = CircuitBreaker<[ExecFn<T>], T>;

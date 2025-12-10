@@ -59,12 +59,12 @@ export default registerAs<OryConfig>('oryConfig', () => {
         hydra: {
             publicUrl: hydraPublicUrl,
             jwksUrl,
-            issuer: process.env.ORY_HYDRA_ISSUER as string,
+            issuer: process.env.ORY_HYDRA_ISSUER as string
         },
         keto: {
             readUrl: process.env.ORY_KETO_READ_URL as string,
-            writeUrl: process.env.ORY_KETO_WRITE_URL as string,
+            writeUrl: process.env.ORY_KETO_WRITE_URL as string
         },
-        audience: process.env.JWT_AUDIENCE as string,
+        audience: process.env.JWT_AUDIENCE as string
     };
 });

@@ -6,6 +6,6 @@ import { S3KeyBuilder } from './s3-key.builder';
 @Module({
     imports: [],
     providers: [S3Factory, S3Service, S3KeyBuilder],
-    exports: [S3Service],
+    exports: [S3Service]
 })
 export class S3Module {}

@@ -1,11 +1,11 @@
-import { context as otContext, propagation, Context, trace, SpanAttributes } from '@opentelemetry/api';
+import { context as otContext, propagation, Context, SpanAttributes } from '@opentelemetry/api';
 import type { Message } from '@aws-sdk/client-sqs';
 import { Attrs } from '@mod/types/app.type';
 
 const setter = {
     set(carrier: Attrs, key: string, value: string) {
         carrier[key] = { DataType: 'String', StringValue: value };
-    },
+    }
 };
 
 const getter = {
@@ -15,7 +15,7 @@ const getter = {
     },
     keys(carrier: Message['MessageAttributes'] | undefined): string[] {
         return carrier ? Object.keys(carrier) : [];
-    },
+    }
 };
 
 /** Inject W3C (or configured global) trace headers into SQS attributes */
@@ -39,6 +39,6 @@ export function baseSqsSpanAttrs(queueName: string, msg: Message): SpanAttribute
         'messaging.sqs.message_group_id': msg.Attributes?.MessageGroupId ?? msg.Attributes?.MessageGroupId ?? undefined,
         'messaging.sqs.approximate_receive_count': msg.Attributes?.ApproximateReceiveCount
             ? Number(msg.Attributes.ApproximateReceiveCount)
-            : undefined,
+            : undefined
     };
 }

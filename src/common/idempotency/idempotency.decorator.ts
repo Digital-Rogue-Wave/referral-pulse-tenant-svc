@@ -7,5 +7,4 @@ export interface IdempotencyOptions {
     keyPrefix?: string;
 }
 
-export const Idempotent = (options: IdempotencyOptions = {}) =>
-    SetMetadata(IDEMPOTENCY_KEY, options);
+export const Idempotent = (options: IdempotencyOptions = {}) => SetMetadata(IDEMPOTENCY_KEY, options);

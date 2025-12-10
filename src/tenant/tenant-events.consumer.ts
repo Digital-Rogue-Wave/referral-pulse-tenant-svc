@@ -15,7 +15,7 @@ export class CampaignEventsConsumer {
         private readonly metrics: MonitoringService,
         private readonly eventIdempotency: EventIdempotencyService,
         private readonly cls: ClsService,
-        private readonly logger: AppLoggingService,
+        private readonly logger: AppLoggingService
     ) {}
 
     @SqsMessageHandler('campaign-events', false)
@@ -25,7 +25,7 @@ export class CampaignEventsConsumer {
         const { metadata, payload } = envelope;
 
         this.logger.info(
-            `Processing campaign event - eventType: ${metadata.eventType}, eventId: ${metadata.eventId}, requestId: ${metadata.requestId || 'none'}`,
+            `Processing campaign event - eventType: ${metadata.eventType}, eventId: ${metadata.eventId}, requestId: ${metadata.requestId || 'none'}`
         );
 
         switch (metadata.eventType) {
@@ -46,24 +46,22 @@ export class CampaignEventsConsumer {
         }
     }
 
-    private async handleCreated(payload: CampaignEvents.Created): Promise<void> {
+    private handleCreated(payload: CampaignEvents.Created): void {
         this.logger.info(`Campaign created processed - campaignId: ${payload.campaignId}`);
         // Business logic
     }
 
-    private async handleUpdated(payload: CampaignEvents.Updated): Promise<void> {
+    private handleUpdated(payload: CampaignEvents.Updated): void {
         this.logger.info(`Campaign updated processed - campaignId: ${payload.campaignId}`);
         // Business logic
     }
 
-    private async handleInvitationSent(payload: CampaignEvents.InvitationSent): Promise<void> {
-        this.logger.info(
-            `Campaign invitation sent processed - campaignId: ${payload.campaignId}, invitationId: ${payload.invitationId}`,
-        );
+    private handleInvitationSent(payload: CampaignEvents.InvitationSent): void {
+        this.logger.info(`Campaign invitation sent processed - campaignId: ${payload.campaignId}, invitationId: ${payload.invitationId}`);
         // Business logic
     }
 
-    private async handleActivated(payload: CampaignEvents.Activated): Promise<void> {
+    private handleActivated(payload: CampaignEvents.Activated): void {
         this.logger.info(`Campaign activated processed - campaignId: ${payload.campaignId}`);
         // Business logic
     }

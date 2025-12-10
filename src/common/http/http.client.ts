@@ -26,12 +26,9 @@ export class HttpClient {
         private readonly auth: MachineAuthProvider,
         private readonly outboundLogger: OutboundLoggingService,
         @Optional() @Inject(TenantContext) private readonly tenantContext?: TenantContext,
-        @Optional() private readonly metrics?: MonitoringService,
+        @Optional() private readonly metrics?: MonitoringService
     ) {
-        const cfg = configService.getOrThrow<ConfigType<typeof httpClientConfig>>(
-            'httpClientConfig',
-            { infer: true },
-        );
+        const cfg = configService.getOrThrow<ConfigType<typeof httpClientConfig>>('httpClientConfig', { infer: true });
 
         const axios = http.axiosRef;
         helper.configureAxios(axios, cfg.retry.intra);
@@ -58,11 +55,7 @@ export class HttpClient {
                 reqConfig.headers = headers;
             }
 
-            this.outboundLogger.requestStart(
-                target,
-                (reqConfig.method ?? 'GET').toUpperCase(),
-                reqConfig.url ?? '',
-            );
+            this.outboundLogger.requestStart(target, (reqConfig.method ?? 'GET').toUpperCase(), reqConfig.url ?? '');
 
             return reqConfig;
         });
@@ -78,13 +71,7 @@ export class HttpClient {
                     const host = this.extractHost(res.config);
 
                     if (this.metrics) {
-                        this.metrics.observeHttpClient(
-                            kind,
-                            (res.config.method ?? 'GET').toUpperCase(),
-                            host,
-                            res.status,
-                            elapsed,
-                        );
+                        this.metrics.observeHttpClient(kind, (res.config.method ?? 'GET').toUpperCase(), host, res.status, elapsed);
                     }
 
                     this.outboundLogger.requestEnd(
@@ -92,7 +79,7 @@ export class HttpClient {
                         (res.config.method ?? 'GET').toUpperCase(),
                         res.config.url ?? '',
                         res.status,
-                        elapsed * 1000,
+                        elapsed * 1000
                     );
                 }
                 return res;
@@ -117,11 +104,11 @@ export class HttpClient {
                         (ec?.method ?? 'GET').toUpperCase(),
                         ec?.url ?? '',
                         elapsed * 1000,
-                        error,
+                        error
                     );
                 }
                 return Promise.reject(error);
-            },
+            }
         );
 
         // Circuit breakers for intra-service and external calls
@@ -159,13 +146,9 @@ export class HttpClient {
     }
 
     // Public API with circuit breaker
-    async request<TResponse = unknown>(
-        config: AxiosRequestConfig,
-    ): Promise<AxiosResponse<TResponse>> {
+    async request<TResponse = unknown>(config: AxiosRequestConfig): Promise<AxiosResponse<TResponse>> {
         const breaker = this.selectBreaker(config.url ?? '');
-        return breaker.fire(() =>
-            firstValueFrom(this.http.request<TResponse>(config))
-        );
+        return breaker.fire(() => firstValueFrom(this.http.request<TResponse>(config)));
     }
 
     get<T = unknown>(url: string, config?: AxiosRequestConfig) {

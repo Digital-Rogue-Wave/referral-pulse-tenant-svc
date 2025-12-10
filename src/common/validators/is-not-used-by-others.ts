@@ -8,9 +8,7 @@ import { ValidationEntity } from '@mod/types/app.type';
 @Injectable()
 @ValidatorConstraint({ name: 'IsNotUsedByOthers', async: true })
 export class IsNotUsedByOthers implements ValidatorConstraintInterface {
-    constructor(
-        @InjectDataSource() private readonly dataSource: DataSource,
-    ) {}
+    constructor(@InjectDataSource() private readonly dataSource: DataSource) {}
 
     async validate(rawValue: unknown, validationArgs: ValidationArguments): Promise<boolean> {
         try {
@@ -27,9 +25,7 @@ export class IsNotUsedByOthers implements ValidatorConstraintInterface {
             const dbColumnName = columnMeta?.databaseName ?? propertyName;
 
             const alias = repository.metadata.tableName || repository.metadata.name.toLowerCase();
-            const query = repository
-                .createQueryBuilder(alias)
-                .where(`${alias}.${dbColumnName} = :value`, { value: rawValue as unknown });
+            const query = repository.createQueryBuilder(alias).where(`${alias}.${dbColumnName} = :value`, { value: rawValue as unknown });
 
             // If we’re updating the same entity, exclude its current id
             if (currentEntity?.id != null) {

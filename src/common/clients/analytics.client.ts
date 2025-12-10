@@ -9,21 +9,15 @@ export class AnalyticsClient {
 
     constructor(
         private readonly http: HttpClient,
-        private readonly config: ConfigService,
+        private readonly config: ConfigService
     ) {
-        const services = this.config.getOrThrow<ConfigType<typeof servicesConfig>>(
-            'servicesConfig',
-            { infer: true }
-        );
+        const services = this.config.getOrThrow<ConfigType<typeof servicesConfig>>('servicesConfig', { infer: true });
 
         this.baseUrl = services.analytics;
     }
 
     async getCampaignAnalytics(req: { userId: string; campaignId: string }) {
-        const { data } = await this.http.post(
-            `${this.baseUrl}/internal/analytics/{campaignId}/`,
-            req
-        );
+        const { data } = await this.http.post(`${this.baseUrl}/internal/analytics/{campaignId}/`, req);
 
         return data;
     }

@@ -11,7 +11,7 @@ import { JwtPayload } from '@mod/types/app.interface';
 export class JwtStrategy extends PassportStrategy(Strategy) {
     constructor(
         private readonly config: ConfigService,
-        private readonly cls: ClsService,
+        private readonly cls: ClsService
     ) {
         const oryCfg = config.getOrThrow<ConfigType<typeof oryConfig>>('oryConfig', { infer: true });
 
@@ -22,18 +22,18 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
                 cache: true,
                 rateLimit: true,
                 jwksRequestsPerMinute: 10,
-                jwksUri: oryCfg.hydra.jwksUrl,
+                jwksUri: oryCfg.hydra.jwksUrl
             }),
 
             audience: oryCfg.audience,
             issuer: oryCfg.hydra.issuer,
-            algorithms: ['RS256'],
+            algorithms: ['RS256']
         };
 
         super(options);
     }
 
-    async validate(payload: JwtPayload): Promise<JwtPayload> {
+    validate(payload: JwtPayload): JwtPayload {
         if (!payload.sub) {
             throw new UnauthorizedException('JWT missing sub claim');
         }
@@ -65,10 +65,6 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
         // 1. Top-level tenant_id
         // 2. ext.tenant_id
         // 3. For M2M tokens, might be in client metadata (handle in service layer)
-        return (
-            payload.tenant_id ||
-            payload.ext?.tenant_id ||
-            undefined
-        );
+        return payload.tenant_id || payload.ext?.tenant_id || undefined;
     }
 }

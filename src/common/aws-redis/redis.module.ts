@@ -10,17 +10,7 @@ import { ElastiCacheIamAuthProvider } from '@mod/common/aws-redis/redis-iam-auth
 
 @Module({
     imports: [ConfigModule.forFeature(redisConfig), HelperModule],
-    providers: [
-        RedisFactory,
-        RedisService,
-        RedisPubSubService,
-        RedisKeyBuilder,
-        ElastiCacheIamAuthProvider
-    ],
-    exports: [
-        RedisService,
-        RedisPubSubService,
-        RedisKeyBuilder,
-    ],
+    providers: [RedisFactory, RedisService, RedisPubSubService, RedisKeyBuilder, ElastiCacheIamAuthProvider],
+    exports: [RedisService, RedisPubSubService, RedisKeyBuilder]
 })
 export class RedisModule {}

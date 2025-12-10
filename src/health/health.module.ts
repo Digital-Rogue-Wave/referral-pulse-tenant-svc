@@ -9,16 +9,8 @@ import { RedisHealthIndicator } from '@mod/health/redis.health';
 import { CommonModule } from '@mod/common/common.module';
 
 @Module({
-    imports: [
-        ConfigModule,
-        TerminusModule,
-        TypeOrmModule,
-        CommonModule,
-    ],
+    imports: [ConfigModule, TerminusModule, TypeOrmModule, CommonModule],
     controllers: [HealthController],
-    providers: [
-        TypeOrmHealthIndicator,
-        RedisHealthIndicator,
-    ],
+    providers: [TypeOrmHealthIndicator, RedisHealthIndicator]
 })
 export class HealthModule {}

@@ -9,21 +9,15 @@ export class RewardsClient {
 
     constructor(
         private readonly http: HttpClient,
-        private readonly config: ConfigService,
+        private readonly config: ConfigService
     ) {
-        const services = this.config.getOrThrow<ConfigType<typeof servicesConfig>>(
-            'servicesConfig',
-            { infer: true }
-        );
+        const services = this.config.getOrThrow<ConfigType<typeof servicesConfig>>('servicesConfig', { infer: true });
 
         this.baseUrl = services.rewards;
     }
 
     async grantReward(req: { userId: string; rewardType: string; amount: number }) {
-        const { data } = await this.http.post(
-            `${this.baseUrl}/internal/rewards/grant`,
-            req
-        );
+        const { data } = await this.http.post(`${this.baseUrl}/internal/rewards/grant`, req);
 
         return data;
     }

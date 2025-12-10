@@ -21,7 +21,7 @@ export class TracingEnrichmentInterceptor implements NestInterceptor {
                 'app.user_id': userId ?? 'anonymous',
                 'http.request_id': requestId ?? 'n/a',
                 'http.route': req?.url ?? '',
-                'http.method': req?.method ?? '',
+                'http.method': req?.method ?? ''
             });
         }
 
@@ -29,8 +29,8 @@ export class TracingEnrichmentInterceptor implements NestInterceptor {
         return next.handle().pipe(
             tap({
                 next: () => span?.setAttribute('app.handler_duration_ms', Date.now() - started),
-                error: () => span?.setAttribute('app.handler_duration_ms', Date.now() - started),
-            }),
+                error: () => span?.setAttribute('app.handler_duration_ms', Date.now() - started)
+            })
         );
     }
 }

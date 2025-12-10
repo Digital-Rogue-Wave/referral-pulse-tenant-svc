@@ -5,6 +5,6 @@ import { SnsPublisher } from './sns.publisher';
 @Module({
     imports: [],
     providers: [SnsFactory, SnsPublisher],
-    exports: [SnsPublisher],
+    exports: [SnsPublisher]
 })
 export class SnsModule {}

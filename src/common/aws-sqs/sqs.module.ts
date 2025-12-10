@@ -31,7 +31,7 @@ export class SqsMessagingModule {
                             region: aws.region,
                             endpoint: sqs.endpoint || undefined,
                             maxAttempts: aws.maxAttempts,
-                            retryMode: aws.retryMode, // 'standard' | 'adaptive' | 'legacy'
+                            retryMode: aws.retryMode // 'standard' | 'adaptive' | 'legacy'
                         };
 
                         const consumers: ReadonlyArray<SqsConsumerDef> = sqs.consumers ?? [];
@@ -43,19 +43,19 @@ export class SqsMessagingModule {
                                 queueUrl: consumer.queueUrl,
                                 waitTimeSeconds: consumer.waitTimeSeconds,
                                 visibilityTimeout: consumer.visibilityTimeout,
-                                maxNumberOfMessages: consumer.batchSize,
+                                maxNumberOfMessages: consumer.batchSize
                             })),
                             producers: producers.map((producer: SqsProducerDef) => ({
                                 name: producer.name,
-                                queueUrl: producer.queueUrl,
+                                queueUrl: producer.queueUrl
                             })),
-                            sqs: sqsClientConfig,
+                            sqs: sqsClientConfig
                         };
-                    },
-                }),
+                    }
+                })
             ],
             providers: [SqsManager],
-            exports: [SqsManager, SsutSqsModule],
+            exports: [SqsManager, SsutSqsModule]
         };
     }
 }

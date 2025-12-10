@@ -1,4 +1,4 @@
-import { Injectable, CanActivate, ExecutionContext, ForbiddenException, SetMetadata, Inject, Logger } from '@nestjs/common';
+import { Injectable, CanActivate, ExecutionContext, SetMetadata, Inject, Logger, HttpException, HttpStatus } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
 import { Request } from 'express';
 import { ClsService } from 'nestjs-cls';
@@ -34,7 +34,7 @@ export class KetoGuard implements CanActivate {
         const user = req.user as JwtPayload;
 
         if (!user || !user.sub) {
-            throw new ForbiddenException('No authenticated user');
+            throw new HttpException({ message: 'No authenticated user', code: HttpStatus.FORBIDDEN }, HttpStatus.FORBIDDEN);
         }
 
         const isServiceToken = this.cls.get('isServiceToken') as boolean;
@@ -53,7 +53,7 @@ export class KetoGuard implements CanActivate {
             object = req.params[paramName];
 
             if (!object) {
-                throw new ForbiddenException(`Missing route parameter: ${paramName}`);
+                throw new HttpException({ message: `Missing route parameter: ${paramName}`, code: HttpStatus.FORBIDDEN }, HttpStatus.FORBIDDEN);
             }
         }
 
@@ -63,7 +63,10 @@ export class KetoGuard implements CanActivate {
         const allowed = await this.keto.check(permission.namespace, object, permission.relation, subjectId);
 
         if (!allowed) {
-            throw new ForbiddenException(`Missing permission: ${permission.namespace}:${object}#${permission.relation}`);
+            throw new HttpException(
+                { message: `Missing permission: ${permission.namespace}:${object}#${permission.relation}`, code: HttpStatus.FORBIDDEN },
+                HttpStatus.FORBIDDEN
+            );
         }
 
         return true;

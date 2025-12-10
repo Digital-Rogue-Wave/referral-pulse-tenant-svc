@@ -13,21 +13,9 @@ export class MessagingModule {
     static register(): DynamicModule {
         return {
             module: MessagingModule,
-            imports: [
-                ConfigModule.forFeature(sqsConfig),
-                ConfigModule.forFeature(snsConfig),
-                SqsMessagingModule.register(),
-                SnsModule,
-            ],
-            providers: [
-                SqsManager,
-                SnsPublisher,
-            ],
-            exports: [
-                SqsManager,
-                SnsPublisher,
-                SqsMessagingModule,
-            ],
+            imports: [ConfigModule.forFeature(sqsConfig), ConfigModule.forFeature(snsConfig), SqsMessagingModule.register(), SnsModule],
+            providers: [SqsManager, SnsPublisher],
+            exports: [SqsManager, SnsPublisher, SqsMessagingModule]
         };
     }
 }

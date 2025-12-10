@@ -1,13 +1,5 @@
 import { registerAs } from '@nestjs/config';
-import {
-    IsBooleanString,
-    IsNumberString,
-    IsOptional,
-    IsString,
-    Max,
-    Min,
-    ValidateIf,
-} from 'class-validator';
+import { IsBooleanString, IsNumberString, IsOptional, IsString, ValidateIf } from 'class-validator';
 import validateConfig from '@mod/common/validators/validate-config';
 import { MaybeType } from '@mod/types/maybe.type';
 
@@ -92,7 +84,7 @@ class EnvironmentVariablesValidator {
     DATABASE_CERT: MaybeType<string>;
 }
 
-export default registerAs<DatabaseConfig>('database', () => {
+export default registerAs<DatabaseConfig>('databaseConfig', () => {
     validateConfig(process.env, EnvironmentVariablesValidator);
 
     return {
@@ -109,6 +101,6 @@ export default registerAs<DatabaseConfig>('database', () => {
         rejectUnauthorized: process.env.DATABASE_REJECT_UNAUTHORIZED === 'true',
         ca: process.env.DATABASE_CA,
         key: process.env.DATABASE_KEY,
-        cert: process.env.DATABASE_CERT,
+        cert: process.env.DATABASE_CERT
     };
 });

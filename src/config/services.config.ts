@@ -44,6 +44,6 @@ export default registerAs<ServicesConfig>('servicesConfig', () => {
         analytics: process.env.SERVICE_ANALYTICS_URL as string,
         sdkConfig: process.env.SERVICE_SDK_CONFIG_URL as string,
         campaigns: process.env.SERVICE_CAMPAIGNS_URL as string,
-        workflowOrchestration: process.env.SERVICE_WORKFLOW_ORCHESTRATION_URL as string,
+        workflowOrchestration: process.env.SERVICE_WORKFLOW_ORCHESTRATION_URL as string
     };
 });

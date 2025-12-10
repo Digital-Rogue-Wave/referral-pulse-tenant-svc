@@ -42,6 +42,10 @@ class SnsEnvValidator {
     SNS_TENANT_EVENTS_TOPIC_ARN?: string;
 }
 
+export type SnsConfig = {
+    topics: TopicDef[];
+};
+
 export default registerAs('snsConfig', () => {
     validateConfig(process.env, SnsEnvValidator);
 

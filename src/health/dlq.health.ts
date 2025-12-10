@@ -17,14 +17,14 @@ export class DlqHealthIndicator extends HealthIndicator {
                 // Threshold: alert if total DLQ messages exceed 100
                 const result = this.getStatus(key, false, {
                     dlqMessageCount: totalMessages,
-                    queues: Object.fromEntries(depths),
+                    queues: Object.fromEntries(depths)
                 });
                 throw new HealthCheckError('DLQ threshold exceeded', result);
             }
 
             return this.getStatus(key, true, {
                 dlqMessageCount: totalMessages,
-                queues: Object.fromEntries(depths),
+                queues: Object.fromEntries(depths)
             });
         } catch (error) {
             throw new HealthCheckError('DLQ check failed', error);

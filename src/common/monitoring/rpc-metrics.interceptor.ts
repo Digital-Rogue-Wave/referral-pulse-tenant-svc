@@ -10,7 +10,7 @@ export class RpcMetricsInterceptor implements NestInterceptor {
     constructor(
         private readonly metrics: RpcMetricsService,
         private readonly helper: HelperService,
-        private readonly reflector: Reflector,
+        private readonly reflector: Reflector
     ) {}
 
     intercept(context: ExecutionContext, next: CallHandler): Observable<unknown> {
@@ -43,7 +43,7 @@ export class RpcMetricsInterceptor implements NestInterceptor {
             finalize(() => {
                 const seconds = Number(process.hrtime.bigint() - startedAt) / 1_000_000_000;
                 this.metrics.observeServerDuration(transport, pattern, result, seconds);
-            }),
+            })
         );
     }
 }

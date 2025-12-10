@@ -9,21 +9,15 @@ export class ContentAiClient {
 
     constructor(
         private readonly http: HttpClient,
-        private readonly config: ConfigService,
+        private readonly config: ConfigService
     ) {
-        const services = this.config.getOrThrow<ConfigType<typeof servicesConfig>>(
-            'servicesConfig',
-            { infer: true }
-        );
+        const services = this.config.getOrThrow<ConfigType<typeof servicesConfig>>('servicesConfig', { infer: true });
 
         this.baseUrl = services.contentAi;
     }
 
     async generateContent(req: { template: string; variables: Record<string, string> }) {
-        const { data } = await this.http.post(
-            `${this.baseUrl}/internal/generate`,
-            req
-        );
+        const { data } = await this.http.post(`${this.baseUrl}/internal/generate`, req);
 
         return data;
     }

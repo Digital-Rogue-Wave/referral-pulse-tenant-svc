@@ -9,33 +9,17 @@ export class OutboundLoggingService {
         this.logger.info('outbound_request_start', { target, method, url, attempt });
     }
 
-    requestEnd(
-        target: string,
-        method: string,
-        url: string,
-        statusCode: number,
-        durationMs: number,
-    ): void {
+    requestEnd(target: string, method: string, url: string, statusCode: number, durationMs: number): void {
         this.logger.info('outbound_request_end', {
             target,
             method,
             url,
             statusCode,
-            durationMs,
+            durationMs
         });
     }
 
-    requestError(
-        target: string,
-        method: string,
-        url: string,
-        durationMs: number,
-        err: unknown,
-    ): void {
-        this.logger.fatal(
-            'outbound_request_error',
-            { target, method, url, durationMs },
-            err,
-        );
+    requestError(target: string, method: string, url: string, durationMs: number, err: unknown): void {
+        this.logger.fatal('outbound_request_error', { target, method, url, durationMs }, err);
     }
 }

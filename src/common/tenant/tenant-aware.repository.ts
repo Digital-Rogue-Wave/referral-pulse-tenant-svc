@@ -12,7 +12,7 @@ import {
     Repository,
     SaveOptions,
     SelectQueryBuilder,
-    UpdateResult,
+    UpdateResult
 } from 'typeorm';
 import type { QueryDeepPartialEntity } from 'typeorm/query-builder/QueryPartialEntity';
 import { ClsService } from 'nestjs-cls';
@@ -23,15 +23,12 @@ export const InjectTenantAwareRepository = <T extends ObjectLiteral>(entity: Ent
     Inject(`TenantAwareRepository_${typeof entity === 'function' ? entity.name : String(entity)}`);
 
 /** Provider factory for a tenant-aware repository */
-export function createTenantAwareRepositoryProvider<T extends ObjectLiteral>(
-    entity: EntityTarget<T>,
-): Provider {
+export function createTenantAwareRepositoryProvider<T extends ObjectLiteral>(entity: EntityTarget<T>): Provider {
     const token = `TenantAwareRepository_${typeof entity === 'function' ? entity.name : String(entity)}`;
     return {
         provide: token,
-        useFactory: (dataSource: DataSource, cls: ClsService<ClsRequestContext>) =>
-            new TenantAwareRepository<T>(entity, dataSource, cls),
-        inject: [DataSource, ClsService],
+        useFactory: (dataSource: DataSource, cls: ClsService<ClsRequestContext>) => new TenantAwareRepository<T>(entity, dataSource, cls),
+        inject: [DataSource, ClsService]
     };
 }
 
@@ -55,7 +52,7 @@ export class TenantAwareRepository<Entity extends ObjectLiteral> extends Reposit
     constructor(
         private readonly entityTarget: EntityTarget<Entity>,
         dataSource: DataSource,
-        private readonly cls: ClsService<ClsRequestContext>,
+        private readonly cls: ClsService<ClsRequestContext>
     ) {
         super(entityTarget, dataSource.createEntityManager());
     }
@@ -71,14 +68,12 @@ export class TenantAwareRepository<Entity extends ObjectLiteral> extends Reposit
     }
 
     private mergeTenantIntoWhere(
-        where?: FindOptionsWhere<Entity> | FindOptionsWhere<Entity>[],
+        where?: FindOptionsWhere<Entity> | FindOptionsWhere<Entity>[]
     ): FindOptionsWhere<Entity> | FindOptionsWhere<Entity>[] | undefined {
         const tenantId = this.getTenantId();
         if (!where) return { tenantId } as unknown as FindOptionsWhere<Entity>;
         if (Array.isArray(where)) {
-            return where.map(
-                (w) => ({ ...(w as Record<string, unknown>), tenantId }) as unknown as FindOptionsWhere<Entity>,
-            );
+            return where.map((w) => ({ ...(w as Record<string, unknown>), tenantId }) as unknown as FindOptionsWhere<Entity>);
         }
         return { ...(where as Record<string, unknown>), tenantId } as unknown as FindOptionsWhere<Entity>;
     }
@@ -128,10 +123,7 @@ export class TenantAwareRepository<Entity extends ObjectLiteral> extends Reposit
 
     override save<T extends DeepPartial<Entity>>(entity: T, options?: SaveOptions): Promise<T & Entity>;
     override save<T extends DeepPartial<Entity>>(entities: T[], options?: SaveOptions): Promise<(T & Entity)[]>;
-    override async save<T extends DeepPartial<Entity>>(
-        entityOrEntities: T | T[],
-        options?: SaveOptions,
-    ): Promise<(T & Entity) | (T & Entity)[]> {
+    override async save<T extends DeepPartial<Entity>>(entityOrEntities: T | T[], options?: SaveOptions): Promise<(T & Entity) | (T & Entity)[]> {
         if (Array.isArray(entityOrEntities)) {
             const arr = entityOrEntities.map((e) => this.withTenantOnPartial(e));
             return super.save(arr, options);
@@ -148,7 +140,7 @@ export class TenantAwareRepository<Entity extends ObjectLiteral> extends Reposit
     async findOneTenantContext(
         fields: FindOptionsWhere<Entity>,
         relations?: FindOptionsRelations<Entity>,
-        select?: FindOptionsSelect<Entity>,
+        select?: FindOptionsSelect<Entity>
     ): Promise<Entity | null> {
         return this.findOne({ where: fields, relations, select });
     }
@@ -199,11 +191,7 @@ export class TenantAwareRepository<Entity extends ObjectLiteral> extends Reposit
 
     // -------------- Generic outbox helpers
 
-    async saveWithIdempotency(
-        partial: DeepPartial<Entity>,
-        idempotencyKeyField: keyof Entity & string,
-        options?: SaveOptions,
-    ): Promise<Entity> {
+    async saveWithIdempotency(partial: DeepPartial<Entity>, idempotencyKeyField: keyof Entity & string, options?: SaveOptions): Promise<Entity> {
         const value = (partial as Record<string, unknown>)[idempotencyKeyField];
         if (value == null) {
             return (await this.save(partial, options)) as unknown as Entity;
@@ -217,7 +205,7 @@ export class TenantAwareRepository<Entity extends ObjectLiteral> extends Reposit
             const tenantId = this.getTenantId();
             const where = {
                 [idempotencyKeyField]: value,
-                tenantId,
+                tenantId
             } as unknown as FindOptionsWhere<Entity>;
 
             const existing = await super.findOne({ where });
@@ -272,7 +260,7 @@ RETURNING t.*;
         pendingValue: unknown,
         attempts: number,
         baseDelaySec = 5,
-        capSec = 60 * 60,
+        capSec = 60 * 60
     ): Promise<void> {
         const tenantId = this.getTenantId();
         const where = { id, tenantId } as unknown as FindOptionsWhere<Entity>;
@@ -283,7 +271,7 @@ RETURNING t.*;
         const set = {
             [statusColumn]: pendingValue,
             [attemptsColumn]: attempts + 1,
-            [nextAttemptAtColumn]: next,
+            [nextAttemptAtColumn]: next
         } as unknown as QueryDeepPartialEntity<Entity>;
 
         await super.update(where, set);
@@ -300,21 +288,18 @@ RETURNING t.*;
             | { id: string | number }
             | FindOptionsWhere<Entity>
             | FindOptionsWhere<Entity>[],
-        partialEntity: QueryDeepPartialEntity<Entity>,
+        partialEntity: QueryDeepPartialEntity<Entity>
     ): Promise<UpdateResult> {
         const tenantId = this.getTenantId();
 
         if (Array.isArray(criteria)) {
             if (criteria.length > 0 && typeof criteria[0] === 'object') {
                 const arr = (criteria as FindOptionsWhere<Entity>[]).map(
-                    (c) => ({ ...(c as Record<string, unknown>), tenantId }) as unknown as FindOptionsWhere<Entity>,
+                    (c) => ({ ...(c as Record<string, unknown>), tenantId }) as unknown as FindOptionsWhere<Entity>
                 );
                 return super.update(arr, partialEntity);
             }
-            return super.update(
-                { id: criteria as unknown, tenantId } as unknown as FindOptionsWhere<Entity>,
-                partialEntity,
-            );
+            return super.update({ id: criteria as unknown, tenantId } as unknown as FindOptionsWhere<Entity>, partialEntity);
         }
 
         if (typeof criteria === 'object' && criteria !== null) {
@@ -335,7 +320,7 @@ export class TenantAwareRepositoryModule {
         return {
             module: TenantAwareRepositoryModule,
             providers,
-            exports: providers,
+            exports: providers
         };
     }
 }

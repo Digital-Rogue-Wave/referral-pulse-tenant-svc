@@ -1,8 +1,7 @@
 import { registerAs } from '@nestjs/config';
 import validateConfig from '@mod/common/validators/validate-config';
 import { MaybeType } from '@mod/types/maybe.type';
-import { IsEnum, IsInt, IsNumberString, IsOptional, IsString, IsUrl, Max, Min } from 'class-validator';
-
+import { IsEnum, IsNumberString, IsOptional, IsString, IsUrl } from 'class-validator';
 
 export enum AppEnvironment {
     Development = 'development',
@@ -53,7 +52,7 @@ class EnvironmentVariablesValidator {
     APP_HEADER_LANGUAGE: MaybeType<string>;
 }
 
-export default registerAs<AppConfig>('app', () => {
+export default registerAs<AppConfig>('appConfig', () => {
     validateConfig(process.env, EnvironmentVariablesValidator);
 
     return {

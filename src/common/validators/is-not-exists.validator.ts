@@ -3,7 +3,6 @@ import { ValidatorConstraint, ValidatorConstraintInterface, ValidationArguments 
 import { DataSource, EntityTarget, ObjectLiteral } from 'typeorm';
 import { InjectDataSource } from '@nestjs/typeorm';
 import { HttpResponseException } from '../exceptions/http-response.exception';
-import { I18nContext, I18nService } from 'nestjs-i18n';
 import { ValidationEntity } from '@mod/types/app.type';
 
 @Injectable()
@@ -11,7 +10,7 @@ import { ValidationEntity } from '@mod/types/app.type';
 export class IsNotExist implements ValidatorConstraintInterface {
     constructor(
         @InjectDataSource()
-        private readonly dataSource: DataSource,
+        private readonly dataSource: DataSource
     ) {}
 
     async validate(rawValue: unknown, validationArgs: ValidationArguments): Promise<boolean> {
@@ -50,6 +49,6 @@ export class IsNotExist implements ValidatorConstraintInterface {
     }
 
     defaultMessage(validationArgs: ValidationArguments): string {
-        return  validationArgs.constraints?.[1] as string;
+        return validationArgs.constraints?.[1] as string;
     }
 }

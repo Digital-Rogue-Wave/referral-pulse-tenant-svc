@@ -18,7 +18,7 @@ export class RedisFactory implements OnModuleDestroy {
 
     constructor(
         private readonly configService: ConfigService,
-        @Optional() @Inject(REDIS_IAM_AUTH_PROVIDER) private readonly iam?: RedisIamAuthProvider,
+        @Optional() @Inject(REDIS_IAM_AUTH_PROVIDER) private readonly iam?: RedisIamAuthProvider
     ) {}
 
     getClient(): RedisClient {
@@ -63,7 +63,7 @@ export class RedisFactory implements OnModuleDestroy {
             lazyConnect: config.lazyConnect,
             maxRetriesPerRequest: config.maxRetriesPerRequest,
             connectTimeout: config.connectionTimeoutMs,
-            retryStrategy: (attempt) => Math.min(config.reconnectBackoffMs * 2 ** (attempt - 1), 10_000),
+            retryStrategy: (attempt) => Math.min(config.reconnectBackoffMs * 2 ** (attempt - 1), 10_000)
         };
     }
 
@@ -78,7 +78,7 @@ export class RedisFactory implements OnModuleDestroy {
         const options: RedisOptions = {
             ...this.commonOptions(cfg),
             host: node.host,
-            port: node.port,
+            port: node.port
         };
 
         const client = new IORedis(options);
@@ -99,15 +99,19 @@ export class RedisFactory implements OnModuleDestroy {
             redisOptions: this.commonOptions(cfg),
             scaleReads: 'slave',
             clusterRetryStrategy: (attempt) => Math.min(cfg.reconnectBackoffMs * 2 ** (attempt - 1), 10_000),
-            enableAutoPipelining: cfg.enableAutoPipelining,
+            enableAutoPipelining: cfg.enableAutoPipelining
         };
 
         const cluster = new Cluster(nodes, clusterOpts);
 
         // IAM token for each node as it becomes ready
         if (cfg.authMode === 'iam' && this.iam) {
-            cluster.on('node:ready', async (node: Redis) => { await this.maybeAuthIAM(node, cfg); });
-            cluster.on('node:reconnecting', async (node: Redis) => { await this.maybeAuthIAM(node, cfg); });
+            cluster.on('node:ready', async (node: Redis) => {
+                await this.maybeAuthIAM(node, cfg);
+            });
+            cluster.on('node:reconnecting', async (node: Redis) => {
+                await this.maybeAuthIAM(node, cfg);
+            });
         }
 
         this.attachLoggers(cluster, 'redis');

@@ -12,11 +12,9 @@ export class IsDateGreaterThanNowValidator implements ValidatorConstraintInterfa
 
             const now = dayjs();
             return inputDate.isAfter(now);
-        } catch (_caughtError) {
+        } catch (error) {
             // Do not touch unknown; wrap a proper HttpException
-            throw new HttpResponseException(
-                new UnprocessableEntityException('Date must be greater than the current date'),
-            );
+            throw new HttpResponseException(new UnprocessableEntityException(`Date must be greater than the current date ${error}`));
         }
     }
 

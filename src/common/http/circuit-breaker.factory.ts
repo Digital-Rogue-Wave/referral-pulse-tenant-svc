@@ -13,7 +13,7 @@ export class CircuitBreakerFactory implements OnModuleDestroy {
 
     constructor(
         private readonly logger: AppLoggingService,
-        private readonly config: ConfigService,
+        private readonly config: ConfigService
     ) {
         const maxEntries = this.config.get<number>('cacheConfig.httpBreaker.cacheMax', { infer: true }) ?? 128;
         const ttlMs = this.config.get<number>('cacheConfig.httpBreaker.cacheTtlMs', { infer: true }) ?? 300_000;
@@ -25,7 +25,7 @@ export class CircuitBreakerFactory implements OnModuleDestroy {
             allowStale: false,
             updateAgeOnGet: true,
             maxSize: maxBytes,
-            sizeCalculation: () => 8 * 1024,
+            sizeCalculation: () => 8 * 1024
         });
     }
 
@@ -40,7 +40,7 @@ export class CircuitBreakerFactory implements OnModuleDestroy {
             timeout: cfg.timeoutMs,
             errorThresholdPercentage: cfg.errorThresholdPercentage,
             volumeThreshold: cfg.volumeThreshold,
-            resetTimeout: cfg.resetTimeoutMs,
+            resetTimeout: cfg.resetTimeoutMs
         });
 
         breaker.on('open', () => this.logger.warn(`Circuit OPEN: ${key}`));
@@ -62,6 +62,6 @@ export class CircuitBreakerFactory implements OnModuleDestroy {
             b.shutdown();
             b.removeAllListeners();
         }
-        this.cache.clear();
+        await this.cache.clear();
     }
 }

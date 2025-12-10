@@ -8,7 +8,7 @@ export class EventIdempotencyService {
 
     constructor(
         private readonly redis: RedisService,
-        private readonly keys: RedisKeyBuilder,
+        private readonly keys: RedisKeyBuilder
     ) {}
 
     async isProcessed(eventId: string, consumerName: string): Promise<boolean> {
@@ -19,11 +19,7 @@ export class EventIdempotencyService {
 
     async markProcessed(eventId: string, consumerName: string, result?: unknown): Promise<void> {
         const key = this.keys.build('event:processed', consumerName, eventId);
-        await this.redis.set(
-            key,
-            JSON.stringify({ processedAt: new Date().toISOString(), result }),
-            this.ttl,
-        );
+        await this.redis.set(key, JSON.stringify({ processedAt: new Date().toISOString(), result }), this.ttl);
     }
 
     async wasSent(eventId: string, destination: string): Promise<boolean> {
@@ -34,10 +30,6 @@ export class EventIdempotencyService {
 
     async markSent(eventId: string, destination: string): Promise<void> {
         const key = this.keys.build('event:sent', destination, eventId);
-        await this.redis.set(
-            key,
-            JSON.stringify({ sentAt: new Date().toISOString(), destination }),
-            this.ttl,
-        );
+        await this.redis.set(key, JSON.stringify({ sentAt: new Date().toISOString(), destination }), this.ttl);
     }
 }

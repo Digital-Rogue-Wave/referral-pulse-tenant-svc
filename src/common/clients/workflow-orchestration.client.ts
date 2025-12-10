@@ -9,30 +9,22 @@ export class WorkflowOrchestrationClient {
 
     constructor(
         private readonly http: HttpClient,
-        private readonly config: ConfigService,
+        private readonly config: ConfigService
     ) {
-        const services = this.config.getOrThrow<ConfigType<typeof servicesConfig>>(
-            'servicesConfig',
-            { infer: true }
-        );
+        const services = this.config.getOrThrow<ConfigType<typeof servicesConfig>>('servicesConfig', { infer: true });
 
         this.baseUrl = services.workflowOrchestration;
     }
 
     async startWorkflow(req: { workflowType: string; input: Record<string, unknown> }) {
         // OAuth2 JWT added automatically by HttpClient
-        const { data } = await this.http.post(
-            `${this.baseUrl}/internal/workflows/start`,
-            req
-        );
+        const { data } = await this.http.post(`${this.baseUrl}/internal/workflows/start`, req);
 
         return data;
     }
 
     async getWorkflowStatus(workflowId: string) {
-        const { data } = await this.http.get(
-            `${this.baseUrl}/internal/workflows/${workflowId}`
-        );
+        const { data } = await this.http.get(`${this.baseUrl}/internal/workflows/${workflowId}`);
 
         return data;
     }

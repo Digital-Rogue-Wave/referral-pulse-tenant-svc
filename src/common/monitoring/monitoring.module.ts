@@ -22,8 +22,8 @@ export class MonitoringModule {
                     inject: [metricsConfig.KEY],
                     useFactory: (cfg: ConfigType<typeof metricsConfig>) => ({
                         path: cfg.endpoint,
-                        defaultMetrics: { enabled: true },
-                    }),
+                        defaultMetrics: { enabled: true }
+                    })
                 }),
                 HelperModule
             ],
@@ -42,8 +42,8 @@ export class MonitoringModule {
                             help: 'HTTP server request duration (s)',
                             buckets: cfg.defaultBuckets,
                             labelNames: ['method', 'route', 'status'],
-                            registers: [promDefaultRegistry],
-                        }),
+                            registers: [promDefaultRegistry]
+                        })
                 },
 
                 // ---- HTTP client duration
@@ -56,8 +56,8 @@ export class MonitoringModule {
                             help: 'HTTP client request duration (s)',
                             buckets: cfg.defaultBuckets,
                             labelNames: ['method', 'target', 'status', 'kind'], // kind=intra|thirdparty
-                            registers: [promDefaultRegistry],
-                        }),
+                            registers: [promDefaultRegistry]
+                        })
                 },
 
                 // ---- SQS handler duration
@@ -70,8 +70,8 @@ export class MonitoringModule {
                             help: 'SQS message handler duration (s)',
                             buckets: cfg.defaultBuckets,
                             labelNames: ['queue', 'result'], // ok|error
-                            registers: [promDefaultRegistry],
-                        }),
+                            registers: [promDefaultRegistry]
+                        })
                 },
 
                 // ---- SQS processed counter
@@ -82,8 +82,8 @@ export class MonitoringModule {
                             name: 'sqs_messages_processed_total',
                             help: 'Total SQS messages processed',
                             labelNames: ['queue', 'result'],
-                            registers: [promDefaultRegistry],
-                        }),
+                            registers: [promDefaultRegistry]
+                        })
                 },
 
                 // ---- RPC server duration
@@ -96,8 +96,8 @@ export class MonitoringModule {
                             help: 'RPC (Nest microservices) handler duration (s)',
                             buckets: cfg.defaultBuckets,
                             labelNames: ['transport', 'pattern', 'result'], // ok|error
-                            registers: [promDefaultRegistry],
-                        }),
+                            registers: [promDefaultRegistry]
+                        })
                 },
 
                 // ---- RPC in/out counter
@@ -108,14 +108,14 @@ export class MonitoringModule {
                             name: 'rpc_messages_total',
                             help: 'RPC messages processed',
                             labelNames: ['direction', 'transport', 'pattern', 'result'], // direction=in|out
-                            registers: [promDefaultRegistry],
-                        }),
+                            registers: [promDefaultRegistry]
+                        })
                 },
 
                 // Global RPC interceptor (server-side)
-                { provide: APP_INTERCEPTOR, useClass: RpcMetricsInterceptor },
+                { provide: APP_INTERCEPTOR, useClass: RpcMetricsInterceptor }
             ],
-            exports: [MonitoringService, RpcMetricsService],
+            exports: [MonitoringService, RpcMetricsService]
         };
     }
 }

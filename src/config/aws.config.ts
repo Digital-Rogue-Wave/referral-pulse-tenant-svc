@@ -1,12 +1,12 @@
 import { registerAs } from '@nestjs/config';
 import validateConfig from '@mod/common/validators/validate-config';
 import type { MaybeType } from '@mod/types/maybe.type';
-import { IsEnum, IsInt, IsNumberString, IsOptional } from 'class-validator';
+import { IsEnum, IsNumberString, IsOptional } from 'class-validator';
 
 export enum AwsRetryMode {
     Standard = 'standard',
     Adaptive = 'adaptive',
-    Legacy = 'legacy',
+    Legacy = 'legacy'
 }
 
 export type AwsConfig = {

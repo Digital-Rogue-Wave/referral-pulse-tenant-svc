@@ -8,7 +8,7 @@ export class S3KeyBuilder {
 
     constructor(
         private readonly configService: ConfigService,
-        @Optional() private readonly tenant?: ClsTenantContext,
+        @Optional() private readonly tenant?: ClsTenantContext
     ) {
         this.prefix = this.configService.getOrThrow<string>('s3Config.keyPrefix', { infer: true });
     }

@@ -8,7 +8,7 @@ import { AppLoggingService } from './app-logging.service';
 export class HttpLoggingInterceptor implements NestInterceptor {
     constructor(
         private readonly logger: AppLoggingService,
-        private readonly cls: ClsService<ClsRequestContext>,
+        private readonly cls: ClsService<ClsRequestContext>
     ) {}
 
     intercept(context: ExecutionContext, next: CallHandler): Observable<unknown> {
@@ -17,7 +17,10 @@ export class HttpLoggingInterceptor implements NestInterceptor {
         }
 
         const req = context.switchToHttp().getRequest<{
-            method?: string; originalUrl?: string; ip?: string; headers?: Record<string, string>;
+            method?: string;
+            originalUrl?: string;
+            ip?: string;
+            headers?: Record<string, string>;
         }>();
         const res = context.switchToHttp().getResponse<{ statusCode?: number }>();
 
@@ -43,9 +46,9 @@ export class HttpLoggingInterceptor implements NestInterceptor {
                         durationMs,
                         requestId,
                         tenantId,
-                        userId,
+                        userId
                     },
-                    caught,
+                    caught
                 );
 
                 return throwError(() => caught);
@@ -60,10 +63,10 @@ export class HttpLoggingInterceptor implements NestInterceptor {
                         durationMs,
                         requestId,
                         tenantId,
-                        userId,
+                        userId
                     });
                 }
-            }),
+            })
         );
     }
 }

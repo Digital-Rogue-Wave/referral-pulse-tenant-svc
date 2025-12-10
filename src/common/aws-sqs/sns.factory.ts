@@ -13,9 +13,9 @@ export class SnsFactory {
             maxAttempts: this.configService.get<number>('awsConfig.maxAttempts', { infer: true }) ?? 3,
             retryMode:
                 this.configService.get<'standard' | 'adaptive' | 'legacy'>('awsConfig.retryMode', {
-                    infer: true,
+                    infer: true
                 }) ?? 'standard',
-            requestHandler: new NodeHttpHandler({ connectionTimeout: 5000, socketTimeout: 60000 }),
+            requestHandler: new NodeHttpHandler({ connectionTimeout: 5000, socketTimeout: 60000 })
         };
 
         this.client = new SNSClient(cfg);

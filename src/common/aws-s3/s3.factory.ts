@@ -10,19 +10,16 @@ export class S3Factory {
     constructor(private readonly configService: ConfigService) {
         // ---- shared AWS settings
         const region = this.configService.getOrThrow<string>('awsConfig.region', { infer: true });
-        const maxAttempts =
-            this.configService.get<number>('awsConfig.maxAttempts', { infer: true }) ?? 3;
+        const maxAttempts = this.configService.get<number>('awsConfig.maxAttempts', { infer: true }) ?? 3;
         const retryMode =
             this.configService.get<'standard' | 'adaptive' | 'legacy'>('awsConfig.retryMode', {
-                infer: true,
+                infer: true
             }) ?? 'standard';
 
         // ---- S3-specific settings
         const endpoint = this.configService.get<string>('s3Config.endpoint', { infer: true });
-        const forcePathStyle =
-            this.configService.get<boolean>('s3Config.forcePathStyle', { infer: true }) ?? false;
-        const accelerate =
-            this.configService.get<boolean>('s3Config.accelerate', { infer: true }) ?? false;
+        const forcePathStyle = this.configService.get<boolean>('s3Config.forcePathStyle', { infer: true }) ?? false;
+        const accelerate = this.configService.get<boolean>('s3Config.accelerate', { infer: true }) ?? false;
 
         const base: S3ClientConfig = {
             region,
@@ -30,8 +27,8 @@ export class S3Factory {
             retryMode,
             requestHandler: new NodeHttpHandler({
                 connectionTimeout: 5_000,
-                requestTimeout: 60_000,
-            }),
+                requestTimeout: 60_000
+            })
         };
 
         // Custom endpoint (e.g., LocalStack/MinIO) and Accelerate are mutually exclusive.

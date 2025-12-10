@@ -16,7 +16,7 @@ export function SqsEventHandler(opts: SqsEventHandlerOptions) {
     return function (
         _target: unknown,
         _propertyKey: string | symbol,
-        descriptor: TypedPropertyDescriptor<(message: Message) => Promise<void>>,
+        descriptor: TypedPropertyDescriptor<(message: Message) => Promise<void>>
     ): TypedPropertyDescriptor<(message: Message) => Promise<void>> {
         const original = descriptor.value!;
 
@@ -27,7 +27,7 @@ export function SqsEventHandler(opts: SqsEventHandlerOptions) {
                 cls?: ClsService;
                 logger?: AppLoggingService;
             },
-            message: Message,
+            message: Message
         ): Promise<void> {
             const tracer = trace.getTracer('sqs');
             const start = process.hrtime.bigint();
@@ -35,7 +35,7 @@ export function SqsEventHandler(opts: SqsEventHandlerOptions) {
 
             await otContext.with(parentCtx, async () => {
                 const span = tracer.startSpan(`sqs.consume ${opts.queue}`, {
-                    attributes: baseSqsSpanAttrs(opts.queue, message),
+                    attributes: baseSqsSpanAttrs(opts.queue, message)
                 });
 
                 try {
@@ -52,14 +52,11 @@ export function SqsEventHandler(opts: SqsEventHandlerOptions) {
 
                     // Idempotency check
                     if (this.eventIdempotency) {
-                        const isProcessed = await this.eventIdempotency.isProcessed(
-                            metadata.eventId,
-                            opts.consumerName,
-                        );
+                        const isProcessed = await this.eventIdempotency.isProcessed(metadata.eventId, opts.consumerName);
 
                         if (isProcessed) {
                             this.logger?.info(
-                                `SQS event already processed - eventId: ${metadata.eventId}, eventType: ${metadata.eventType}, consumerName: ${opts.consumerName}, requestId: ${metadata.requestId || 'none'}`,
+                                `SQS event already processed - eventId: ${metadata.eventId}, eventType: ${metadata.eventType}, consumerName: ${opts.consumerName}, requestId: ${metadata.requestId || 'none'}`
                             );
 
                             span.addEvent('event_skipped_duplicate');
@@ -73,10 +70,7 @@ export function SqsEventHandler(opts: SqsEventHandlerOptions) {
 
                     // Mark as processed
                     if (this.eventIdempotency) {
-                        await this.eventIdempotency.markProcessed(
-                            metadata.eventId,
-                            opts.consumerName,
-                        );
+                        await this.eventIdempotency.markProcessed(metadata.eventId, opts.consumerName);
                     }
 
                     span.setStatus({ code: SpanStatusCode.OK });

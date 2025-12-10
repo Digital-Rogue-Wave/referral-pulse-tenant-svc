@@ -40,13 +40,13 @@ export class TracingModule implements OnModuleDestroy {
                     inject: [tracingConfig.KEY, appConfig.KEY],
                     useFactory: async (cfg: ConfigType<typeof tracingConfig>, app: ConfigType<typeof appConfig>) => {
                         if (!cfg.enabled) {
-                            return { start: async () => void 0, shutdown: async () => void 0 } as unknown as NodeSDK;
+                            return { start: () => void 0, shutdown: () => void 0 } as unknown as NodeSDK;
                         }
 
                         // OTLP exporter
                         const exporter = new OTLPTraceExporter({
                             url: cfg.otlpEndpoint,
-                            headers: cfg.otlpHeaders,
+                            headers: cfg.otlpHeaders
                         });
 
                         // Minimal, correct resource: only service-level/static attrs
@@ -54,12 +54,12 @@ export class TracingModule implements OnModuleDestroy {
                             'service.name': cfg.serviceName,
                             'service.version': process.env.APP_VERSION ?? '0.0.0',
                             'deployment.environment': cfg.environment,
-                            'app.name': app.name,
+                            'app.name': app.name
                         });
 
                         // Parent-based sampler w/ ratio
                         const sampler = new ParentBasedSampler({
-                            root: new TraceIdRatioBasedSampler(Math.max(0, Math.min(1, cfg.samplerRatio))),
+                            root: new TraceIdRatioBasedSampler(Math.max(0, Math.min(1, cfg.samplerRatio)))
                         });
 
                         // Instrumentations (HTTP hook sets url.full on spans)
@@ -72,8 +72,7 @@ export class TracingModule implements OnModuleDestroy {
                                         const path = req.url;
                                         const host = req.headers?.host as string | undefined;
                                         const proto =
-                                            (req.headers?.['x-forwarded-proto'] as string | undefined) ??
-                                            (req.socket?.encrypted ? 'https' : 'http');
+                                            (req.headers?.['x-forwarded-proto'] as string | undefined) ?? (req.socket?.encrypted ? 'https' : 'http');
                                         const full = host ? `${proto}://${host}${path}` : path;
                                         span.setAttribute('url.full', full);
                                         return;
@@ -90,7 +89,7 @@ export class TracingModule implements OnModuleDestroy {
                                 } catch {
                                     // best-effort only; ignore hook errors
                                 }
-                            },
+                            }
                         });
 
                         const instrumentations = [
@@ -100,14 +99,14 @@ export class TracingModule implements OnModuleDestroy {
                             new IORedisInstrumentation(),
                             new PgInstrumentation(),
                             new TypeormInstrumentation(),
-                            new AwsInstrumentation(),
+                            new AwsInstrumentation()
                         ];
 
                         const sdk = new NodeSDK({
                             resource,
                             traceExporter: exporter,
                             sampler,
-                            instrumentations,
+                            instrumentations
                         });
 
                         // Propagation
@@ -116,10 +115,10 @@ export class TracingModule implements OnModuleDestroy {
 
                         await sdk.start();
                         return sdk;
-                    },
-                },
+                    }
+                }
             ],
-            exports: [],
+            exports: []
         };
     }
 }

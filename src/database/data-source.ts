@@ -15,5 +15,5 @@ export const AppDataSource = new DataSource({
     namingStrategy: new SnakeNamingStrategy(),
     logging: process.env.NODE_ENV !== 'production',
     entities: [isProd ? 'dist/**/*.entity.js' : 'src/**/*.entity.ts'],
-    migrations: [isProd ? 'dist/database/migrations/*.{js,cjs}' : 'src/database/migrations/*.{ts,tsx,js}'],
+    migrations: [isProd ? 'dist/database/migrations/*.{js,cjs}' : 'src/database/migrations/*.{ts,tsx,js}']
 } as any);

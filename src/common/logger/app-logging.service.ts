@@ -14,7 +14,7 @@ function baseBindings(config: LoggerConfig) {
         k8sNamespace: config.k8sNamespace,
         podName: config.podName,
         nodeName: config.nodeName,
-        region: config.region,
+        region: config.region
     };
 }
 
@@ -26,16 +26,13 @@ export class AppLoggingService implements LoggerService {
     constructor(
         private readonly helper: HelperService,
         @Inject(loggerConfig.KEY) private readonly cfg: ConfigType<typeof loggerConfig>,
-        private readonly cls: ClsService<LogContext>,
+        private readonly cls: ClsService<LogContext>
     ) {
         this.baseBindings = baseBindings(cfg);
 
         const transport = helper.buildTransport(cfg);
         this.logger = transport
-            ? pino(
-                { level: cfg.level, base: this.baseBindings, timestamp: pino.stdTimeFunctions.isoTime },
-                pino.transport(transport),
-            )
+            ? pino({ level: cfg.level, base: this.baseBindings, timestamp: pino.stdTimeFunctions.isoTime }, pino.transport(transport))
             : pino({ level: cfg.level, base: this.baseBindings, timestamp: pino.stdTimeFunctions.isoTime });
     }
 
@@ -52,7 +49,7 @@ export class AppLoggingService implements LoggerService {
             // ADD ALB trace context
             albTraceRoot: this.cls.get('albTraceRoot'),
             albParentId: this.cls.get('albParentId'),
-            albSampled: this.cls.get('albSampled'),
+            albSampled: this.cls.get('albSampled')
         };
     }
 
@@ -67,7 +64,7 @@ export class AppLoggingService implements LoggerService {
             ...this.ctx(),
             ...(context ? { context } : {}),
             ...(safeMeta ?? {}),
-            ...(this.withError(err) ?? {}),
+            ...(this.withError(err) ?? {})
         };
     }
 
@@ -99,7 +96,7 @@ export class AppLoggingService implements LoggerService {
             this.logger.error(meta, message.message);
             return;
         }
-        const meta = this.payload(trace ? { trace } as JsonRecord : undefined, undefined, context);
+        const meta = this.payload(trace ? ({ trace } as JsonRecord) : undefined, undefined, context);
         this.logger.error(meta, this.asMessage(message) ?? String(message));
     }
 

@@ -21,17 +21,13 @@ export class HttpClientsModule {
                     inject: [ConfigService],
                     useFactory: (cfg: ConfigService) => ({
                         timeout: cfg.getOrThrow<number>('httpClientConfig.intra.timeoutMs', { infer: true }),
-                        maxRedirects: 5,
-                    }),
+                        maxRedirects: 5
+                    })
                 }),
-                HelperModule,
+                HelperModule
             ],
-            providers: [
-                CircuitBreakerFactory,
-                MachineAuthProvider,
-                HttpClient,
-            ],
-            exports: [HttpClient],
+            providers: [CircuitBreakerFactory, MachineAuthProvider, HttpClient],
+            exports: [HttpClient]
         };
     }
 }
