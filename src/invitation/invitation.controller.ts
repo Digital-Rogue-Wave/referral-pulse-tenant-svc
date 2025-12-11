@@ -5,16 +5,15 @@ import {
     Param,
     Get,
     UseGuards,
-    Req,
     HttpCode,
     HttpStatus,
     UseInterceptors,
     Put,
     Query,
     HttpException,
-    Delete
+    Delete,
+    Req
 } from '@nestjs/common';
-import { Request } from 'express';
 import { InvitationService } from './invitation.service';
 import { CreateInvitationDto } from './dto/create-invitation.dto';
 import { EditInvitationDto } from './dto/accept-invitation.dto';
@@ -25,7 +24,8 @@ import { InvitationEntity } from './invitation.entity';
 import { ApiTags, ApiBearerAuth, ApiCreatedResponse, ApiBody, ApiOkResponse, ApiQuery } from '@nestjs/swagger';
 import { InvitationDto } from './dto/invitation.dto';
 import { MapInterceptor } from '@automapper/nestjs';
-
+import { Request } from 'express';
+import { JwtPayload } from '@mod/types/app.interface';
 @ApiTags('Invitations')
 @ApiBearerAuth()
 @Controller({ path: 'invitations', version: '1' })
@@ -64,11 +64,11 @@ export class InvitationController {
         @Query('action') action: 'accept' | 'reject'
     ): Promise<InvitationEntity> {
         if (action === 'accept') {
-            const userId = req.user?.sub;
-            if (!userId) {
+            const user = req.user as JwtPayload;
+            if (!user) {
                 throw new HttpException({ message: 'User not authenticated', code: HttpStatus.UNAUTHORIZED }, HttpStatus.UNAUTHORIZED);
             }
-            return this.invitationService.accept(editInvitationDto.token, userId);
+            return this.invitationService.accept(editInvitationDto.token, user.sub);
         } else if (action === 'reject') {
             return this.invitationService.reject(editInvitationDto.token);
         } else {
