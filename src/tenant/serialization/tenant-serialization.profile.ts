@@ -2,7 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { createMap, Mapper, MappingProfile, typeConverter } from '@automapper/core';
 import { AutomapperProfile, InjectMapper } from '@automapper/nestjs';
 import { TenantEntity } from '../tenant.entity';
-import { TenantDto } from '../dto/tenant.dto';
+import { TenantDto } from '../dto/tenant/tenant.dto';
 
 @Injectable()
 export class TenantSerializationProfile extends AutomapperProfile {

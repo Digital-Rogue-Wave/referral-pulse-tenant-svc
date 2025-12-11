@@ -1,13 +1,13 @@
-import { Controller, Get, Post, Body, Param, Delete, Put, HttpCode, HttpStatus, UseInterceptors, UploadedFile, UseGuards, Req } from '@nestjs/common';
+import { Controller, Get, Post, Body, Param, Delete, Put, HttpCode, HttpStatus, UseInterceptors, UploadedFile, UseGuards, Ip } from '@nestjs/common';
 import { TenantService } from './tenant.service';
 import { TenantEntity } from './tenant.entity';
-import { CreateTenantDto } from './dto/create-tenant.dto';
-import { UpdateTenantDto } from './dto/update-tenant.dto';
+import { CreateTenantDto } from './dto/tenant/create-tenant.dto';
+import { UpdateTenantDto } from './dto/tenant/update-tenant.dto';
 import { TransferOwnershipDto } from './dto/transfer-ownership.dto';
 import { NullableType } from '@mod/types/nullable.type';
 import { DeleteResult } from 'typeorm';
 import { ApiBody, ApiConsumes, ApiCreatedResponse, ApiExtraModels, ApiOkResponse, ApiTags, getSchemaPath, ApiBearerAuth } from '@nestjs/swagger';
-import { TenantDto } from './dto/tenant.dto';
+import { TenantDto } from './dto/tenant/tenant.dto';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { ParseFormdataPipe } from '@mod/common/pipes/parse-formdata.pipe';
 import { Utils } from '@mod/common/utils/utils';
@@ -15,8 +15,8 @@ import { MapInterceptor } from '@automapper/nestjs';
 import { JwtAuthGuard } from '@mod/common/auth/jwt-auth.guard';
 import { KetoGuard, RequirePermission } from '@mod/common/auth/keto.guard';
 import { KetoNamespace, KetoPermission } from '@mod/common/auth/keto.constants';
-import { Request } from 'express';
-import { JwtPayload } from '@mod/types/app.interface';
+import { CurrentUser, CurrentUserType } from '@mod/common/auth/current-user.decorator';
+import { TenantSettingsDto } from './dto/settings/tenant-settings.dto';
 
 @ApiTags('tenants')
 @ApiBearerAuth()
@@ -47,15 +47,14 @@ export class TenantController {
     @HttpCode(HttpStatus.CREATED)
     @Post()
     async create(
-        @Req() req: Request,
+        @CurrentUser() user: CurrentUserType,
         @Body('data', ParseFormdataPipe) data: any,
         @UploadedFile() file?: Express.Multer.File | Express.MulterS3.File
     ): Promise<TenantEntity> {
         const createTenantDto = await Utils.validateDtoOrFail(CreateTenantDto, data);
 
         // Override ownerId with authenticated user
-        const user = req.user as JwtPayload;
-        createTenantDto.ownerId = user.sub;
+        createTenantDto.ownerId = user.id;
 
         return await this.tenantService.create(createTenantDto, file);
     }
@@ -93,19 +92,19 @@ export class TenantController {
         }
     })
     @ApiOkResponse({ type: TenantDto })
+    @UseInterceptors(MapInterceptor(TenantEntity, TenantDto))
     @UseGuards(KetoGuard)
     @RequirePermission({ namespace: KetoNamespace.TENANT, relation: KetoPermission.UPDATE, objectParam: 'id' })
     @HttpCode(HttpStatus.OK)
     @Put(':id')
     async update(
-        @Req() req: Request,
+        @CurrentUser() user: CurrentUserType,
         @Param('id') id: string,
         @Body('data', ParseFormdataPipe) data: any,
         @UploadedFile() file?: Express.Multer.File | Express.MulterS3.File
     ) {
-        const user = req.user as JwtPayload;
         const updateTenantDto = await Utils.validateDtoOrFail(UpdateTenantDto, data);
-        return await this.tenantService.update(id, updateTenantDto, file, user.sub, user.email);
+        return await this.tenantService.update(id, updateTenantDto, file, user.id, user.email);
     }
 
     @ApiOkResponse({ description: 'Ownership transferred successfully' })
@@ -113,10 +112,33 @@ export class TenantController {
     @UseGuards(JwtAuthGuard, KetoGuard)
     @RequirePermission({ namespace: KetoNamespace.TENANT, relation: KetoPermission.UPDATE, objectParam: 'id' })
     @HttpCode(HttpStatus.OK)
-    @Post(':id/transfer-ownership')
-    async transferOwnership(@Param('id') id: string, @Body() dto: TransferOwnershipDto, @Req() req: Request): Promise<void> {
-        const user = req.user as JwtPayload;
-        await this.tenantService.transferOwnership(id, dto.newOwnerId, user.sub);
+    @Put(':id/transfer-ownership')
+    async transferOwnership(@Param('id') id: string, @Body() dto: TransferOwnershipDto, @CurrentUser() user: CurrentUserType): Promise<void> {
+        return await this.tenantService.transferOwnership(id, dto.newOwnerId, user.id);
+    }
+
+    @ApiOkResponse({ type: TenantSettingsDto })
+    @UseGuards(KetoGuard)
+    @RequirePermission({ namespace: KetoNamespace.TENANT, relation: KetoPermission.READ, objectParam: 'id' })
+    @HttpCode(HttpStatus.OK)
+    @Get(':id/settings')
+    async getSettings(@Param('id') id: string): Promise<TenantSettingsDto> {
+        return await this.tenantService.getSettings(id);
+    }
+
+    @ApiBody({ type: TenantSettingsDto })
+    @ApiOkResponse({ type: TenantSettingsDto })
+    @UseGuards(KetoGuard)
+    @RequirePermission({ namespace: KetoNamespace.TENANT, relation: KetoPermission.UPDATE, objectParam: 'id' })
+    @HttpCode(HttpStatus.OK)
+    @Put(':id/settings')
+    async updateSettings(
+        @Param('id') id: string,
+        @Body() settingsDto: TenantSettingsDto,
+        @CurrentUser() user: CurrentUserType,
+        @Ip() ipAddress: string
+    ): Promise<TenantSettingsDto> {
+        return await this.tenantService.updateSettings(id, settingsDto, user.id, ipAddress);
     }
 
     @ApiOkResponse({ type: DeleteResult })

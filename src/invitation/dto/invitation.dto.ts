@@ -1,5 +1,5 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { TenantDto } from '@mod/tenant/dto/tenant.dto';
+import { TenantDto } from '@mod/tenant/dto/tenant/tenant.dto';
 import { RoleEnum } from '@mod/common/enums/role.enum';
 import { InvitationStatusEnum } from '@mod/common/enums/invitation.enum';
 

@@ -33,10 +33,14 @@ import { AllConfigType } from '@mod/config/config.type';
 import { HeaderResolver, I18nModule } from 'nestjs-i18n';
 import path from 'path';
 import { EventEmitterModule } from '@nestjs/event-emitter';
+import { TypeOrmModule } from '@nestjs/typeorm';
+import { AuditLog } from '@mod/common/entities/audit-log.entity';
+import { AuditService } from './services/audit.service';
 
 @Global()
 @Module({
     imports: [
+        TypeOrmModule.forFeature([AuditLog]),
         EventEmitterModule.forRoot(),
         LoggingModule,
         RedisModule,
@@ -147,7 +151,8 @@ import { EventEmitterModule } from '@nestjs/event-emitter';
         IsGreaterThanOrEqualConstraint,
         RequestIdMiddleware,
         SharedService,
-        S3Client
+        S3Client,
+        AuditService
     ],
     exports: [
         IsNotUsedByOthers,
@@ -171,7 +176,8 @@ import { EventEmitterModule } from '@nestjs/event-emitter';
         HelperModule,
         ClientsModule,
         MulterModule,
-        SharedService
+        SharedService,
+        AuditService
     ]
 })
 export class CommonModule {}

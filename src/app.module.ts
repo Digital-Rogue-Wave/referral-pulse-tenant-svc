@@ -25,8 +25,13 @@ import { WebhookModule } from './webhook/webhook.module';
 import { FilesModule } from './files/files.module';
 import { TenantModule } from './tenant/tenant.module';
 import { InvitationModule } from './invitation/invitation.module';
+import { CurrencyModule } from './currency/currency.module';
+import { ApiKeyModule } from './api-key/api-key.module';
+import { FeatureFlagModule } from './feature-flag/feature-flag.module';
 import { AutomapperModule } from '@automapper/nestjs';
 import { classes } from '@automapper/classes';
+import { ApiKeyController } from './api-key/api-key.controller';
+import { TenantMiddleware } from './common/tenant/tenant.middleware';
 
 @Module({
     imports: [
@@ -48,7 +53,10 @@ import { classes } from '@automapper/classes';
         WebhookModule,
         FilesModule,
         TenantModule,
-        InvitationModule
+        InvitationModule,
+        CurrencyModule,
+        ApiKeyModule,
+        FeatureFlagModule
     ],
     providers: [
         // Order matters: enrich spans, then record metrics
@@ -61,5 +69,6 @@ import { classes } from '@automapper/classes';
 export class AppModule implements NestModule {
     configure(consumer: MiddlewareConsumer) {
         consumer.apply(RequestIdMiddleware).forRoutes({ path: '*', method: RequestMethod.ALL });
+        consumer.apply(TenantMiddleware).forRoutes(ApiKeyController);
     }
 }

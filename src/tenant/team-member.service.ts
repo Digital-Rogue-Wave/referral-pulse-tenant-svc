@@ -2,7 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { FindManyOptions, FindOptionsRelations, FindOptionsWhere, Repository } from 'typeorm';
 import { TeamMemberEntity } from './team-member.entity';
-import { UpdateTeamMemberDto } from './dto/update-team-member.dto';
+import { UpdateTeamMemberDto } from './dto/team-member/update-team-member.dto';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { NullableType } from '@mod/types/nullable.type';
 

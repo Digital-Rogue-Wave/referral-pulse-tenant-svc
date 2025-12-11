@@ -1,59 +1,21 @@
 import { Injectable, HttpStatus, HttpException } from '@nestjs/common';
 import { EventEmitter2 } from '@nestjs/event-emitter';
-import { ConfigService } from '@nestjs/config';
 import { InjectRepository } from '@nestjs/typeorm';
 import { FindOptionsRelations, FindOptionsWhere, Repository } from 'typeorm';
-import { InvitationEntity } from './invitation.entity';
-import { CreateInvitationDto } from './dto/create-invitation.dto';
-import { InvitationStatusEnum } from '../common/enums/invitation.enum';
-import { TeamMemberEntity } from '../tenant/team-member.entity';
-import { randomBytes } from 'crypto';
-import { TenantService } from '@mod/tenant/tenant.service';
-import { Utils } from '@mod/common/utils/utils';
-import { CreateFullInvitationDto } from './dto/create-full-invitation.dto';
-import { AllConfigType } from '@mod/config/config.type';
+import { InvitationEntity } from '../invitation.entity';
+import { InvitationStatusEnum } from '../../common/enums/invitation.enum';
+import { TeamMemberEntity } from '../../tenant/team-member.entity';
 import { NullableType } from '@mod/types/nullable.type';
 
 @Injectable()
-export class InvitationService {
+export class PublicInvitationService {
     constructor(
         @InjectRepository(InvitationEntity)
         private readonly invitationRepository: Repository<InvitationEntity>,
         @InjectRepository(TeamMemberEntity)
         private readonly teamMemberRepository: Repository<TeamMemberEntity>,
-        private readonly tenantService: TenantService,
-        private readonly eventEmitter: EventEmitter2,
-        private readonly configService: ConfigService<AllConfigType>
+        private readonly eventEmitter: EventEmitter2
     ) {}
-
-    async create(tenantId: string, createInvitationDto: CreateInvitationDto): Promise<InvitationEntity> {
-        const tenant = await this.tenantService.findOneOrFail({ id: tenantId });
-        const token = randomBytes(32).toString('hex');
-        const expiryDays = this.configService.getOrThrow('appConfig.invitationExpiryDays', { infer: true });
-        const expiresAt = new Date();
-        expiresAt.setDate(expiresAt.getDate() + expiryDays);
-
-        const createFullInvitationDto = await Utils.validateDtoOrFail(CreateFullInvitationDto, {
-            ...createInvitationDto,
-            tenant,
-            token,
-            expiresAt,
-            status: InvitationStatusEnum.PENDING
-        });
-
-        const invitation = this.invitationRepository.create(createFullInvitationDto);
-        const savedInvitation = await this.invitationRepository.save(invitation);
-
-        // Emit invitation created event
-        this.eventEmitter.emit('invitation.created', {
-            invitationId: savedInvitation.id,
-            email: createInvitationDto.email,
-            token,
-            tenantName: tenant.name
-        });
-
-        return savedInvitation;
-    }
 
     async findOne(
         field: FindOptionsWhere<InvitationEntity>,
@@ -93,7 +55,7 @@ export class InvitationService {
         });
         await this.teamMemberRepository.save(member);
 
-        // Emit member joined event for Keto relation creation
+        // Emit member joined event
         this.eventEmitter.emit('member.joined', {
             userId,
             tenantId: invitation.tenant.id,
@@ -122,16 +84,5 @@ export class InvitationService {
             throw new HttpException({ message: 'Invitation invalid or expired', code: HttpStatus.BAD_REQUEST }, HttpStatus.BAD_REQUEST);
         }
         return invitation;
-    }
-
-    async revoke(id: string): Promise<void> {
-        const invitation = await this.findOneOrFail({ id }, { tenant: true });
-
-        if (invitation.status !== InvitationStatusEnum.PENDING) {
-            throw new HttpException({ message: 'Invitation is not pending', code: HttpStatus.BAD_REQUEST }, HttpStatus.BAD_REQUEST);
-        }
-
-        invitation.status = InvitationStatusEnum.REVOKED;
-        await this.invitationRepository.save(invitation);
     }
 }

@@ -7,7 +7,11 @@ export enum KetoNamespace {
 export enum KetoRelation {
     MEMBER = 'member',
     WRITE = 'write',
-    READ = 'read'
+    READ = 'read',
+    CREATE_API_KEY = 'create_api_key',
+    UPDATE_API_KEY = 'update_api_key',
+    DELETE_API_KEY = 'delete_api_key',
+    LIST_API_KEY = 'list_api_key'
 }
 
 export enum KetoPermission {

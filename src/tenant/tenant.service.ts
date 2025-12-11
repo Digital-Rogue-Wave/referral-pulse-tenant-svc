@@ -2,8 +2,9 @@ import { Injectable, HttpStatus, HttpException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { DeleteResult, FindOptionsRelations, FindOptionsWhere, Repository } from 'typeorm';
 import { TenantEntity } from './tenant.entity';
-import { CreateTenantDto } from './dto/create-tenant.dto';
-import { UpdateTenantDto } from './dto/update-tenant.dto';
+import { CreateTenantDto } from './dto/tenant/create-tenant.dto';
+import { UpdateTenantDto } from './dto/tenant/update-tenant.dto';
+import { TenantSettingsDto } from './dto/settings/tenant-settings.dto';
 import { NullableType } from '@mod/types/nullable.type';
 import { FilesService } from '@mod/files/files.service';
 import { KetoService } from '@mod/common/auth/keto.service';
@@ -131,15 +132,72 @@ export class TenantService {
         });
     }
 
+    async getSettings(id: string): Promise<TenantSettingsDto> {
+        const tenant = await this.findOneOrFail({ id });
+        return tenant.settings as TenantSettingsDto;
+    }
+
+    async updateSettings(id: string, settingsDto: TenantSettingsDto, userId: string, ipAddress?: string): Promise<TenantSettingsDto> {
+        // Verify permission
+        const allowed = await this.ketoService.check(KetoNamespace.TENANT, id, KetoPermission.UPDATE, userId);
+        if (!allowed) {
+            throw new HttpException(
+                { message: 'You do not have permission to update settings for this tenant', code: HttpStatus.FORBIDDEN },
+                HttpStatus.FORBIDDEN
+            );
+        }
+
+        const tenant = await this.findOneOrFail({ id });
+        const oldSettings = tenant.settings;
+
+        const newSettings = {
+            ...tenant.settings,
+            branding: { ...(tenant.settings.branding || {}), ...settingsDto.branding },
+            notifications: { ...(tenant.settings.notifications || {}), ...settingsDto.notifications },
+            general: { ...(tenant.settings.general || {}), ...settingsDto.general }
+        };
+
+        tenant.settings = newSettings;
+
+        await this.tenantRepository.save(tenant);
+
+        // Reuse tenant.updated event but maybe we want a specific one.
+        // For now, let's treat it as a tenant update.
+        // Or create a specific listener. The task implies audit log viewing, so capturing this as an action is good.
+
+        // Let's use the existing tenant.updated event but pass the changes in a way the listener understands,
+        // or just rely on the fact that we changed 'settings'.
+
+        this.eventEmitter.emit('tenant.updated', {
+            tenant,
+            oldTenant: { ...tenant, settings: oldSettings },
+            changes: { settings: newSettings },
+            userId,
+            ipAddress
+        });
+
+        return tenant.settings as TenantSettingsDto;
+    }
+
     async remove(id: string): Promise<DeleteResult> {
         return await this.tenantRepository.delete(id);
     }
 
     private getDefaultSettings() {
         return {
-            theme: 'light',
+            branding: {
+                primaryColor: '#000000',
+                secondaryColor: '#ffffff',
+                fontFamily: 'Inter'
+            },
             notifications: {
-                email: true
+                emailEnabled: true,
+                webhookEnabled: false
+            },
+            general: {
+                timezone: 'UTC',
+                currency: 'USD',
+                locale: 'en-US'
             }
         };
     }

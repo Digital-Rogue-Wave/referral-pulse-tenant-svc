@@ -10,7 +10,7 @@ import { CreateAuditLogDto } from '@mod/common/dto/create-audit-log.dto';
 import { AuditAction } from '@mod/common/enums/audit-action.enum';
 import { PublishSnsEventDto, SnsPublishOptionsDto } from '@mod/common/dto/sns-publish.dto';
 import { TenantEntity } from '../tenant.entity';
-import { UpdateTenantDto } from '../dto/update-tenant.dto';
+import { UpdateTenantDto } from '../dto/tenant/update-tenant.dto';
 
 @Injectable()
 export class TenantListener {
