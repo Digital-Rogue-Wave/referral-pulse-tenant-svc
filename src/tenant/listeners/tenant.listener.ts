@@ -1,7 +1,5 @@
 import { Injectable } from '@nestjs/common';
 import { OnEvent } from '@nestjs/event-emitter';
-import { TenantCreatedEvent } from '../events/tenant-created.event';
-import { TenantUpdatedEvent } from '../events/tenant-updated.event';
 import { SnsPublisher } from '@mod/common/aws-sqs/sns.publisher';
 import { AuditService } from '@mod/common/services/audit.service';
 import { KetoService } from '@mod/common/auth/keto.service';
@@ -11,6 +9,8 @@ import { KetoNamespace, KetoRelation } from '@mod/common/auth/keto.constants';
 import { CreateAuditLogDto } from '@mod/common/dto/create-audit-log.dto';
 import { AuditAction } from '@mod/common/enums/audit-action.enum';
 import { PublishSnsEventDto, SnsPublishOptionsDto } from '@mod/common/dto/sns-publish.dto';
+import { TenantEntity } from '../tenant.entity';
+import { UpdateTenantDto } from '../dto/update-tenant.dto';
 
 @Injectable()
 export class TenantListener {
@@ -21,8 +21,8 @@ export class TenantListener {
     ) {}
 
     @OnEvent('tenant.created')
-    async handleTenantCreatedEvent(event: TenantCreatedEvent) {
-        const { tenant, ownerId } = event;
+    async handleTenantCreatedEvent(payload: { tenant: TenantEntity; ownerId: string }) {
+        const { tenant, ownerId } = payload;
 
         // 1. Create Keto tuple
         const tuple = await Utils.validateDtoOrFail(KetoRelationTupleDto, {
@@ -65,8 +65,15 @@ export class TenantListener {
     }
 
     @OnEvent('tenant.updated')
-    async handleTenantUpdatedEvent(event: TenantUpdatedEvent) {
-        const { tenant, oldTenant, changes, userId, userEmail, ipAddress } = event;
+    async handleTenantUpdatedEvent(payload: {
+        tenant: TenantEntity;
+        oldTenant: TenantEntity;
+        changes: UpdateTenantDto;
+        userId?: string;
+        userEmail?: string;
+        ipAddress?: string;
+    }) {
+        const { tenant, oldTenant, changes, userId, userEmail, ipAddress } = payload;
 
         // 1. Audit Log
         await this.auditService.log({

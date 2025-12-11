@@ -1,8 +1,9 @@
-import { Request as ExpressRequest } from 'express';
+import { JwtPayload } from './app.interface';
 
 declare global {
     namespace Express {
         interface Request {
+            user?: JwtPayload;
             tenantId?: string;
             tenantInfo?: any;
             apiKeyId?: string;
@@ -13,5 +14,8 @@ declare global {
             requestId?: string;
             idempotencyKey?: string;
         }
+
+        // Passport.js also uses Express.User
+        type User = JwtPayload;
     }
 }

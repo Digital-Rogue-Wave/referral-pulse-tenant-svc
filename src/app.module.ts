@@ -23,6 +23,8 @@ import { HttpLoggingInterceptor } from '@mod/common/logger/http-logging.intercep
 import { RpcLoggingInterceptor } from '@mod/common/logger/rpc-logging.interceptor';
 import { WebhookModule } from './webhook/webhook.module';
 import { FilesModule } from './files/files.module';
+import { TenantModule } from './tenant/tenant.module';
+import { InvitationModule } from './invitation/invitation.module';
 import { AutomapperModule } from '@automapper/nestjs';
 import { classes } from '@automapper/classes';
 
@@ -44,7 +46,9 @@ import { classes } from '@automapper/classes';
         TerminusModule,
         HealthModule,
         WebhookModule,
-        FilesModule
+        FilesModule,
+        TenantModule,
+        InvitationModule
     ],
     providers: [
         // Order matters: enrich spans, then record metrics

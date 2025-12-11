@@ -10,8 +10,6 @@ import { KetoService } from '@mod/common/auth/keto.service';
 import slugify from 'slugify';
 import { KetoNamespace, KetoPermission } from '@mod/common/auth/keto.constants';
 import { EventEmitter2 } from '@nestjs/event-emitter';
-import { TenantCreatedEvent } from './events/tenant-created.event';
-import { TenantUpdatedEvent } from './events/tenant-updated.event';
 
 @Injectable()
 export class TenantService {
@@ -49,7 +47,10 @@ export class TenantService {
         const savedTenant = await this.tenantRepository.save(tenant);
 
         // Emit tenant.created event for side effects (Keto, Audit, SNS)
-        this.eventEmitter.emit('tenant.created', new TenantCreatedEvent(savedTenant, createTenantDto.ownerId!));
+        this.eventEmitter.emit('tenant.created', {
+            tenant: savedTenant,
+            ownerId: createTenantDto.ownerId!
+        });
 
         return savedTenant;
     }
@@ -100,9 +101,34 @@ export class TenantService {
         const updatedTenant = await this.findOneOrFail({ id });
 
         // Emit tenant.updated event for side effects (Audit, SNS)
-        this.eventEmitter.emit('tenant.updated', new TenantUpdatedEvent(updatedTenant, oldTenant, updateTenantDto, userId, userEmail, ipAddress));
+        this.eventEmitter.emit('tenant.updated', {
+            tenant: updatedTenant,
+            oldTenant,
+            changes: updateTenantDto,
+            userId,
+            userEmail,
+            ipAddress
+        });
 
         return updatedTenant;
+    }
+
+    async transferOwnership(tenantId: string, newOwnerId: string, currentOwnerId: string): Promise<void> {
+        const tenant = await this.findOneOrFail({ id: tenantId });
+
+        // Verify current owner has permission
+        const allowed = await this.ketoService.check(KetoNamespace.TENANT, tenantId, KetoPermission.UPDATE, currentOwnerId);
+        if (!allowed) {
+            throw new HttpException({ message: 'Only the owner can transfer ownership', code: HttpStatus.FORBIDDEN }, HttpStatus.FORBIDDEN);
+        }
+
+        // Emit event for Keto relation updates
+        this.eventEmitter.emit('ownership.transferred', {
+            tenantId,
+            oldOwnerId: currentOwnerId,
+            newOwnerId,
+            tenantName: tenant.name
+        });
     }
 
     async remove(id: string): Promise<DeleteResult> {

@@ -140,31 +140,115 @@ sequenceDiagram
 
 Triggered when an organization owner invites a new team member. The invitee must complete the **User Authentication Flow** (Register/Login via Kratos) to accept the invitation.
 
+#### 4.1 Send Invitation
+
+**Endpoint**: `POST /tenants/:id/invites`
+**Payload**: `{ email: string, role: string }`
+
+1.  **Permission Check**: Verify subject has permission to invite members (`invite` relation in Keto).
+2.  **Token Generation**: Generate a secure, unique invitation token (e.g., 32-byte hex).
+3.  **Persistence**: Save the `InvitationEntity` with status `PENDING` and an expiration date (default 7 days).
+4.  **Notification**: Trigger the Notification Service to send an email with the "magic link" containing the token.
+5.  **Audit**: Log `INVITATION_CREATED`.
+
 ```mermaid
 sequenceDiagram
     autonumber
-    actor Owner
-    actor Invitee
+    actor Admin
     participant TS as Tenant Service
     participant Keto as Ory Keto
     participant DB as Database
     participant Mail as Notification Service
-    participant Kratos as Ory Kratos
+    participant Invitee
 
-    Note over Owner: Event: Owner Invites Team Member
-    Owner->>TS: POST /tenants/:id/invites
+    Note over Admin: Admin invites new member
+    Admin->>TS: POST /tenants/:id/invites
     TS->>Keto: Check Permission (invite)
-    TS->>DB: Create Invitation Record
+    TS->>DB: Create Invitation (Token, PENDING)
     TS->>Mail: Send Invitation Email
-    Mail-->>Invitee: Email with Link
+    Mail-->>Invitee: Email with Magic Link
+    TS-->>Admin: Success
+```
 
-    Note over Invitee: Event: Invitee Accepts
-    Invitee->>Kratos: Register/Login
+#### 4.2 Accept Invitation
+
+**Endpoint**: `POST /invites/accept`
+**Payload**: `{ token: string }`
+
+**Pre-requisite**: User clicks the link -> Frontend calls `GET /invites/:token/validate` -> User Registers/Logs in.
+
+1.  **Validation**: Ensure token exists, status is `PENDING`, and `expiresAt` > now.
+2.  **Association**: Create a `TeamMemberEntity` linking the authenticated `userId` to the `tenantId` with the specified `role`.
+3.  **Status Update**: Update invitation status to `ACCEPTED`.
+4.  **Authorization Update**: Update Ory Keto to grant the user access to the tenant (add tuple: `tenant:id#member@user:id`).
+5.  **Audit**: Log `INVITATION_ACCEPTED`.
+
+```mermaid
+sequenceDiagram
+    autonumber
+    actor Invitee
+    participant Kratos as Ory Kratos
+    participant TS as Tenant Service
+    participant DB as Database
+    participant Keto as Ory Keto
+
+    Note over Invitee: User clicks link & authenticates
+    Invitee->>Kratos: Register / Login
     Invitee->>TS: POST /invites/accept
-    TS->>DB: Validate Invitation
-    TS->>Keto: Add Relation (Invitee is Member of Tenant)
-    TS->>DB: Update Invitation Status
+    TS->>DB: Validate Token & Expiry
+    TS->>DB: Update Invitation (ACCEPTED)
+    TS->>DB: Create Team Member
+    TS->>Keto: Add Relation (member)
+    TS-->>Invitee: Success (Joined Tenant)
+```
+
+#### 4.3 Reject Invitation
+
+**Endpoint**: `POST /invites/reject`
+**Payload**: `{ token: string }`
+
+Allows an invitee to explicit decline an invitation.
+
+1.  **Validation**: Ensure token exists and is `PENDING`.
+2.  **Status Update**: Update invitation status to `REJECTED`.
+3.  **Audit**: Log `INVITATION_REJECTED`.
+
+```mermaid
+sequenceDiagram
+    autonumber
+    actor Invitee
+    participant TS as Tenant Service
+    participant DB as Database
+
+    Note over Invitee: User declines invitation
+    Invitee->>TS: POST /invites/reject
+    TS->>DB: Update Invitation (REJECTED)
     TS-->>Invitee: Success
+```
+
+#### 4.4 Cancel Invitation
+
+**Endpoint**: `DELETE /tenants/:id/invites/:invitationId` (or `PATCH .../revoke`)
+
+Allows the tenant admin to revoke an invitation before it is accepted.
+
+1.  **Permission Check**: Verify subject has permission to manage invites.
+2.  **Status Update**: Update invitation status to `REVOKED`.
+3.  **Audit**: Log `INVITATION_REVOKED`.
+
+```mermaid
+sequenceDiagram
+    autonumber
+    actor Admin
+    participant TS as Tenant Service
+    participant Keto as Ory Keto
+    participant DB as Database
+
+    Note over Admin: Admin revokes pending invite
+    Admin->>TS: DELETE /tenants/:id/invites/:invitationId
+    TS->>Keto: Check Permission
+    TS->>DB: Update Invitation (REVOKED)
+    TS-->>Admin: Success
 ```
 
 ### 5. API Key Management (Epic 3)
@@ -230,6 +314,8 @@ Manages the state and properties of existing API keys.
 2.  **Action**: Perform the requested database update or deletion.
 3.  **Audit**: Log the specific action (`API_KEY_UPDATED`, `API_KEY_STOPPED`, `API_KEY_DELETED`).
 
+##### Update API Key
+
 ```mermaid
 sequenceDiagram
     autonumber
@@ -239,23 +325,58 @@ sequenceDiagram
     participant DB as Database
     participant Audit as Audit Service
 
-    Note over Admin: Lifecycle Actions
-
-    par Update Key
-        Admin->>TS: PATCH .../api-keys/:keyId
-        TS->>Keto: Check Permission (update_api_key)
+    Note over Admin: Admin updates API Key details
+    Admin->>TS: PATCH /tenants/:tenantId/api-keys/:keyId
+    TS->>Keto: Check Permission (update_api_key)
+    alt Permission Denied
+        TS-->>Admin: 403 Forbidden
+    else Permission Granted
         TS->>DB: Update Name/Scopes
         TS->>Audit: Log 'API_KEY_UPDATED'
         TS-->>Admin: Success
-    and Stop/Revoke Key
-        Admin->>TS: PATCH .../api-keys/:keyId/status
-        TS->>Keto: Check Permission (update_api_key)
+    end
+```
+
+##### Stop/Revoke API Key
+
+```mermaid
+sequenceDiagram
+    autonumber
+    actor Admin
+    participant TS as Tenant Service
+    participant Keto as Ory Keto
+    participant DB as Database
+    participant Audit as Audit Service
+
+    Note over Admin: Admin revokes API Key
+    Admin->>TS: PATCH /tenants/:tenantId/api-keys/:keyId/status
+    TS->>Keto: Check Permission (update_api_key)
+    alt Permission Denied
+        TS-->>Admin: 403 Forbidden
+    else Permission Granted
         TS->>DB: Set Status = STOPPED
         TS->>Audit: Log 'API_KEY_STOPPED'
         TS-->>Admin: Success
-    and Delete Key
-        Admin->>TS: DELETE .../api-keys/:keyId
-        TS->>Keto: Check Permission (delete_api_key)
+    end
+```
+
+##### Delete API Key
+
+```mermaid
+sequenceDiagram
+    autonumber
+    actor Admin
+    participant TS as Tenant Service
+    participant Keto as Ory Keto
+    participant DB as Database
+    participant Audit as Audit Service
+
+    Note over Admin: Admin deletes API Key
+    Admin->>TS: DELETE /tenants/:tenantId/api-keys/:keyId
+    TS->>Keto: Check Permission (delete_api_key)
+    alt Permission Denied
+        TS-->>Admin: 403 Forbidden
+    else Permission Granted
         TS->>DB: Hard Delete Key
         TS->>Audit: Log 'API_KEY_DELETED'
         TS-->>Admin: Success
@@ -285,6 +406,27 @@ Triggered when a tenant subscribes to a paid plan or upgrades their existing sub
     - **Audit**: Log `SUBSCRIPTION_UPDATED`.
 6.  **Event Publishing**: Publish `subscription.changed` to SNS.
 
+##### Free Plan (Downgrade/Selection)
+
+```mermaid
+sequenceDiagram
+    autonumber
+    actor Admin
+    participant TS as Tenant Service
+    participant DB as Database
+    participant SNS as Event Bus (SNS)
+    participant Stripe as Stripe API
+
+    Note over Admin: Admin selects Free Plan
+    Admin->>TS: POST .../subscription/checkout (Plan=Free)
+    TS->>DB: Update Tenant (Plan=Free)
+    TS->>Stripe: Cancel Active Subscription (if any)
+    TS->>SNS: Publish 'subscription.changed'
+    TS-->>Admin: Success (No Payment Required)
+```
+
+##### Starter Plan Checkout
+
 ```mermaid
 sequenceDiagram
     autonumber
@@ -294,16 +436,66 @@ sequenceDiagram
     participant DB as Database
     participant SNS as Event Bus (SNS)
 
-    Note over Admin: Admin selects plan
-    Admin->>TS: POST .../subscription/checkout
-    TS->>Stripe: Create Checkout Session (metadata: tenantId)
+    Note over Admin: Admin selects Starter Plan
+    Admin->>TS: POST .../subscription/checkout (Plan=Starter)
+    TS->>Stripe: Create Checkout Session (metadata: tenantId, plan: Starter)
     Stripe-->>TS: Session URL
     TS-->>Admin: Redirect to Stripe
 
     Note over Admin: Admin completes payment
     Stripe->>TS: Webhook (checkout.session.completed)
     TS->>TS: Verify Webhook Signature
-    TS->>DB: Update Tenant (Plan, Status, CustomerID)
+    TS->>DB: Update Tenant (Plan=Starter, Status=Active)
+    TS->>SNS: Publish 'subscription.changed'
+    TS-->>Stripe: 200 OK
+```
+
+##### Growth Plan Checkout
+
+```mermaid
+sequenceDiagram
+    autonumber
+    actor Admin
+    participant TS as Tenant Service
+    participant Stripe as Stripe API
+    participant DB as Database
+    participant SNS as Event Bus (SNS)
+
+    Note over Admin: Admin selects Growth Plan
+    Admin->>TS: POST .../subscription/checkout (Plan=Growth)
+    TS->>Stripe: Create Checkout Session (metadata: tenantId, plan: Growth)
+    Stripe-->>TS: Session URL
+    TS-->>Admin: Redirect to Stripe
+
+    Note over Admin: Admin completes payment
+    Stripe->>TS: Webhook (checkout.session.completed)
+    TS->>TS: Verify Webhook Signature
+    TS->>DB: Update Tenant (Plan=Growth, Status=Active)
+    TS->>SNS: Publish 'subscription.changed'
+    TS-->>Stripe: 200 OK
+```
+
+##### Enterprise Plan Checkout
+
+```mermaid
+sequenceDiagram
+    autonumber
+    actor Admin
+    participant TS as Tenant Service
+    participant Stripe as Stripe API
+    participant DB as Database
+    participant SNS as Event Bus (SNS)
+
+    Note over Admin: Admin selects Enterprise Plan
+    Admin->>TS: POST .../subscription/checkout (Plan=Enterprise)
+    TS->>Stripe: Create Checkout Session (metadata: tenantId, plan: Enterprise)
+    Stripe-->>TS: Session URL
+    TS-->>Admin: Redirect to Stripe
+
+    Note over Admin: Admin completes payment
+    Stripe->>TS: Webhook (checkout.session.completed)
+    TS->>TS: Verify Webhook Signature
+    TS->>DB: Update Tenant (Plan=Enterprise, Status=Active)
     TS->>SNS: Publish 'subscription.changed'
     TS-->>Stripe: 200 OK
 ```

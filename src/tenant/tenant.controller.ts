@@ -3,6 +3,7 @@ import { TenantService } from './tenant.service';
 import { TenantEntity } from './tenant.entity';
 import { CreateTenantDto } from './dto/create-tenant.dto';
 import { UpdateTenantDto } from './dto/update-tenant.dto';
+import { TransferOwnershipDto } from './dto/transfer-ownership.dto';
 import { NullableType } from '@mod/types/nullable.type';
 import { DeleteResult } from 'typeorm';
 import { ApiBody, ApiConsumes, ApiCreatedResponse, ApiExtraModels, ApiOkResponse, ApiTags, getSchemaPath, ApiBearerAuth } from '@nestjs/swagger';
@@ -105,6 +106,17 @@ export class TenantController {
         const user = req.user as JwtPayload;
         const updateTenantDto = await Utils.validateDtoOrFail(UpdateTenantDto, data);
         return await this.tenantService.update(id, updateTenantDto, file, user.sub, user.email);
+    }
+
+    @ApiOkResponse({ description: 'Ownership transferred successfully' })
+    @ApiBearerAuth()
+    @UseGuards(JwtAuthGuard, KetoGuard)
+    @RequirePermission({ namespace: KetoNamespace.TENANT, relation: KetoPermission.UPDATE, objectParam: 'id' })
+    @HttpCode(HttpStatus.OK)
+    @Post(':id/transfer-ownership')
+    async transferOwnership(@Param('id') id: string, @Body() dto: TransferOwnershipDto, @Req() req: Request): Promise<void> {
+        const user = req.user as JwtPayload;
+        await this.tenantService.transferOwnership(id, dto.newOwnerId, user.sub);
     }
 
     @ApiOkResponse({ type: DeleteResult })

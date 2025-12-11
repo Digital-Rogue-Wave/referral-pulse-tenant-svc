@@ -16,5 +16,6 @@ export enum KetoPermission {
     UPDATE = 'update',
     DELETE = 'delete',
     INGEST = 'ingest',
-    VIEW = 'view'
+    VIEW = 'view',
+    INVITE = 'invite'
 }

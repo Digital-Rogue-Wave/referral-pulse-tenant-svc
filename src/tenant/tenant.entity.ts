@@ -1,7 +1,9 @@
 import EntityHelper from '@mod/common/entities/entity-helper';
 import { TenantStatusEnum } from '@mod/common/enums/tenant.enum';
 import { FileEntity } from '@mod/files/file.entity';
-import { Entity, Column, PrimaryGeneratedColumn, ManyToOne } from 'typeorm';
+import { Entity, Column, PrimaryGeneratedColumn, ManyToOne, OneToMany } from 'typeorm';
+import { InvitationEntity } from '@mod/invitation/invitation.entity';
+import { TeamMemberEntity } from './team-member.entity';
 
 @Entity({ name: 'tenants' })
 export class TenantEntity extends EntityHelper {
@@ -28,4 +30,10 @@ export class TenantEntity extends EntityHelper {
 
     @Column({ type: 'jsonb', default: {} })
     settings: Record<string, any>;
+
+    @OneToMany('InvitationEntity', 'tenant')
+    invitations: InvitationEntity[];
+
+    @OneToMany('TeamMemberEntity', 'tenant')
+    members: TeamMemberEntity[];
 }

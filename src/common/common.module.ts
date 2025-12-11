@@ -12,6 +12,7 @@ import { HelperModule } from '@mod/common/helpers/helper.module';
 import { S3Module } from '@mod/common/aws-s3/s3.module';
 import { SqsMessagingModule } from '@mod/common/aws-sqs/sqs.module';
 import { SnsModule } from '@mod/common/aws-sqs/sns.module';
+import { SesModule } from '@mod/common/aws-ses/ses.module';
 
 import { TracingModule } from '@mod/common/tracing/tracing.module';
 import { MonitoringModule } from '@mod/common/monitoring/monitoring.module';
@@ -43,6 +44,7 @@ import { EventEmitterModule } from '@nestjs/event-emitter';
         S3Module,
         SqsMessagingModule.register(),
         SnsModule,
+        SesModule,
         TracingModule.register(),
         MonitoringModule.register(),
         HttpClientsModule,
