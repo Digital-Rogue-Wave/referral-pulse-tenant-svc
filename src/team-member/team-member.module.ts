@@ -7,7 +7,7 @@ import { FilesModule } from '../files/files.module';
 import { TeamMemberSerializationProfile } from './serialization/team-member-serialization.profile';
 import { BullModule } from '@nestjs/bullmq';
 import { TENANT_DELETION_QUEUE } from '@mod/common/bullmq/queues/tenant-deletion.queue';
-import { TenantDeletionProcessor } from '@mod/common/bullmq/processors/tenant-deletion.processor';
+import { TenantDeletionProcessor } from '@mod/tenant/processors/tenant-deletion.processor';
 import { TenantModule } from '@mod/tenant/tenant.module';
 
 @Module({

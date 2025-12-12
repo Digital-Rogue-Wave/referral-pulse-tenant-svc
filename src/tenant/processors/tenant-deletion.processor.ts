@@ -1,7 +1,7 @@
 import { Processor, WorkerHost } from '@nestjs/bullmq';
 import { Logger } from '@nestjs/common';
 import { Job } from 'bullmq';
-import { TENANT_DELETION_QUEUE, TenantDeletionJobData } from '../queues/tenant-deletion.queue';
+import { TENANT_DELETION_QUEUE, TenantDeletionJobData } from '@mod/common/bullmq/queues/tenant-deletion.queue';
 import { TenantService } from '@mod/tenant/tenant.service';
 
 @Processor(TENANT_DELETION_QUEUE)

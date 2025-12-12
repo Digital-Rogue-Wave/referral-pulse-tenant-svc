@@ -3,7 +3,6 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { RedisService } from '@mod/common/aws-redis/redis.service';
 import { FeatureFlagEntity } from './feature-flag.entity';
-import { TenantFeatureFlagEntity } from './tenant-feature-flag.entity';
 
 @Injectable()
 export class FeatureFlagService {
@@ -12,13 +11,11 @@ export class FeatureFlagService {
     constructor(
         @InjectRepository(FeatureFlagEntity)
         private readonly featureFlagRepo: Repository<FeatureFlagEntity>,
-        @InjectRepository(TenantFeatureFlagEntity)
-        private readonly tenantFeatureFlagRepo: Repository<TenantFeatureFlagEntity>,
         private readonly redis: RedisService
     ) {}
 
-    async isEnabled(key: string, tenantId: string): Promise<boolean> {
-        const cacheKey = `feature_flag:${tenantId}:${key}`;
+    async isEnabled(key: string, entityId: string): Promise<boolean> {
+        const cacheKey = `feature_flag:${entityId}:${key}`;
         const cached = await this.redis.get(cacheKey);
 
         if (cached !== null) {
@@ -33,13 +30,45 @@ export class FeatureFlagService {
             return false;
         }
 
-        const tenantOverride = await this.tenantFeatureFlagRepo.findOne({
-            where: { tenantId, featureKey: key }
-        });
-
-        const isEnabled = tenantOverride ? tenantOverride.isEnabled : flagDef.defaultValue;
+        // Check entity-specific override from JSONB column
+        const isEnabled = flagDef.overrides?.[entityId] ?? flagDef.defaultValue;
 
         await this.redis.set(cacheKey, String(isEnabled), this.CACHE_TTL);
         return isEnabled;
+    }
+
+    async setOverride(key: string, entityId: string, isEnabled: boolean): Promise<void> {
+        const flagDef = await this.featureFlagRepo.findOne({ where: { key } });
+        if (!flagDef) {
+            throw new Error(`Feature flag with key '${key}' not found`);
+        }
+
+        flagDef.overrides = {
+            ...flagDef.overrides,
+            [entityId]: isEnabled
+        };
+
+        await this.featureFlagRepo.save(flagDef);
+
+        // Invalidate cache
+        const cacheKey = `feature_flag:${entityId}:${key}`;
+        await this.redis.del(cacheKey);
+    }
+
+    async removeOverride(key: string, entityId: string): Promise<void> {
+        const flagDef = await this.featureFlagRepo.findOne({ where: { key } });
+        if (!flagDef) {
+            return;
+        }
+
+        // eslint-disable-next-line @typescript-eslint/no-unused-vars
+        const { [entityId]: _, ...remainingOverrides } = flagDef.overrides;
+        flagDef.overrides = remainingOverrides;
+
+        await this.featureFlagRepo.save(flagDef);
+
+        // Invalidate cache
+        const cacheKey = `feature_flag:${entityId}:${key}`;
+        await this.redis.del(cacheKey);
     }
 }

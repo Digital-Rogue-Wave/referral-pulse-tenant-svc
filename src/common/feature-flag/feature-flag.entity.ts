@@ -11,4 +11,7 @@ export class FeatureFlagEntity extends EntityHelper {
 
     @Column({ name: 'default_value', default: false })
     defaultValue: boolean;
+
+    @Column({ type: 'jsonb', name: 'overrides', default: {} })
+    overrides: Record<string, boolean>;
 }

@@ -8,7 +8,7 @@ import { TenantSerializationProfile } from './serialization/tenant-serialization
 import { TenantListener } from './listeners/tenant.listener';
 import { BullModule } from '@nestjs/bullmq';
 import { TENANT_DELETION_QUEUE } from '@mod/common/bullmq/queues/tenant-deletion.queue';
-import { TenantDeletionProcessor } from '@mod/common/bullmq/processors/tenant-deletion.processor';
+import { TenantDeletionProcessor } from './processors/tenant-deletion.processor';
 import { HttpClientsModule } from '@mod/common/http/http-clients.module';
 
 @Module({
