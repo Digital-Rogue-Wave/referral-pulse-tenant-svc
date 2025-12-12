@@ -4,7 +4,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { FindOptionsRelations, FindOptionsWhere, Repository } from 'typeorm';
 import { InvitationEntity } from '../invitation.entity';
 import { InvitationStatusEnum } from '../../common/enums/invitation.enum';
-import { TeamMemberEntity } from '../../tenant/team-member.entity';
+import { TeamMemberEntity } from '../../team-member/team-member.entity';
 import { NullableType } from '@mod/types/nullable.type';
 
 @Injectable()

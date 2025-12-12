@@ -8,6 +8,7 @@ import { KetoService } from './keto.service';
 import { KetoGuard } from './keto.guard';
 import { HttpClientsModule } from '@mod/common/http/http-clients.module';
 import oryConfig from '@mod/config/ory.config';
+import { KratosService } from './kratos.service';
 
 @Global()
 @Module({
@@ -15,6 +16,7 @@ import oryConfig from '@mod/config/ory.config';
     providers: [
         JwtStrategy,
         KetoService,
+        KratosService,
         KetoGuard,
         // Guards (order matters: JWT first, then Keto)
         {
@@ -26,6 +28,6 @@ import oryConfig from '@mod/config/ory.config';
             useExisting: KetoGuard
         }
     ],
-    exports: [PassportModule, KetoService]
+    exports: [PassportModule, KetoService, KratosService]
 })
 export class AuthModule {}

@@ -3,6 +3,8 @@ export enum AuditAction {
     TENANT_CREATED = 'tenant.created',
     TENANT_UPDATED = 'tenant.updated',
     TENANT_DELETED = 'tenant.deleted',
+    TENANT_DELETION_SCHEDULED = 'tenant.deletion_scheduled',
+    TENANT_DELETION_CANCELLED = 'tenant.deletion_cancelled',
     TENANT_SUSPENDED = 'tenant.suspended',
     TENANT_UNSUSPENDED = 'tenant.unsuspended',
 

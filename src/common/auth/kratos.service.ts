@@ -33,4 +33,34 @@ export class KratosService {
 
         return data;
     }
+
+    /**
+     * Verify user password by attempting to create a session
+     * @param identityId - The Kratos identity ID
+     * @param password - The password to verify
+     * @returns true if password is correct, false otherwise
+     */
+    async verifyPassword(identityId: string, password: string): Promise<boolean> {
+        try {
+            // Get identity to extract email/username
+            const identity = await this.getIdentity(identityId);
+            const email = identity.traits?.email;
+
+            if (!email) {
+                return false;
+            }
+
+            // Use Kratos native API to verify credentials
+            // This endpoint validates password without creating a session
+            const { data } = await this.http.post<{ valid: boolean }>(`${this.adminUrl}/admin/identities/${identityId}/credentials/password/verify`, {
+                password
+            });
+
+            return data?.valid === true;
+        } catch (error) {
+            // If verification fails or endpoint returns error, password is invalid
+            console.error(error);
+            return false;
+        }
+    }
 }

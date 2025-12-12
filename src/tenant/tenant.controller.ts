@@ -17,6 +17,8 @@ import { KetoGuard, RequirePermission } from '@mod/common/auth/keto.guard';
 import { KetoNamespace, KetoPermission } from '@mod/common/auth/keto.constants';
 import { CurrentUser, CurrentUserType } from '@mod/common/auth/current-user.decorator';
 import { TenantSettingsDto } from './dto/settings/tenant-settings.dto';
+import { ScheduleDeletionDto } from './dto/schedule-deletion.dto';
+import { CancelDeletionDto } from './dto/cancel-deletion.dto';
 
 @ApiTags('tenants')
 @ApiBearerAuth()
@@ -139,6 +141,47 @@ export class TenantController {
         @Ip() ipAddress: string
     ): Promise<TenantSettingsDto> {
         return await this.tenantService.updateSettings(id, settingsDto, user.id, ipAddress);
+    }
+
+    @ApiBody({ type: ScheduleDeletionDto })
+    @ApiOkResponse({
+        description: 'Deletion scheduled successfully',
+        schema: {
+            type: 'object',
+            properties: {
+                scheduledAt: { type: 'string', format: 'date-time' },
+                executionDate: { type: 'string', format: 'date-time' }
+            }
+        }
+    })
+    @UseGuards(KetoGuard)
+    @RequirePermission({ namespace: KetoNamespace.TENANT, relation: KetoPermission.DELETE, objectParam: 'id' })
+    @HttpCode(HttpStatus.OK)
+    @Post(':id/schedule-deletion')
+    async scheduleDeletion(
+        @Param('id') id: string,
+        @Body() dto: ScheduleDeletionDto,
+        @CurrentUser() user: CurrentUserType,
+        @Ip() ipAddress: string
+    ): Promise<{ scheduledAt: Date; executionDate: Date }> {
+        const validatedDto = await Utils.validateDtoOrFail(ScheduleDeletionDto, dto);
+        return await this.tenantService.scheduleDeletion(id, validatedDto, user.id, user.identityId, ipAddress);
+    }
+
+    @ApiBody({ type: CancelDeletionDto })
+    @ApiOkResponse({ description: 'Deletion cancelled successfully' })
+    @UseGuards(KetoGuard)
+    @RequirePermission({ namespace: KetoNamespace.TENANT, relation: KetoPermission.UPDATE, objectParam: 'id' })
+    @HttpCode(HttpStatus.OK)
+    @Post(':id/cancel-deletion')
+    async cancelDeletion(
+        @Param('id') id: string,
+        @Body() dto: CancelDeletionDto,
+        @CurrentUser() user: CurrentUserType,
+        @Ip() ipAddress: string
+    ): Promise<void> {
+        const validatedDto = await Utils.validateDtoOrFail(CancelDeletionDto, dto);
+        return await this.tenantService.cancelDeletion(id, validatedDto, user.id, user.identityId, ipAddress);
     }
 
     @ApiOkResponse({ type: DeleteResult })

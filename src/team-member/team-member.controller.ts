@@ -6,8 +6,8 @@ import { KetoNamespace, KetoPermission } from '@mod/common/auth/keto.constants';
 import { MapInterceptor } from '@automapper/nestjs';
 import { TeamMemberEntity } from './team-member.entity';
 import { TeamMemberService } from './team-member.service';
-import { TeamMemberDto } from './dto/team-member/team-member.dto';
-import { UpdateTeamMemberDto } from './dto/team-member/update-team-member.dto';
+import { TeamMemberDto } from './dto/team-member.dto';
+import { UpdateTeamMemberDto } from './dto/update-team-member.dto';
 
 @ApiTags('Team Members')
 @ApiBearerAuth()

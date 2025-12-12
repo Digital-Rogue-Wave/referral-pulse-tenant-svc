@@ -5,11 +5,11 @@ import { CreateApiKeyDto } from './dto/create-api-key.dto';
 import { UpdateApiKeyDto } from './dto/update-api-key.dto';
 import { UpdateApiKeyStatusDto } from './dto/update-api-key-status.dto';
 import { EventEmitter2 } from '@nestjs/event-emitter';
-import * as crypto from 'crypto';
 import * as bcrypt from 'bcryptjs';
 import { ApiKeyStatusEnum } from '@mod/common/enums/api-key.enum';
 import { InjectTenantAwareRepository, TenantAwareRepository } from '@mod/common/tenant/tenant-aware.repository';
 import { NullableType } from '@mod/types/nullable.type';
+import { SharedService } from '@mod/common/shared.service';
 
 /**
  * Service responsible for API Key management
@@ -18,14 +18,11 @@ import { NullableType } from '@mod/types/nullable.type';
  */
 @Injectable()
 export class ApiKeyService {
-    private readonly KEY_PREFIX = 'sk_live_';
-    private readonly KEY_LENGTH = 48; // bytes, results in 64 hex characters
-    private readonly BCRYPT_ROUNDS = 10;
-
     constructor(
         @InjectTenantAwareRepository(ApiKeyEntity)
         private readonly apiKeyRepository: TenantAwareRepository<ApiKeyEntity>,
-        private readonly eventEmitter: EventEmitter2
+        private readonly eventEmitter: EventEmitter2,
+        private readonly sharedService: SharedService
     ) {}
 
     /**
@@ -34,9 +31,9 @@ export class ApiKeyService {
      */
     async create(userId: string, createDto: CreateApiKeyDto, ipAddress?: string, userAgent?: string): Promise<ApiKeyEntity> {
         // Generate secure random key
-        const rawKey = this.generateSecureKey();
-        const keyHash = await this.hashKey(rawKey);
-        const keyPrefix = this.extractKeyPrefix(rawKey);
+        const rawKey = this.sharedService.generateSecureApiKey();
+        const keyHash = await this.sharedService.hashApiKey(rawKey);
+        const keyPrefix = this.sharedService.extractApiKeyPrefix(rawKey);
 
         // Create entity
         const apiKey = this.apiKeyRepository.createTenantContext({
@@ -161,7 +158,7 @@ export class ApiKeyService {
      * Returns the API key entity if valid, null otherwise
      */
     async validateKey(rawKey: string): Promise<ApiKeyEntity | null> {
-        const keyPrefix = this.extractKeyPrefix(rawKey);
+        const keyPrefix = this.sharedService.extractApiKeyPrefix(rawKey);
 
         // Find by prefix first (indexed)
         const apiKey = await this.findOne({ keyPrefix, status: ApiKeyStatusEnum.ACTIVE });
@@ -185,30 +182,6 @@ export class ApiKeyService {
         }
 
         return null;
-    }
-
-    /**
-     * Private helper: Generate a cryptographically secure API key
-     */
-    private generateSecureKey(): string {
-        const randomBytes = crypto.randomBytes(this.KEY_LENGTH);
-        const randomHex = randomBytes.toString('hex');
-        return `${this.KEY_PREFIX}${randomHex}`;
-    }
-
-    /**
-     * Private helper: Hash the API key using bcrypt
-     */
-    private async hashKey(rawKey: string): Promise<string> {
-        return await bcrypt.hash(rawKey, this.BCRYPT_ROUNDS);
-    }
-
-    /**
-     * Private helper: Extract the prefix from a key for identification
-     */
-    private extractKeyPrefix(rawKey: string): string {
-        // Return first 20 characters (sk_live_ + first few random chars)
-        return rawKey.substring(0, 20);
     }
 
     /**

@@ -5,7 +5,7 @@ import { PublicInvitationController } from './public/public-invitation.controlle
 import { PrivateInvitationService } from './private/private-invitation.service';
 import { PublicInvitationService } from './public/public-invitation.service';
 import { InvitationEntity } from './invitation.entity';
-import { TeamMemberEntity } from '../tenant/team-member.entity';
+import { TeamMemberEntity } from '../team-member/team-member.entity';
 import { InvitationSerializationProfile } from './serialization/invitation-serialization.profile';
 import { TenantModule } from '@mod/tenant/tenant.module';
 import { InvitationListener } from './listeners/invitation.listener';

@@ -35,6 +35,7 @@ import { HeaderResolver, I18nModule } from 'nestjs-i18n';
 import path from 'path';
 import { EventEmitterModule } from '@nestjs/event-emitter';
 import { AuditModule } from './audit/audit.module';
+import { BullMqModule } from './bullmq/bullmq.module';
 
 @Global()
 @Module({
@@ -50,11 +51,12 @@ import { AuditModule } from './audit/audit.module';
         SesModule,
         TracingModule.register(),
         MonitoringModule.register(),
-        HttpClientsModule,
+        HttpClientsModule.register(),
         IdempotencyModule,
         AuthModule,
         ClientsModule,
         FeatureFlagModule,
+        BullMqModule,
         MulterModule.registerAsync({
             imports: [ConfigModule],
             inject: [ConfigService],
@@ -174,7 +176,9 @@ import { AuditModule } from './audit/audit.module';
         AuthModule,
         AuditModule,
         RedisModule,
-        HelperModule
+        HelperModule,
+        BullMqModule,
+        HttpClientsModule
     ]
 })
 export class CommonModule {}

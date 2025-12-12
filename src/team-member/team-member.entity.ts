@@ -1,5 +1,5 @@
 import { Entity, Column, PrimaryGeneratedColumn, ManyToOne } from 'typeorm';
-import { TenantEntity } from './tenant.entity';
+import { TenantEntity } from '../tenant/tenant.entity';
 import { RoleEnum } from '@mod/common/enums/role.enum';
 import EntityHelper from '@mod/common/entities/entity-helper';
 

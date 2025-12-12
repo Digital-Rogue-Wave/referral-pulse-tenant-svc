@@ -526,29 +526,156 @@ sequenceDiagram
 
 ### 8. Tenant Deletion (Epic 6)
 
-Triggered when a tenant owner requests account deletion.
+Triggered when a tenant owner requests account deletion. This implements a 30-day grace period to allow recovery before permanent deletion.
+
+**Endpoints**:
+
+- `POST /tenants/:id/schedule-deletion` (Schedule deletion)
+- `POST /tenants/:id/cancel-deletion` (Cancel scheduled deletion)
+
+**Implementation Steps**:
+
+#### 8.1 Schedule Deletion
+
+1.  **Permission Check**: Verify subject has `DELETE` permission on the tenant via Keto.
+2.  **Password Verification**: Verify the owner's password via Kratos for security.
+3.  **Status Check**: Ensure deletion is not already scheduled.
+4.  **Date Calculation**: Calculate execution date (30 days from now).
+5.  **Status Update**: Update tenant status to `DELETION_SCHEDULED` and set `deletionScheduledAt` and `deletionReason`.
+6.  **Event Emission**: Emit `tenant.deletion.scheduled` event for side effects (Audit, SNS, Notification, Job Queue).
 
 ```mermaid
 sequenceDiagram
     autonumber
     actor Owner
     participant TS as Tenant Service
+    participant Keto as Ory Keto
     participant Kratos as Ory Kratos
     participant DB as Database
-    participant Bull as Job Queue
+    participant Audit as Audit Service
+    participant SNS as Event Bus (SNS)
     participant Mail as Notification Service
 
     Note over Owner: Owner requests deletion
-    Owner->>TS: POST /tenants/:id/delete
-    TS->>Kratos: Verify Password
-    Kratos-->>TS: Verified
-    TS->>DB: Mark 'Deletion Scheduled' (30 days)
-    TS->>Bull: Schedule Deletion Job
-    TS->>Mail: Send Confirmation Email
-    TS-->>Owner: Success
+    Owner->>TS: POST /tenants/:id/schedule-deletion
+    TS->>Keto: Check Permission (delete)
+    alt Permission Denied
+        TS-->>Owner: 403 Forbidden
+    else Permission Granted
+        TS->>Kratos: Verify Password
+        alt Invalid Password
+            TS-->>Owner: 401 Unauthorized
+        else Password Valid
+            TS->>DB: Check if already scheduled
+            alt Already Scheduled
+                TS-->>Owner: 409 Conflict
+            else Not Scheduled
+                TS->>TS: Calculate Execution Date (+30 days)
+                TS->>DB: Update Status to DELETION_SCHEDULED
+                TS->>Audit: Log 'TENANT_DELETION_SCHEDULED'
+                TS->>SNS: Publish 'tenant.deletion.scheduled'
+                TS->>Mail: Send Confirmation Email
+                TS-->>Owner: Success (scheduledAt, executionDate)
+            end
+        end
+    end
+```
+
+#### 8.2 Cancel Deletion
+
+Allows the owner to cancel a scheduled deletion before the 30-day grace period expires.
+
+1.  **Permission Check**: Verify subject has `UPDATE` permission on the tenant.
+2.  **Password Verification**: Verify the owner's password via Kratos.
+3.  **Status Check**: Ensure deletion is currently scheduled.
+4.  **Status Restore**: Update tenant status back to `ACTIVE` and clear deletion fields.
+5.  **Event Emission**: Emit `tenant.deletion.cancelled` event for side effects.
+
+```mermaid
+sequenceDiagram
+    autonumber
+    actor Owner
+    participant TS as Tenant Service
+    participant Keto as Ory Keto
+    participant Kratos as Ory Kratos
+    participant DB as Database
+    participant Audit as Audit Service
+    participant SNS as Event Bus (SNS)
+    participant Mail as Notification Service
+
+    Note over Owner: Owner cancels deletion
+    Owner->>TS: POST /tenants/:id/cancel-deletion
+    TS->>Keto: Check Permission (update)
+    alt Permission Denied
+        TS-->>Owner: 403 Forbidden
+    else Permission Granted
+        TS->>Kratos: Verify Password
+        alt Invalid Password
+            TS-->>Owner: 401 Unauthorized
+        else Password Valid
+            TS->>DB: Check if deletion is scheduled
+            alt Not Scheduled
+                TS-->>Owner: 400 Bad Request
+            else Deletion Scheduled
+                TS->>DB: Restore Status to ACTIVE
+                TS->>Audit: Log 'TENANT_DELETION_CANCELLED'
+                TS->>SNS: Publish 'tenant.deletion.cancelled'
+                TS->>Mail: Send Cancellation Confirmation
+                TS-->>Owner: Success
+            end
+        end
+    end
+```
+
+#### 8.3 Execute Deletion (Background Job)
+
+This is executed by a scheduled background job after the 30-day grace period.
+
+1.  **Status Verification**: Ensure tenant status is `DELETION_SCHEDULED`.
+2.  **Date Verification**: Verify 30 days have passed since `deletionScheduledAt`.
+3.  **Event Emission**: Emit `tenant.deleted` event BEFORE deletion for cleanup tasks.
+4.  **Hard Delete**: Permanently delete the tenant from the database.
+
+```mermaid
+sequenceDiagram
+    autonumber
+    participant Bull as Job Queue
+    participant TS as Tenant Service
+    participant DB as Database
+    participant Audit as Audit Service
+    participant SNS as Event Bus (SNS)
+    participant Keto as Ory Keto
+    participant S3 as AWS S3
 
     Note over Bull: 30 Days Later
-    Bull->>TS: Execute Deletion Job
-    TS->>DB: Hard Delete Tenant Data
-    TS->>SNS: Publish 'tenant.deleted'
+    Bull->>TS: Execute Deletion Job (tenantId)
+    TS->>DB: Fetch Tenant
+    TS->>TS: Verify Status = DELETION_SCHEDULED
+    TS->>TS: Verify 30 Days Passed
+    alt Verification Failed
+        TS-->>Bull: Error (Job Failed)
+    else Verification Passed
+        TS->>Audit: Log 'TENANT_DELETED'
+        TS->>SNS: Publish 'tenant.deleted'
+        Note over SNS: Other services listen to this event
+        SNS->>Keto: Remove All Tenant Relations
+        SNS->>S3: Delete Tenant Files
+        TS->>DB: Hard Delete Tenant
+        TS-->>Bull: Success
+    end
 ```
+
+**Event Listeners**:
+
+The `TenantListener` handles the following events:
+
+- `tenant.deletion.scheduled`: Logs audit, publishes SNS event, sends notification email, schedules background job.
+- `tenant.deletion.cancelled`: Logs audit, publishes SNS event, sends notification email, cancels background job.
+- `tenant.deleted`: Logs audit, publishes SNS event for cleanup (Keto relations, S3 files, other services).
+
+**Security Considerations**:
+
+- Password verification is required for both scheduling and canceling deletion.
+- Only users with `DELETE` permission (typically the owner) can schedule deletion.
+- The 30-day grace period allows recovery from accidental deletion requests.
+- Audit logs capture all deletion-related actions for compliance.

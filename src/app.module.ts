@@ -31,6 +31,7 @@ import { AutomapperModule } from '@automapper/nestjs';
 import { classes } from '@automapper/classes';
 import { ApiKeyController } from './api-key/api-key.controller';
 import { TenantMiddleware } from './common/tenant/tenant.middleware';
+import { TeamMemberModule } from './team-member/team-member.module';
 
 @Module({
     imports: [
@@ -52,6 +53,7 @@ import { TenantMiddleware } from './common/tenant/tenant.middleware';
         WebhookModule,
         FilesModule,
         TenantModule,
+        TeamMemberModule,
         InvitationModule,
         CurrencyModule,
         ApiKeyModule
