@@ -679,3 +679,530 @@ The `TenantListener` handles the following events:
 - Only users with `DELETE` permission (typically the owner) can schedule deletion.
 - The 30-day grace period allows recovery from accidental deletion requests.
 - Audit logs capture all deletion-related actions for compliance.
+
+### 9. Team Member Role Update (Epic 2)
+
+Triggered when a tenant admin updates a team member's role.
+
+**Endpoint**: `PUT /members/:memberId`
+**Payload**: `{ role: string }`
+
+**Side Effects**:
+
+- Updates Ory Keto relations
+- Sends notification email
+- Creates audit log entry
+- Publishes event to SNS
+
+```mermaid
+sequenceDiagram
+    autonumber
+    actor Admin
+    participant TS as Tenant Service
+    participant Keto as Ory Keto
+    participant DB as Database
+    participant Audit as Audit Service
+    participant SNS as Event Bus (SNS)
+    participant Mail as Notification Service
+
+    Note over Admin: Admin updates member role
+    Admin->>TS: PUT /members/:memberId
+    TS->>Keto: Check Permission (manage_members)
+    alt Permission Denied
+        TS-->>Admin: 403 Forbidden
+    else Permission Granted
+        TS->>DB: Check if last admin
+        alt Last Admin Demotion
+            TS-->>Admin: 400 Bad Request (Cannot demote last admin)
+        else Safe to Update
+            TS->>DB: Update Member Role
+            TS->>Keto: Update Relations (new role permissions)
+            TS->>Audit: Log 'MEMBER_ROLE_UPDATED'
+            TS->>SNS: Publish 'member.updated'
+            TS->>Mail: Send Role Change Notification
+            TS-->>Admin: Success
+        end
+    end
+```
+
+### 10. Team Member Removal (Epic 2)
+
+Triggered when a tenant admin removes a team member from the organization.
+
+**Endpoint**: `DELETE /members/:memberId`
+
+**Side Effects**:
+
+- Removes Ory Keto relations
+- Invalidates member sessions
+- Sends notification email
+- Creates audit log entry
+- Publishes event to SNS
+
+```mermaid
+sequenceDiagram
+    autonumber
+    actor Admin
+    participant TS as Tenant Service
+    participant Keto as Ory Keto
+    participant DB as Database
+    participant Audit as Audit Service
+    participant SNS as Event Bus (SNS)
+    participant Mail as Notification Service
+
+    Note over Admin: Admin removes team member
+    Admin->>TS: DELETE /members/:memberId
+    TS->>Keto: Check Permission (manage_members)
+    alt Permission Denied
+        TS-->>Admin: 403 Forbidden
+    else Permission Granted
+        TS->>DB: Fetch Member Details
+        alt Self-Removal
+            TS-->>Admin: 400 Bad Request (Cannot remove self)
+        else Last Admin Check
+            TS->>DB: Check if last admin
+            alt Last Admin
+                TS-->>Admin: 400 Bad Request (Cannot remove last admin)
+            else Safe to Remove
+                TS->>DB: Delete Team Member
+                TS->>Keto: Remove All Relations (member, permissions)
+                TS->>Audit: Log 'MEMBER_REMOVED'
+                TS->>SNS: Publish 'member.removed'
+                TS->>Mail: Send Removal Notification
+                TS-->>Admin: Success
+            end
+        end
+    end
+```
+
+### 11. Settings Update (Epic 3)
+
+Triggered when a tenant admin updates organization settings (general, branding, notifications).
+
+**Endpoint**: `PUT /tenants/:id/settings`
+**Payload**: `UpdateSettingsDto`
+
+**Side Effects**:
+
+- Updates settings in database
+- Creates audit log entry
+- May trigger cache invalidation
+- Publishes event to SNS
+
+```mermaid
+sequenceDiagram
+    autonumber
+    actor Admin
+    participant TS as Tenant Service
+    participant Keto as Ory Keto
+    participant DB as Database
+    participant Redis as Redis Cache
+    participant Audit as Audit Service
+    participant SNS as Event Bus (SNS)
+
+    Note over Admin: Admin updates settings
+    Admin->>TS: PUT /tenants/:id/settings
+    TS->>Keto: Check Permission (update_settings)
+    alt Permission Denied
+        TS-->>Admin: 403 Forbidden
+    else Permission Granted
+        TS->>TS: Validate Settings DTO
+        alt Validation Failed
+            TS-->>Admin: 400 Bad Request
+        else Valid Settings
+            TS->>DB: Update Tenant Settings (JSONB)
+            TS->>Redis: Invalidate Settings Cache
+            TS->>Audit: Log 'SETTINGS_UPDATED'
+            TS->>SNS: Publish 'tenant.settings.updated'
+            TS-->>Admin: Success
+        end
+    end
+```
+
+### 12. Subscription Upgrade (Epic 4)
+
+Triggered when a tenant admin upgrades to a higher-tier plan.
+
+**Endpoint**: `POST /tenants/:id/subscription/upgrade`
+**Payload**: `{ planId: string, billingCycle: 'monthly' | 'annual' }`
+
+**Side Effects**:
+
+- Updates Stripe subscription with proration
+- Updates tenant plan immediately
+- Creates audit log entry
+- Sends confirmation email
+- Publishes event to SNS
+
+```mermaid
+sequenceDiagram
+    autonumber
+    actor Admin
+    participant TS as Tenant Service
+    participant Keto as Ory Keto
+    participant Stripe as Stripe API
+    participant DB as Database
+    participant Audit as Audit Service
+    participant SNS as Event Bus (SNS)
+    participant Mail as Notification Service
+
+    Note over Admin: Admin upgrades plan
+    Admin->>TS: POST /tenants/:id/subscription/upgrade
+    TS->>Keto: Check Permission (manage_billing)
+    alt Permission Denied
+        TS-->>Admin: 403 Forbidden
+    else Permission Granted
+        TS->>Stripe: Calculate Proration Preview
+        Stripe-->>TS: Proration Amount
+        TS-->>Admin: Return Preview (optional confirmation)
+        Admin->>TS: Confirm Upgrade
+        TS->>Stripe: Update Subscription (prorate=true)
+        alt Stripe Error
+            TS-->>Admin: 500 Payment Failed
+        else Success
+            Stripe-->>TS: Updated Subscription
+            TS->>DB: Update Tenant (plan, status)
+            TS->>Audit: Log 'SUBSCRIPTION_UPGRADED'
+            TS->>SNS: Publish 'subscription.upgraded'
+            TS->>Mail: Send Upgrade Confirmation
+            TS-->>Admin: Success
+        end
+    end
+```
+
+### 13. Subscription Downgrade (Epic 4)
+
+Triggered when a tenant admin downgrades to a lower-tier plan.
+
+**Endpoint**: `POST /tenants/:id/subscription/downgrade`
+**Payload**: `{ planId: string }`
+
+**Side Effects**:
+
+- Schedules Stripe subscription change for period end
+- Stores pending downgrade in database
+- Creates audit log entry
+- Sends confirmation email
+- Publishes event to SNS
+
+```mermaid
+sequenceDiagram
+    autonumber
+    actor Admin
+    participant TS as Tenant Service
+    participant Keto as Ory Keto
+    participant Stripe as Stripe API
+    participant DB as Database
+    participant Audit as Audit Service
+    participant SNS as Event Bus (SNS)
+    participant Mail as Notification Service
+
+    Note over Admin: Admin downgrades plan
+    Admin->>TS: POST /tenants/:id/subscription/downgrade
+    TS->>Keto: Check Permission (manage_billing)
+    alt Permission Denied
+        TS-->>Admin: 403 Forbidden
+    else Permission Granted
+        TS->>DB: Check Current Usage vs New Plan Limits
+        alt Usage Exceeds New Limits
+            TS-->>Admin: 400 Bad Request (Usage exceeds limits)
+        else Usage Within Limits
+            TS->>Stripe: Schedule Change at Period End
+            Stripe-->>TS: Scheduled Subscription
+            TS->>DB: Store Pending Downgrade
+            TS->>Audit: Log 'SUBSCRIPTION_DOWNGRADE_SCHEDULED'
+            TS->>SNS: Publish 'subscription.downgrade_scheduled'
+            TS->>Mail: Send Downgrade Scheduled Email
+            TS-->>Admin: Success (effective_date)
+        end
+    end
+```
+
+### 14. Subscription Cancellation (Epic 4)
+
+Triggered when a tenant admin cancels their subscription.
+
+**Endpoint**: `POST /tenants/:id/subscription/cancel`
+**Payload**: `{ reason?: string }`
+
+**Side Effects**:
+
+- Cancels Stripe subscription at period end
+- Stores cancellation reason
+- Creates audit log entry
+- Sends confirmation email with reactivation link
+- Publishes event to SNS
+
+```mermaid
+sequenceDiagram
+    autonumber
+    actor Admin
+    participant TS as Tenant Service
+    participant Keto as Ory Keto
+    participant Stripe as Stripe API
+    participant DB as Database
+    participant Audit as Audit Service
+    participant SNS as Event Bus (SNS)
+    participant Mail as Notification Service
+
+    Note over Admin: Admin cancels subscription
+    Admin->>TS: POST /tenants/:id/subscription/cancel
+    TS->>Keto: Check Permission (manage_billing)
+    alt Permission Denied
+        TS-->>Admin: 403 Forbidden
+    else Permission Granted
+        TS->>Stripe: Cancel at Period End
+        Stripe-->>TS: Updated Subscription
+        TS->>DB: Update Tenant (cancellation_scheduled, reason)
+        TS->>Audit: Log 'SUBSCRIPTION_CANCELLED'
+        TS->>SNS: Publish 'subscription.cancelled'
+        TS->>Mail: Send Cancellation Email (with reactivation link)
+        TS-->>Admin: Success (active_until)
+    end
+```
+
+### 15. Tenant Suspension (Epic 6)
+
+Triggered when a platform admin suspends a tenant account (e.g., for policy violations or non-payment).
+
+**Endpoint**: `POST /admin/tenants/:id/suspend`
+**Payload**: `{ reason: string }`
+
+**Side Effects**:
+
+- Updates tenant status to SUSPENDED
+- Publishes event to pause campaigns
+- Creates audit log entry
+- Sends notification email
+- Publishes event to SNS
+
+```mermaid
+sequenceDiagram
+    autonumber
+    actor PlatformAdmin
+    participant TS as Tenant Service
+    participant Keto as Ory Keto
+    participant DB as Database
+    participant Audit as Audit Service
+    participant SNS as Event Bus (SNS)
+    participant Mail as Notification Service
+    participant CampaignSvc as Campaign Service
+
+    Note over PlatformAdmin: Platform Admin suspends tenant
+    PlatformAdmin->>TS: POST /admin/tenants/:id/suspend
+    TS->>Keto: Check Permission (admin:suspend_tenant)
+    alt Permission Denied
+        TS-->>PlatformAdmin: 403 Forbidden
+    else Permission Granted
+        TS->>DB: Update Tenant Status (SUSPENDED)
+        TS->>Audit: Log 'TENANT_SUSPENDED'
+        TS->>SNS: Publish 'tenant.suspended'
+        Note over SNS: Campaign Service listens to this event
+        SNS->>CampaignSvc: Pause All Campaigns
+        TS->>Mail: Send Suspension Notification
+        TS-->>PlatformAdmin: Success
+    end
+```
+
+### 16. Tenant Unsuspension (Epic 6)
+
+Triggered when a platform admin unsuspends a previously suspended tenant.
+
+**Endpoint**: `POST /admin/tenants/:id/unsuspend`
+
+**Side Effects**:
+
+- Updates tenant status to ACTIVE
+- Publishes event to resume campaigns
+- Creates audit log entry
+- Sends notification email
+- Publishes event to SNS
+
+```mermaid
+sequenceDiagram
+    autonumber
+    actor PlatformAdmin
+    participant TS as Tenant Service
+    participant Keto as Ory Keto
+    participant DB as Database
+    participant Audit as Audit Service
+    participant SNS as Event Bus (SNS)
+    participant Mail as Notification Service
+    participant CampaignSvc as Campaign Service
+
+    Note over PlatformAdmin: Platform Admin unsuspends tenant
+    PlatformAdmin->>TS: POST /admin/tenants/:id/unsuspend
+    TS->>Keto: Check Permission (admin:suspend_tenant)
+    alt Permission Denied
+        TS-->>PlatformAdmin: 403 Forbidden
+    else Permission Granted
+        TS->>DB: Check Current Status
+        alt Not Suspended
+            TS-->>PlatformAdmin: 400 Bad Request
+        else Currently Suspended
+            TS->>DB: Update Tenant Status (ACTIVE)
+            TS->>Audit: Log 'TENANT_UNSUSPENDED'
+            TS->>SNS: Publish 'tenant.unsuspended'
+            Note over SNS: Campaign Service listens to this event
+            SNS->>CampaignSvc: Resume Campaigns
+            TS->>Mail: Send Unsuspension Notification
+            TS-->>PlatformAdmin: Success
+        end
+    end
+```
+
+### 17. Account Locking (Self-Service) (Epic 6)
+
+Triggered when a tenant owner temporarily locks their account.
+
+**Endpoint**: `POST /tenants/:id/lock`
+**Payload**: `{ password: string, lockUntil?: Date, reason?: string }`
+
+**Side Effects**:
+
+- Updates tenant status to LOCKED
+- Requires password verification
+- Optionally schedules auto-unlock
+- Creates audit log entry
+- Sends notification email
+
+```mermaid
+sequenceDiagram
+    autonumber
+    actor Owner
+    participant TS as Tenant Service
+    participant Keto as Ory Keto
+    participant Kratos as Ory Kratos
+    participant DB as Database
+    participant Audit as Audit Service
+    participant Bull as Job Queue
+    participant Mail as Notification Service
+
+    Note over Owner: Owner locks account
+    Owner->>TS: POST /tenants/:id/lock
+    TS->>Keto: Check Permission (owner)
+    alt Permission Denied
+        TS-->>Owner: 403 Forbidden
+    else Permission Granted
+        TS->>Kratos: Verify Password
+        alt Invalid Password
+            TS-->>Owner: 401 Unauthorized
+        else Password Valid
+            TS->>DB: Update Status (LOCKED, lock_until, reason)
+            TS->>Audit: Log 'TENANT_LOCKED'
+            alt Auto-Unlock Scheduled
+                TS->>Bull: Schedule Auto-Unlock Job
+            end
+            TS->>Mail: Send Lock Confirmation
+            TS-->>Owner: Success
+        end
+    end
+```
+
+### 18. Account Unlocking (Epic 6)
+
+Triggered when a tenant owner unlocks their previously locked account.
+
+**Endpoint**: `POST /tenants/:id/unlock`
+**Payload**: `{ password: string }`
+
+**Side Effects**:
+
+- Updates tenant status to ACTIVE
+- Requires password verification
+- Cancels scheduled auto-unlock job
+- Creates audit log entry
+- Sends notification email
+
+```mermaid
+sequenceDiagram
+    autonumber
+    actor Owner
+    participant TS as Tenant Service
+    participant Keto as Ory Keto
+    participant Kratos as Ory Kratos
+    participant DB as Database
+    participant Audit as Audit Service
+    participant Bull as Job Queue
+    participant Mail as Notification Service
+
+    Note over Owner: Owner unlocks account
+    Owner->>TS: POST /tenants/:id/unlock
+    TS->>Keto: Check Permission (owner)
+    alt Permission Denied
+        TS-->>Owner: 403 Forbidden
+    else Permission Granted
+        TS->>Kratos: Verify Password
+        alt Invalid Password
+            TS-->>Owner: 401 Unauthorized
+        else Password Valid
+            TS->>DB: Check if Locked
+            alt Not Locked
+                TS-->>Owner: 400 Bad Request
+            else Currently Locked
+                TS->>DB: Update Status (ACTIVE)
+                TS->>Bull: Cancel Auto-Unlock Job (if exists)
+                TS->>Audit: Log 'TENANT_UNLOCKED'
+                TS->>Mail: Send Unlock Confirmation
+                TS-->>Owner: Success
+            end
+        end
+    end
+```
+
+### 19. Data Export Request (Epic 6)
+
+Triggered when a tenant owner requests a full data export for GDPR compliance or backup.
+
+**Endpoint**: `POST /tenants/:id/export`
+
+**Side Effects**:
+
+- Creates background job for data aggregation
+- Calls multiple services to collect data
+- Generates ZIP file and uploads to S3
+- Creates presigned download URL
+- Sends email with download link
+- Implements rate limiting (1 per 24h)
+
+```mermaid
+sequenceDiagram
+    autonumber
+    actor Owner
+    participant TS as Tenant Service
+    participant Keto as Ory Keto
+    participant DB as Database
+    participant Bull as Job Queue
+    participant CampaignSvc as Campaign Service
+    participant ReferralSvc as Referral Service
+    participant S3 as AWS S3
+    participant Mail as Notification Service
+
+    Note over Owner: Owner requests data export
+    Owner->>TS: POST /tenants/:id/export
+    TS->>Keto: Check Permission (owner)
+    alt Permission Denied
+        TS-->>Owner: 403 Forbidden
+    else Permission Granted
+        TS->>DB: Check Last Export Time
+        alt Rate Limit Exceeded
+            TS-->>Owner: 429 Too Many Requests
+        else Within Rate Limit
+            TS->>Bull: Create Export Job
+            TS-->>Owner: 202 Accepted (job queued)
+
+            Note over Bull: Background Job Execution
+            Bull->>TS: Execute Export Job
+            TS->>DB: Fetch Tenant Data
+            TS->>CampaignSvc: Fetch Campaign Data
+            TS->>ReferralSvc: Fetch Referral Data
+            TS->>TS: Generate ZIP File
+            TS->>S3: Upload ZIP
+            S3-->>TS: File URL
+            TS->>S3: Generate Presigned URL (7 days)
+            S3-->>TS: Download URL
+            TS->>Mail: Send Export Ready Email
+            TS->>DB: Update Last Export Time
+        end
+    end
+```

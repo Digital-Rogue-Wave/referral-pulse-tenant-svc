@@ -1,5 +1,5 @@
 {
-    "name": "referral-pulse-campaign-microservice",
+    "name": "referral-pulse-tenant-microservice",
     "version": "0.0.1",
     "description": "Referral Pulse Ingestion Microservice",
     "author": "Nizar Chaouachi",
