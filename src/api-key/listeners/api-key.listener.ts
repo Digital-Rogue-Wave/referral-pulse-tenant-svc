@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { OnEvent } from '@nestjs/event-emitter';
-import { AuditService } from '@mod/common/services/audit.service';
-import { AuditAction } from '@mod/common/enums/audit-action.enum';
+import { AuditService } from '@mod/common/audit/audit.service';
+import { AuditAction } from '@mod/common/audit/audit-action.enum';
 import { ApiKeyEntity } from '../api-key.entity';
 import { ApiKeyStatusEnum } from '@mod/common/enums/api-key.enum';
 import { UpdateApiKeyDto } from '../dto/update-api-key.dto';

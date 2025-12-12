@@ -1,13 +1,13 @@
 import { Injectable } from '@nestjs/common';
 import { OnEvent } from '@nestjs/event-emitter';
 import { SnsPublisher } from '@mod/common/aws-sqs/sns.publisher';
-import { AuditService } from '@mod/common/services/audit.service';
+import { AuditService } from '@mod/common/audit/audit.service';
 import { KetoService } from '@mod/common/auth/keto.service';
 import { Utils } from '@mod/common/utils/utils';
 import { KetoRelationTupleDto } from '@mod/common/auth/dto/keto-relation-tuple.dto';
 import { KetoNamespace, KetoRelation } from '@mod/common/auth/keto.constants';
-import { CreateAuditLogDto } from '@mod/common/dto/create-audit-log.dto';
-import { AuditAction } from '@mod/common/enums/audit-action.enum';
+import { CreateAuditLogDto } from '@mod/common/audit/create-audit-log.dto';
+import { AuditAction } from '@mod/common/audit/audit-action.enum';
 import { PublishSnsEventDto, SnsPublishOptionsDto } from '@mod/common/dto/sns-publish.dto';
 import { TenantEntity } from '../tenant.entity';
 import { UpdateTenantDto } from '../dto/tenant/update-tenant.dto';

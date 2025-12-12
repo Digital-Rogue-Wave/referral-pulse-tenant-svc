@@ -34,15 +34,13 @@ import { AllConfigType } from '@mod/config/config.type';
 import { HeaderResolver, I18nModule } from 'nestjs-i18n';
 import path from 'path';
 import { EventEmitterModule } from '@nestjs/event-emitter';
-import { TypeOrmModule } from '@nestjs/typeorm';
-import { AuditLog } from '@mod/common/entities/audit-log.entity';
-import { AuditService } from './services/audit.service';
+import { AuditModule } from './audit/audit.module';
 
 @Global()
 @Module({
     imports: [
-        TypeOrmModule.forFeature([AuditLog]),
         EventEmitterModule.forRoot(),
+        AuditModule,
         LoggingModule,
         RedisModule,
         HelperModule,
@@ -152,11 +150,10 @@ import { AuditService } from './services/audit.service';
         CompareDateConstraint,
         IsGreaterThanOrEqualConstraint,
         RequestIdMiddleware,
-        SharedService,
-        S3Client,
-        AuditService
+        SharedService
     ],
     exports: [
+        // Validators - exported so they can be used in DTOs across the application
         IsNotUsedByOthers,
         IsNotExist,
         IsExist,
@@ -164,23 +161,20 @@ import { AuditService } from './services/audit.service';
         EndLaterThanStartDateValidator,
         CompareDateConstraint,
         IsGreaterThanOrEqualConstraint,
-        RedisModule,
-        S3Module,
-        SqsMessagingModule,
-        SnsModule,
-        TracingModule,
-        MonitoringModule,
-        HttpClientsModule,
-        LoggingModule,
-        IdempotencyModule,
+
+        // Middleware
         RequestIdMiddleware,
-        AuthModule,
-        HelperModule,
-        ClientsModule,
-        MulterModule,
+
+        // Services - exported so they can be injected in other modules
         SharedService,
-        AuditService,
-        FeatureFlagModule
+
+        // Modules - re-exported so their services are available to feature modules
+        S3Module,
+        SnsModule,
+        AuthModule,
+        AuditModule,
+        RedisModule,
+        HelperModule
     ]
 })
 export class CommonModule {}
