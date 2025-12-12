@@ -13,6 +13,7 @@ import { S3Module } from '@mod/common/aws-s3/s3.module';
 import { SqsMessagingModule } from '@mod/common/aws-sqs/sqs.module';
 import { SnsModule } from '@mod/common/aws-sqs/sns.module';
 import { SesModule } from '@mod/common/aws-ses/ses.module';
+import { FeatureFlagModule } from './feature-flag/feature-flag.module';
 
 import { TracingModule } from '@mod/common/tracing/tracing.module';
 import { MonitoringModule } from '@mod/common/monitoring/monitoring.module';
@@ -55,6 +56,7 @@ import { AuditService } from './services/audit.service';
         IdempotencyModule,
         AuthModule,
         ClientsModule,
+        FeatureFlagModule,
         MulterModule.registerAsync({
             imports: [ConfigModule],
             inject: [ConfigService],
@@ -177,7 +179,8 @@ import { AuditService } from './services/audit.service';
         ClientsModule,
         MulterModule,
         SharedService,
-        AuditService
+        AuditService,
+        FeatureFlagModule
     ]
 })
 export class CommonModule {}

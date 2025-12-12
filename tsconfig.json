@@ -30,5 +30,10 @@
         }
     },
     "typeRoots": ["src/types", "node_modules/@types"],
-    "include": ["src/**/*.ts", "src/**/*.d.ts", "src/types/**/*.ts", "test/**/*.ts"]
+    "include": ["src/**/*.ts", "src/**/*.d.ts", "src/types/**/*.ts", "test/**/*.ts"],
+    "ts-node": {
+        "compilerOptions": {
+            "module": "commonjs"
+        }
+    }
 }

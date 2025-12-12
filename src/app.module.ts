@@ -27,7 +27,6 @@ import { TenantModule } from './tenant/tenant.module';
 import { InvitationModule } from './invitation/invitation.module';
 import { CurrencyModule } from './currency/currency.module';
 import { ApiKeyModule } from './api-key/api-key.module';
-import { FeatureFlagModule } from './feature-flag/feature-flag.module';
 import { AutomapperModule } from '@automapper/nestjs';
 import { classes } from '@automapper/classes';
 import { ApiKeyController } from './api-key/api-key.controller';
@@ -55,8 +54,7 @@ import { TenantMiddleware } from './common/tenant/tenant.middleware';
         TenantModule,
         InvitationModule,
         CurrencyModule,
-        ApiKeyModule,
-        FeatureFlagModule
+        ApiKeyModule
     ],
     providers: [
         // Order matters: enrich spans, then record metrics
