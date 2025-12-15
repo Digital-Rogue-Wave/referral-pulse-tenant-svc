@@ -6,6 +6,8 @@ import { InvitationEntity } from '../invitation.entity';
 import { InvitationStatusEnum } from '../../common/enums/invitation.enum';
 import { TeamMemberEntity } from '../../team-member/team-member.entity';
 import { NullableType } from '@mod/types/nullable.type';
+import { Utils } from '@mod/common/utils/utils';
+import { CreateTeamMemberDto } from '@mod/team-member/dto/create-team-member.dto';
 
 @Injectable()
 export class PublicInvitationService {
@@ -48,11 +50,13 @@ export class PublicInvitationService {
         await this.invitationRepository.save(invitation);
 
         // Create Team Member
-        const member = this.teamMemberRepository.create({
+        const createTeamMemberDto = await Utils.validateDtoOrFail(CreateTeamMemberDto, {
             userId,
-            tenant: invitation.tenant,
+            tenantId: invitation.tenant.id,
             role: invitation.role
         });
+
+        const member = this.teamMemberRepository.create(createTeamMemberDto);
         await this.teamMemberRepository.save(member);
 
         // Emit member joined event

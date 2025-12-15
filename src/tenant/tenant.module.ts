@@ -10,6 +10,7 @@ import { BullModule } from '@nestjs/bullmq';
 import { TENANT_DELETION_QUEUE } from '@mod/common/bullmq/queues/tenant-deletion.queue';
 import { TenantDeletionProcessor } from './processors/tenant-deletion.processor';
 import { HttpClientsModule } from '@mod/common/http/http-clients.module';
+import { TenantSettingModule } from '@mod/tenant-setting/tenant-setting.module';
 
 @Module({
     imports: [
@@ -18,7 +19,8 @@ import { HttpClientsModule } from '@mod/common/http/http-clients.module';
         HttpClientsModule,
         BullModule.registerQueue({
             name: TENANT_DELETION_QUEUE
-        })
+        }),
+        TenantSettingModule
     ],
     controllers: [TenantController],
     providers: [TenantService, TenantSerializationProfile, TenantListener, TenantDeletionProcessor],

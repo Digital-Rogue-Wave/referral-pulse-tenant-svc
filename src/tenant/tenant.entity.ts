@@ -1,9 +1,10 @@
 import EntityHelper from '@mod/common/entities/entity-helper';
 import { TenantStatusEnum } from '@mod/common/enums/tenant.enum';
 import { FileEntity } from '@mod/files/file.entity';
-import { Entity, Column, PrimaryGeneratedColumn, ManyToOne, OneToMany } from 'typeorm';
+import { Entity, Column, PrimaryGeneratedColumn, ManyToOne, OneToMany, OneToOne } from 'typeorm';
 import { InvitationEntity } from '@mod/invitation/invitation.entity';
 import { TeamMemberEntity } from '../team-member/team-member.entity';
+import { TenantSettingEntity } from '@mod/tenant-setting/tenant-setting.entity';
 
 @Entity({ name: 'tenants' })
 export class TenantEntity extends EntityHelper {
@@ -28,8 +29,10 @@ export class TenantEntity extends EntityHelper {
     })
     status: TenantStatusEnum;
 
-    @Column({ type: 'jsonb', default: {} })
-    settings: Record<string, any>;
+    @OneToOne(() => TenantSettingEntity, (setting) => setting.tenant, {
+        cascade: true
+    })
+    setting: TenantSettingEntity;
 
     @Column({ type: 'timestamp', nullable: true })
     deletionScheduledAt?: Date;

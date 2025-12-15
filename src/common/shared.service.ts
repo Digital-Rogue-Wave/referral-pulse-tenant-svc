@@ -42,25 +42,9 @@ export class SharedService {
 
     /**
      * Get default tenant settings
+     * @deprecated Moved to TenantSettingService
      */
-    getDefaultTenantSettings() {
-        return {
-            branding: {
-                primaryColor: '#000000',
-                secondaryColor: '#ffffff',
-                fontFamily: 'Inter'
-            },
-            notifications: {
-                emailEnabled: true,
-                webhookEnabled: false
-            },
-            general: {
-                timezone: 'UTC',
-                currency: 'USD',
-                locale: 'en-US'
-            }
-        };
-    }
+    // getDefaultTenantSettings removed - logic moved to TenantSettingService
 
     /*
   async getTokensData(data: {

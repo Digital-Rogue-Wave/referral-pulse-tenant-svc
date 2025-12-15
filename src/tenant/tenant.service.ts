@@ -4,7 +4,6 @@ import { DeleteResult, FindOptionsRelations, FindOptionsWhere, Repository } from
 import { TenantEntity } from './tenant.entity';
 import { CreateTenantDto } from './dto/tenant/create-tenant.dto';
 import { UpdateTenantDto } from './dto/tenant/update-tenant.dto';
-import { TenantSettingsDto } from './dto/settings/tenant-settings.dto';
 import { NullableType } from '@mod/types/nullable.type';
 import { FilesService } from '@mod/files/files.service';
 import { KetoService } from '@mod/common/auth/keto.service';
@@ -15,7 +14,7 @@ import { KratosService } from '@mod/common/auth/kratos.service';
 import { TenantStatusEnum } from '@mod/common/enums/tenant.enum';
 import { ScheduleDeletionDto } from './dto/schedule-deletion.dto';
 import { CancelDeletionDto } from './dto/cancel-deletion.dto';
-import { SharedService } from '@mod/common/shared.service';
+import { TenantSettingService } from '@mod/tenant-setting/tenant-setting.service';
 
 @Injectable()
 export class TenantService {
@@ -26,7 +25,7 @@ export class TenantService {
         private readonly ketoService: KetoService,
         private readonly eventEmitter: EventEmitter2,
         private readonly kratosService: KratosService,
-        private readonly sharedService: SharedService
+        private readonly tenantSettingService: TenantSettingService
     ) {}
 
     async create(createTenantDto: CreateTenantDto, file?: Express.Multer.File | Express.MulterS3.File): Promise<TenantEntity> {
@@ -44,13 +43,15 @@ export class TenantService {
 
         const tenant = this.tenantRepository.create({
             ...createTenantDto,
-            slug: tenantSlug,
-            settings: this.sharedService.getDefaultTenantSettings()
+            slug: tenantSlug
         });
 
         if (file) {
             tenant.image = await this.filesService.uploadFile(file);
         }
+
+        // Create default settings
+        tenant.setting = await this.tenantSettingService.createDefault();
 
         const savedTenant = await this.tenantRepository.save(tenant);
 
@@ -137,53 +138,6 @@ export class TenantService {
             newOwnerId,
             tenantName: tenant.name
         });
-    }
-
-    async getSettings(id: string): Promise<TenantSettingsDto> {
-        const tenant = await this.findOneOrFail({ id });
-        return tenant.settings as TenantSettingsDto;
-    }
-
-    async updateSettings(id: string, settingsDto: TenantSettingsDto, userId: string, ipAddress?: string): Promise<TenantSettingsDto> {
-        // Verify permission
-        const allowed = await this.ketoService.check(KetoNamespace.TENANT, id, KetoPermission.UPDATE, userId);
-        if (!allowed) {
-            throw new HttpException(
-                { message: 'You do not have permission to update settings for this tenant', code: HttpStatus.FORBIDDEN },
-                HttpStatus.FORBIDDEN
-            );
-        }
-
-        const tenant = await this.findOneOrFail({ id });
-        const oldSettings = tenant.settings;
-
-        const newSettings = {
-            ...tenant.settings,
-            branding: { ...(tenant.settings.branding || {}), ...settingsDto.branding },
-            notifications: { ...(tenant.settings.notifications || {}), ...settingsDto.notifications },
-            general: { ...(tenant.settings.general || {}), ...settingsDto.general }
-        };
-
-        tenant.settings = newSettings;
-
-        await this.tenantRepository.save(tenant);
-
-        // Reuse tenant.updated event but maybe we want a specific one.
-        // For now, let's treat it as a tenant update.
-        // Or create a specific listener. The task implies audit log viewing, so capturing this as an action is good.
-
-        // Let's use the existing tenant.updated event but pass the changes in a way the listener understands,
-        // or just rely on the fact that we changed 'settings'.
-
-        this.eventEmitter.emit('tenant.updated', {
-            tenant,
-            oldTenant: { ...tenant, settings: oldSettings },
-            changes: { settings: newSettings },
-            userId,
-            ipAddress
-        });
-
-        return tenant.settings as TenantSettingsDto;
     }
 
     /**

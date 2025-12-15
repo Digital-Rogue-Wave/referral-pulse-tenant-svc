@@ -16,7 +16,6 @@ import { JwtAuthGuard } from '@mod/common/auth/jwt-auth.guard';
 import { KetoGuard, RequirePermission } from '@mod/common/auth/keto.guard';
 import { KetoNamespace, KetoPermission } from '@mod/common/auth/keto.constants';
 import { CurrentUser, CurrentUserType } from '@mod/common/auth/current-user.decorator';
-import { TenantSettingsDto } from './dto/settings/tenant-settings.dto';
 import { ScheduleDeletionDto } from './dto/schedule-deletion.dto';
 import { CancelDeletionDto } from './dto/cancel-deletion.dto';
 
@@ -117,30 +116,6 @@ export class TenantController {
     @Put(':id/transfer-ownership')
     async transferOwnership(@Param('id') id: string, @Body() dto: TransferOwnershipDto, @CurrentUser() user: CurrentUserType): Promise<void> {
         return await this.tenantService.transferOwnership(id, dto.newOwnerId, user.id);
-    }
-
-    @ApiOkResponse({ type: TenantSettingsDto })
-    @UseGuards(KetoGuard)
-    @RequirePermission({ namespace: KetoNamespace.TENANT, relation: KetoPermission.READ, objectParam: 'id' })
-    @HttpCode(HttpStatus.OK)
-    @Get(':id/settings')
-    async getSettings(@Param('id') id: string): Promise<TenantSettingsDto> {
-        return await this.tenantService.getSettings(id);
-    }
-
-    @ApiBody({ type: TenantSettingsDto })
-    @ApiOkResponse({ type: TenantSettingsDto })
-    @UseGuards(KetoGuard)
-    @RequirePermission({ namespace: KetoNamespace.TENANT, relation: KetoPermission.UPDATE, objectParam: 'id' })
-    @HttpCode(HttpStatus.OK)
-    @Put(':id/settings')
-    async updateSettings(
-        @Param('id') id: string,
-        @Body() settingsDto: TenantSettingsDto,
-        @CurrentUser() user: CurrentUserType,
-        @Ip() ipAddress: string
-    ): Promise<TenantSettingsDto> {
-        return await this.tenantService.updateSettings(id, settingsDto, user.id, ipAddress);
     }
 
     @ApiBody({ type: ScheduleDeletionDto })

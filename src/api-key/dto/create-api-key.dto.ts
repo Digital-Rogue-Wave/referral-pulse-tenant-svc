@@ -1,5 +1,7 @@
-import { IsString, IsNotEmpty, IsArray, IsOptional, ArrayMinSize } from 'class-validator';
+import { IsString, IsNotEmpty, IsArray, ArrayMinSize, IsDate } from 'class-validator';
 import { ApiProperty } from '@nestjs/swagger';
+import { Type } from 'class-transformer';
+import { CompareDate, DateComparisonMethod } from '@mod/common/validators/compare-date.validator';
 
 export class CreateApiKeyDto {
     @ApiProperty({
@@ -23,8 +25,10 @@ export class CreateApiKeyDto {
     @ApiProperty({
         description: 'Optional expiration date for the API key',
         example: '2025-12-31T23:59:59Z',
-        required: false
+        required: true
     })
-    @IsOptional()
-    expiresAt?: Date;
+    @IsDate()
+    @Type(() => Date)
+    @CompareDate(new Date(), DateComparisonMethod.GREATER)
+    expiresAt: Date;
 }
