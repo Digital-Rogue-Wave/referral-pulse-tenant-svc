@@ -1,5 +1,4 @@
-import { Entity, Column, PrimaryGeneratedColumn, ManyToOne } from 'typeorm';
-import { TenantEntity } from '../tenant/tenant.entity';
+import { Entity, Column, PrimaryGeneratedColumn } from 'typeorm';
 import { InvitationStatusEnum } from '../common/enums/invitation.enum';
 import { RoleEnum } from '../common/enums/role.enum';
 import EntityHelper from '@mod/common/entities/entity-helper';
@@ -8,6 +7,9 @@ import EntityHelper from '@mod/common/entities/entity-helper';
 export class InvitationEntity extends EntityHelper {
     @PrimaryGeneratedColumn('uuid')
     id: string;
+
+    @Column()
+    tenantId: string;
 
     @Column()
     email: string;
@@ -31,7 +33,4 @@ export class InvitationEntity extends EntityHelper {
 
     @Column()
     expiresAt: Date;
-
-    @ManyToOne('TenantEntity', 'invitations', { onDelete: 'CASCADE' })
-    tenant: TenantEntity;
 }

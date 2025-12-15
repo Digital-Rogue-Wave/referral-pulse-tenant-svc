@@ -11,6 +11,9 @@ export class TeamMemberEntity extends EntityHelper {
     @Column()
     userId: string;
 
+    @Column()
+    tenantId: string;
+
     @Column({
         type: 'enum',
         enum: RoleEnum,

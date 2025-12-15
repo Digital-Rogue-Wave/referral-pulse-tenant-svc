@@ -18,19 +18,19 @@ export class PrivateInvitationController {
     @ApiBody({ type: CreateInvitationDto })
     @ApiCreatedResponse({ type: InvitationDto, description: 'The invitation has been successfully created' })
     @UseGuards(JwtAuthGuard, KetoGuard)
-    @RequirePermission({ namespace: KetoNamespace.TENANT, relation: KetoPermission.INVITE, objectParam: 'id' })
+    @RequirePermission({ namespace: KetoNamespace.TENANT, relation: KetoPermission.INVITE })
     @UseInterceptors(MapInterceptor(InvitationEntity, InvitationDto))
     @HttpCode(HttpStatus.CREATED)
-    @Post('tenants/:id/invites')
-    async invite(@Param('id') tenantId: string, @Body() createInvitationDto: CreateInvitationDto): Promise<InvitationEntity> {
-        return this.invitationService.create(tenantId, createInvitationDto);
+    @Post()
+    async invite(@Body() createInvitationDto: CreateInvitationDto): Promise<InvitationEntity> {
+        return this.invitationService.create(createInvitationDto);
     }
 
     @ApiOkResponse({ description: 'The invitation has been successfully revoked' })
     @UseGuards(JwtAuthGuard, KetoGuard)
-    @RequirePermission({ namespace: KetoNamespace.TENANT, relation: KetoPermission.INVITE, objectParam: 'id' })
+    @RequirePermission({ namespace: KetoNamespace.TENANT, relation: KetoPermission.INVITE })
     @HttpCode(HttpStatus.OK)
-    @Delete('tenants/:id/invites/:invitationId')
+    @Delete(':invitationId')
     async revoke(@Param('invitationId') invitationId: string): Promise<void> {
         return this.invitationService.revoke(invitationId);
     }

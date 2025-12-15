@@ -34,6 +34,7 @@ import { TenantMiddleware } from './common/tenant/tenant.middleware';
 import { TeamMemberModule } from './team-member/team-member.module';
 import { TenantSettingModule } from './tenant-setting/tenant-setting.module';
 import { PrivateInvitationController } from './invitation/private/private-invitation.controller';
+import { TeamMemberController } from './team-member/team-member.controller';
 
 @Module({
     imports: [
@@ -72,6 +73,6 @@ import { PrivateInvitationController } from './invitation/private/private-invita
 export class AppModule implements NestModule {
     configure(consumer: MiddlewareConsumer) {
         consumer.apply(RequestIdMiddleware).forRoutes({ path: '*', method: RequestMethod.ALL });
-        consumer.apply(TenantMiddleware).forRoutes(ApiKeyController, PrivateInvitationController);
+        consumer.apply(TenantMiddleware).forRoutes(ApiKeyController, TeamMemberController, PrivateInvitationController);
     }
 }

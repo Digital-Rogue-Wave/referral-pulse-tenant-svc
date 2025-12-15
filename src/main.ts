@@ -6,7 +6,6 @@ import { useContainer } from 'class-validator';
 import { AppModule } from './app.module';
 import { AllConfigType } from './config/config.type';
 import validationOptions from '@mod/common/validators/validation-options';
-import { apiReference } from '@scalar/nestjs-api-reference';
 import helmet from 'helmet';
 import compression from 'compression';
 import hpp from 'hpp';
@@ -47,6 +46,7 @@ async function bootstrap() {
         .setTitle('Referral Pulse Campaign API')
         .setDescription('API List fro campaign microservice')
         .setVersion('1.0')
+        .addBearerAuth()
         .addGlobalParameters({
             name: configService.getOrThrow('appConfig.headerLanguage', { infer: true }),
             required: true,
@@ -55,7 +55,8 @@ async function bootstrap() {
         .build();
 
     const document = SwaggerModule.createDocument(app, options);
-    app.use(
+    SwaggerModule.setup('tenant-docs', app, document);
+    /*app.use(
         '/tenant-docs',
         apiReference({
             spec: {
@@ -63,7 +64,7 @@ async function bootstrap() {
             },
             favicon: 'https://cdn.prod.website-files.com/6600622e5ed775a33bff8280/6601af87c424b81fa4e5c8c1_DIGITAL%20ROGUE%20WAVE.svg'
         })
-    );
+    );*/
 
     await app.listen(configService.getOrThrow('appConfig.port', { infer: true }), () => {
         Logger.log(

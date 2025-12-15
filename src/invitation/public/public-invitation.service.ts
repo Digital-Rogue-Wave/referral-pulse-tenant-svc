@@ -3,19 +3,18 @@ import { EventEmitter2 } from '@nestjs/event-emitter';
 import { InjectRepository } from '@nestjs/typeorm';
 import { FindOptionsRelations, FindOptionsWhere, Repository } from 'typeorm';
 import { InvitationEntity } from '../invitation.entity';
-import { InvitationStatusEnum } from '../../common/enums/invitation.enum';
-import { TeamMemberEntity } from '../../team-member/team-member.entity';
+import { InvitationStatusEnum } from '@mod/common/enums/invitation.enum';
 import { NullableType } from '@mod/types/nullable.type';
 import { Utils } from '@mod/common/utils/utils';
 import { CreateTeamMemberDto } from '@mod/team-member/dto/create-team-member.dto';
+import { TeamMemberService } from '@mod/team-member/team-member.service';
 
 @Injectable()
 export class PublicInvitationService {
     constructor(
         @InjectRepository(InvitationEntity)
         private readonly invitationRepository: Repository<InvitationEntity>,
-        @InjectRepository(TeamMemberEntity)
-        private readonly teamMemberRepository: Repository<TeamMemberEntity>,
+        private readonly teamMemberService: TeamMemberService,
         private readonly eventEmitter: EventEmitter2
     ) {}
 
@@ -34,7 +33,7 @@ export class PublicInvitationService {
     }
 
     async accept(token: string, userId: string): Promise<InvitationEntity> {
-        const invitation = await this.findOneOrFail({ token }, { tenant: true });
+        const invitation = await this.findOneOrFail({ token });
 
         if (invitation.status !== InvitationStatusEnum.PENDING) {
             throw new HttpException({ message: 'Invitation is not pending', code: HttpStatus.BAD_REQUEST }, HttpStatus.BAD_REQUEST);
@@ -52,17 +51,16 @@ export class PublicInvitationService {
         // Create Team Member
         const createTeamMemberDto = await Utils.validateDtoOrFail(CreateTeamMemberDto, {
             userId,
-            tenantId: invitation.tenant.id,
+            tenantId: invitation.tenantId,
             role: invitation.role
         });
 
-        const member = this.teamMemberRepository.create(createTeamMemberDto);
-        await this.teamMemberRepository.save(member);
+        await this.teamMemberService.create(createTeamMemberDto);
 
         // Emit member joined event
         this.eventEmitter.emit('member.joined', {
             userId,
-            tenantId: invitation.tenant.id,
+            tenantId: invitation.tenantId,
             role: invitation.role,
             invitationId: invitation.id
         });
@@ -70,7 +68,7 @@ export class PublicInvitationService {
     }
 
     async reject(token: string): Promise<InvitationEntity> {
-        const invitation = await this.findOneOrFail({ token }, { tenant: true });
+        const invitation = await this.findOneOrFail({ token });
 
         if (invitation.status !== InvitationStatusEnum.PENDING) {
             throw new HttpException({ message: 'Invitation is not pending', code: HttpStatus.BAD_REQUEST }, HttpStatus.BAD_REQUEST);
@@ -83,7 +81,7 @@ export class PublicInvitationService {
     }
 
     async validate(token: string): Promise<InvitationEntity> {
-        const invitation = await this.findOneOrFail({ token }, { tenant: true });
+        const invitation = await this.findOneOrFail({ token });
         if (invitation.status !== InvitationStatusEnum.PENDING || invitation.expiresAt < new Date()) {
             throw new HttpException({ message: 'Invitation invalid or expired', code: HttpStatus.BAD_REQUEST }, HttpStatus.BAD_REQUEST);
         }

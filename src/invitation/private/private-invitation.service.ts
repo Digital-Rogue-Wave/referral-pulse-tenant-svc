@@ -5,7 +5,7 @@ import { InjectTenantAwareRepository, TenantAwareRepository } from '@mod/common/
 import { FindOptionsRelations, FindOptionsWhere } from 'typeorm';
 import { InvitationEntity } from '../invitation.entity';
 import { CreateInvitationDto } from '../dto/create-invitation.dto';
-import { InvitationStatusEnum } from '../../common/enums/invitation.enum';
+import { InvitationStatusEnum } from '@mod/common/enums/invitation.enum';
 
 import { randomBytes } from 'crypto';
 import { TenantService } from '@mod/tenant/tenant.service';
@@ -24,9 +24,7 @@ export class PrivateInvitationService {
         private readonly configService: ConfigService<AllConfigType>
     ) {}
 
-    async create(tenantId: string, createInvitationDto: CreateInvitationDto): Promise<InvitationEntity> {
-        // Ensure tenant exists (and user has access, handled by guard/controller)
-        const tenant = await this.tenantService.findOneOrFail({ id: tenantId });
+    async create(createInvitationDto: CreateInvitationDto): Promise<InvitationEntity> {
         const token = randomBytes(32).toString('hex');
         const expiryDays = this.configService.getOrThrow('appConfig.invitationExpiryDays', { infer: true });
         const expiresAt = new Date();
@@ -35,7 +33,6 @@ export class PrivateInvitationService {
         // Calculate fields
         const createFullInvitationDto = await Utils.validateDtoOrFail(CreateFullInvitationDto, {
             ...createInvitationDto,
-            tenant,
             token,
             expiresAt,
             status: InvitationStatusEnum.PENDING
@@ -50,7 +47,7 @@ export class PrivateInvitationService {
             invitationId: savedInvitation.id,
             email: createInvitationDto.email,
             token,
-            tenantName: tenant.name
+            tenantId: savedInvitation.tenantId
         });
 
         return savedInvitation;

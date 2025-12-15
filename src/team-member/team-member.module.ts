@@ -1,5 +1,4 @@
 import { Module } from '@nestjs/common';
-import { TypeOrmModule } from '@nestjs/typeorm';
 import { TeamMemberEntity } from './team-member.entity';
 import { TeamMemberController } from './team-member.controller';
 import { TeamMemberService } from './team-member.service';
@@ -9,10 +8,11 @@ import { BullModule } from '@nestjs/bullmq';
 import { TENANT_DELETION_QUEUE } from '@mod/common/bullmq/queues/tenant-deletion.queue';
 import { TenantDeletionProcessor } from '@mod/tenant/processors/tenant-deletion.processor';
 import { TenantModule } from '@mod/tenant/tenant.module';
+import { TenantAwareRepositoryModule } from '@mod/common/tenant/tenant-aware.repository';
 
 @Module({
     imports: [
-        TypeOrmModule.forFeature([TeamMemberEntity]),
+        TenantAwareRepositoryModule.forEntities([TeamMemberEntity]),
         FilesModule,
         TenantModule,
         BullModule.registerQueue({
