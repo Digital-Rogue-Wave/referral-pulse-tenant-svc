@@ -1,14 +1,8 @@
 import { Controller, Get, Post, Body, Param, Delete, Put, HttpCode, HttpStatus, UseInterceptors, UploadedFile, UseGuards, Ip } from '@nestjs/common';
-import { TenantService } from './tenant.service';
-import { TenantEntity } from './tenant.entity';
-import { CreateTenantDto } from './dto/tenant/create-tenant.dto';
-import { UpdateTenantDto } from './dto/tenant/update-tenant.dto';
-import { TransferOwnershipDto } from './dto/transfer-ownership.dto';
+import { AwareTenantService } from './aware-tenant.service';
 import { NullableType } from '@mod/types/nullable.type';
 import { DeleteResult } from 'typeorm';
-import { ApiBody, ApiConsumes, ApiCreatedResponse, ApiExtraModels, ApiOkResponse, ApiTags, getSchemaPath, ApiBearerAuth } from '@nestjs/swagger';
-import { TenantDto } from './dto/tenant/tenant.dto';
-import { FileInterceptor } from '@nestjs/platform-express';
+import { ApiBody, ApiConsumes, ApiExtraModels, ApiOkResponse, ApiTags, getSchemaPath, ApiBearerAuth } from '@nestjs/swagger';
 import { ParseFormdataPipe } from '@mod/common/pipes/parse-formdata.pipe';
 import { Utils } from '@mod/common/utils/utils';
 import { MapInterceptor } from '@automapper/nestjs';
@@ -16,49 +10,19 @@ import { JwtAuthGuard } from '@mod/common/auth/jwt-auth.guard';
 import { KetoGuard, RequirePermission } from '@mod/common/auth/keto.guard';
 import { KetoNamespace, KetoPermission } from '@mod/common/auth/keto.constants';
 import { CurrentUser, CurrentUserType } from '@mod/common/auth/current-user.decorator';
-import { ScheduleDeletionDto } from './dto/schedule-deletion.dto';
-import { CancelDeletionDto } from './dto/cancel-deletion.dto';
+import { TenantDto } from '../dto/tenant/tenant.dto';
+import { TenantEntity } from '../tenant.entity';
+import { UpdateTenantDto } from '../dto/tenant/update-tenant.dto';
+import { TransferOwnershipDto } from '../dto/transfer-ownership.dto';
+import { ScheduleDeletionDto } from '../dto/schedule-deletion.dto';
+import { CancelDeletionDto } from '../dto/cancel-deletion.dto';
 
 @ApiTags('tenants')
 @ApiBearerAuth()
 @UseGuards(JwtAuthGuard)
 @Controller({ path: 'tenants', version: '1' })
-export class TenantController {
-    constructor(private readonly tenantService: TenantService) {}
-
-    @ApiConsumes('multipart/form-data')
-    @ApiExtraModels(CreateTenantDto)
-    @ApiBody({
-        schema: {
-            type: 'object',
-            properties: {
-                file: {
-                    type: 'string',
-                    format: 'binary'
-                },
-                data: {
-                    $ref: getSchemaPath(CreateTenantDto)
-                }
-            }
-        }
-    })
-    @ApiCreatedResponse({ type: TenantDto, description: 'The tenant has been successfully created' })
-    @UseInterceptors(MapInterceptor(TenantEntity, TenantDto))
-    @UseInterceptors(FileInterceptor('file'))
-    @HttpCode(HttpStatus.CREATED)
-    @Post()
-    async create(
-        @CurrentUser() user: CurrentUserType,
-        @Body('data', ParseFormdataPipe) data: any,
-        @UploadedFile() file?: Express.Multer.File | Express.MulterS3.File
-    ): Promise<TenantEntity> {
-        const createTenantDto = await Utils.validateDtoOrFail(CreateTenantDto, data);
-
-        // Override ownerId with authenticated user
-        createTenantDto.ownerId = user.id;
-
-        return await this.tenantService.create(createTenantDto, file);
-    }
+export class AwareTenantController {
+    constructor(private readonly tenantService: AwareTenantService) {}
 
     @ApiOkResponse({ type: TenantDto, isArray: true })
     @UseInterceptors(MapInterceptor(TenantEntity, TenantDto, { isArray: true }))

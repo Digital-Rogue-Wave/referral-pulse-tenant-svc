@@ -10,7 +10,7 @@ import { CreateTeamMemberDto } from '@mod/team-member/dto/create-team-member.dto
 import { TeamMemberService } from '@mod/team-member/team-member.service';
 
 @Injectable()
-export class PublicInvitationService {
+export class AgnosticInvitationService {
     constructor(
         @InjectRepository(InvitationEntity)
         private readonly invitationRepository: Repository<InvitationEntity>,

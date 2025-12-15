@@ -33,8 +33,9 @@ import { ApiKeyController } from './api-key/api-key.controller';
 import { TenantMiddleware } from './common/tenant/tenant.middleware';
 import { TeamMemberModule } from './team-member/team-member.module';
 import { TenantSettingModule } from './tenant-setting/tenant-setting.module';
-import { PrivateInvitationController } from './invitation/private/private-invitation.controller';
+import { AwareInvitationController } from './invitation/aware/aware-invitation.controller';
 import { TeamMemberController } from './team-member/team-member.controller';
+import { AwareTenantController } from './tenant/aware/aware-tenant.controller';
 
 @Module({
     imports: [
@@ -73,6 +74,6 @@ import { TeamMemberController } from './team-member/team-member.controller';
 export class AppModule implements NestModule {
     configure(consumer: MiddlewareConsumer) {
         consumer.apply(RequestIdMiddleware).forRoutes({ path: '*', method: RequestMethod.ALL });
-        consumer.apply(TenantMiddleware).forRoutes(ApiKeyController, TeamMemberController, PrivateInvitationController);
+        consumer.apply(TenantMiddleware).forRoutes(AwareTenantController, ApiKeyController, TeamMemberController, AwareInvitationController);
     }
 }

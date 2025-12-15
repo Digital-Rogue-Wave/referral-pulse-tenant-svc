@@ -8,18 +8,16 @@ import { CreateInvitationDto } from '../dto/create-invitation.dto';
 import { InvitationStatusEnum } from '@mod/common/enums/invitation.enum';
 
 import { randomBytes } from 'crypto';
-import { TenantService } from '@mod/tenant/tenant.service';
 import { Utils } from '@mod/common/utils/utils';
 import { CreateFullInvitationDto } from '../dto/create-full-invitation.dto';
 import { AllConfigType } from '@mod/config/config.type';
 import { NullableType } from '@mod/types/nullable.type';
 
 @Injectable()
-export class PrivateInvitationService {
+export class AwareInvitationService {
     constructor(
         @InjectTenantAwareRepository(InvitationEntity)
         private readonly invitationRepository: TenantAwareRepository<InvitationEntity>,
-        private readonly tenantService: TenantService,
         private readonly eventEmitter: EventEmitter2,
         private readonly configService: ConfigService<AllConfigType>
     ) {}
