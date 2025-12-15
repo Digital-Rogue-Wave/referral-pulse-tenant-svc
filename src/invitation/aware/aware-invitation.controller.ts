@@ -1,5 +1,5 @@
 import { Controller, Post, Body, Param, UseGuards, HttpCode, HttpStatus, UseInterceptors, Delete } from '@nestjs/common';
-import { PrivateInvitationService } from './private-invitation.service';
+import { AwareInvitationService } from './aware-invitation.service';
 import { CreateInvitationDto } from '../dto/create-invitation.dto';
 import { JwtAuthGuard } from '@mod/common/auth/jwt-auth.guard';
 import { KetoGuard, RequirePermission } from '@mod/common/auth/keto.guard';
@@ -12,8 +12,8 @@ import { MapInterceptor } from '@automapper/nestjs';
 @ApiTags('Invitations')
 @ApiBearerAuth()
 @Controller({ path: 'invitations', version: '1' })
-export class PrivateInvitationController {
-    constructor(private readonly invitationService: PrivateInvitationService) {}
+export class AwareInvitationController {
+    constructor(private readonly invitationService: AwareInvitationService) {}
 
     @ApiBody({ type: CreateInvitationDto })
     @ApiCreatedResponse({ type: InvitationDto, description: 'The invitation has been successfully created' })

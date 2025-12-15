@@ -1,9 +1,9 @@
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
-import { PrivateInvitationController } from './private/private-invitation.controller';
-import { PublicInvitationController } from './public/public-invitation.controller';
-import { PrivateInvitationService } from './private/private-invitation.service';
-import { PublicInvitationService } from './public/public-invitation.service';
+import { AwareInvitationController } from './aware/aware-invitation.controller';
+import { AgnosticInvitationController } from './agnostic/agnostic-invitation.controller';
+import { AwareInvitationService } from './aware/aware-invitation.service';
+import { AgnosticInvitationService } from './agnostic/agnostic-invitation.service';
 import { InvitationEntity } from './invitation.entity';
 import { InvitationSerializationProfile } from './serialization/invitation-serialization.profile';
 import { TenantModule } from '@mod/tenant/tenant.module';
@@ -18,8 +18,8 @@ import { TeamMemberModule } from '@mod/team-member/team-member.module';
         TenantModule,
         TeamMemberModule
     ],
-    controllers: [PrivateInvitationController, PublicInvitationController],
-    providers: [PrivateInvitationService, PublicInvitationService, InvitationSerializationProfile, InvitationListener],
-    exports: [PrivateInvitationService, PublicInvitationService]
+    controllers: [AwareInvitationController, AgnosticInvitationController],
+    providers: [AwareInvitationService, AgnosticInvitationService, InvitationSerializationProfile, InvitationListener],
+    exports: [AwareInvitationService, AgnosticInvitationService]
 })
 export class InvitationModule {}

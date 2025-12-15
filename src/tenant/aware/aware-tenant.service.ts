@@ -1,82 +1,36 @@
 import { Injectable, HttpStatus, HttpException } from '@nestjs/common';
-import { InjectRepository } from '@nestjs/typeorm';
-import { DeleteResult, FindOptionsRelations, FindOptionsWhere, Repository } from 'typeorm';
-import { TenantEntity } from './tenant.entity';
-import { CreateTenantDto } from './dto/tenant/create-tenant.dto';
-import { UpdateTenantDto } from './dto/tenant/update-tenant.dto';
+import { DeleteResult, FindOptionsRelations, FindOptionsWhere } from 'typeorm';
 import { NullableType } from '@mod/types/nullable.type';
 import { FilesService } from '@mod/files/files.service';
-import { KetoService } from '@mod/common/auth/keto.service';
-import slugify from 'slugify';
-import { KetoNamespace, KetoPermission } from '@mod/common/auth/keto.constants';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { KratosService } from '@mod/common/auth/kratos.service';
 import { TenantStatusEnum } from '@mod/common/enums/tenant.enum';
-import { ScheduleDeletionDto } from './dto/schedule-deletion.dto';
-import { CancelDeletionDto } from './dto/cancel-deletion.dto';
-import { TenantSettingService } from '@mod/tenant-setting/tenant-setting.service';
+import { InjectTenantAwareRepository, TenantAwareRepository } from '@mod/common/tenant/tenant-aware.repository';
+import { TenantEntity } from '../tenant.entity';
+import { UpdateTenantDto } from '../dto/tenant/update-tenant.dto';
+import { ScheduleDeletionDto } from '../dto/schedule-deletion.dto';
+import { CancelDeletionDto } from '../dto/cancel-deletion.dto';
 
 @Injectable()
-export class TenantService {
+export class AwareTenantService {
     constructor(
-        @InjectRepository(TenantEntity)
-        private readonly tenantRepository: Repository<TenantEntity>,
+        @InjectTenantAwareRepository(TenantEntity)
+        private readonly tenantRepository: TenantAwareRepository<TenantEntity>,
         private readonly filesService: FilesService,
-        private readonly ketoService: KetoService,
         private readonly eventEmitter: EventEmitter2,
-        private readonly kratosService: KratosService,
-        private readonly tenantSettingService: TenantSettingService
+        private readonly kratosService: KratosService
     ) {}
 
-    async create(createTenantDto: CreateTenantDto, file?: Express.Multer.File | Express.MulterS3.File): Promise<TenantEntity> {
-        const { name, slug } = createTenantDto;
-
-        let tenantSlug = slug;
-        if (!tenantSlug) {
-            tenantSlug = slugify(name, { lower: true, strict: true });
-        }
-
-        const existing = await this.tenantRepository.findOne({ where: { slug: tenantSlug } });
-        if (existing) {
-            throw new HttpException({ message: 'Tenant with this slug already exists', code: HttpStatus.CONFLICT }, HttpStatus.CONFLICT);
-        }
-
-        const tenant = this.tenantRepository.create({
-            ...createTenantDto,
-            slug: tenantSlug
-        });
-
-        if (file) {
-            tenant.image = await this.filesService.uploadFile(file);
-        }
-
-        // Create default settings
-        tenant.setting = await this.tenantSettingService.createDefault();
-
-        const savedTenant = await this.tenantRepository.save(tenant);
-
-        // Emit tenant.created event for side effects (Keto, Audit, SNS)
-        this.eventEmitter.emit('tenant.created', {
-            tenant: savedTenant,
-            ownerId: createTenantDto.ownerId!
-        });
-
-        return savedTenant;
-    }
-
     async findAll(): Promise<TenantEntity[]> {
-        return await this.tenantRepository.find();
+        return await this.tenantRepository.findTenantContext();
     }
 
     async findOne(field: FindOptionsWhere<TenantEntity>, relations?: FindOptionsRelations<TenantEntity>): Promise<NullableType<TenantEntity>> {
-        return this.tenantRepository.findOne({
-            where: field,
-            relations
-        });
+        return this.tenantRepository.findOneTenantContext(field, relations);
     }
 
-    async findOneOrFail(field: FindOptionsWhere<TenantEntity>, relations?: FindOptionsRelations<TenantEntity>): Promise<TenantEntity> {
-        return this.tenantRepository.findOneOrFail({ where: field, relations });
+    async findOneOrFail(field: FindOptionsWhere<TenantEntity>): Promise<TenantEntity> {
+        return this.tenantRepository.findOneOrFailTenantContext(field);
     }
 
     async update(
@@ -87,17 +41,6 @@ export class TenantService {
         userEmail?: string,
         ipAddress?: string
     ): Promise<TenantEntity> {
-        // Verify permission if userId is provided
-        if (userId) {
-            const allowed = await this.ketoService.check(KetoNamespace.TENANT, id, KetoPermission.UPDATE, userId);
-            if (!allowed) {
-                throw new HttpException(
-                    { message: 'You do not have permission to update this tenant', code: HttpStatus.FORBIDDEN },
-                    HttpStatus.FORBIDDEN
-                );
-            }
-        }
-
         const existingTenant = await this.findOneOrFail({ id });
         // Create a shallow copy for "old" state reference
         const oldTenant = { ...existingTenant } as TenantEntity;
@@ -122,18 +65,12 @@ export class TenantService {
         return updatedTenant;
     }
 
-    async transferOwnership(tenantId: string, newOwnerId: string, currentOwnerId: string): Promise<void> {
-        const tenant = await this.findOneOrFail({ id: tenantId });
-
-        // Verify current owner has permission
-        const allowed = await this.ketoService.check(KetoNamespace.TENANT, tenantId, KetoPermission.UPDATE, currentOwnerId);
-        if (!allowed) {
-            throw new HttpException({ message: 'Only the owner can transfer ownership', code: HttpStatus.FORBIDDEN }, HttpStatus.FORBIDDEN);
-        }
+    async transferOwnership(id: string, newOwnerId: string, currentOwnerId: string): Promise<void> {
+        const tenant = await this.findOneOrFail({ id });
 
         // Emit event for Keto relation updates
         this.eventEmitter.emit('ownership.transferred', {
-            tenantId,
+            tenantId: id,
             oldOwnerId: currentOwnerId,
             newOwnerId,
             tenantName: tenant.name
@@ -151,12 +88,6 @@ export class TenantService {
         identityId: string,
         ipAddress?: string
     ): Promise<{ scheduledAt: Date; executionDate: Date }> {
-        // Verify permission - only owner can delete
-        const allowed = await this.ketoService.check(KetoNamespace.TENANT, id, KetoPermission.DELETE, userId);
-        if (!allowed) {
-            throw new HttpException({ message: 'Only the tenant owner can schedule deletion', code: HttpStatus.FORBIDDEN }, HttpStatus.FORBIDDEN);
-        }
-
         // Verify password
         const passwordValid = await this.kratosService.verifyPassword(identityId, dto.password);
         if (!passwordValid) {
@@ -200,15 +131,6 @@ export class TenantService {
      * Requires password verification for security
      */
     async cancelDeletion(id: string, dto: CancelDeletionDto, userId: string, identityId: string, ipAddress?: string): Promise<void> {
-        // Verify permission
-        const allowed = await this.ketoService.check(KetoNamespace.TENANT, id, KetoPermission.UPDATE, userId);
-        if (!allowed) {
-            throw new HttpException(
-                { message: 'You do not have permission to cancel deletion for this tenant', code: HttpStatus.FORBIDDEN },
-                HttpStatus.FORBIDDEN
-            );
-        }
-
         // Verify password
         const passwordValid = await this.kratosService.verifyPassword(identityId, dto.password);
         if (!passwordValid) {

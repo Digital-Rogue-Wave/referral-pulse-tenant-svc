@@ -4,14 +4,14 @@ import { MapInterceptor } from '@automapper/nestjs';
 import { InvitationEntity } from '../invitation.entity';
 import { InvitationDto } from '../dto/invitation.dto';
 import { EditInvitationDto } from '../dto/accept-invitation.dto';
-import { PublicInvitationService } from './public-invitation.service';
+import { AgnosticInvitationService } from './agnostic-invitation.service';
 import { CurrentUser, CurrentUserType } from '@mod/common/auth/current-user.decorator';
 import { JwtAuthGuard } from '@mod/common/auth/jwt-auth.guard';
 
 @ApiTags('Public Invitations')
 @Controller({ path: 'invitations/public', version: '1' })
-export class PublicInvitationController {
-    constructor(private readonly invitationService: PublicInvitationService) {}
+export class AgnosticInvitationController {
+    constructor(private readonly invitationService: AgnosticInvitationService) {}
 
     @ApiOkResponse({ type: InvitationDto, description: 'The invitation has been successfully validated' })
     @UseInterceptors(MapInterceptor(InvitationEntity, InvitationDto))
