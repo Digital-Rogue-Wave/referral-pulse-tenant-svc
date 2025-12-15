@@ -32,6 +32,8 @@ import { classes } from '@automapper/classes';
 import { ApiKeyController } from './api-key/api-key.controller';
 import { TenantMiddleware } from './common/tenant/tenant.middleware';
 import { TeamMemberModule } from './team-member/team-member.module';
+import { TenantSettingModule } from './tenant-setting/tenant-setting.module';
+import { PrivateInvitationController } from './invitation/private/private-invitation.controller';
 
 @Module({
     imports: [
@@ -56,6 +58,7 @@ import { TeamMemberModule } from './team-member/team-member.module';
         TeamMemberModule,
         InvitationModule,
         CurrencyModule,
+        TenantSettingModule,
         ApiKeyModule
     ],
     providers: [
@@ -69,6 +72,6 @@ import { TeamMemberModule } from './team-member/team-member.module';
 export class AppModule implements NestModule {
     configure(consumer: MiddlewareConsumer) {
         consumer.apply(RequestIdMiddleware).forRoutes({ path: '*', method: RequestMethod.ALL });
-        consumer.apply(TenantMiddleware).forRoutes(ApiKeyController);
+        consumer.apply(TenantMiddleware).forRoutes(ApiKeyController, PrivateInvitationController);
     }
 }

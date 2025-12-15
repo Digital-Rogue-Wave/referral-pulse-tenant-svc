@@ -51,7 +51,7 @@ export class ApiKeyDto extends EntityHelperDto {
     @ApiProperty({
         description: 'Expiration date of the API key',
         example: '2025-12-31T23:59:59Z',
-        nullable: true
+        nullable: false
     })
-    expiresAt: Date | null;
+    expiresAt: Date;
 }

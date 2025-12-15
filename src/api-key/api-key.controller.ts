@@ -4,7 +4,7 @@ import { ApiKeyService } from './api-key.service';
 import { CreateApiKeyDto } from './dto/create-api-key.dto';
 import { UpdateApiKeyDto } from './dto/update-api-key.dto';
 import { UpdateApiKeyStatusDto } from './dto/update-api-key-status.dto';
-import { ApiKeyDto } from './dto/api-key-response.dto';
+import { ApiKeyDto } from './dto/api-key.dto';
 import { CurrentUser, CurrentUserType } from '@mod/common/auth/current-user.decorator';
 import { JwtAuthGuard } from '@mod/common/auth/jwt-auth.guard';
 import { KetoGuard, RequirePermission } from '@mod/common/auth/keto.guard';
@@ -15,7 +15,7 @@ import { MapInterceptor } from '@automapper/nestjs';
 import { NullableType } from '@mod/types/nullable.type';
 
 @ApiTags('API Keys')
-@Controller('tenants/:tenantId/api-keys')
+@Controller({ path: 'api-keys', version: '1' })
 @ApiBearerAuth()
 @UseGuards(JwtAuthGuard, KetoGuard)
 export class ApiKeyController {
