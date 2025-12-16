@@ -1,8 +1,8 @@
 import { IsString, IsArray, IsOptional } from 'class-validator';
-import { ApiProperty } from '@nestjs/swagger';
+import { ApiPropertyOptional } from '@nestjs/swagger';
 
 export class UpdateApiKeyDto {
-    @ApiProperty({
+    @ApiPropertyOptional({
         description: 'Updated friendly name for the API key',
         example: 'Production API Key - Updated',
         required: false
@@ -11,7 +11,7 @@ export class UpdateApiKeyDto {
     @IsString()
     name?: string;
 
-    @ApiProperty({
+    @ApiPropertyOptional({
         description: 'Updated array of permission scopes',
         example: ['campaigns:read', 'referrals:read'],
         type: [String],

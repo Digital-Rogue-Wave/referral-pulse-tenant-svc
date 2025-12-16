@@ -1,5 +1,5 @@
 import { Controller, Get, Post, Delete, Body, Param, UseGuards, HttpCode, HttpStatus, Put, UseInterceptors, Ip, Headers } from '@nestjs/common';
-import { ApiTags, ApiBearerAuth, ApiCreatedResponse, ApiBody, ApiOkResponse } from '@nestjs/swagger';
+import { ApiTags, ApiBearerAuth, ApiCreatedResponse, ApiBody, ApiOkResponse, ApiHeader } from '@nestjs/swagger';
 import { ApiKeyService } from './api-key.service';
 import { CreateApiKeyDto } from './dto/create-api-key.dto';
 import { UpdateApiKeyDto } from './dto/update-api-key.dto';
@@ -11,15 +11,28 @@ import { KetoGuard, RequirePermission } from '@mod/common/auth/keto.guard';
 import { KetoNamespace, KetoRelation } from '@mod/common/auth/keto.constants';
 import { ApiKeyEntity } from './api-key.entity';
 
-import { MapInterceptor } from '@automapper/nestjs';
+import { InjectMapper, MapInterceptor } from '@automapper/nestjs';
 import { NullableType } from '@mod/types/nullable.type';
+import { ApiPaginationQuery, Paginate, PaginateQuery } from 'nestjs-paginate';
+import { apiKeyPaginationConfig } from './config/api-key-pagination-config';
+import { PaginatedDto } from '@mod/common/serialization/paginated.dto';
+import { Mapper } from '@automapper/core';
 
 @ApiTags('API Keys')
+@ApiHeader({
+    name: 'tenant-id',
+    required: true,
+    description: 'Tenant-Id header',
+    schema: { type: 'string' }
+})
 @Controller({ path: 'api-keys', version: '1' })
 @ApiBearerAuth()
 @UseGuards(JwtAuthGuard, KetoGuard)
 export class ApiKeyController {
-    constructor(private readonly apiKeyService: ApiKeyService) {}
+    constructor(
+        private readonly apiKeyService: ApiKeyService,
+        @InjectMapper() private readonly mapper: Mapper
+    ) {}
 
     @ApiBody({
         type: CreateApiKeyDto,
@@ -45,6 +58,7 @@ export class ApiKeyController {
         return await this.apiKeyService.create(user.id, createDto, ipAddress, userAgent);
     }
 
+    @ApiPaginationQuery(apiKeyPaginationConfig)
     @ApiOkResponse({
         description: 'List of API keys',
         type: ApiKeyDto,
@@ -58,8 +72,9 @@ export class ApiKeyController {
     @UseInterceptors(MapInterceptor(ApiKeyEntity, ApiKeyDto, { isArray: true }))
     @HttpCode(HttpStatus.OK)
     @Get()
-    async findAll(): Promise<ApiKeyEntity[]> {
-        return await this.apiKeyService.findAll();
+    async listApiKeys(@Paginate() query: PaginateQuery): Promise<PaginatedDto<ApiKeyEntity, ApiKeyDto>> {
+        const apiKeys = await this.apiKeyService.findAll(query);
+        return new PaginatedDto<ApiKeyEntity, ApiKeyDto>(this.mapper, apiKeys, ApiKeyEntity, ApiKeyDto);
     }
 
     @ApiOkResponse({

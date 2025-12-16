@@ -17,6 +17,7 @@ import {
 import type { QueryDeepPartialEntity } from 'typeorm/query-builder/QueryPartialEntity';
 import { ClsService } from 'nestjs-cls';
 import type { ClsRequestContext } from '@domains/context/cls-request-context';
+import { PaginateConfig, PaginateQuery, Paginated, paginate } from 'nestjs-paginate';
 
 /** Token helper to inject a tenant-aware repository for a given entity */
 export const InjectTenantAwareRepository = <T extends ObjectLiteral>(entity: EntityTarget<T>) =>
@@ -145,8 +146,12 @@ export class TenantAwareRepository<Entity extends ObjectLiteral> extends Reposit
         return this.findOne({ where: fields, relations, select });
     }
 
-    async findOneOrFailTenantContext(fields: FindOptionsWhere<Entity>): Promise<Entity> {
-        const e = await this.findOne({ where: fields });
+    async findOneOrFailTenantContext(
+        fields: FindOptionsWhere<Entity>,
+        relations?: FindOptionsRelations<Entity>,
+        select?: FindOptionsSelect<Entity>
+    ): Promise<Entity> {
+        const e = await this.findOne({ where: fields, relations, select });
         if (!e) throw new Error('Entity not found in tenant context');
         return e;
     }
@@ -187,6 +192,22 @@ export class TenantAwareRepository<Entity extends ObjectLiteral> extends Reposit
     createTenantContextQueryBuilder(alias: string): SelectQueryBuilder<Entity> {
         const tenantId = this.getTenantId();
         return super.createQueryBuilder(alias).andWhere(`${alias}.tenantId = :tenantId`, { tenantId });
+    }
+
+    async paginateTenantContext<T extends ObjectLiteral>(
+        query: PaginateQuery,
+        tenantAwareRepository: Repository<T>,
+        paginationConfig: PaginateConfig<T>
+    ): Promise<Paginated<T>> {
+        const tenantId = this.getTenantId();
+
+        // Merge tenantId into the where clause
+        const tenantAwareWhere = { tenantId } as unknown as FindOptionsWhere<T>;
+
+        return paginate(query, tenantAwareRepository, {
+            ...paginationConfig,
+            where: tenantAwareWhere
+        });
     }
 
     // -------------- Generic outbox helpers
