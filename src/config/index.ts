@@ -16,6 +16,7 @@ import s3Config from './s3.config';
 import servicesConfig from './services.config';
 import snsConfig from './sns.config';
 import sqsConfig from './sqs.config';
+import stripeConfig from './stripe.config';
 import tracingConfig from './tracing.config';
 
 // Re-export individual configs
@@ -33,6 +34,7 @@ export {
     servicesConfig,
     snsConfig,
     sqsConfig,
+    stripeConfig,
     tracingConfig
 };
 
@@ -54,5 +56,6 @@ export const allConfigs = [
     servicesConfig,
     snsConfig,
     sqsConfig,
+    stripeConfig,
     tracingConfig
 ];

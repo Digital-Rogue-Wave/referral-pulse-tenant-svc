@@ -48,6 +48,14 @@ export class TenantListener {
         });
         await this.ketoService.createTuple(tuple);
 
+        const billingTuple = await Utils.validateDtoOrFail(KetoRelationTupleDto, {
+            namespace: KetoNamespace.TENANT,
+            object: tenant.id,
+            relation: KetoRelation.MANAGE_BILLING,
+            subject_id: ownerId
+        });
+        await this.ketoService.createTuple(billingTuple);
+
         // 2. Audit Log
         const auditLogDto = await Utils.validateDtoOrFail(CreateAuditLogDto, {
             tenantId: tenant.id,

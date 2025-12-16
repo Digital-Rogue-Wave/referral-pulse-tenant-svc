@@ -1,0 +1,648 @@
+@baseUrl = http://localhost
+@kratosAdmin = {{baseUrl}}:4434
+@kratosPublic = {{baseUrl}}:4433
+@hydraAdmin = {{baseUrl}}:4445
+@hydraPublic = {{baseUrl}}:4444
+@ketoRead = {{baseUrl}}:4466
+@ketoWrite = {{baseUrl}}:4467
+@app = http://localhost:3000
+
+# Variables for dynamic values
+@identityId = 18663b5f-3ba5-47c9-801b-28a098bbf394
+@clientId = test-client
+@flowId = {{loginFlow.response.body.id}}
+
+### ==========================================
+### 1. HEALTH CHECKS
+### ==========================================
+
+### Kratos Admin Health
+GET {{kratosAdmin}}/admin/health/ready
+
+### Kratos Public Health
+GET {{kratosPublic}}/health/ready
+
+### Hydra Admin Health
+GET {{hydraAdmin}}/health/ready
+
+### Hydra Public Health
+GET {{hydraPublic}}/health/ready
+
+### Keto Read Health
+GET {{ketoRead}}/health/ready
+
+### Keto Write Health
+GET {{ketoWrite}}/health/ready
+
+### ==========================================
+### 2. KRATOS IDENTITY MANAGEMENT
+### ==========================================
+
+### List All Identities
+GET {{kratosAdmin}}/admin/identities
+
+### Get Specific Identity
+GET {{kratosAdmin}}/admin/identities/{{identityId}}
+
+### Create New Identity
+# @name createIdentity
+POST {{kratosAdmin}}/admin/identities
+Content-Type: application/json
+
+{
+    "schema_id": "default",
+    "traits": {
+        "email": "test2@example.com",
+        "firstname": "John",
+        "lastname": "Doe",
+        "company": {
+            "name": "Test Corp",
+            "country": "USA",
+            "website": "https://test.com"
+        },
+        "tenantCode": "T002",
+        "tenantName": "Test Tenant"
+    }
+}
+
+### Update Identity
+PUT {{kratosAdmin}}/admin/identities/{{identityId}}
+Content-Type: application/json
+
+{
+    "schema_id": "default",
+    "traits": {
+        "email": "updated@example.com",
+        "firstname": "Updated",
+        "lastname": "User",
+        "company": {
+            "name": "Updated Corp",
+            "country": "UK",
+            "website": "https://updated.com"
+        },
+        "tenantCode": "T001",
+        "tenantName": "Updated Tenant"
+    },
+    "state": "active"
+}
+
+### Delete Identity
+DELETE {{kratosAdmin}}/admin/identities/{{identityId}}
+
+### ==========================================
+### 3. HYDRA OAUTH2 CLIENT MANAGEMENT
+### ==========================================
+
+### List All OAuth2 Clients
+GET {{hydraAdmin}}/admin/clients
+
+### Create OAuth2 Client
+# @name createClient
+POST {{hydraAdmin}}/admin/clients
+Content-Type: application/json
+
+{
+    "client_id": "test-client",
+    "client_secret": "test-secret",
+    "grant_types": ["authorization_code", "refresh_token", "client_credentials"],
+    "response_types": ["code"],
+    "scope": "openid offline email profile",
+    "redirect_uris": ["http://localhost:3000/callback", "http://localhost:3000/auth/callback"],
+    "token_endpoint_auth_method": "client_secret_post"
+}
+
+### Get Specific OAuth2 Client
+GET {{hydraAdmin}}/admin/clients/{{clientId}}
+
+### Update OAuth2 Client
+PUT {{hydraAdmin}}/admin/clients/{{clientId}}
+Content-Type: application/json
+
+{
+    "client_id": "test-client",
+    "client_secret": "test-secret",
+    "grant_types": ["authorization_code", "refresh_token", "client_credentials"],
+    "response_types": ["code"],
+    "scope": "openid offline email profile",
+    "redirect_uris": ["http://localhost:3000/callback"],
+    "token_endpoint_auth_method": "client_secret_post"
+}
+
+### Delete OAuth2 Client
+DELETE {{hydraAdmin}}/admin/clients/{{clientId}}
+
+
+### ==========================================
+### 4. KETO PERMISSIONS MANAGEMENT
+### ==========================================
+
+### Step 1: Check Keto Status and Existing Namespaces
+### ==========================================
+
+### Check Keto Read Service Health
+GET {{ketoRead}}/health/ready
+
+### Check Keto Write Service Health  
+GET {{ketoWrite}}/health/ready
+
+### Check Available Namespaces
+# @name listNamespaces
+GET {{ketoRead}}/namespaces
+
+### List Existing Relation Tuples (see current setup)
+# @name existingTuples
+GET {{ketoRead}}/relation-tuples?page_size=10
+
+### Step 2: Work With Existing Role-Based Structure
+### ==========================================
+
+### Check if identity has manager role permissions for resource read
+# @name checkManagerRead
+POST {{ketoRead}}/relation-tuples/check
+Content-Type: application/json
+
+{
+    "namespace": "event",
+    "object": "resource",
+    "relation": "read",
+    "subject_id": "{{identityId}}"
+}
+
+### Check if identity has manager role permissions for resource write
+# @name checkManagerWrite
+POST {{ketoRead}}/relation-tuples/check
+Content-Type: application/json
+
+{
+    "namespace": "event",
+    "object": "resource",
+    "relation": "write",
+    "subject_id": "{{identityId}}"
+}
+
+### Add identity to manager role
+# @name addToManagerRole
+PUT {{ketoWrite}}/admin/relation-tuples
+Content-Type: application/json
+
+{
+    "namespace": "role",
+    "object": "manager",
+    "relation": "member",
+    "subject_id": "{{identityId}}"
+}
+
+### Add identity to viewer role
+# @name addToViewerRole
+PUT {{ketoWrite}}/admin/relation-tuples
+Content-Type: application/json
+
+{
+    "namespace": "role",
+    "object": "viewer",
+    "relation": "member",
+    "subject_id": "{{identityId}}"
+}
+
+### Check permissions after adding to manager role (individual checks)
+### Note: Keto doesn't support batch check in this version, so we check individually
+
+### Step 3: Create Custom Objects in Existing Namespaces
+### ==========================================
+
+### Create campaign object in event namespace with view permission for managers
+# @name createCampaignViewPermission
+PUT {{ketoWrite}}/admin/relation-tuples
+Content-Type: application/json
+
+{
+    "namespace": "event",
+    "object": "campaign-123",
+    "relation": "view",
+    "subject_set": {
+        "namespace": "role",
+        "object": "manager",
+        "relation": "member"
+    }
+}
+
+### Create campaign object with edit permission for managers
+# @name createCampaignEditPermission
+PUT {{ketoWrite}}/admin/relation-tuples
+Content-Type: application/json
+
+{
+    "namespace": "event",
+    "object": "campaign-123",
+    "relation": "edit",
+    "subject_set": {
+        "namespace": "role",
+        "object": "manager",
+        "relation": "member"
+    }
+}
+
+### Create organization object in event namespace
+# @name createOrgAdminPermission
+PUT {{ketoWrite}}/admin/relation-tuples
+Content-Type: application/json
+
+{
+    "namespace": "event",
+    "object": "org-456",
+    "relation": "admin",
+    "subject_set": {
+        "namespace": "role",
+        "object": "manager",
+        "relation": "member"
+    }
+}
+
+### Create direct permission (bypass roles)
+# @name createDirectPermission
+PUT {{ketoWrite}}/admin/relation-tuples
+Content-Type: application/json
+
+{
+    "namespace": "event",
+    "object": "campaign-789",
+    "relation": "view",
+    "subject_id": "{{identityId}}"
+}
+
+### Step 4: Test the Custom Permissions
+### ==========================================
+
+### Check campaign view permission (should work via manager role)
+# @name checkCampaignView
+POST {{ketoRead}}/relation-tuples/check
+Content-Type: application/json
+
+{
+    "namespace": "event",
+    "object": "campaign-123",
+    "relation": "view",
+    "subject_id": "{{identityId}}"
+}
+
+### Check campaign edit permission (should work via manager role)
+# @name checkCampaignEdit
+POST {{ketoRead}}/relation-tuples/check
+Content-Type: application/json
+
+{
+    "namespace": "event",
+    "object": "campaign-123",
+    "relation": "edit",
+    "subject_id": "{{identityId}}"
+}
+
+### Check organization admin permission (should work via manager role)
+# @name checkOrgAdmin
+POST {{ketoRead}}/relation-tuples/check
+Content-Type: application/json
+
+{
+    "namespace": "event",
+    "object": "org-456",
+    "relation": "admin",
+    "subject_id": "{{identityId}}"
+}
+
+### Check direct permission (should work)
+# @name checkDirectPermission
+POST {{ketoRead}}/relation-tuples/check
+Content-Type: application/json
+
+{
+    "namespace": "event",
+    "object": "campaign-789",
+    "relation": "view",
+    "subject_id": "{{identityId}}"
+}
+
+### Step 5: List and Verify Created Permissions
+### ==========================================
+
+### List all relation tuples for event namespace
+GET {{ketoRead}}/relation-tuples?namespace=event&page_size=20
+
+### List all relation tuples for role namespace
+GET {{ketoRead}}/relation-tuples?namespace=role&page_size=20
+
+### List relation tuples for specific campaign
+GET {{ketoRead}}/relation-tuples?namespace=event&object=campaign-123
+
+### Step 6: Cleanup (Optional) - FIXED DELETE REQUESTS
+### ==========================================
+
+### Remove identity from manager role (using query parameters)
+# @name removeFromManagerRole
+DELETE {{ketoWrite}}/admin/relation-tuples?namespace=role&object=manager&relation=member&subject_id={{identityId}}
+
+### Remove identity from viewer role (using query parameters)
+# @name removeFromViewerRole
+DELETE {{ketoWrite}}/admin/relation-tuples?namespace=role&object=viewer&relation=member&subject_id={{identityId}}
+
+### Remove direct permission (using query parameters)
+# @name removeDirectPermission
+DELETE {{ketoWrite}}/admin/relation-tuples?namespace=event&object=campaign-789&relation=view&subject_id={{identityId}}
+
+### Remove campaign view permission (using query parameters for subject_set)
+# @name removeCampaignViewPermission
+DELETE {{ketoWrite}}/admin/relation-tuples?namespace=event&object=campaign-123&relation=view&subject_set_namespace=role&subject_set_object=manager&subject_set_relation=member
+
+### Remove campaign edit permission (using query parameters for subject_set)
+# @name removeCampaignEditPermission
+DELETE {{ketoWrite}}/admin/relation-tuples?namespace=event&object=campaign-123&relation=edit&subject_set_namespace=role&subject_set_object=manager&subject_set_relation=member
+
+### Remove organization admin permission (using query parameters for subject_set)
+# @name removeOrgAdminPermission
+DELETE {{ketoWrite}}/admin/relation-tuples?namespace=event&object=org-456&relation=admin&subject_set_namespace=role&subject_set_object=manager&subject_set_relation=member
+
+### Step 7: Verify Cleanup
+### ==========================================
+
+### Check if permissions were removed
+POST {{ketoRead}}/relation-tuples/check
+Content-Type: application/json
+
+{
+    "namespace": "event",
+    "object": "campaign-123",
+    "relation": "view",
+    "subject_id": "{{identityId}}"
+}
+
+### List remaining relation tuples
+GET {{ketoRead}}/relation-tuples?namespace=event&page_size=10
+
+### Step 8: Alternative Batch Operations (if needed)
+### ==========================================
+
+### Batch create multiple permissions (using patch API if available)
+PATCH {{ketoWrite}}/admin/relation-tuples
+Content-Type: application/json
+
+{
+    "action": "insert",
+    "relation_tuples": [
+        {
+            "namespace": "event",
+            "object": "batch-campaign-1",
+            "relation": "view",
+            "subject_id": "{{identityId}}"
+        },
+        {
+            "namespace": "event",
+            "object": "batch-campaign-2",
+            "relation": "edit",
+            "subject_id": "{{identityId}}"
+        }
+    ]
+}
+
+### Batch delete using patch
+PATCH {{ketoWrite}}/admin/relation-tuples
+Content-Type: application/json
+
+{
+    "action": "delete",
+    "relation_tuples": [
+        {
+            "namespace": "event",
+            "object": "batch-campaign-1",
+            "relation": "view",
+            "subject_id": "{{identityId}}"
+        },
+        {
+            "namespace": "event",
+            "object": "batch-campaign-2",
+            "relation": "edit",
+            "subject_id": "{{identityId}}"
+        }
+    ]
+}
+
+### ==========================================
+### 5. OAUTH2 FLOW SIMULATION
+### ==========================================
+
+### Initiate Login Flow
+# @name loginFlow
+GET {{kratosPublic}}/self-service/login/browser
+
+### Get Login Flow Details
+GET {{kratosPublic}}/self-service/login/flows?id={{flowId}}
+
+### Submit Login (you'll need to adjust based on your Kratos config)
+POST {{kratosPublic}}/self-service/login?flow={{flowId}}
+Content-Type: application/json
+
+{
+    "method": "password",
+    "identifier": "ahmed@chebbi.com",
+    "password": "test-password"
+}
+
+### Initiate OAuth2 Authorization Flow
+# @name authFlow
+GET {{hydraPublic}}/oauth2/auth?client_id={{clientId}}&response_type=code&scope=openid+offline&state=random-state&redirect_uri=http://localhost:3000/callback
+
+### Get Token with Authorization Code
+# @name getToken
+POST {{hydraPublic}}/oauth2/token
+Content-Type: application/x-www-form-urlencoded
+
+grant_type=authorization_code
+&code={{authFlow.response.body.code}}
+&redirect_uri=http://localhost:3000/callback
+&client_id={{clientId}}
+&client_secret=test-secret
+
+### Get Token with Client Credentials (M2M)
+# @name getClientToken
+POST {{hydraPublic}}/oauth2/token
+Content-Type: application/x-www-form-urlencoded
+
+grant_type=client_credentials
+&client_id={{clientId}}
+&client_secret=test-secret
+&scope=openid
+
+### Introspect Token
+POST {{hydraAdmin}}/admin/oauth2/introspect
+Content-Type: application/x-www-form-urlencoded
+
+token={{getToken.response.body.access_token}}
+
+### ==========================================
+### 6. NESTJS APPLICATION TESTING
+### ==========================================
+
+### Test Public Health Endpoint
+GET {{app}}/test/health
+
+### Test Public Info Endpoint
+GET {{app}}/test/info
+
+### Test Public Endpoint (should work without auth)
+GET {{app}}/test/public
+
+### Test Protected Endpoint (should fail without token - 401)
+GET {{app}}/test/protected
+
+### Test Campaign View Permission (should fail without token - 401)
+GET {{app}}/test/campaigns/campaign-123
+
+### Test Campaign Edit Permission (should fail without token - 401)
+GET {{app}}/test/campaigns/campaign-123/edit
+
+### Test Campaign Delete Permission (should fail without token - 401)
+GET {{app}}/test/campaigns/campaign-123/delete
+
+### Test Organization Admin Permission (should fail without token - 401)
+GET {{app}}/test/organizations/org-456/admin
+
+### Test Organization View Permission (should fail without token - 401)
+GET {{app}}/test/organizations/org-456/view
+
+### Test Service Endpoint (should fail without token - 401)
+GET {{app}}/test/service
+
+### Test with Invalid Token (should fail - 401)
+GET {{app}}/test/protected
+Authorization: Bearer invalid-token-here
+
+### Test with Valid Token (once you have a real JWT)
+# Note: Uncomment and use when you have a real token
+# GET {{app}}/test/protected
+# Authorization: Bearer {{getToken.response.body.access_token}}
+
+# GET {{app}}/test/campaigns/campaign-123
+# Authorization: Bearer {{getToken.response.body.access_token}}
+
+# GET {{app}}/test/campaigns/campaign-123/edit  
+# Authorization: Bearer {{getToken.response.body.access_token}}
+
+# GET {{app}}/test/campaigns/campaign-123/delete
+# Authorization: Bearer {{getToken.response.body.access_token}}
+
+# GET {{app}}/test/organizations/org-456/admin
+# Authorization: Bearer {{getToken.response.body.access_token}}
+
+# GET {{app}}/test/organizations/org-456/view
+# Authorization: Bearer {{getToken.response.body.access_token}}
+
+# GET {{app}}/test/service
+# Authorization: Bearer {{getClientToken.response.body.access_token}}
+
+### ==========================================
+### 7. SCHEMAS AND CONFIGURATION
+### ==========================================
+
+### Get Kratos Schemas
+GET {{kratosAdmin}}/admin/schemas
+
+### Get Default Schema
+GET {{kratosAdmin}}/admin/schemas/default
+
+### Get Hydra JWKS
+GET {{hydraPublic}}/.well-known/jwks.json
+
+### Get Hydra OpenID Configuration
+GET {{hydraPublic}}/.well-known/openid-configuration
+
+### ==========================================
+### 8. COMPREHENSIVE HEALTH CHECK
+### ==========================================
+
+### Complete System Health Check
+# @name healthCheck
+GET {{kratosAdmin}}/admin/health/ready
+
+###
+GET {{hydraAdmin}}/health/ready
+
+###
+GET {{ketoRead}}/health/ready
+
+###
+GET {{app}}/test/public
+
+### System Status Summary
+# @name systemStatus
+GET {{kratosAdmin}}/admin/identities
+
+###
+GET {{hydraAdmin}}/admin/clients
+
+###
+GET {{ketoRead}}/relation-tuples
+
+### ==========================================
+### 9. BATCH OPERATIONS
+### ==========================================
+
+### Batch Create Identities
+# @name batchIdentities
+POST {{kratosAdmin}}/admin/identities
+Content-Type: application/json
+
+[
+    {
+        "schema_id": "default",
+        "traits": {
+            "email": "user1@example.com",
+            "firstname": "Alice",
+            "lastname": "Smith",
+            "company": {
+                "name": "Company A",
+                "country": "USA",
+                "website": "https://companya.com"
+            },
+            "tenantCode": "T001",
+            "tenantName": "Tenant A"
+        }
+    },
+    {
+        "schema_id": "default",
+        "traits": {
+            "email": "user2@example.com",
+            "firstname": "Bob",
+            "lastname": "Johnson",
+            "company": {
+                "name": "Company B",
+                "country": "UK",
+                "website": "https://companyb.com"
+            },
+            "tenantCode": "T002",
+            "tenantName": "Tenant B"
+        }
+    }
+]
+
+### Batch Create Permissions
+PUT {{ketoWrite}}/admin/relation-tuples
+Content-Type: application/json
+
+[
+    {
+        "namespace": "campaigns",
+        "object": "campaign-1",
+        "relation": "view",
+        "subject_id": "{{identityId}}"
+    },
+    {
+        "namespace": "campaigns",
+        "object": "campaign-1",
+        "relation": "edit",
+        "subject_id": "{{identityId}}"
+    },
+    {
+        "namespace": "organizations",
+        "object": "org-1",
+        "relation": "admin",
+        "subject_id": "{{identityId}}"
+    }
+]

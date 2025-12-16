@@ -10,6 +10,7 @@ import { S3Config } from '@mod/config/s3.config';
 import { SqsConfig } from '@mod/config/sqs.config';
 import { SnsConfig } from '@mod/config/sns.config';
 import { TracingConfig } from '@mod/config/tracing.config';
+import { StripeConfig } from '@mod/config/stripe.config';
 
 export type AllConfigType = {
     appConfig: AppConfig;
@@ -24,4 +25,5 @@ export type AllConfigType = {
     s3Config: S3Config;
     sqsConfig: SqsConfig;
     snsConfig: SnsConfig;
+    stripeConfig: StripeConfig;
 };

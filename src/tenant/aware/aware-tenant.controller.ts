@@ -8,7 +8,7 @@ import { Utils } from '@mod/common/utils/utils';
 import { MapInterceptor } from '@automapper/nestjs';
 import { JwtAuthGuard } from '@mod/common/auth/jwt-auth.guard';
 import { KetoGuard, RequirePermission } from '@mod/common/auth/keto.guard';
-import { KetoNamespace, KetoPermission } from '@mod/common/auth/keto.constants';
+import { KetoNamespace, KetoPermission, KetoRelation } from '@mod/common/auth/keto.constants';
 import { CurrentUser, CurrentUserType } from '@mod/common/auth/current-user.decorator';
 import { TenantDto } from '../dto/tenant/tenant.dto';
 import { TenantEntity } from '../tenant.entity';
