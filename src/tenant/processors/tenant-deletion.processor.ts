@@ -2,13 +2,13 @@ import { Processor, WorkerHost } from '@nestjs/bullmq';
 import { Logger } from '@nestjs/common';
 import { Job } from 'bullmq';
 import { TENANT_DELETION_QUEUE, TenantDeletionJobData } from '@mod/common/bullmq/queues/tenant-deletion.queue';
-import { TenantService } from '@mod/tenant/tenant.service';
+import { AwareTenantService } from '../aware/aware-tenant.service';
 
 @Processor(TENANT_DELETION_QUEUE)
 export class TenantDeletionProcessor extends WorkerHost {
     private readonly logger = new Logger(TenantDeletionProcessor.name);
 
-    constructor(private readonly tenantService: TenantService) {
+    constructor(private readonly tenantService: AwareTenantService) {
         super();
     }
 

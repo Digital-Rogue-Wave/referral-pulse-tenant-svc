@@ -1,7 +1,6 @@
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { TenantEntity } from './tenant.entity';
-import { TenantController } from './tenant.controller';
 import { FilesModule } from '../files/files.module';
 import { TenantSerializationProfile } from './serialization/tenant-serialization.profile';
 import { TenantListener } from './listeners/tenant.listener';
@@ -13,6 +12,8 @@ import { TenantSettingModule } from '@mod/tenant-setting/tenant-setting.module';
 import { TenantAwareRepositoryModule } from '@mod/common/tenant/tenant-aware.repository';
 import { AgnosticTenantService } from './agnostic/agnostic-tenant.service';
 import { AwareTenantService } from './aware/aware-tenant.service';
+import { AwareTenantController } from './aware/aware-tenant.controller';
+import { AgnosticTenantController } from './agnostic/agnostic-tenant.controller';
 
 @Module({
     imports: [
@@ -25,7 +26,7 @@ import { AwareTenantService } from './aware/aware-tenant.service';
         }),
         TenantSettingModule
     ],
-    controllers: [TenantController],
+    controllers: [AwareTenantController, AgnosticTenantController],
     providers: [AwareTenantService, AgnosticTenantService, TenantSerializationProfile, TenantListener, TenantDeletionProcessor],
     exports: [AwareTenantService, AgnosticTenantService]
 })

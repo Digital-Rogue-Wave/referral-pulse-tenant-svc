@@ -1,5 +1,5 @@
 import { Controller, Post, Body, Headers, UnauthorizedException } from '@nestjs/common';
-import { TenantService } from '../tenant/tenant.service';
+import { AgnosticTenantService } from '../tenant/agnostic/agnostic-tenant.service';
 import { ConfigService } from '@nestjs/config';
 import { Public } from '@mod/common/auth/jwt-auth.guard';
 
@@ -7,7 +7,7 @@ import { Public } from '@mod/common/auth/jwt-auth.guard';
 @Public()
 export class WebhookController {
     constructor(
-        private readonly tenantService: TenantService,
+        private readonly tenantService: AgnosticTenantService,
         private readonly configService: ConfigService
     ) {}
 
