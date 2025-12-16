@@ -9,10 +9,11 @@ import { KetoGuard } from './keto.guard';
 import { HttpClientsModule } from '@mod/common/http/http-clients.module';
 import oryConfig from '@mod/config/ory.config';
 import { KratosService } from './kratos.service';
+import { JwtModule } from '@nestjs/jwt';
 
 @Global()
 @Module({
-    imports: [PassportModule.register({ defaultStrategy: 'jwt' }), ConfigModule.forFeature(oryConfig), HttpClientsModule.register()],
+    imports: [PassportModule.register({ defaultStrategy: 'jwt' }),JwtModule.register({}), ConfigModule.forFeature(oryConfig), HttpClientsModule.register()],
     providers: [
         JwtStrategy,
         KetoService,

@@ -53,7 +53,14 @@ export class KetoGuard implements CanActivate {
             object = req.params[paramName];
 
             if (!object) {
-                throw new HttpException({ message: `Missing route parameter: ${paramName}`, code: HttpStatus.FORBIDDEN }, HttpStatus.FORBIDDEN);
+                const tenantId = this.cls.get('tenantId') as string | undefined;
+                if (!tenantId) {
+                    throw new HttpException(
+                        { message: `Missing route parameter: ${paramName} and tenant context`, code: HttpStatus.FORBIDDEN },
+                        HttpStatus.FORBIDDEN
+                    );
+                }
+                object = tenantId;
             }
         }
 

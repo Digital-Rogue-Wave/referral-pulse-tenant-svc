@@ -1,14 +1,17 @@
-import { Controller, Post, Body, Headers, UnauthorizedException } from '@nestjs/common';
+import { Controller, Post, Body, Headers, UnauthorizedException, Req } from '@nestjs/common';
 import { AgnosticTenantService } from '../tenant/agnostic/agnostic-tenant.service';
 import { ConfigService } from '@nestjs/config';
 import { Public } from '@mod/common/auth/jwt-auth.guard';
+import { BillingService } from '../billing/billing.service';
+import { Request } from 'express';
 
 @Controller({ path: 'webhook', version: '1' })
 @Public()
 export class WebhookController {
     constructor(
         private readonly tenantService: AgnosticTenantService,
-        private readonly configService: ConfigService
+        private readonly configService: ConfigService,
+        private readonly billingService: BillingService
     ) {}
 
     @Post('ory/signup')
@@ -31,5 +34,11 @@ export class WebhookController {
         });
 
         return { status: 'ok' };
+    }
+
+    @Post('stripe')
+    async handleStripeWebhook(@Headers('stripe-signature') signature: string, @Req() req: Request) {
+        await this.billingService.handleStripeWebhook((req as any).rawBody ?? req.body, signature);
+        return { received: true };
     }
 }
