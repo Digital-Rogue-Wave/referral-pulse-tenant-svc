@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { TenantSettingEntity } from '../tenant-setting.entity';
+import type { TenantEntity } from '@mod/tenant/tenant.entity';
 
 @Injectable()
 export class AgnosticTenantSettingService {
@@ -13,9 +14,10 @@ export class AgnosticTenantSettingService {
     /**
      * Create default settings for a new tenant
      */
-    async createDefault(): Promise<TenantSettingEntity> {
+    async createDefault(tenant?: TenantEntity): Promise<TenantSettingEntity> {
         return await this.repository.save({
-            currencyCode: 'USD',
+            tenant,
+            currency: { code: 'USD' } as any,
             branding: {
                 primaryColor: '#000000',
                 secondaryColor: '#ffffff',

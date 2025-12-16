@@ -1,6 +1,6 @@
 export enum KetoNamespace {
     ROLE = 'role',
-    TENANT = 'tenant',
+    TENANT = 'tenants',
     EVENT = 'event'
 }
 

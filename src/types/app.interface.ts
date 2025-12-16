@@ -27,7 +27,7 @@ export interface JwtPayload {
     iat: number;
 
     // User tokens (from frontend flow)
-    email?: string;
+    email: string;
     email_verified?: boolean;
 
     // Service tokens (M2M client credentials)

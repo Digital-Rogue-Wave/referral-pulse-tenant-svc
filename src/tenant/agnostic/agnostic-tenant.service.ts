@@ -40,10 +40,10 @@ export class AgnosticTenantService {
             tenant.image = await this.filesService.uploadFile(file);
         }
 
-        // Create default settings
-        tenant.setting = await this.tenantSettingService.createDefault();
-
         const savedTenant = await this.tenantRepository.save(tenant);
+
+        // Create default settings linked to the saved tenant
+        savedTenant.setting = await this.tenantSettingService.createDefault(savedTenant);
 
         // Emit tenant.created event for side effects (Keto, Audit, SNS)
         this.eventEmitter.emit('tenant.created', {

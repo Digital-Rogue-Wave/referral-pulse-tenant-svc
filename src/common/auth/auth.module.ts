@@ -13,7 +13,12 @@ import { JwtModule } from '@nestjs/jwt';
 
 @Global()
 @Module({
-    imports: [PassportModule.register({ defaultStrategy: 'jwt' }),JwtModule.register({}), ConfigModule.forFeature(oryConfig), HttpClientsModule.register()],
+    imports: [
+        PassportModule.register({ defaultStrategy: 'jwt' }),
+        JwtModule.register({}),
+        ConfigModule.forFeature(oryConfig),
+        HttpClientsModule.register()
+    ],
     providers: [
         JwtStrategy,
         KetoService,
