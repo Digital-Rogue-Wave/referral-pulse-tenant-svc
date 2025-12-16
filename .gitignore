@@ -39,3 +39,7 @@ lerna-debug.log*
 .env
 .env.*
 /ormconfig.json
+
+openspec
+.windsurf
+AGENTS.md
