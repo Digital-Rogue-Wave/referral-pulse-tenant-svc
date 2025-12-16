@@ -2,7 +2,7 @@ import { Controller, Get, Post, Body, Param, Delete, Put, HttpCode, HttpStatus, 
 import { AwareTenantService } from './aware-tenant.service';
 import { NullableType } from '@mod/types/nullable.type';
 import { DeleteResult } from 'typeorm';
-import { ApiBody, ApiConsumes, ApiExtraModels, ApiOkResponse, ApiTags, getSchemaPath, ApiBearerAuth } from '@nestjs/swagger';
+import { ApiBody, ApiConsumes, ApiExtraModels, ApiOkResponse, ApiTags, getSchemaPath, ApiBearerAuth, ApiHeader } from '@nestjs/swagger';
 import { ParseFormdataPipe } from '@mod/common/pipes/parse-formdata.pipe';
 import { Utils } from '@mod/common/utils/utils';
 import { MapInterceptor } from '@automapper/nestjs';
@@ -18,6 +18,12 @@ import { ScheduleDeletionDto } from '../dto/schedule-deletion.dto';
 import { CancelDeletionDto } from '../dto/cancel-deletion.dto';
 
 @ApiTags('tenants')
+@ApiHeader({
+    name: 'tenant-id',
+    required: true,
+    description: 'Tenant-Id header',
+    schema: { type: 'string' }
+})
 @ApiBearerAuth()
 @UseGuards(JwtAuthGuard)
 @Controller({ path: 'tenants', version: '1' })

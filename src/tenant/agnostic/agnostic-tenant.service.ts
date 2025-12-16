@@ -3,7 +3,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { FilesService } from '@mod/files/files.service';
 import slugify from 'slugify';
-import { TenantSettingService } from '@mod/tenant-setting/tenant-setting.service';
+import { AgnosticTenantSettingService } from '@mod/tenant-setting/agnostic/agnostic-tenant-setting.service';
 import { TenantEntity } from '../tenant.entity';
 import { CreateTenantDto } from '../dto/tenant/create-tenant.dto';
 import { EventEmitter2 } from '@nestjs/event-emitter';
@@ -14,7 +14,7 @@ export class AgnosticTenantService {
         @InjectRepository(TenantEntity)
         private readonly tenantRepository: Repository<TenantEntity>,
         private readonly filesService: FilesService,
-        private readonly tenantSettingService: TenantSettingService,
+        private readonly tenantSettingService: AgnosticTenantSettingService,
         private readonly eventEmitter: EventEmitter2
     ) {}
 

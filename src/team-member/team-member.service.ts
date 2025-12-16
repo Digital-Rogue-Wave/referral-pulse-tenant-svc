@@ -4,7 +4,7 @@ import { TeamMemberEntity } from './team-member.entity';
 import { UpdateTeamMemberDto } from './dto/update-team-member.dto';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { NullableType } from '@mod/types/nullable.type';
-import { paginate, Paginated, PaginateQuery } from 'nestjs-paginate';
+import { Paginated, PaginateQuery } from 'nestjs-paginate';
 import { tenantMemberPaginationConfig } from './config/tenant-member-pagination-config';
 import { InjectTenantAwareRepository, TenantAwareRepository } from '@mod/common/tenant/tenant-aware.repository';
 import { CreateTeamMemberDto } from './dto/create-team-member.dto';
@@ -23,7 +23,7 @@ export class TeamMemberService {
     }
 
     async findAll(query: PaginateQuery): Promise<Paginated<TeamMemberEntity>> {
-        return await paginate(query, this.teamMemberRepository, tenantMemberPaginationConfig);
+        return await this.teamMemberRepository.paginateTenantContext(query, this.teamMemberRepository, tenantMemberPaginationConfig);
     }
 
     async findOne(

@@ -10,6 +10,8 @@ import { ApiKeyStatusEnum } from '@mod/common/enums/api-key.enum';
 import { InjectTenantAwareRepository, TenantAwareRepository } from '@mod/common/tenant/tenant-aware.repository';
 import { NullableType } from '@mod/types/nullable.type';
 import { SharedService } from '@mod/common/shared.service';
+import { Paginated, PaginateQuery } from 'nestjs-paginate';
+import { apiKeyPaginationConfig } from './config/api-key-pagination-config';
 
 /**
  * Service responsible for API Key management
@@ -64,10 +66,8 @@ export class ApiKeyService {
     /**
      * List all API keys for a tenant
      */
-    async findAll(): Promise<ApiKeyEntity[]> {
-        return await this.apiKeyRepository.findTenantContext({
-            order: { createdAt: 'DESC' }
-        });
+    async findAll(query: PaginateQuery): Promise<Paginated<ApiKeyEntity>> {
+        return await this.apiKeyRepository.paginateTenantContext(query, this.apiKeyRepository, apiKeyPaginationConfig);
     }
 
     /**
