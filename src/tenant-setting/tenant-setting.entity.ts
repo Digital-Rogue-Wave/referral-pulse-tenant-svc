@@ -1,5 +1,5 @@
 import EntityHelper from '@mod/common/entities/entity-helper';
-import { Entity, Column, ManyToOne, OneToOne, PrimaryGeneratedColumn } from 'typeorm';
+import { Entity, Column, ManyToOne, OneToOne, PrimaryGeneratedColumn, JoinColumn } from 'typeorm';
 import { CurrencyEntity } from '@mod/currency/currency.entity';
 import type { TenantEntity } from '@mod/tenant/tenant.entity';
 
@@ -30,6 +30,10 @@ export class TenantSettingEntity extends EntityHelper {
     @ManyToOne(() => CurrencyEntity, { eager: true })
     currency: CurrencyEntity;
 
-    @OneToOne('TenantEntity', (tenant: TenantEntity) => tenant.setting, { onDelete: 'CASCADE' })
+    @OneToOne('TenantEntity', (tenant: TenantEntity) => tenant.setting, {
+        onDelete: 'CASCADE',
+        nullable: false
+    })
+    @JoinColumn()
     tenant: TenantEntity;
 }

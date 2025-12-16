@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Body, Param, Delete, Put, HttpCode, HttpStatus, UseInterceptors, UploadedFile, UseGuards, Ip } from '@nestjs/common';
+import { Controller, Get, Body, Param, Delete, Put, HttpCode, HttpStatus, UseInterceptors, UploadedFile, UseGuards, Ip } from '@nestjs/common';
 import { AwareTenantService } from './aware-tenant.service';
 import { NullableType } from '@mod/types/nullable.type';
 import { DeleteResult } from 'typeorm';
@@ -8,7 +8,7 @@ import { Utils } from '@mod/common/utils/utils';
 import { MapInterceptor } from '@automapper/nestjs';
 import { JwtAuthGuard } from '@mod/common/auth/jwt-auth.guard';
 import { KetoGuard, RequirePermission } from '@mod/common/auth/keto.guard';
-import { KetoNamespace, KetoPermission, KetoRelation } from '@mod/common/auth/keto.constants';
+import { KetoNamespace, KetoPermission } from '@mod/common/auth/keto.constants';
 import { CurrentUser, CurrentUserType } from '@mod/common/auth/current-user.decorator';
 import { TenantDto } from '../dto/tenant/tenant.dto';
 import { TenantEntity } from '../tenant.entity';
@@ -102,7 +102,7 @@ export class AwareTenantController {
     @UseGuards(KetoGuard)
     @RequirePermission({ namespace: KetoNamespace.TENANT, relation: KetoPermission.DELETE, objectParam: 'id' })
     @HttpCode(HttpStatus.OK)
-    @Post(':id/schedule-deletion')
+    @Put(':id/schedule-deletion')
     async scheduleDeletion(
         @Param('id') id: string,
         @Body() dto: ScheduleDeletionDto,
@@ -118,7 +118,7 @@ export class AwareTenantController {
     @UseGuards(KetoGuard)
     @RequirePermission({ namespace: KetoNamespace.TENANT, relation: KetoPermission.UPDATE, objectParam: 'id' })
     @HttpCode(HttpStatus.OK)
-    @Post(':id/cancel-deletion')
+    @Put(':id/cancel-deletion')
     async cancelDeletion(
         @Param('id') id: string,
         @Body() dto: CancelDeletionDto,

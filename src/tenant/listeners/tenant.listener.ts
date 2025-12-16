@@ -22,6 +22,7 @@ import { TENANT_DELETION_QUEUE, TenantDeletionJobData } from '@mod/common/bullmq
 @Injectable()
 export class TenantListener {
     private readonly ketoWriteUrl: string;
+    private readonly ketoReadUrl: string;
 
     constructor(
         private readonly sns: SnsPublisher,
@@ -33,6 +34,7 @@ export class TenantListener {
     ) {
         const oryCfg = this.configService.getOrThrow<ConfigType<typeof oryConfig>>('oryConfig', { infer: true });
         this.ketoWriteUrl = oryCfg.keto.writeUrl;
+        this.ketoReadUrl = oryCfg.keto.readUrl;
     }
 
     @OnEvent('tenant.created')
@@ -69,11 +71,17 @@ export class TenantListener {
         await this.auditService.log(auditLogDto);
 
         // 3. Publish SNS Event
+        const tenantData = { ...tenant };
+        if (tenantData.setting) {
+            tenantData.setting = { ...tenantData.setting } as any;
+            delete (tenantData.setting as any).tenant;
+        }
+
         const snsEventDto = await Utils.validateDtoOrFail(PublishSnsEventDto, {
             eventId: tenant.id,
             eventType: 'tenant.created',
             data: {
-                ...tenant,
+                ...tenantData,
                 ownerId: ownerId
             } as any,
             timestamp: new Date().toISOString()
@@ -117,12 +125,18 @@ export class TenantListener {
         });
 
         // 2. Publish SNS Event
+        const tenantData = { ...tenant };
+        if (tenantData.setting) {
+            tenantData.setting = { ...tenantData.setting } as any;
+            delete (tenantData.setting as any).tenant;
+        }
+
         await this.sns.publish(
             {
                 eventId: tenant.id,
                 eventType: 'tenant.updated',
                 data: {
-                    ...tenant,
+                    ...tenantData,
                     changes: changes
                 } as unknown as any,
                 timestamp: new Date().toISOString()
@@ -311,9 +325,9 @@ export class TenantListener {
                 relation: string;
                 subject_id?: string;
             }>;
-        }>(`${this.ketoWriteUrl}/admin/relation-tuples`, {
+        }>(`${this.ketoReadUrl}/relation-tuples`, {
             params: {
-                namespace: 'tenants',
+                namespace: KetoNamespace.TENANT,
                 object: tenantId
             }
         });

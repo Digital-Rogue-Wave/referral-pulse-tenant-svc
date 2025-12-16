@@ -51,9 +51,9 @@ import { AwareTenantController } from './tenant/aware/aware-tenant.controller';
         AutomapperModule.forRoot({
             strategyInitializer: classes()
         }),
+        CommonModule,
         IdempotencyModule,
         TransactionalOrmModule,
-        CommonModule,
         TerminusModule,
         HealthModule,
         WebhookModule,
@@ -77,6 +77,8 @@ import { AwareTenantController } from './tenant/aware/aware-tenant.controller';
 export class AppModule implements NestModule {
     configure(consumer: MiddlewareConsumer) {
         consumer.apply(RequestIdMiddleware).forRoutes({ path: '*', method: RequestMethod.ALL });
-        consumer.apply(TenantMiddleware).forRoutes(AwareTenantController, ApiKeyController, TeamMemberController, AwareInvitationController, BillingController);
+        consumer
+            .apply(TenantMiddleware)
+            .forRoutes(AwareTenantController, ApiKeyController, TeamMemberController, AwareInvitationController, BillingController);
     }
 }
