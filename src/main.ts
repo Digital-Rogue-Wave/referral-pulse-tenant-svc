@@ -47,6 +47,7 @@ async function bootstrap() {
         .setTitle('Referral Pulse Campaign API')
         .setDescription('API List fro campaign microservice')
         .setVersion('1.0')
+        .addBearerAuth()
         .addGlobalParameters({
             name: configService.getOrThrow('appConfig.headerLanguage', { infer: true }),
             required: true,

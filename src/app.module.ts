@@ -27,9 +27,11 @@ import { TenantModule } from './tenant/tenant.module';
 import { InvitationModule } from './invitation/invitation.module';
 import { CurrencyModule } from './currency/currency.module';
 import { ApiKeyModule } from './api-key/api-key.module';
+import { BillingModule } from './billing/billing.module';
 import { AutomapperModule } from '@automapper/nestjs';
 import { classes } from '@automapper/classes';
 import { ApiKeyController } from './api-key/api-key.controller';
+import { BillingController } from './billing/billing.controller';
 import { TenantMiddleware } from './common/tenant/tenant.middleware';
 import { TeamMemberModule } from './team-member/team-member.module';
 
@@ -53,6 +55,7 @@ import { TeamMemberModule } from './team-member/team-member.module';
         WebhookModule,
         FilesModule,
         TenantModule,
+        BillingModule,
         TeamMemberModule,
         InvitationModule,
         CurrencyModule,
@@ -69,6 +72,6 @@ import { TeamMemberModule } from './team-member/team-member.module';
 export class AppModule implements NestModule {
     configure(consumer: MiddlewareConsumer) {
         consumer.apply(RequestIdMiddleware).forRoutes({ path: '*', method: RequestMethod.ALL });
-        consumer.apply(TenantMiddleware).forRoutes(ApiKeyController);
+        consumer.apply(TenantMiddleware).forRoutes(ApiKeyController, BillingController);
     }
 }

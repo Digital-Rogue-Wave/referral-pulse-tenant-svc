@@ -8,7 +8,7 @@ import oryConfig from '@mod/config/ory.config';
 import { JwtPayload } from '@mod/types/app.interface';
 
 @Injectable()
-export class JwtStrategy extends PassportStrategy(Strategy) {
+export class JwtStrategy extends PassportStrategy(Strategy, "jwt") {
     constructor(
         private readonly config: ConfigService,
         private readonly cls: ClsService
@@ -42,14 +42,14 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
         const isServiceToken = !!payload.client_id || payload.grant_type === 'client_credentials';
 
         // Extract tenant_id from various possible locations
-        const tenantId = this.extractTenantId(payload);
+        // const tenantId = this.extractTenantId(payload);
 
-        if (!tenantId) {
-            throw new UnauthorizedException('JWT missing tenant_id claim');
-        }
+        // if (!tenantId) {
+        //     throw new UnauthorizedException('JWT missing tenant_id claim');
+        // }
 
-        // Store in CLS
-        this.cls.set('tenantId', tenantId);
+        // // Store in CLS
+        // this.cls.set('tenantId', tenantId);
         this.cls.set('userId', isServiceToken ? undefined : payload.sub);
         this.cls.set('isServiceToken', isServiceToken);
 
