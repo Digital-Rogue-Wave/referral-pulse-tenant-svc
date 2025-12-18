@@ -17,6 +17,7 @@ export enum AuditAction {
     // Settings actions
     SETTINGS_UPDATED = 'settings.updated',
     LOGO_UPLOADED = 'logo.uploaded',
+    DOMAIN_VERIFIED = 'domain.verified',
 
     // API key actions
     API_KEY_CREATED = 'api_key.created',

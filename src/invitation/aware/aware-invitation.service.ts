@@ -12,6 +12,8 @@ import { Utils } from '@mod/common/utils/utils';
 import { CreateFullInvitationDto } from '../dto/create-full-invitation.dto';
 import { AllConfigType } from '@mod/config/config.type';
 import { NullableType } from '@mod/types/nullable.type';
+import { Paginated, PaginateQuery } from 'nestjs-paginate';
+import { invitationPaginationConfig } from '../config/invitation-pagination-config';
 
 @Injectable()
 export class AwareInvitationService {
@@ -49,6 +51,10 @@ export class AwareInvitationService {
         });
 
         return savedInvitation;
+    }
+
+    async findAll(query: PaginateQuery): Promise<Paginated<InvitationEntity>> {
+        return await this.invitationRepository.paginateTenantContext(query, this.invitationRepository, invitationPaginationConfig);
     }
 
     async findOne(

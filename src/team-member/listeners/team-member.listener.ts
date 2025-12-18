@@ -15,20 +15,15 @@ export class TeamMemberListener {
     @OnEvent('member.role.updated')
     async handleMemberRoleUpdated(payload: { memberId: string; userId: string; oldRole: string; newRole: string }) {
         const { userId, newRole } = payload;
+        // Fetch identity to get email
+        const identity = await this.kratosService.getIdentity(userId);
+        const email = identity.traits?.email;
 
-        try {
-            // Fetch identity to get email
-            const identity = await this.kratosService.getIdentity(userId);
-            const email = identity.traits?.email;
-
-            if (email) {
-                await this.sesService.sendEmail(email, 'Role Updated', `Your role has been updated to ${newRole}.`);
-                this.logger.log(`Sent role update notification to ${email}`);
-            } else {
-                this.logger.warn(`No email found for user ${userId}, skipping role update notification`);
-            }
-        } catch (error) {
-            this.logger.error(`Failed to handle member role update for user ${userId}`, error);
+        if (email) {
+            await this.sesService.sendEmail(email, 'Role Updated', `Your role has been updated to ${newRole}.`);
+            this.logger.log(`Sent role update notification to ${email}`);
+        } else {
+            this.logger.warn(`No email found for user ${userId}, skipping role update notification`);
         }
     }
 }
