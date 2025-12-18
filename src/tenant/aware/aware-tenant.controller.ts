@@ -32,7 +32,7 @@ import { TransferOwnershipDto } from '../dto/transfer-ownership.dto';
 import { ScheduleDeletionDto } from '../dto/schedule-deletion.dto';
 import { CancelDeletionDto } from '../dto/cancel-deletion.dto';
 import { TenantStatsDto } from '../dto/stats/tenant-stats.dto';
-import { TenantStatsService } from '../services/tenant-stats.service';
+import { TenantStatsService } from '../tenant-stats.service';
 
 @ApiTags('tenants')
 @ApiHeader({
