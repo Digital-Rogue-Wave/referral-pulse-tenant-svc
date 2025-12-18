@@ -18,6 +18,7 @@ import { AwareTenantService } from './aware-tenant.service';
 import { NullableType } from '@mod/types/nullable.type';
 import { DeleteResult } from 'typeorm';
 import { ApiBody, ApiConsumes, ApiExtraModels, ApiOkResponse, ApiTags, getSchemaPath, ApiBearerAuth, ApiHeader } from '@nestjs/swagger';
+import { DomainVerificationStatusEnum } from '@mod/common/enums/tenant.enum';
 import { ParseFormdataPipe } from '@mod/common/pipes/parse-formdata.pipe';
 import { Utils } from '@mod/common/utils/utils';
 import { MapInterceptor } from '@automapper/nestjs';
@@ -135,6 +136,23 @@ export class AwareTenantController {
     async verifyCustomDomain(@Param('id') id: string): Promise<TenantDto> {
         // @ts-ignore
         return await this.tenantService.verifyCustomDomain(id);
+    }
+
+    @ApiOkResponse({
+        description: 'Get custom domain verification status',
+        schema: {
+            type: 'object',
+            properties: {
+                customDomain: { type: 'string' },
+                domainVerificationStatus: { enum: Object.values(DomainVerificationStatusEnum) },
+                domainVerificationToken: { type: 'string' }
+            }
+        }
+    })
+    @HttpCode(HttpStatus.OK)
+    @Get(':id/custom-domain/status')
+    async getDomainStatus(@Param('id') id: string) {
+        return await this.tenantService.getDomainStatus(id);
     }
 
     @ApiOkResponse({ description: 'Ownership transferred successfully' })
