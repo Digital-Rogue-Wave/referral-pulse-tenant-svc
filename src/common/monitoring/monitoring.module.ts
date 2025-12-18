@@ -86,6 +86,18 @@ export class MonitoringModule {
                         })
                 },
 
+                // ---- Billing subscription events counter
+                {
+                    provide: 'PrometheusCounter_billing_subscription_events_total',
+                    useFactory: () =>
+                        new Counter({
+                            name: 'billing_subscription_events_total',
+                            help: 'Total billing subscription events (Stripe webhooks, subscription.changed)',
+                            labelNames: ['event', 'result'],
+                            registers: [promDefaultRegistry]
+                        })
+                },
+
                 // ---- RPC server duration
                 {
                     provide: 'PrometheusHistogram_rpc_server_duration_seconds',

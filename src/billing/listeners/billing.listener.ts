@@ -4,10 +4,14 @@ import { SnsPublisher } from '@mod/common/aws-sqs/sns.publisher';
 import { Utils } from '@mod/common/utils/utils';
 import { PublishSnsEventDto, SnsPublishOptionsDto } from '@mod/common/dto/sns-publish.dto';
 import { BillingPlanEnum, SubscriptionStatusEnum } from '@mod/common/enums/tenant.enum';
+import { MonitoringService } from '@mod/common/monitoring/monitoring.service';
 
 @Injectable()
 export class BillingListener {
-    constructor(private readonly sns: SnsPublisher) {}
+    constructor(
+        private readonly sns: SnsPublisher,
+        private readonly metrics: MonitoringService
+    ) {}
 
     @OnEvent('subscription.changed')
     async handleSubscriptionChangedEvent(payload: {
@@ -31,5 +35,7 @@ export class BillingListener {
         });
 
         await this.sns.publish(snsEventDto as any, snsOptionsDto);
+
+        this.metrics.incCounter('billing_subscription_events_total', { event: 'subscription.changed', result: 'ok' });
     }
 }
