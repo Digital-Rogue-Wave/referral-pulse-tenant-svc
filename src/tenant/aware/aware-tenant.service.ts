@@ -112,6 +112,19 @@ export class AwareTenantService {
         return tenant;
     }
 
+    async getDomainStatus(id: string): Promise<{
+        customDomain?: string;
+        domainVerificationStatus?: DomainVerificationStatusEnum;
+        domainVerificationToken?: string;
+    }> {
+        const tenant = await this.findOneOrFail({ id });
+        return {
+            customDomain: tenant.customDomain,
+            domainVerificationStatus: tenant.domainVerificationStatus,
+            domainVerificationToken: tenant.domainVerificationToken
+        };
+    }
+
     async checkSubdomainAvailability(subdomain: string): Promise<{ available: boolean }> {
         const available = await this.subdomainService.isSubdomainAvailable(subdomain);
         return { available };
