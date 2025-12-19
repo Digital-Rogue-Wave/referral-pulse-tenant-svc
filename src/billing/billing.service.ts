@@ -13,13 +13,14 @@ import { EventIdempotencyService } from '@mod/common/idempotency/event-idempoten
 import { MonitoringService } from '@mod/common/monitoring/monitoring.service';
 import { AuditService } from '@mod/common/audit/audit.service';
 import { AuditAction } from '@mod/common/audit/audit-action.enum';
+import { InjectTenantAwareRepository, TenantAwareRepository } from '@mod/common/tenant/tenant-aware.repository';
 
 @Injectable()
 export class BillingService {
 	private readonly logger = new Logger(BillingService.name);
     constructor(
-        @InjectRepository(BillingEntity)
-        private readonly billingRepository: Repository<BillingEntity>,
+        @InjectTenantAwareRepository(BillingEntity)
+        private readonly billingRepository: TenantAwareRepository<BillingEntity>,
         private readonly eventEmitter: EventEmitter2,
         private readonly stripeService: StripeService,
         private readonly cls: ClsService<ClsRequestContext>,
@@ -28,19 +29,11 @@ export class BillingService {
         private readonly auditService: AuditService
     ) {}
 
-    private getTenantIdFromContext(): string {
-        const tenantId = this.cls.get('tenantId');
-        if (!tenantId) {
-            throw new Error('BillingService: tenantId missing in CLS context');
-        }
-        return tenantId as string;
-    }
-
-    private async getOrCreateBillingForTenant(tenantId: string): Promise<BillingEntity> {
+    private async createBillingForTenant(): Promise<BillingEntity> {
+        const tenantId = this.billingRepository.getTenantId();
         let billing = await this.billingRepository.findOne({ where: { tenantId } });
         if (!billing) {
-            billing = this.billingRepository.create({
-                tenantId,
+            billing = this.billingRepository.createTenantContext({
                 plan: BillingPlanEnum.FREE,
                 status: SubscriptionStatusEnum.NONE
             });
@@ -50,8 +43,7 @@ export class BillingService {
     }
 
     private async getOrCreateBillingForCurrentTenant(): Promise<BillingEntity> {
-        const tenantId = this.getTenantIdFromContext();
-        return this.getOrCreateBillingForTenant(tenantId);
+              return this.createBillingForTenant();
     }
 
     async subscriptionCheckout(plan: BillingPlanEnum): Promise<SubscriptionCheckoutResponseDto> {
@@ -137,7 +129,7 @@ export class BillingService {
             return;
         }
 
-        const billing = await this.getOrCreateBillingForTenant(tenantId);
+        const billing = await this.createBillingForTenant();
 
         const previousPlan = billing.plan;
         const previousStatus = billing.status;

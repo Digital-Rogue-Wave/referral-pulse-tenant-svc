@@ -5,9 +5,10 @@ import { BillingService } from './billing.service';
 import { BillingController } from './billing.controller';
 import { StripeService } from './stripe.service';
 import { BillingListener } from './listeners/billing.listener';
+import { TenantAwareRepositoryModule } from '@mod/common/tenant/tenant-aware.repository';
 
 @Module({
-    imports: [TypeOrmModule.forFeature([BillingEntity])],
+    imports: [TenantAwareRepositoryModule.forEntities([BillingEntity])],
     controllers: [BillingController],
     providers: [BillingService, StripeService, BillingListener],
     exports: [BillingService]
