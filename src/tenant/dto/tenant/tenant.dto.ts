@@ -1,22 +1,27 @@
 import { ApiProperty } from '@nestjs/swagger';
+import { AutoMap } from '@automapper/classes';
 import { EntityHelperDto } from '@mod/common/dto/entity-helper.dto';
 import { BillingPlanEnum, SubscriptionStatusEnum, TenantStatusEnum, DomainVerificationStatusEnum } from '@mod/common/enums/tenant.enum';
 import { FileDto } from '@mod/files/dto/file.dto';
 
 export class TenantDto extends EntityHelperDto {
     @ApiProperty()
+    @AutoMap()
     id: string;
 
     @ApiProperty()
+    @AutoMap()
     name: string;
 
     @ApiProperty()
+    @AutoMap()
     slug: string;
 
     @ApiProperty({
         type: FileDto,
         required: false
     })
+    @AutoMap(() => FileDto)
     image?: FileDto | null;
 
     @ApiProperty({
@@ -24,6 +29,7 @@ export class TenantDto extends EntityHelperDto {
         enumName: 'TenantStatusEnum',
         description: 'The status of the tenant'
     })
+    @AutoMap()
     status: TenantStatusEnum;
 
     @ApiProperty({
@@ -44,6 +50,7 @@ export class TenantDto extends EntityHelperDto {
     settings: Record<string, any>;
 
     @ApiProperty({ required: false })
+    @AutoMap()
     customDomain?: string;
 
     @ApiProperty({
@@ -51,8 +58,10 @@ export class TenantDto extends EntityHelperDto {
         enumName: 'DomainVerificationStatusEnum',
         required: false
     })
+    @AutoMap()
     domainVerificationStatus?: DomainVerificationStatusEnum;
 
     @ApiProperty({ required: false })
+    @AutoMap()
     domainVerificationToken?: string;
 }

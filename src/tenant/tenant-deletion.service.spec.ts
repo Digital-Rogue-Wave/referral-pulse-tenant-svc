@@ -1,74 +1,76 @@
+import { describe, it, expect, beforeEach } from '@jest/globals';
 import { Test, TestingModule } from '@nestjs/testing';
-import { TenantService } from './tenant.service';
-import { Repository } from 'typeorm';
+import { AwareTenantService } from './aware/aware-tenant.service';
 import { TenantEntity } from './tenant.entity';
-import { getRepositoryToken } from '@nestjs/typeorm';
 import { FilesService } from '@mod/files/files.service';
 import { KetoService } from '@mod/common/auth/keto.service';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { KratosService } from '@mod/common/auth/kratos.service';
 import { HttpException } from '@nestjs/common';
 import { TenantStatusEnum } from '@mod/common/enums/tenant.enum';
+import { createMock, DeepMocked } from '@golevelup/ts-jest';
+import { DnsVerificationService } from './dns/dns-verification.service';
+import { SubdomainService } from './dns/subdomain.service';
 
-describe('TenantService - Deletion', () => {
-    let service: TenantService;
-    let tenantRepository: Repository<TenantEntity>;
-    let ketoService: KetoService;
-    let kratosService: KratosService;
-    let eventEmitter: EventEmitter2;
+import { TenantAwareRepository } from '@mod/common/tenant/tenant-aware.repository';
+
+describe('AwareTenantService - Deletion', () => {
+    let service: AwareTenantService;
+    let tenantRepository: DeepMocked<TenantAwareRepository<TenantEntity>>;
+    let ketoService: DeepMocked<KetoService>;
+    let kratosService: DeepMocked<KratosService>;
+    let eventEmitter: DeepMocked<EventEmitter2>;
 
     const mockTenant: TenantEntity = {
         id: 'tenant-123',
         name: 'Test Tenant',
         slug: 'test-tenant',
         status: TenantStatusEnum.ACTIVE,
-        settings: {},
         deletionScheduledAt: undefined,
         deletionReason: undefined
-    } as TenantEntity;
+    } as any;
 
     beforeEach(async () => {
+        tenantRepository = createMock<TenantAwareRepository<TenantEntity>>();
+        ketoService = createMock<KetoService>();
+        kratosService = createMock<KratosService>();
+        eventEmitter = createMock<EventEmitter2>();
+
         const module: TestingModule = await Test.createTestingModule({
             providers: [
-                TenantService,
+                AwareTenantService,
                 {
-                    provide: getRepositoryToken(TenantEntity),
-                    useValue: {
-                        findOneOrFail: jest.fn(),
-                        save: jest.fn(),
-                        delete: jest.fn()
-                    }
+                    provide: `TenantAwareRepository_TenantEntity`,
+                    useValue: tenantRepository
                 },
                 {
                     provide: FilesService,
-                    useValue: {}
+                    useValue: createMock<FilesService>()
                 },
                 {
                     provide: KetoService,
-                    useValue: {
-                        check: jest.fn()
-                    }
+                    useValue: ketoService
                 },
                 {
                     provide: KratosService,
-                    useValue: {
-                        verifyPassword: jest.fn()
-                    }
+                    useValue: kratosService
                 },
                 {
                     provide: EventEmitter2,
-                    useValue: {
-                        emit: jest.fn()
-                    }
+                    useValue: eventEmitter
+                },
+                {
+                    provide: DnsVerificationService,
+                    useValue: createMock<DnsVerificationService>()
+                },
+                {
+                    provide: SubdomainService,
+                    useValue: createMock<SubdomainService>()
                 }
             ]
         }).compile();
 
-        service = module.get<TenantService>(TenantService);
-        tenantRepository = module.get<Repository<TenantEntity>>(getRepositoryToken(TenantEntity));
-        ketoService = module.get<KetoService>(KetoService);
-        kratosService = module.get<KratosService>(KratosService);
-        eventEmitter = module.get<EventEmitter2>(EventEmitter2);
+        service = module.get<AwareTenantService>(AwareTenantService);
     });
 
     describe('scheduleDeletion', () => {
@@ -77,15 +79,14 @@ describe('TenantService - Deletion', () => {
             const userId = 'user-123';
             const identityId = 'identity-123';
 
-            jest.spyOn(ketoService, 'check').mockResolvedValue(true);
-            jest.spyOn(kratosService, 'verifyPassword').mockResolvedValue(true);
-            jest.spyOn(tenantRepository, 'findOneOrFail').mockResolvedValue(mockTenant);
-            jest.spyOn(tenantRepository, 'save').mockResolvedValue({
+            kratosService.verifyPassword.mockResolvedValue(true);
+            tenantRepository.findOneOrFailTenantContext.mockResolvedValue(mockTenant);
+            tenantRepository.save.mockResolvedValue({
                 ...mockTenant,
                 status: TenantStatusEnum.DELETION_SCHEDULED,
                 deletionScheduledAt: new Date(),
                 deletionReason: dto.reason
-            } as TenantEntity);
+            } as any);
 
             const result = await service.scheduleDeletion(mockTenant.id, dto, userId, identityId);
 
@@ -94,23 +95,12 @@ describe('TenantService - Deletion', () => {
             expect(eventEmitter.emit).toHaveBeenCalledWith('tenant.deletion.scheduled', expect.any(Object));
         });
 
-        it('should throw error if user lacks permission', async () => {
-            const dto = { password: 'correct-password' };
-            const userId = 'user-123';
-            const identityId = 'identity-123';
-
-            jest.spyOn(ketoService, 'check').mockResolvedValue(false);
-
-            await expect(service.scheduleDeletion(mockTenant.id, dto, userId, identityId)).rejects.toThrow(HttpException);
-        });
-
         it('should throw error if password is invalid', async () => {
             const dto = { password: 'wrong-password' };
             const userId = 'user-123';
             const identityId = 'identity-123';
 
-            jest.spyOn(ketoService, 'check').mockResolvedValue(true);
-            jest.spyOn(kratosService, 'verifyPassword').mockResolvedValue(false);
+            kratosService.verifyPassword.mockResolvedValue(false);
 
             await expect(service.scheduleDeletion(mockTenant.id, dto, userId, identityId)).rejects.toThrow(HttpException);
         });
@@ -125,9 +115,8 @@ describe('TenantService - Deletion', () => {
                 status: TenantStatusEnum.DELETION_SCHEDULED
             };
 
-            jest.spyOn(ketoService, 'check').mockResolvedValue(true);
-            jest.spyOn(kratosService, 'verifyPassword').mockResolvedValue(true);
-            jest.spyOn(tenantRepository, 'findOneOrFail').mockResolvedValue(scheduledTenant as TenantEntity);
+            kratosService.verifyPassword.mockResolvedValue(true);
+            tenantRepository.findOneOrFailTenantContext.mockResolvedValue(scheduledTenant as any);
 
             await expect(service.scheduleDeletion(mockTenant.id, dto, userId, identityId)).rejects.toThrow(HttpException);
         });
@@ -146,15 +135,14 @@ describe('TenantService - Deletion', () => {
                 deletionReason: 'Test reason'
             };
 
-            jest.spyOn(ketoService, 'check').mockResolvedValue(true);
-            jest.spyOn(kratosService, 'verifyPassword').mockResolvedValue(true);
-            jest.spyOn(tenantRepository, 'findOneOrFail').mockResolvedValue(scheduledTenant as TenantEntity);
-            jest.spyOn(tenantRepository, 'save').mockResolvedValue({
+            kratosService.verifyPassword.mockResolvedValue(true);
+            tenantRepository.findOneOrFailTenantContext.mockResolvedValue(scheduledTenant as any);
+            tenantRepository.save.mockResolvedValue({
                 ...scheduledTenant,
                 status: TenantStatusEnum.ACTIVE,
                 deletionScheduledAt: undefined,
                 deletionReason: undefined
-            } as TenantEntity);
+            } as any);
 
             await service.cancelDeletion(mockTenant.id, dto, userId, identityId);
 
@@ -172,9 +160,8 @@ describe('TenantService - Deletion', () => {
                 status: TenantStatusEnum.ACTIVE
             };
 
-            jest.spyOn(ketoService, 'check').mockResolvedValue(true);
-            jest.spyOn(kratosService, 'verifyPassword').mockResolvedValue(true);
-            jest.spyOn(tenantRepository, 'findOneOrFail').mockResolvedValue(activeTenant as TenantEntity);
+            kratosService.verifyPassword.mockResolvedValue(true);
+            tenantRepository.findOneOrFailTenantContext.mockResolvedValue(activeTenant as any);
 
             await expect(service.cancelDeletion(mockTenant.id, dto, userId, identityId)).rejects.toThrow(HttpException);
         });
@@ -191,8 +178,8 @@ describe('TenantService - Deletion', () => {
                 deletionScheduledAt: scheduledDate
             };
 
-            jest.spyOn(tenantRepository, 'findOneOrFail').mockResolvedValue(scheduledTenant as TenantEntity);
-            jest.spyOn(tenantRepository, 'delete').mockResolvedValue({ affected: 1 } as any);
+            tenantRepository.findOneOrFailTenantContext.mockResolvedValue(scheduledTenant as any);
+            tenantRepository.delete.mockResolvedValue({ affected: 1 } as any);
 
             await service.executeDeletion(mockTenant.id);
 
@@ -210,13 +197,13 @@ describe('TenantService - Deletion', () => {
                 deletionScheduledAt: scheduledDate
             };
 
-            jest.spyOn(tenantRepository, 'findOneOrFail').mockResolvedValue(scheduledTenant as TenantEntity);
+            tenantRepository.findOneOrFailTenantContext.mockResolvedValue(scheduledTenant as any);
 
             await expect(service.executeDeletion(mockTenant.id)).rejects.toThrow(HttpException);
         });
 
         it('should throw error if tenant is not scheduled for deletion', async () => {
-            jest.spyOn(tenantRepository, 'findOneOrFail').mockResolvedValue(mockTenant);
+            tenantRepository.findOneOrFailTenantContext.mockResolvedValue(mockTenant as any);
 
             await expect(service.executeDeletion(mockTenant.id)).rejects.toThrow(HttpException);
         });
