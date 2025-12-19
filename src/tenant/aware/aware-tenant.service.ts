@@ -13,6 +13,7 @@ import { CancelDeletionDto } from '../dto/cancel-deletion.dto';
 import { DnsVerificationService } from '../dns/dns-verification.service';
 import { SubdomainService } from '../dns/subdomain.service';
 import { randomStringGenerator } from '@nestjs/common/utils/random-string-generator.util';
+import { CurrentUserType } from '@mod/common/auth/current-user.decorator';
 
 @Injectable()
 export class AwareTenantService {
@@ -41,9 +42,8 @@ export class AwareTenantService {
     async update(
         id: string,
         updateTenantDto: UpdateTenantDto,
+        user: CurrentUserType,
         file?: Express.Multer.File | Express.MulterS3.File,
-        userId?: string,
-        userEmail?: string,
         ipAddress?: string
     ): Promise<TenantEntity> {
         const existingTenant = await this.findOneOrFail({ id });
@@ -82,8 +82,8 @@ export class AwareTenantService {
             tenant: updatedTenant,
             oldTenant,
             changes: updateTenantDto,
-            userId,
-            userEmail,
+            userId: user.id,
+            userEmail: user.email,
             ipAddress
         });
 
