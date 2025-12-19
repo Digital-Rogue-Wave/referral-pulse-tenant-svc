@@ -30,4 +30,11 @@ export class UpdateTenantDto {
     })
     @IsOptional()
     settings?: Record<string, any>;
+
+    @ApiPropertyOptional({
+        description: 'Custom domain for the tenant (e.g. refer.acme.com)'
+    })
+    @IsString()
+    @IsOptional()
+    customDomain?: string;
 }

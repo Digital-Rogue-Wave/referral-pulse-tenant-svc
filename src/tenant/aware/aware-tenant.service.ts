@@ -4,12 +4,15 @@ import { NullableType } from '@mod/types/nullable.type';
 import { FilesService } from '@mod/files/files.service';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { KratosService } from '@mod/common/auth/kratos.service';
-import { TenantStatusEnum } from '@mod/common/enums/tenant.enum';
+import { TenantStatusEnum, DomainVerificationStatusEnum } from '@mod/common/enums/tenant.enum';
 import { InjectTenantAwareRepository, TenantAwareRepository } from '@mod/common/tenant/tenant-aware.repository';
 import { TenantEntity } from '../tenant.entity';
 import { UpdateTenantDto } from '../dto/tenant/update-tenant.dto';
 import { ScheduleDeletionDto } from '../dto/schedule-deletion.dto';
 import { CancelDeletionDto } from '../dto/cancel-deletion.dto';
+import { DnsVerificationService } from '../dns/dns-verification.service';
+import { SubdomainService } from '../dns/subdomain.service';
+import { randomStringGenerator } from '@nestjs/common/utils/random-string-generator.util';
 
 @Injectable()
 export class AwareTenantService {
@@ -18,7 +21,9 @@ export class AwareTenantService {
         private readonly tenantRepository: TenantAwareRepository<TenantEntity>,
         private readonly filesService: FilesService,
         private readonly eventEmitter: EventEmitter2,
-        private readonly kratosService: KratosService
+        private readonly kratosService: KratosService,
+        private readonly dnsVerificationService: DnsVerificationService,
+        private readonly subdomainService: SubdomainService
     ) {}
 
     async findAll(): Promise<TenantEntity[]> {
@@ -45,11 +50,31 @@ export class AwareTenantService {
         // Create a shallow copy for "old" state reference
         const oldTenant = { ...existingTenant } as TenantEntity;
 
+        const partialUpdate: Partial<TenantEntity> = { ...updateTenantDto };
+
         if (file) {
             existingTenant.image = await this.filesService.uploadFile(file);
         }
 
-        await this.tenantRepository.update(id, updateTenantDto);
+        if (updateTenantDto.customDomain && updateTenantDto.customDomain !== existingTenant.customDomain) {
+            partialUpdate.domainVerificationToken = `pulse-verification-${randomStringGenerator()}`;
+            partialUpdate.domainVerificationStatus = DomainVerificationStatusEnum.PENDING;
+        }
+
+        if (updateTenantDto.slug && updateTenantDto.slug !== existingTenant.slug) {
+            this.subdomainService.validateSubdomain(updateTenantDto.slug);
+            const isAvailable = await this.subdomainService.isSubdomainAvailable(updateTenantDto.slug);
+            if (!isAvailable) {
+                throw new HttpException('Subdomain is already taken', HttpStatus.CONFLICT);
+            }
+            // Reserve old slug for 7 days
+            await this.subdomainService.reserveSubdomain(existingTenant.slug, id, 7);
+        }
+
+        await this.tenantRepository.save({
+            ...existingTenant,
+            ...partialUpdate
+        });
         const updatedTenant = await this.findOneOrFail({ id });
 
         // Emit tenant.updated event for side effects (Audit, SNS)
@@ -63,6 +88,46 @@ export class AwareTenantService {
         });
 
         return updatedTenant;
+    }
+
+    async verifyCustomDomain(id: string): Promise<TenantEntity> {
+        const tenant = await this.findOneOrFail({ id });
+
+        if (!tenant.customDomain || !tenant.domainVerificationToken) {
+            throw new HttpException('No custom domain configuration found to verify', HttpStatus.BAD_REQUEST);
+        }
+
+        const isVerified = await this.dnsVerificationService.verifyTxtRecord(tenant.customDomain, tenant.domainVerificationToken);
+
+        if (isVerified) {
+            tenant.domainVerificationStatus = DomainVerificationStatusEnum.VERIFIED;
+            await this.tenantRepository.save(tenant);
+            this.eventEmitter.emit('tenant.domain.verified', { tenant });
+        } else {
+            tenant.domainVerificationStatus = DomainVerificationStatusEnum.FAILED;
+            await this.tenantRepository.save(tenant);
+            throw new HttpException('DNS verification failed. Please check your TXT records.', HttpStatus.BAD_REQUEST);
+        }
+
+        return tenant;
+    }
+
+    async getDomainStatus(id: string): Promise<{
+        customDomain?: string;
+        domainVerificationStatus?: DomainVerificationStatusEnum;
+        domainVerificationToken?: string;
+    }> {
+        const tenant = await this.findOneOrFail({ id });
+        return {
+            customDomain: tenant.customDomain,
+            domainVerificationStatus: tenant.domainVerificationStatus,
+            domainVerificationToken: tenant.domainVerificationToken
+        };
+    }
+
+    async checkSubdomainAvailability(subdomain: string): Promise<{ available: boolean }> {
+        const available = await this.subdomainService.isSubdomainAvailable(subdomain);
+        return { available };
     }
 
     async transferOwnership(id: string, newOwnerId: string, currentOwnerId: string): Promise<void> {

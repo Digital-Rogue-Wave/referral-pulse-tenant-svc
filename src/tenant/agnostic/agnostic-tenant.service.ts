@@ -7,6 +7,11 @@ import { AgnosticTenantSettingService } from '@mod/tenant-setting/agnostic/agnos
 import { TenantEntity } from '../tenant.entity';
 import { CreateTenantDto } from '../dto/tenant/create-tenant.dto';
 import { EventEmitter2 } from '@nestjs/event-emitter';
+import { SubdomainService } from '../dns/subdomain.service';
+import { KetoService } from '@mod/common/auth/keto.service';
+import { Utils } from '@mod/common/utils/utils';
+import { KetoRelationTupleDto } from '@mod/common/auth/dto/keto-relation-tuple.dto';
+import { KetoNamespace, KetoRelation } from '@mod/common/auth/keto.constants';
 
 @Injectable()
 export class AgnosticTenantService {
@@ -15,7 +20,9 @@ export class AgnosticTenantService {
         private readonly tenantRepository: Repository<TenantEntity>,
         private readonly filesService: FilesService,
         private readonly tenantSettingService: AgnosticTenantSettingService,
-        private readonly eventEmitter: EventEmitter2
+        private readonly eventEmitter: EventEmitter2,
+        private readonly subdomainService: SubdomainService,
+        private readonly ketoService: KetoService
     ) {}
 
     async create(createTenantDto: CreateTenantDto, file?: Express.Multer.File | Express.MulterS3.File): Promise<TenantEntity> {
@@ -26,11 +33,16 @@ export class AgnosticTenantService {
             tenantSlug = slugify(name, { lower: true, strict: true });
         }
 
-        const existing = await this.tenantRepository.findOne({ where: { slug: tenantSlug } });
-        if (existing) {
-            throw new HttpException({ message: 'Tenant with this slug already exists', code: HttpStatus.CONFLICT }, HttpStatus.CONFLICT);
+        // Validate subdomain format and reserved list
+        this.subdomainService.validateSubdomain(tenantSlug);
+
+        // Check availability (including reserved subdomains)
+        const isAvailable = await this.subdomainService.isSubdomainAvailable(tenantSlug);
+        if (!isAvailable) {
+            throw new HttpException({ message: 'Subdomain is already taken or reserved', code: HttpStatus.CONFLICT }, HttpStatus.CONFLICT);
         }
 
+        // 1. Create and save the tenant entity
         const tenant = this.tenantRepository.create({
             ...createTenantDto,
             slug: tenantSlug
@@ -42,13 +54,32 @@ export class AgnosticTenantService {
 
         const savedTenant = await this.tenantRepository.save(tenant);
 
-        // Create default settings linked to the saved tenant
+        // 2. Create default settings linked to the saved tenant
         savedTenant.setting = await this.tenantSettingService.createDefault(savedTenant);
 
-        // Emit tenant.created event for side effects (Keto, Audit, SNS)
+        const ownerId = createTenantDto.ownerId!;
+
+        // 3. Create Keto relations for the owner (Permissions)
+        const memberTuple = await Utils.validateDtoOrFail(KetoRelationTupleDto, {
+            namespace: KetoNamespace.TENANT,
+            object: savedTenant.id,
+            relation: KetoRelation.MEMBER,
+            subject_id: ownerId
+        });
+        await this.ketoService.createTuple(memberTuple);
+
+        const billingTuple = await Utils.validateDtoOrFail(KetoRelationTupleDto, {
+            namespace: KetoNamespace.TENANT,
+            object: savedTenant.id,
+            relation: KetoRelation.MANAGE_BILLING,
+            subject_id: ownerId
+        });
+        await this.ketoService.createTuple(billingTuple);
+
+        // 4. Emit tenant.created event for side effects (Audit, SNS)
         this.eventEmitter.emit('tenant.created', {
             tenant: savedTenant,
-            ownerId: createTenantDto.ownerId!
+            ownerId: ownerId
         });
 
         return savedTenant;

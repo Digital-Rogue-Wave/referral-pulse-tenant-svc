@@ -4,14 +4,14 @@ import { SnsPublisher } from '@mod/common/aws-sqs/sns.publisher';
 import { AuditService } from '@mod/common/audit/audit.service';
 import { KetoService } from '@mod/common/auth/keto.service';
 import { Utils } from '@mod/common/utils/utils';
-import { KetoRelationTupleDto } from '@mod/common/auth/dto/keto-relation-tuple.dto';
-import { KetoNamespace, KetoRelation } from '@mod/common/auth/keto.constants';
+import { KetoNamespace } from '@mod/common/auth/keto.constants';
 import { CreateAuditLogDto } from '@mod/common/audit/create-audit-log.dto';
 import { AuditAction } from '@mod/common/audit/audit-action.enum';
 import { PublishSnsEventDto, SnsPublishOptionsDto } from '@mod/common/dto/sns-publish.dto';
 import { TenantEntity } from '../tenant.entity';
 import { UpdateTenantDto } from '../dto/tenant/update-tenant.dto';
 import { HttpClient } from '@mod/common/http/http.client';
+import { DomainProvisioningService } from '../dns/domain-provisioning.service';
 import { ConfigService, ConfigType } from '@nestjs/config';
 import oryConfig from '@mod/config/ory.config';
 
@@ -30,35 +30,42 @@ export class TenantListener {
         private readonly ketoService: KetoService,
         @InjectQueue(TENANT_DELETION_QUEUE) private readonly deletionQueue: Queue<TenantDeletionJobData>,
         private readonly httpClient: HttpClient,
-        private readonly configService: ConfigService
+        private readonly configService: ConfigService,
+        private readonly domainProvisioningService: DomainProvisioningService
     ) {
         const oryCfg = this.configService.getOrThrow<ConfigType<typeof oryConfig>>('oryConfig', { infer: true });
         this.ketoWriteUrl = oryCfg.keto.writeUrl;
         this.ketoReadUrl = oryCfg.keto.readUrl;
     }
 
+    @OnEvent('tenant.domain.verified')
+    async handleTenantDomainVerifiedEvent(payload: { tenant: TenantEntity }) {
+        const { tenant } = payload;
+
+        // 1. Audit Log
+        await this.auditService.log({
+            tenantId: tenant.id,
+            // @ts-ignore
+            userId: 'system',
+            action: AuditAction.DOMAIN_VERIFIED,
+            description: `Domain ${tenant.customDomain} verified`,
+            metadata: {
+                domain: tenant.customDomain,
+                token: tenant.domainVerificationToken
+            }
+        });
+
+        // 2. Provision
+        if (tenant.customDomain) {
+            await this.domainProvisioningService.provisionDomain(tenant.id, tenant.customDomain);
+        }
+    }
+
     @OnEvent('tenant.created')
     async handleTenantCreatedEvent(payload: { tenant: TenantEntity; ownerId: string }) {
         const { tenant, ownerId } = payload;
 
-        // 1. Create Keto tuple
-        const tuple = await Utils.validateDtoOrFail(KetoRelationTupleDto, {
-            namespace: KetoNamespace.TENANT,
-            object: tenant.id,
-            relation: KetoRelation.MEMBER,
-            subject_id: ownerId
-        });
-        await this.ketoService.createTuple(tuple);
-
-        const billingTuple = await Utils.validateDtoOrFail(KetoRelationTupleDto, {
-            namespace: KetoNamespace.TENANT,
-            object: tenant.id,
-            relation: KetoRelation.MANAGE_BILLING,
-            subject_id: ownerId
-        });
-        await this.ketoService.createTuple(billingTuple);
-
-        // 2. Audit Log
+        // 1. Audit Log
         const auditLogDto = await Utils.validateDtoOrFail(CreateAuditLogDto, {
             tenantId: tenant.id,
             userId: ownerId,
@@ -70,7 +77,7 @@ export class TenantListener {
         });
         await this.auditService.log(auditLogDto);
 
-        // 3. Publish SNS Event
+        // 2. Publish SNS Event
         const tenantData = { ...tenant };
         if (tenantData.setting) {
             tenantData.setting = { ...tenantData.setting } as any;

@@ -1,6 +1,6 @@
 import { ApiProperty } from '@nestjs/swagger';
 import { EntityHelperDto } from '@mod/common/dto/entity-helper.dto';
-import { BillingPlanEnum, SubscriptionStatusEnum, TenantStatusEnum } from '@mod/common/enums/tenant.enum';
+import { BillingPlanEnum, SubscriptionStatusEnum, TenantStatusEnum, DomainVerificationStatusEnum } from '@mod/common/enums/tenant.enum';
 import { FileDto } from '@mod/files/dto/file.dto';
 
 export class TenantDto extends EntityHelperDto {
@@ -42,4 +42,17 @@ export class TenantDto extends EntityHelperDto {
 
     @ApiProperty({ description: 'Custom settings for the tenant' })
     settings: Record<string, any>;
+
+    @ApiProperty({ required: false })
+    customDomain?: string;
+
+    @ApiProperty({
+        enum: DomainVerificationStatusEnum,
+        enumName: 'DomainVerificationStatusEnum',
+        required: false
+    })
+    domainVerificationStatus?: DomainVerificationStatusEnum;
+
+    @ApiProperty({ required: false })
+    domainVerificationToken?: string;
 }

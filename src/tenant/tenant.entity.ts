@@ -1,5 +1,5 @@
 import EntityHelper from '@mod/common/entities/entity-helper';
-import { TenantStatusEnum } from '@mod/common/enums/tenant.enum';
+import { TenantStatusEnum, DomainVerificationStatusEnum } from '@mod/common/enums/tenant.enum';
 import { FileEntity } from '@mod/files/file.entity';
 import { Entity, Column, PrimaryGeneratedColumn, ManyToOne, OneToMany, OneToOne } from 'typeorm';
 import { InvitationEntity } from '@mod/invitation/invitation.entity';
@@ -39,6 +39,19 @@ export class TenantEntity extends EntityHelper {
 
     @Column({ type: 'text', nullable: true })
     deletionReason?: string;
+
+    @Column({ nullable: true, unique: true })
+    customDomain?: string;
+
+    @Column({
+        type: 'enum',
+        enum: DomainVerificationStatusEnum,
+        default: DomainVerificationStatusEnum.UNVERIFIED
+    })
+    domainVerificationStatus: DomainVerificationStatusEnum;
+
+    @Column({ nullable: true })
+    domainVerificationToken?: string;
 
     @OneToMany('InvitationEntity', 'tenant')
     invitations: InvitationEntity[];

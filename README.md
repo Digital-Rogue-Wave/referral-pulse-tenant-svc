@@ -735,6 +735,38 @@ sequenceDiagram
     end
 ```
 
+### 9.1 Subdomain Availability Check (Epic 1)
+
+Triggered when a user enters a subdomain during tenant creation or update. This workflow ensures that the requested slug is valid, not reserved, and not already in use by another tenant.
+
+**Endpoint**: `GET /tenants/subdomain/check`
+**Query**: `?slug=string`
+
+**Workflow**:
+
+1.  **Format Validation**: Verifies the slug follows DNS standards (lowercase, alphanumeric, hyphens).
+2.  **Reserved List Check**: Checks against hardcoded reserved subdomains (e.g., `admin`, `api`, `www`).
+3.  **Tenant Uniqueness**: Ensures no other tenant is using the slug.
+4.  **Reservation Check**: Checks the `ReservedSubdomainEntity` to see if the slug is currently leased (e.g., after a tenant rename).
+
+```mermaid
+sequenceDiagram
+    autonumber
+    actor User
+    participant TS as Tenant Service
+    participant SubSvc as Subdomain Service
+    participant DB as Database
+
+    User->>TS: GET /tenants/subdomain/check?slug=example
+    TS->>SubSvc: isSubdomainAvailable("example")
+    SubSvc->>SubSvc: Validate Format (Regex)
+    SubSvc->>SubSvc: Check Reserved List (Constants)
+    SubSvc->>DB: Check Tenant Slugs
+    SubSvc->>DB: Check Reserved Subdomains (Leases)
+    SubSvc-->>TS: Availability Result
+    TS-->>User: { "available": true/false }
+```
+
 ### 10. Team Member Removal (Epic 2)
 
 Triggered when a tenant admin removes a team member from the organization.
@@ -826,6 +858,55 @@ sequenceDiagram
             TS->>SNS: Publish 'tenant.settings.updated'
             TS-->>Admin: Success
         end
+    end
+```
+
+### 11.1. Custom Domain Verification (Epic 3)
+
+Triggered when a tenant owner adds or updates a custom domain. The system requires asynchronous verification via DNS TXT records before provisioning infrastructure.
+
+**Endpoint**: `POST /tenants/:id/verify-domain`
+
+**Workflow**:
+
+1.  **Token Generation**: When a custom domain is first added via `PATCH /tenants/:id`, the system generates a unique verification token.
+2.  **DNS Configuration**: The user must add a TXT record for `_referral-pulse-challenge` with the provided token.
+3.  **Resolution**: The Tenant Service uses Node's `dns` module to resolve the TXT record and compare it with the stored token.
+4.  **Provisioning Side-Effects**: Upon successful verification, the system emits an event that triggers automated infrastructure provisioning (SSL via ACM and CDN via CloudFront).
+
+```mermaid
+sequenceDiagram
+    autonumber
+    actor Owner
+    participant TS as Tenant Service
+    participant DNS as DnsVerification Service
+    participant DB as Database
+    participant ACM as AWS ACM
+    participant CF as AWS CloudFront
+    participant SNS as Event Bus (SNS)
+
+    Note over Owner: Owner sets customDomain in Profile
+    Owner->>TS: PATCH /tenants/:id (customDomain: "hub.brand.com")
+    TS->>TS: Generate pulse-verification-token
+    TS->>DB: Save Domain (Status: PENDING)
+    TS-->>Owner: Return Token (Add to DNS as TXT)
+
+    Note over Owner: Adds TXT record to DNS
+    Owner->>TS: POST /tenants/:id/verify-domain
+    TS->>DNS: verifyTxtRecord("hub.brand.com", token)
+    DNS->>DNS: Resolve TXT _referral-pulse-challenge.hub.brand.com
+    DNS-->>TS: Verification Result
+
+    alt Verification Successful
+        TS->>DB: Update Status (VERIFIED)
+        TS->>SNS: Publish 'tenant.domain.verified'
+        Note over SNS: Provisioning Listener
+        SNS->>ACM: Request Certificate
+        SNS->>CF: Update Distribution (Alias)
+        TS-->>Owner: Success (Provisioning Started)
+    else Verification Failed
+        TS->>DB: Update Status (FAILED)
+        TS-->>Owner: 400 Bad Request
     end
 ```
 

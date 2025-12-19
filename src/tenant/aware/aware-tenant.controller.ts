@@ -1,8 +1,24 @@
-import { Controller, Get, Body, Param, Delete, Put, HttpCode, HttpStatus, UseInterceptors, UploadedFile, UseGuards, Ip } from '@nestjs/common';
+import {
+    Controller,
+    Get,
+    Body,
+    Param,
+    Delete,
+    Put,
+    Post,
+    HttpCode,
+    HttpStatus,
+    UseInterceptors,
+    UploadedFile,
+    UseGuards,
+    Ip,
+    Query
+} from '@nestjs/common';
 import { AwareTenantService } from './aware-tenant.service';
 import { NullableType } from '@mod/types/nullable.type';
 import { DeleteResult } from 'typeorm';
 import { ApiBody, ApiConsumes, ApiExtraModels, ApiOkResponse, ApiTags, getSchemaPath, ApiBearerAuth, ApiHeader } from '@nestjs/swagger';
+import { DomainVerificationStatusEnum } from '@mod/common/enums/tenant.enum';
 import { ParseFormdataPipe } from '@mod/common/pipes/parse-formdata.pipe';
 import { Utils } from '@mod/common/utils/utils';
 import { MapInterceptor } from '@automapper/nestjs';
@@ -16,6 +32,8 @@ import { UpdateTenantDto } from '../dto/tenant/update-tenant.dto';
 import { TransferOwnershipDto } from '../dto/transfer-ownership.dto';
 import { ScheduleDeletionDto } from '../dto/schedule-deletion.dto';
 import { CancelDeletionDto } from '../dto/cancel-deletion.dto';
+import { TenantStatsDto } from '../dto/stats/tenant-stats.dto';
+import { TenantStatsService } from '../tenant-stats.service';
 
 @ApiTags('tenants')
 @ApiHeader({
@@ -28,7 +46,20 @@ import { CancelDeletionDto } from '../dto/cancel-deletion.dto';
 @UseGuards(JwtAuthGuard)
 @Controller({ path: 'tenants', version: '1' })
 export class AwareTenantController {
-    constructor(private readonly tenantService: AwareTenantService) {}
+    constructor(
+        private readonly tenantService: AwareTenantService,
+        private readonly statsService: TenantStatsService
+    ) {}
+
+    @ApiOkResponse({
+        description: 'Get dashboard stats for current tenant',
+        type: TenantStatsDto
+    })
+    @HttpCode(HttpStatus.OK)
+    @Get(':id/stats')
+    async getStats(@Param('id') id: string): Promise<TenantStatsDto> {
+        return await this.statsService.getStats(id);
+    }
 
     @ApiOkResponse({ type: TenantDto, isArray: true })
     @UseInterceptors(MapInterceptor(TenantEntity, TenantDto, { isArray: true }))
@@ -36,6 +67,21 @@ export class AwareTenantController {
     @Get()
     async findAll() {
         return await this.tenantService.findAll();
+    }
+
+    @ApiOkResponse({
+        description: 'Check if subdomain is available',
+        schema: {
+            type: 'object',
+            properties: {
+                available: { type: 'boolean' }
+            }
+        }
+    })
+    @HttpCode(HttpStatus.OK)
+    @Get('subdomain/check')
+    async checkSubdomain(@Query('subdomain') subdomain: string) {
+        return await this.tenantService.checkSubdomainAvailability(subdomain);
     }
 
     @ApiOkResponse({ type: TenantDto })
@@ -76,6 +122,37 @@ export class AwareTenantController {
     ) {
         const updateTenantDto = await Utils.validateDtoOrFail(UpdateTenantDto, data);
         return await this.tenantService.update(id, updateTenantDto, file, user.id, user.email);
+    }
+
+    @ApiOkResponse({
+        description: 'Domain verified successfully',
+        type: TenantDto
+    })
+    @UseInterceptors(MapInterceptor(TenantEntity, TenantDto))
+    @UseGuards(KetoGuard)
+    @RequirePermission({ namespace: KetoNamespace.TENANT, relation: KetoPermission.UPDATE, objectParam: 'id' })
+    @HttpCode(HttpStatus.OK)
+    @Post(':id/custom-domain/verify')
+    async verifyCustomDomain(@Param('id') id: string): Promise<TenantDto> {
+        // @ts-ignore
+        return await this.tenantService.verifyCustomDomain(id);
+    }
+
+    @ApiOkResponse({
+        description: 'Get custom domain verification status',
+        schema: {
+            type: 'object',
+            properties: {
+                customDomain: { type: 'string' },
+                domainVerificationStatus: { enum: Object.values(DomainVerificationStatusEnum) },
+                domainVerificationToken: { type: 'string' }
+            }
+        }
+    })
+    @HttpCode(HttpStatus.OK)
+    @Get(':id/custom-domain/status')
+    async getDomainStatus(@Param('id') id: string) {
+        return await this.tenantService.getDomainStatus(id);
     }
 
     @ApiOkResponse({ description: 'Ownership transferred successfully' })
