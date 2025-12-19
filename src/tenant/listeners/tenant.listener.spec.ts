@@ -1,3 +1,4 @@
+import { jest, describe, it, expect, beforeEach } from '@jest/globals';
 import { Test, TestingModule } from '@nestjs/testing';
 import { TenantListener } from './tenant.listener';
 import { SnsPublisher } from '@mod/common/aws-sqs/sns.publisher';
@@ -6,13 +7,21 @@ import { KetoService } from '@mod/common/auth/keto.service';
 import { getQueueToken } from '@nestjs/bullmq';
 import { TENANT_DELETION_QUEUE } from '@mod/common/bullmq/queues/tenant-deletion.queue';
 import { TenantEntity } from '../tenant.entity';
+import { createMock, DeepMocked } from '@golevelup/ts-jest';
+import { Queue } from 'bullmq';
+import { HttpClient } from '@mod/common/http/http.client';
+import { ConfigService } from '@nestjs/config';
+import { DomainProvisioningService } from '../dns/domain-provisioning.service';
 
 describe('TenantListener', () => {
     let listener: TenantListener;
-    let queueMock: { add: jest.Mock; getJob: jest.Mock };
-    let snsMock: { publish: jest.Mock };
-    let auditServiceMock: { log: jest.Mock };
-    let ketoServiceMock: { check: jest.Mock };
+    let queue: DeepMocked<Queue>;
+    let snsPublisher: DeepMocked<SnsPublisher>;
+    let auditService: DeepMocked<AuditService>;
+    let ketoService: DeepMocked<KetoService>;
+    let httpClient: DeepMocked<HttpClient>;
+    let configService: DeepMocked<ConfigService>;
+    let domainProvisioningService: DeepMocked<DomainProvisioningService>;
 
     const mockTenant = {
         id: 'tenant-123',
@@ -21,21 +30,31 @@ describe('TenantListener', () => {
     } as TenantEntity;
 
     beforeEach(async () => {
-        queueMock = {
-            add: jest.fn(),
-            getJob: jest.fn()
-        };
-        snsMock = { publish: jest.fn() };
-        auditServiceMock = { log: jest.fn() };
-        ketoServiceMock = { check: jest.fn() };
+        queue = createMock<Queue>();
+        snsPublisher = createMock<SnsPublisher>();
+        auditService = createMock<AuditService>();
+        ketoService = createMock<KetoService>();
+        httpClient = createMock<HttpClient>();
+        configService = createMock<ConfigService>();
+        domainProvisioningService = createMock<DomainProvisioningService>();
+
+        configService.getOrThrow.mockReturnValue({
+            keto: {
+                writeUrl: 'http://keto-write',
+                readUrl: 'http://keto-read'
+            }
+        });
 
         const module: TestingModule = await Test.createTestingModule({
             providers: [
                 TenantListener,
-                { provide: SnsPublisher, useValue: snsMock },
-                { provide: AuditService, useValue: auditServiceMock },
-                { provide: KetoService, useValue: ketoServiceMock },
-                { provide: getQueueToken(TENANT_DELETION_QUEUE), useValue: queueMock }
+                { provide: SnsPublisher, useValue: snsPublisher },
+                { provide: AuditService, useValue: auditService },
+                { provide: KetoService, useValue: ketoService },
+                { provide: getQueueToken(TENANT_DELETION_QUEUE), useValue: queue },
+                { provide: HttpClient, useValue: httpClient },
+                { provide: ConfigService, useValue: configService },
+                { provide: DomainProvisioningService, useValue: domainProvisioningService }
             ]
         }).compile();
 
@@ -60,9 +79,9 @@ describe('TenantListener', () => {
 
             await listener.handleTenantDeletionScheduledEvent(payload);
 
-            expect(auditServiceMock.log).toHaveBeenCalled();
-            expect(snsMock.publish).toHaveBeenCalled();
-            expect(queueMock.add).toHaveBeenCalledWith(
+            expect(auditService.log).toHaveBeenCalled();
+            expect(snsPublisher.publish).toHaveBeenCalled();
+            expect(queue.add).toHaveBeenCalledWith(
                 'execute-deletion',
                 {
                     tenantId: mockTenant.id,
@@ -86,13 +105,13 @@ describe('TenantListener', () => {
             };
 
             const jobMock = { remove: jest.fn() };
-            queueMock.getJob.mockResolvedValue(jobMock);
+            queue.getJob.mockResolvedValue(jobMock as any);
 
             await listener.handleTenantDeletionCancelledEvent(payload);
 
-            expect(auditServiceMock.log).toHaveBeenCalled();
-            expect(snsMock.publish).toHaveBeenCalled();
-            expect(queueMock.getJob).toHaveBeenCalledWith(`deletion-${mockTenant.id}`);
+            expect(auditService.log).toHaveBeenCalled();
+            expect(snsPublisher.publish).toHaveBeenCalled();
+            expect(queue.getJob).toHaveBeenCalledWith(`deletion-${mockTenant.id}`);
             expect(jobMock.remove).toHaveBeenCalled();
         });
 
@@ -102,11 +121,11 @@ describe('TenantListener', () => {
                 userId: 'user-1'
             };
 
-            queueMock.getJob.mockResolvedValue(null);
+            queue.getJob.mockResolvedValue(null as any);
 
             await listener.handleTenantDeletionCancelledEvent(payload);
 
-            expect(queueMock.getJob).toHaveBeenCalledWith(`deletion-${mockTenant.id}`);
+            expect(queue.getJob).toHaveBeenCalledWith(`deletion-${mockTenant.id}`);
             // Should not crash
         });
     });
