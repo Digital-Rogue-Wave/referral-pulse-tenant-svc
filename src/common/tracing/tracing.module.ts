@@ -27,7 +27,9 @@ import appConfig from '@mod/config/app.config';
 export class TracingModule implements OnModuleDestroy {
     constructor(private readonly sdk: NodeSDK) {}
     async onModuleDestroy(): Promise<void> {
-        await this.sdk.shutdown().catch(() => void 0);
+        if (this.sdk && typeof this.sdk.shutdown === 'function') {
+            await this.sdk.shutdown().catch(() => void 0);
+        }
     }
 
     static register(): DynamicModule {
@@ -40,7 +42,10 @@ export class TracingModule implements OnModuleDestroy {
                     inject: [tracingConfig.KEY, appConfig.KEY],
                     useFactory: async (cfg: ConfigType<typeof tracingConfig>, app: ConfigType<typeof appConfig>) => {
                         if (!cfg.enabled) {
-                            return { start: () => void 0, shutdown: () => void 0 } as unknown as NodeSDK;
+                            return {
+                                start: () => Promise.resolve(),
+                                shutdown: () => Promise.resolve()
+                            } as unknown as NodeSDK;
                         }
 
                         // OTLP exporter
