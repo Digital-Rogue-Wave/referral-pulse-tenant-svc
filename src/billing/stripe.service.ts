@@ -1,4 +1,4 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { HttpException, HttpStatus, Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import Stripe from 'stripe';
 import { AllConfigType } from '@mod/config/config.type';
@@ -24,19 +24,19 @@ export class StripeService {
 
         switch (plan) {
             case BillingPlanEnum.FREE:
-                if (!cfg?.freePriceId) throw new Error('Stripe Free price ID is not configured');
+                if (!cfg?.freePriceId) throw new HttpException('Stripe Free price ID is not configured', HttpStatus.BAD_REQUEST);
                 return cfg.freePriceId;
             case BillingPlanEnum.STARTER:
-                if (!cfg?.starterPriceId) throw new Error('Stripe Starter price ID is not configured');
+                if (!cfg?.starterPriceId) throw new HttpException('Stripe Starter price ID is not configured', HttpStatus.BAD_REQUEST);
                 return cfg.starterPriceId;
             case BillingPlanEnum.GROWTH:
-                if (!cfg?.growthPriceId) throw new Error('Stripe Growth price ID is not configured');
+                if (!cfg?.growthPriceId) throw new HttpException('Stripe Growth price ID is not configured', HttpStatus.BAD_REQUEST);
                 return cfg.growthPriceId;
             case BillingPlanEnum.ENTERPRISE:
-                if (!cfg?.enterprisePriceId) throw new Error('Stripe Enterprise price ID is not configured');
+                if (!cfg?.enterprisePriceId) throw new HttpException('Stripe Enterprise price ID is not configured', HttpStatus.BAD_REQUEST);
                 return cfg.enterprisePriceId;
             default:
-                throw new Error(`No Stripe price mapping for plan: ${plan}`);
+                throw new HttpException(`No Stripe price mapping for plan: ${plan}`, HttpStatus.BAD_REQUEST);
         }
     }
 
@@ -50,7 +50,7 @@ export class StripeService {
         const cancelUrl = this.configService.get('stripeConfig.cancelUrl', { infer: true });
 
         if (!successUrl || !cancelUrl) {
-            throw new Error('Stripe success/cancel URLs are not configured');
+            throw new HttpException('Stripe success/cancel URLs are not configured', HttpStatus.BAD_REQUEST);
         }
 
         const priceId = this.priceIdForPlan(params.plan);
@@ -82,7 +82,7 @@ export class StripeService {
         const cfg = this.configService.get('stripeConfig', { infer: true });
         const webhookSecret = cfg?.webhookSecret as string | undefined;
         if (!webhookSecret) {
-            throw new Error('Stripe webhook secret is not configured');
+            throw new HttpException('Stripe webhook secret is not configured', HttpStatus.BAD_REQUEST);
         }
 
         return stripe.webhooks.constructEvent(payload, signature, webhookSecret);

@@ -8,8 +8,8 @@
 @app = http://localhost:3000
 
 # Variables for dynamic values
-@identityId = 18663b5f-3ba5-47c9-801b-28a098bbf394
-@clientId = test-client
+@identityId = 69c1f238-de28-457d-98b9-2dbebc2b01ee
+@clientId = 3b62f8da-d08e-4461-8d91-de8aefe89488
 @flowId = {{loginFlow.response.body.id}}
 
 ### ==========================================
@@ -108,7 +108,7 @@ Content-Type: application/json
     "response_types": ["code"],
     "scope": "openid offline email profile",
     "redirect_uris": ["http://localhost:3000/callback", "http://localhost:3000/auth/callback"],
-    "token_endpoint_auth_method": "client_secret_post"
+    "token_endpoint_auth_method": "client_secret_basic"
 }
 
 ### Get Specific OAuth2 Client

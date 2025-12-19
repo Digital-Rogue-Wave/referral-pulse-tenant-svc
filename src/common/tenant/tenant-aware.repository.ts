@@ -60,7 +60,7 @@ export class TenantAwareRepository<Entity extends ObjectLiteral> extends Reposit
 
     // -------------- Utilities
 
-    private getTenantId(): string {
+    public getTenantId(): string {
         const tenantId = this.cls.get('tenantId');
         if (!tenantId) {
             throw new Error('TenantAwareRepository: tenantId missing in CLS context');
