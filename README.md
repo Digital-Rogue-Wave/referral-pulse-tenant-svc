@@ -385,26 +385,30 @@ sequenceDiagram
 
 ### 6. Subscription Checkout (Epic 4)
 
-Triggered when a tenant subscribes to a paid plan or upgrades their existing subscription. This flow utilizes Stripe Checkout for secure payment processing.
+Triggered when a tenant subscribes to a plan or changes their existing subscription. This flow utilizes Stripe Checkout for all plans (including Free) and applies billing state changes via Stripe webhooks.
 
 **Endpoints**:
 
-- `POST /tenants/:tenantId/subscription/checkout` (Create Session)
-- `POST /tenants/webhooks/stripe` (Handle Events)
+- `POST /billings/subscription/checkout` (Create Session; tenant resolved from `tenant-id` header)
+- `POST /webhook/stripe` (Handle Events)
 
 **Implementation Steps**:
 
 1.  **Plan Selection**: Admin selects a billing plan (Free, Starter, Growth, Enterprise).
-2.  **Session Creation**: Tenant Service calls Stripe API to create a `checkout.session`.
+2.  **Session Creation**: The Billing module calls Stripe API to create a `checkout.session`.
     - Metadata includes `tenantId` and `planId`.
+    - For the Free plan, a dedicated Free price ID is used.
     - Success/Cancel URLs point back to the frontend application.
 3.  **Redirection**: Service returns the `sessionId` or `url` to the frontend, which redirects the user to Stripe.
-4.  **Payment Processing**: User completes payment on Stripe's hosted page.
-5.  **Webhook Handling**: Stripe sends `checkout.session.completed` event to the webhook endpoint.
+4.  **Payment Processing**: User completes checkout on Stripe's hosted page.
+5.  **Webhook Handling**: Stripe sends a `checkout.session.completed` event to the webhook endpoint.
     - **Verify Signature**: Ensure request is from Stripe.
-    - **Update Tenant**: Set `billing_plan`, `subscription_status`='active', and `stripe_customer_id`.
+    - **Update Billing**: Update the `BillingEntity` for the tenant:
+        - Set the `plan` to the selected plan.
+        - For paid plans, set `status` to `active` and store `stripeCustomerId` and `stripeSubscriptionId`.
+        - For the Free plan, set `status` to `none`, store `stripeCustomerId`, and clear any `stripeSubscriptionId`.
     - **Audit**: Log `SUBSCRIPTION_UPDATED`.
-6.  **Event Publishing**: Publish `subscription.changed` to SNS.
+6.  **Event Publishing**: Publish `subscription.changed` to SNS from the Billing module.
 
 ##### Free Plan (Downgrade/Selection)
 
@@ -412,17 +416,23 @@ Triggered when a tenant subscribes to a paid plan or upgrades their existing sub
 sequenceDiagram
     autonumber
     actor Admin
-    participant TS as Tenant Service
+    participant BS as Billing Module
+    participant Stripe as Stripe API
     participant DB as Database
     participant SNS as Event Bus (SNS)
-    participant Stripe as Stripe API
 
     Note over Admin: Admin selects Free Plan
-    Admin->>TS: POST .../subscription/checkout (Plan=Free)
-    TS->>DB: Update Tenant (Plan=Free)
-    TS->>Stripe: Cancel Active Subscription (if any)
-    TS->>SNS: Publish 'subscription.changed'
-    TS-->>Admin: Success (No Payment Required)
+    Admin->>BS: POST /billings/subscription/checkout (Plan=Free, tenant-id header)
+    BS->>Stripe: Create Checkout Session (metadata: tenantId, plan: Free)
+    Stripe-->>BS: Session URL
+    BS-->>Admin: Redirect to Stripe
+
+    Note over Admin: Admin completes checkout
+    Stripe->>BS: Webhook (checkout.session.completed)
+    BS->>BS: Verify Webhook Signature
+    BS->>DB: Update BillingEntity (Plan=Free, Status=None, clear subscriptionId)
+    BS->>SNS: Publish 'subscription.changed'
+    BS-->>Stripe: 200 OK
 ```
 
 ##### Starter Plan Checkout
@@ -431,23 +441,23 @@ sequenceDiagram
 sequenceDiagram
     autonumber
     actor Admin
-    participant TS as Tenant Service
+    participant BS as Billing Module
     participant Stripe as Stripe API
     participant DB as Database
     participant SNS as Event Bus (SNS)
 
     Note over Admin: Admin selects Starter Plan
-    Admin->>TS: POST .../subscription/checkout (Plan=Starter)
-    TS->>Stripe: Create Checkout Session (metadata: tenantId, plan: Starter)
-    Stripe-->>TS: Session URL
-    TS-->>Admin: Redirect to Stripe
+    Admin->>BS: POST /billings/subscription/checkout (Plan=Starter, tenant-id header)
+    BS->>Stripe: Create Checkout Session (metadata: tenantId, plan: Starter)
+    Stripe-->>BS: Session URL
+    BS-->>Admin: Redirect to Stripe
 
     Note over Admin: Admin completes payment
-    Stripe->>TS: Webhook (checkout.session.completed)
-    TS->>TS: Verify Webhook Signature
-    TS->>DB: Update Tenant (Plan=Starter, Status=Active)
-    TS->>SNS: Publish 'subscription.changed'
-    TS-->>Stripe: 200 OK
+    Stripe->>BS: Webhook (checkout.session.completed)
+    BS->>BS: Verify Webhook Signature
+    BS->>DB: Update BillingEntity (Plan=Starter, Status=Active)
+    BS->>SNS: Publish 'subscription.changed'
+    BS-->>Stripe: 200 OK
 ```
 
 ##### Growth Plan Checkout
@@ -456,23 +466,23 @@ sequenceDiagram
 sequenceDiagram
     autonumber
     actor Admin
-    participant TS as Tenant Service
+    participant BS as Billing Module
     participant Stripe as Stripe API
     participant DB as Database
     participant SNS as Event Bus (SNS)
 
     Note over Admin: Admin selects Growth Plan
-    Admin->>TS: POST .../subscription/checkout (Plan=Growth)
-    TS->>Stripe: Create Checkout Session (metadata: tenantId, plan: Growth)
-    Stripe-->>TS: Session URL
-    TS-->>Admin: Redirect to Stripe
+    Admin->>BS: POST /billings/subscription/checkout (Plan=Growth, tenant-id header)
+    BS->>Stripe: Create Checkout Session (metadata: tenantId, plan: Growth)
+    Stripe-->>BS: Session URL
+    BS-->>Admin: Redirect to Stripe
 
     Note over Admin: Admin completes payment
-    Stripe->>TS: Webhook (checkout.session.completed)
-    TS->>TS: Verify Webhook Signature
-    TS->>DB: Update Tenant (Plan=Growth, Status=Active)
-    TS->>SNS: Publish 'subscription.changed'
-    TS-->>Stripe: 200 OK
+    Stripe->>BS: Webhook (checkout.session.completed)
+    BS->>BS: Verify Webhook Signature
+    BS->>DB: Update BillingEntity (Plan=Growth, Status=Active)
+    BS->>SNS: Publish 'subscription.changed'
+    BS-->>Stripe: 200 OK
 ```
 
 ##### Enterprise Plan Checkout
@@ -481,23 +491,23 @@ sequenceDiagram
 sequenceDiagram
     autonumber
     actor Admin
-    participant TS as Tenant Service
+    participant BS as Billing Module
     participant Stripe as Stripe API
     participant DB as Database
     participant SNS as Event Bus (SNS)
 
     Note over Admin: Admin selects Enterprise Plan
-    Admin->>TS: POST .../subscription/checkout (Plan=Enterprise)
-    TS->>Stripe: Create Checkout Session (metadata: tenantId, plan: Enterprise)
-    Stripe-->>TS: Session URL
-    TS-->>Admin: Redirect to Stripe
+    Admin->>BS: POST /billings/subscription/checkout (Plan=Enterprise, tenant-id header)
+    BS->>Stripe: Create Checkout Session (metadata: tenantId, plan: Enterprise)
+    Stripe-->>BS: Session URL
+    BS-->>Admin: Redirect to Stripe
 
     Note over Admin: Admin completes payment
-    Stripe->>TS: Webhook (checkout.session.completed)
-    TS->>TS: Verify Webhook Signature
-    TS->>DB: Update Tenant (Plan=Enterprise, Status=Active)
-    TS->>SNS: Publish 'subscription.changed'
-    TS-->>Stripe: 200 OK
+    Stripe->>BS: Webhook (checkout.session.completed)
+    BS->>BS: Verify Webhook Signature
+    BS->>DB: Update BillingEntity (Plan=Enterprise, Status=Active)
+    BS->>SNS: Publish 'subscription.changed'
+    BS-->>Stripe: 200 OK
 ```
 
 ### 7. Plan Limit Enforcement (Epic 5)
