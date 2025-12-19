@@ -3,8 +3,8 @@ import { OnEvent } from '@nestjs/event-emitter';
 import { SnsPublisher } from '@mod/common/aws-sqs/sns.publisher';
 import { Utils } from '@mod/common/utils/utils';
 import { PublishSnsEventDto, SnsPublishOptionsDto } from '@mod/common/dto/sns-publish.dto';
-import { BillingPlanEnum, SubscriptionStatusEnum } from '@mod/common/enums/billing.enum';
 import { MonitoringService } from '@mod/common/monitoring/monitoring.service';
+import { SubscriptionChangedEvent } from '@mod/common/interfaces/billing-events.interface';
 
 @Injectable()
 export class BillingListener {
@@ -14,13 +14,7 @@ export class BillingListener {
     ) {}
 
     @OnEvent('subscription.changed')
-    async handleSubscriptionChangedEvent(payload: {
-        tenantId: string;
-        billingPlan: BillingPlanEnum;
-        subscriptionStatus: SubscriptionStatusEnum;
-        stripeCustomerId?: string;
-        stripeSubscriptionId?: string;
-    }) {
+    async handleSubscriptionChangedEvent(payload: SubscriptionChangedEvent) {
         const snsEventDto = await Utils.validateDtoOrFail(PublishSnsEventDto, {
             eventId: payload.tenantId,
             eventType: 'subscription.changed',

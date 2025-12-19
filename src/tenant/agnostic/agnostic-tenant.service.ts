@@ -1,4 +1,4 @@
-import { Injectable, HttpStatus, HttpException } from '@nestjs/common';
+import { Injectable, HttpStatus, HttpException, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { FilesService } from '@mod/files/files.service';
@@ -15,6 +15,7 @@ import { KetoNamespace, KetoRelation } from '@mod/common/auth/keto.constants';
 
 @Injectable()
 export class AgnosticTenantService {
+    private readonly logger = new Logger(AgnosticTenantService.name);
     constructor(
         @InjectRepository(TenantEntity)
         private readonly tenantRepository: Repository<TenantEntity>,
@@ -76,6 +77,11 @@ export class AgnosticTenantService {
         });
         await this.ketoService.createTuple(billingTuple);
 
+        // Envent emitter logging
+        this.logger.log(`tenant.created event received`, {
+            tenantId: savedTenant.id,
+            ownerId: ownerId
+        });
         // 4. Emit tenant.created event for side effects (Audit, SNS)
         this.eventEmitter.emit('tenant.created', {
             tenant: savedTenant,
