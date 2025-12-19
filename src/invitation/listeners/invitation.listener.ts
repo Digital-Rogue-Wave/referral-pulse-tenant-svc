@@ -4,6 +4,8 @@ import { SesService } from '@mod/common/aws-ses/ses.service';
 import { KetoService } from '@mod/common/auth/keto.service';
 import { KetoNamespace, KetoRelation } from '@mod/common/auth/keto.constants';
 
+import { InvitationCreatedEvent, MemberJoinedEvent } from '@mod/common/interfaces/invitation-events.interface';
+
 @Injectable()
 export class InvitationListener {
     constructor(
@@ -12,7 +14,7 @@ export class InvitationListener {
     ) {}
 
     @OnEvent('invitation.created')
-    async handleInvitationCreatedEvent(payload: { invitationId: string; email: string; token: string; tenantName: string }) {
+    async handleInvitationCreatedEvent(payload: InvitationCreatedEvent) {
         const { email, token, tenantName } = payload;
         const subject = `Invitation to join ${tenantName}`;
         const body = `You have been invited to join ${tenantName}. Click here to accept: https://app.referral-pulse.com/invites/${token}`;
@@ -26,7 +28,7 @@ export class InvitationListener {
     }
 
     @OnEvent('member.joined')
-    async handleMemberJoinedEvent(payload: { userId: string; tenantId: string; role: string; invitationId: string }) {
+    async handleMemberJoinedEvent(payload: MemberJoinedEvent) {
         const { userId, tenantId, role } = payload;
 
         try {

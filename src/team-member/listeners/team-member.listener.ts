@@ -3,6 +3,8 @@ import { OnEvent } from '@nestjs/event-emitter';
 import { SesService } from '@mod/common/aws-ses/ses.service';
 import { KratosService } from '@mod/common/auth/kratos.service';
 
+import { MemberRoleUpdatedEvent } from '@mod/common/interfaces/team-member-events.interface';
+
 @Injectable()
 export class TeamMemberListener {
     private readonly logger = new Logger(TeamMemberListener.name);
@@ -13,7 +15,7 @@ export class TeamMemberListener {
     ) {}
 
     @OnEvent('member.role.updated')
-    async handleMemberRoleUpdated(payload: { memberId: string; userId: string; oldRole: string; newRole: string }) {
+    async handleMemberRoleUpdated(payload: MemberRoleUpdatedEvent) {
         const { userId, newRole } = payload;
         // Fetch identity to get email
         const identity = await this.kratosService.getIdentity(userId);

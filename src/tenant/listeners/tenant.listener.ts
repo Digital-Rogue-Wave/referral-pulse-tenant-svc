@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { OnEvent } from '@nestjs/event-emitter';
 import { SnsPublisher } from '@mod/common/aws-sqs/sns.publisher';
 import { AuditService } from '@mod/common/audit/audit.service';
@@ -8,20 +8,25 @@ import { KetoNamespace } from '@mod/common/auth/keto.constants';
 import { CreateAuditLogDto } from '@mod/common/audit/create-audit-log.dto';
 import { AuditAction } from '@mod/common/audit/audit-action.enum';
 import { PublishSnsEventDto, SnsPublishOptionsDto } from '@mod/common/dto/sns-publish.dto';
-import { TenantEntity } from '../tenant.entity';
-import { UpdateTenantDto } from '../dto/tenant/update-tenant.dto';
 import { HttpClient } from '@mod/common/http/http.client';
 import { DomainProvisioningService } from '../dns/domain-provisioning.service';
 import { ConfigService, ConfigType } from '@nestjs/config';
 import oryConfig from '@mod/config/ory.config';
-
 import { InjectQueue } from '@nestjs/bullmq';
 import { Queue } from 'bullmq';
 import { TENANT_DELETION_QUEUE, TenantDeletionJobData } from '@mod/common/bullmq/queues/tenant-deletion.queue';
+import {
+    TenantCreatedEvent,
+    TenantDeletedEvent,
+    TenantDeletionCancelledEvent,
+    TenantDeletionScheduledEvent,
+    TenantDomainVerifiedEvent,
+    TenantUpdatedEvent
+} from '@mod/common/interfaces/tenant-events.interface';
 
 @Injectable()
 export class TenantListener {
-    private readonly ketoWriteUrl: string;
+    private readonly logger = new Logger(TenantListener.name);
     private readonly ketoReadUrl: string;
 
     constructor(
@@ -34,12 +39,11 @@ export class TenantListener {
         private readonly domainProvisioningService: DomainProvisioningService
     ) {
         const oryCfg = this.configService.getOrThrow<ConfigType<typeof oryConfig>>('oryConfig', { infer: true });
-        this.ketoWriteUrl = oryCfg.keto.writeUrl;
         this.ketoReadUrl = oryCfg.keto.readUrl;
     }
 
     @OnEvent('tenant.domain.verified')
-    async handleTenantDomainVerifiedEvent(payload: { tenant: TenantEntity }) {
+    async handleTenantDomainVerifiedEvent(payload: TenantDomainVerifiedEvent) {
         const { tenant } = payload;
 
         // 1. Audit Log
@@ -62,7 +66,14 @@ export class TenantListener {
     }
 
     @OnEvent('tenant.created')
-    async handleTenantCreatedEvent(payload: { tenant: TenantEntity; ownerId: string }) {
+    async handleTenantCreatedEvent(payload: TenantCreatedEvent) {
+        this.logger.log(
+            `tenant.created event received`,
+            JSON.stringify({
+                tenantId: payload.tenant.id,
+                ownerId: payload.ownerId
+            })
+        );
         const { tenant, ownerId } = payload;
 
         // 1. Audit Log
@@ -103,14 +114,7 @@ export class TenantListener {
     }
 
     @OnEvent('tenant.updated')
-    async handleTenantUpdatedEvent(payload: {
-        tenant: TenantEntity;
-        oldTenant: TenantEntity;
-        changes: UpdateTenantDto;
-        userId?: string;
-        userEmail?: string;
-        ipAddress?: string;
-    }) {
+    async handleTenantUpdatedEvent(payload: TenantUpdatedEvent) {
         const { tenant, oldTenant, changes, userId, userEmail, ipAddress } = payload;
 
         // 1. Audit Log
@@ -157,14 +161,7 @@ export class TenantListener {
     }
 
     @OnEvent('tenant.deletion.scheduled')
-    async handleTenantDeletionScheduledEvent(payload: {
-        tenant: TenantEntity;
-        userId: string;
-        scheduledAt: Date;
-        executionDate: Date;
-        reason?: string;
-        ipAddress?: string;
-    }) {
+    async handleTenantDeletionScheduledEvent(payload: TenantDeletionScheduledEvent) {
         const { tenant, userId, scheduledAt, executionDate, reason, ipAddress } = payload;
 
         // 1. Audit Log
@@ -220,7 +217,7 @@ export class TenantListener {
     }
 
     @OnEvent('tenant.deletion.cancelled')
-    async handleTenantDeletionCancelledEvent(payload: { tenant: TenantEntity; userId: string; ipAddress?: string }) {
+    async handleTenantDeletionCancelledEvent(payload: TenantDeletionCancelledEvent) {
         const { tenant, userId, ipAddress } = payload;
 
         // 1. Audit Log
@@ -261,7 +258,7 @@ export class TenantListener {
     }
 
     @OnEvent('tenant.deleted')
-    async handleTenantDeletedEvent(payload: { tenant: TenantEntity; deletedAt: Date }) {
+    async handleTenantDeletedEvent(payload: TenantDeletedEvent) {
         const { tenant, deletedAt } = payload;
 
         // 1. Audit Log (before tenant is deleted)

@@ -2,16 +2,20 @@ import { Injectable } from '@nestjs/common';
 import { OnEvent } from '@nestjs/event-emitter';
 import { AuditService } from '@mod/common/audit/audit.service';
 import { AuditAction } from '@mod/common/audit/audit-action.enum';
-import { ApiKeyEntity } from '../api-key.entity';
 import { ApiKeyStatusEnum } from '@mod/common/enums/api-key.enum';
-import { UpdateApiKeyDto } from '../dto/update-api-key.dto';
+import {
+    ApiKeyCreatedEvent,
+    ApiKeyDeletedEvent,
+    ApiKeyStatusUpdatedEvent,
+    ApiKeyUpdatedEvent
+} from '@mod/common/interfaces/api-key-events.interface';
 
 @Injectable()
 export class ApiKeyListener {
     constructor(private readonly auditService: AuditService) {}
 
     @OnEvent('api-key.created')
-    async handleApiKeyCreatedEvent(payload: { apiKey: ApiKeyEntity; userId: string; ipAddress?: string; userAgent?: string }) {
+    async handleApiKeyCreatedEvent(payload: ApiKeyCreatedEvent) {
         const { apiKey, userId, ipAddress, userAgent } = payload;
 
         await this.auditService.log({
@@ -30,13 +34,7 @@ export class ApiKeyListener {
     }
 
     @OnEvent('api-key.updated')
-    async handleApiKeyUpdatedEvent(payload: {
-        apiKey: ApiKeyEntity;
-        changes: UpdateApiKeyDto;
-        userId: string;
-        ipAddress?: string;
-        userAgent?: string;
-    }) {
+    async handleApiKeyUpdatedEvent(payload: ApiKeyUpdatedEvent) {
         const { apiKey, changes, userId, ipAddress, userAgent } = payload;
 
         await this.auditService.log({
@@ -54,14 +52,7 @@ export class ApiKeyListener {
     }
 
     @OnEvent('api-key.status.updated')
-    async handleApiKeyStatusUpdatedEvent(payload: {
-        apiKey: ApiKeyEntity;
-        previousStatus: ApiKeyStatusEnum;
-        newStatus: ApiKeyStatusEnum;
-        userId: string;
-        ipAddress?: string;
-        userAgent?: string;
-    }) {
+    async handleApiKeyStatusUpdatedEvent(payload: ApiKeyStatusUpdatedEvent) {
         const { apiKey, previousStatus, newStatus, userId, ipAddress, userAgent } = payload;
 
         // Determine audit action
@@ -83,15 +74,7 @@ export class ApiKeyListener {
     }
 
     @OnEvent('api-key.deleted')
-    async handleApiKeyDeletedEvent(payload: {
-        apiKeyId: string;
-        tenantId: string;
-        keyName: string;
-        keyPrefix: string;
-        userId: string;
-        ipAddress?: string;
-        userAgent?: string;
-    }) {
+    async handleApiKeyDeletedEvent(payload: ApiKeyDeletedEvent) {
         const { apiKeyId, tenantId, keyName, keyPrefix, userId, ipAddress, userAgent } = payload;
 
         await this.auditService.log({

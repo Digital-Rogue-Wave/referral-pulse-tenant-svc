@@ -121,7 +121,7 @@ export class AwareTenantController {
         @UploadedFile() file?: Express.Multer.File | Express.MulterS3.File
     ) {
         const updateTenantDto = await Utils.validateDtoOrFail(UpdateTenantDto, data);
-        return await this.tenantService.update(id, updateTenantDto, file, user.id, user.email);
+        return await this.tenantService.update(id, updateTenantDto, user, file);
     }
 
     @ApiOkResponse({
