@@ -1,5 +1,5 @@
 import EntityHelper from '@mod/common/entities/entity-helper';
-import { BillingPlanEnum, SubscriptionStatusEnum } from '@mod/common/enums/tenant.enum';
+import { BillingPlanEnum, SubscriptionStatusEnum } from '@mod/common/enums/billing.enum';
 import { TenantEntity } from '@mod/tenant/tenant.entity';
 import { Entity, Column, PrimaryGeneratedColumn, ManyToOne, JoinColumn, Index } from 'typeorm';
 
@@ -39,4 +39,7 @@ export class BillingEntity extends EntityHelper {
 
     @Column({ name: 'stripe_subscription_id', type: 'varchar', nullable: true })
     stripeSubscriptionId?: string | null;
+
+    @Column({ name: 'stripe_transaction_id', type: 'varchar', nullable: true })
+    stripeTransactionId?: string | null;
 }

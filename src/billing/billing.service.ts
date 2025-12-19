@@ -3,7 +3,7 @@ import { EventEmitter2 } from '@nestjs/event-emitter';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { BillingEntity } from './billing.entity';
-import { BillingPlanEnum, SubscriptionStatusEnum } from '@mod/common/enums/tenant.enum';
+import { BillingPlanEnum, SubscriptionStatusEnum, PaymentStatusEnum } from '@mod/common/enums/billing.enum';
 import { SubscriptionCheckoutResponseDto } from './dto/subscription-checkout-response.dto';
 import { SubscriptionStatusDto } from './dto/subscription-status.dto';
 import { StripeService } from './stripe.service';
@@ -40,11 +40,55 @@ export class BillingService {
             });
             billing = await this.billingRepository.save(billing);
         }
+
         return billing;
     }
 
+    private async handleInvoicePaymentSucceeded(event: Stripe.Event): Promise<void> {
+        const invoice = event.data.object as Stripe.Invoice;
+        const invoiceId = invoice.id;
+
+        const rawInvoice = invoice as any;
+        const paymentIntentId =
+            typeof rawInvoice.payment_intent === 'string'
+                ? rawInvoice.payment_intent
+                : rawInvoice.payment_intent?.id;
+
+        const subscriptionId =
+            typeof rawInvoice.subscription === 'string'
+                ? rawInvoice.subscription
+                : rawInvoice.subscription?.id;
+
+        if (!subscriptionId) {
+            this.logger.warn(
+                `invoice.payment_succeeded missing subscription reference: eventId=${event.id}, invoiceId=${invoiceId}`
+            );
+            return;
+        }
+
+        const billing = await this.billingRepository.manager.findOne(BillingEntity, {
+            where: { stripeSubscriptionId: subscriptionId }
+        });
+
+        if (!billing) {
+            this.logger.warn(
+                `invoice.payment_succeeded: no BillingEntity found for subscriptionId=${subscriptionId}, eventId=${event.id}, invoiceId=${invoiceId}`
+            );
+            return;
+        }
+
+        if (paymentIntentId) {
+            billing.stripeTransactionId = paymentIntentId;
+            await this.billingRepository.manager.save(billing);
+        }
+
+        this.logger.log(
+            `Processed invoice.payment_succeeded from Stripe: eventId=${event.id}, invoiceId=${invoiceId}, subscriptionId=${subscriptionId}, paymentIntentId=${paymentIntentId ?? 'unknown'}`
+        );
+    }
+
     private async getOrCreateBillingForCurrentTenant(): Promise<BillingEntity> {
-              return this.createBillingForTenant();
+        return this.createBillingForTenant();
     }
 
     async subscriptionCheckout(plan: BillingPlanEnum): Promise<SubscriptionCheckoutResponseDto> {
@@ -62,7 +106,8 @@ export class BillingService {
         return {
             plan,
             checkoutUrl: session.url ?? undefined,
-            sessionId: session.id
+            sessionId: session.id,
+            paymentStatus: PaymentStatusEnum.PENDING
         };
     }
 
@@ -72,8 +117,15 @@ export class BillingService {
         return {
             plan: billing.plan,
             subscriptionStatus: billing.status,
+            paymentStatus:
+                billing.status === SubscriptionStatusEnum.ACTIVE
+                    ? PaymentStatusEnum.COMPLETED
+                    : billing.status === SubscriptionStatusEnum.CANCELED
+                    ? PaymentStatusEnum.FAILED
+                    : PaymentStatusEnum.PENDING,
             stripeCustomerId: billing.stripeCustomerId ?? null,
-            stripeSubscriptionId: billing.stripeSubscriptionId ?? null
+            stripeSubscriptionId: billing.stripeSubscriptionId ?? null,
+            stripeTransactionId: billing.stripeTransactionId ?? null
         };
     }
 
@@ -111,6 +163,14 @@ export class BillingService {
                     await this.handleCheckoutSessionCompleted(event);
                     break;
                 }
+                case 'invoice.payment_succeeded': {
+                    await this.handleInvoicePaymentSucceeded(event);
+                    break;
+                }
+                case 'invoice.payment_failed': {
+                    await this.handleInvoicePaymentFailed(event);
+                    break;
+                }
                 default:
                     this.logger.debug(`Ignoring unsupported Stripe event type: ${event.type}`);
             }
@@ -141,6 +201,8 @@ export class BillingService {
             return;
         }
 
+        this.cls.set('tenantId', tenantId);
+
         const billing = await this.createBillingForTenant();
 
         const previousPlan = billing.plan;
@@ -165,6 +227,14 @@ export class BillingService {
                 `Processed checkout.session.completed for tenant ${tenantId}: plan=${planId}, status=Active, customer=${billing.stripeCustomerId}, subscription=${billing.stripeSubscriptionId}`
             );
         }
+
+        const rawSession = session as any;
+        const paymentIntentId =
+            typeof rawSession.payment_intent === 'string'
+                ? rawSession.payment_intent
+                : rawSession.payment_intent?.id;
+
+        billing.stripeTransactionId = paymentIntentId ?? billing.stripeTransactionId ?? null;
 
         await this.billingRepository.save(billing);
 
@@ -193,5 +263,24 @@ export class BillingService {
                 stripeCheckoutSessionId: session.id
             }
         });
+    }
+
+    private async handleInvoicePaymentFailed(event: Stripe.Event): Promise<void> {
+        const invoice = event.data.object as Stripe.Invoice;
+        const invoiceId = invoice.id;
+        const customerId =
+            typeof invoice.customer === 'string'
+                ? invoice.customer
+                : invoice.customer?.id;
+
+        const rawInvoice = invoice as any;
+        const paymentIntentId =
+            typeof rawInvoice.payment_intent === 'string'
+                ? rawInvoice.payment_intent
+                : rawInvoice.payment_intent?.id;
+
+        this.logger.warn(
+            `Processed invoice.payment_failed from Stripe: eventId=${event.id}, invoiceId=${invoiceId}, customerId=${customerId ?? 'unknown'}, paymentIntentId=${paymentIntentId ?? 'unknown'}`
+        );
     }
 }
