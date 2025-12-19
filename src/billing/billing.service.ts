@@ -5,6 +5,7 @@ import { Repository } from 'typeorm';
 import { BillingEntity } from './billing.entity';
 import { BillingPlanEnum, SubscriptionStatusEnum } from '@mod/common/enums/tenant.enum';
 import { SubscriptionCheckoutResponseDto } from './dto/subscription-checkout-response.dto';
+import { SubscriptionStatusDto } from './dto/subscription-status.dto';
 import { StripeService } from './stripe.service';
 import { ClsService } from 'nestjs-cls';
 import type { ClsRequestContext } from '@domains/context/cls-request-context';
@@ -62,6 +63,17 @@ export class BillingService {
             plan,
             checkoutUrl: session.url ?? undefined,
             sessionId: session.id
+        };
+    }
+
+    async getCurrentSubscription(): Promise<SubscriptionStatusDto> {
+        const billing = await this.getOrCreateBillingForCurrentTenant();
+
+        return {
+            plan: billing.plan,
+            subscriptionStatus: billing.status,
+            stripeCustomerId: billing.stripeCustomerId ?? null,
+            stripeSubscriptionId: billing.stripeSubscriptionId ?? null
         };
     }
 
