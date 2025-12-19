@@ -3,7 +3,7 @@ import { OnEvent } from '@nestjs/event-emitter';
 import { SnsPublisher } from '@mod/common/aws-sqs/sns.publisher';
 import { Utils } from '@mod/common/utils/utils';
 import { PublishSnsEventDto, SnsPublishOptionsDto } from '@mod/common/dto/sns-publish.dto';
-import { BillingPlanEnum, SubscriptionStatusEnum } from '@mod/common/enums/tenant.enum';
+import { BillingPlanEnum, SubscriptionStatusEnum } from '@mod/common/enums/billing.enum';
 import { MonitoringService } from '@mod/common/monitoring/monitoring.service';
 
 @Injectable()

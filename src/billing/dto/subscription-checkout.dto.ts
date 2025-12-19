@@ -1,6 +1,6 @@
 import { ApiProperty } from '@nestjs/swagger';
 import { IsEnum } from 'class-validator';
-import { BillingPlanEnum } from '@mod/common/enums/tenant.enum';
+import { BillingPlanEnum } from '@mod/common/enums/billing.enum';
 
 export class SubscriptionCheckoutDto {
     @ApiProperty({

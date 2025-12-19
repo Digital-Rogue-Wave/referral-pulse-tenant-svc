@@ -1,5 +1,5 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { BillingPlanEnum } from '@mod/common/enums/tenant.enum';
+import { BillingPlanEnum, PaymentStatusEnum } from '@mod/common/enums/billing.enum';
 
 export class SubscriptionCheckoutResponseDto {
     @ApiProperty({
@@ -18,4 +18,11 @@ export class SubscriptionCheckoutResponseDto {
         description: 'Stripe Checkout Session identifier, when applicable'
     })
     sessionId?: string;
+
+    @ApiPropertyOptional({
+        enum: PaymentStatusEnum,
+        enumName: 'PaymentStatusEnum',
+        description: 'Current payment status for the initiated subscription checkout'
+    })
+    paymentStatus?: PaymentStatusEnum;
 }

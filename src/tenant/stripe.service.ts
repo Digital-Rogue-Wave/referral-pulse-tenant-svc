@@ -2,7 +2,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import Stripe from 'stripe';
 import { AllConfigType } from '@mod/config/config.type';
-import { BillingPlanEnum } from '@mod/common/enums/tenant.enum';
+import { BillingPlanEnum } from '@mod/common/enums/billing.enum';
 
 @Injectable()
 export class StripeService {
