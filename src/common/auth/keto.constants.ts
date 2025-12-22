@@ -12,7 +12,8 @@ export enum KetoRelation {
     UPDATE_API_KEY = 'update_api_key',
     DELETE_API_KEY = 'delete_api_key',
     LIST_API_KEY = 'list_api_key',
-    MANAGE_BILLING = 'manage_billing'
+    MANAGE_BILLING = 'manage_billing',
+    MANAGE_PLANS = 'manage_plans'
 }
 
 export enum KetoPermission {

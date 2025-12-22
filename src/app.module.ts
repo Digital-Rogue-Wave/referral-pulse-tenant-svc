@@ -32,6 +32,8 @@ import { AutomapperModule } from '@automapper/nestjs';
 import { classes } from '@automapper/classes';
 import { ApiKeyController } from './api-key/api-key.controller';
 import { BillingController } from './billing/billing.controller';
+import { PlanAdminController } from './billing/plan-admin.controller';
+import { PlanPublicController } from './billing/plan-public.controller';
 import { TenantMiddleware } from './common/tenant/tenant.middleware';
 import { TeamMemberModule } from './team-member/team-member.module';
 import { TenantSettingModule } from './tenant-setting/tenant-setting.module';
@@ -79,6 +81,14 @@ export class AppModule implements NestModule {
         consumer.apply(RequestIdMiddleware).forRoutes({ path: '*', method: RequestMethod.ALL });
         consumer
             .apply(TenantMiddleware)
-            .forRoutes(AwareTenantController, ApiKeyController, TeamMemberController, AwareInvitationController, BillingController);
+            .forRoutes(
+                AwareTenantController,
+                ApiKeyController,
+                TeamMemberController,
+                AwareInvitationController,
+                BillingController,
+                PlanAdminController,
+                PlanPublicController
+            );
     }
 }

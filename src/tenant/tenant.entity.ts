@@ -1,5 +1,6 @@
 import EntityHelper from '@mod/common/entities/entity-helper';
 import { TenantStatusEnum, DomainVerificationStatusEnum } from '@mod/common/enums/tenant.enum';
+import { PaymentStatusEnum } from '@mod/common/enums/billing.enum';
 import { FileEntity } from '@mod/files/file.entity';
 import { AutoMap } from '@automapper/classes';
 import { Entity, Column, PrimaryGeneratedColumn, ManyToOne, OneToMany, OneToOne } from 'typeorm';
@@ -34,6 +35,26 @@ export class TenantEntity extends EntityHelper {
     })
     @AutoMap()
     status: TenantStatusEnum;
+
+    @Column({ type: 'timestamp', nullable: true })
+    trialStartedAt?: Date;
+
+    @Column({ type: 'timestamp', nullable: true })
+    trialEndsAt?: Date;
+
+    @Column({
+        type: 'enum',
+        enum: PaymentStatusEnum,
+        enumName: 'payment_status_enum',
+        default: PaymentStatusEnum.PENDING
+    })
+    paymentStatus: PaymentStatusEnum;
+
+    @Column({ type: 'timestamp', nullable: true })
+    suspendedAt?: Date;
+
+    @Column({ type: 'timestamp', nullable: true })
+    lockedAt?: Date;
 
     @OneToOne(() => TenantSettingEntity, (setting) => setting.tenant, {
         cascade: true

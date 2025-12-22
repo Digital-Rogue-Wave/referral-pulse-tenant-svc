@@ -6,11 +6,26 @@ import { BillingController } from './billing.controller';
 import { StripeService } from './stripe.service';
 import { BillingListener } from './listeners/billing.listener';
 import { TenantAwareRepositoryModule } from '@mod/common/tenant/tenant-aware.repository';
+import { PlanEntity } from './plan.entity';
+import { TenantUsageEntity } from './tenant-usage.entity';
+import { BillingEventEntity } from './billing-event.entity';
+import { PlanService } from './plan.service';
+import { PlanAdminController } from './plan-admin.controller';
+import { PlanPublicController } from './plan-public.controller';
+import { PlanSerializationProfile } from './serialization/plan-serialization.profile';
+import { PlanStripeSyncService } from './plan-stripe-sync.service';
 
 @Module({
-    imports: [TenantAwareRepositoryModule.forEntities([BillingEntity])],
-    controllers: [BillingController],
-    providers: [BillingService, StripeService, BillingListener],
-    exports: [BillingService]
+    imports: [
+        TypeOrmModule.forFeature([PlanEntity]),
+        TenantAwareRepositoryModule.forEntities([
+            BillingEntity,
+            TenantUsageEntity,
+            BillingEventEntity
+        ])
+    ],
+    controllers: [BillingController, PlanAdminController, PlanPublicController],
+    providers: [BillingService, StripeService, BillingListener, PlanService, PlanSerializationProfile, PlanStripeSyncService],
+    exports: [BillingService, PlanService]
 })
 export class BillingModule {}
