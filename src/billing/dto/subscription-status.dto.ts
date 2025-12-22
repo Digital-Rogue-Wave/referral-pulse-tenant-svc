@@ -1,5 +1,5 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { BillingPlanEnum, SubscriptionStatusEnum } from '@mod/common/enums/tenant.enum';
+import { BillingPlanEnum, SubscriptionStatusEnum, PaymentStatusEnum } from '@mod/common/enums/billing.enum';
 
 export class SubscriptionStatusDto {
     @ApiProperty({
@@ -17,6 +17,13 @@ export class SubscriptionStatusDto {
     subscriptionStatus: SubscriptionStatusEnum;
 
     @ApiPropertyOptional({
+        enum: PaymentStatusEnum,
+        enumName: 'PaymentStatusEnum',
+        description: 'Derived payment status for the tenant subscription'
+    })
+    paymentStatus?: PaymentStatusEnum;
+
+    @ApiPropertyOptional({
         description: 'Stripe customer identifier associated with this tenant, when applicable'
     })
     stripeCustomerId?: string | null;
@@ -25,4 +32,9 @@ export class SubscriptionStatusDto {
         description: 'Stripe subscription identifier associated with this tenant, when applicable'
     })
     stripeSubscriptionId?: string | null;
+
+    @ApiPropertyOptional({
+        description: 'Stripe transaction (Payment Intent) identifier associated with the latest billing event, when applicable'
+    })
+    stripeTransactionId?: string | null;
 }

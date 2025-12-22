@@ -1,7 +1,8 @@
 import { ApiProperty } from '@nestjs/swagger';
 import { AutoMap } from '@automapper/classes';
 import { EntityHelperDto } from '@mod/common/dto/entity-helper.dto';
-import { BillingPlanEnum, SubscriptionStatusEnum, TenantStatusEnum, DomainVerificationStatusEnum } from '@mod/common/enums/tenant.enum';
+import { TenantStatusEnum, DomainVerificationStatusEnum } from '@mod/common/enums/tenant.enum';
+import { BillingPlanEnum, SubscriptionStatusEnum } from '@mod/common/enums/billing.enum';
 import { FileDto } from '@mod/files/dto/file.dto';
 
 export class TenantDto extends EntityHelperDto {
