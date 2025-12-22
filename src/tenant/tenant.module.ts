@@ -1,4 +1,4 @@
-import { Module } from '@nestjs/common';
+import { Module, forwardRef } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { TenantEntity } from './tenant.entity';
 import { ReservedSubdomainEntity } from './reserved-subdomain.entity';
@@ -18,7 +18,9 @@ import { AgnosticTenantController } from './agnostic/agnostic-tenant.controller'
 import { DnsVerificationService } from './dns/dns-verification.service';
 import { DomainProvisioningService } from './dns/domain-provisioning.service';
 import { SubdomainService } from './dns/subdomain.service';
+
 import { TenantStatsService } from './tenant-stats.service';
+import { TeamMemberModule } from '@mod/team-member/team-member.module';
 
 @Module({
     imports: [
@@ -29,7 +31,8 @@ import { TenantStatsService } from './tenant-stats.service';
         BullModule.registerQueue({
             name: TENANT_DELETION_QUEUE
         }),
-        TenantSettingModule
+        TenantSettingModule,
+        forwardRef(() => TeamMemberModule)
     ],
     controllers: [AwareTenantController, AgnosticTenantController],
     providers: [

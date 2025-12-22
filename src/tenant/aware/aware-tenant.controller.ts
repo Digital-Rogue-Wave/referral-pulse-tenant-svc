@@ -27,6 +27,7 @@ import { KetoGuard, RequirePermission } from '@mod/common/auth/keto.guard';
 import { KetoNamespace, KetoPermission } from '@mod/common/auth/keto.constants';
 import { CurrentUser, CurrentUserType } from '@mod/common/auth/current-user.decorator';
 import { TenantDto } from '../dto/tenant/tenant.dto';
+import { TenantProfileDto } from '../dto/tenant/tenant-profile.dto';
 import { TenantEntity } from '../tenant.entity';
 import { UpdateTenantDto } from '../dto/tenant/update-tenant.dto';
 import { TransferOwnershipDto } from '../dto/transfer-ownership.dto';
@@ -84,12 +85,12 @@ export class AwareTenantController {
         return await this.tenantService.checkSubdomainAvailability(subdomain);
     }
 
-    @ApiOkResponse({ type: TenantDto })
-    @UseInterceptors(MapInterceptor(TenantEntity, TenantDto))
+    @ApiOkResponse({ type: TenantProfileDto })
+    @UseInterceptors(MapInterceptor(TenantEntity, TenantProfileDto))
     @HttpCode(HttpStatus.OK)
     @Get(':id')
     async findOne(@Param('id') id: string): Promise<NullableType<TenantEntity>> {
-        return await this.tenantService.findOne({ id });
+        return await this.tenantService.getProfile(id);
     }
 
     @ApiConsumes('multipart/form-data')
@@ -133,8 +134,7 @@ export class AwareTenantController {
     @RequirePermission({ namespace: KetoNamespace.TENANT, relation: KetoPermission.UPDATE, objectParam: 'id' })
     @HttpCode(HttpStatus.OK)
     @Post(':id/custom-domain/verify')
-    async verifyCustomDomain(@Param('id') id: string): Promise<TenantDto> {
-        // @ts-ignore
+    async verifyCustomDomain(@Param('id') id: string): Promise<TenantEntity> {
         return await this.tenantService.verifyCustomDomain(id);
     }
 

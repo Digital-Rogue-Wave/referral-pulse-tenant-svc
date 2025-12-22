@@ -13,6 +13,7 @@ import { DnsVerificationService } from './dns/dns-verification.service';
 import { SubdomainService } from './dns/subdomain.service';
 
 import { TenantAwareRepository } from '@mod/common/tenant/tenant-aware.repository';
+import Stubber from '@mod/common/mock/typeorm-faker';
 
 describe('AwareTenantService - Deletion', () => {
     let service: AwareTenantService;
@@ -21,14 +22,14 @@ describe('AwareTenantService - Deletion', () => {
     let kratosService: DeepMocked<KratosService>;
     let eventEmitter: DeepMocked<EventEmitter2>;
 
-    const mockTenant: TenantEntity = {
+    const mockTenant = Stubber.stubOne(TenantEntity, {
         id: 'tenant-123',
         name: 'Test Tenant',
         slug: 'test-tenant',
         status: TenantStatusEnum.ACTIVE,
         deletionScheduledAt: undefined,
         deletionReason: undefined
-    } as any;
+    });
 
     beforeEach(async () => {
         tenantRepository = createMock<TenantAwareRepository<TenantEntity>>();

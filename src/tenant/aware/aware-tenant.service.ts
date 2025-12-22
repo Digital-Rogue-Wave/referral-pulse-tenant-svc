@@ -12,6 +12,8 @@ import { ScheduleDeletionDto } from '../dto/schedule-deletion.dto';
 import { CancelDeletionDto } from '../dto/cancel-deletion.dto';
 import { DnsVerificationService } from '../dns/dns-verification.service';
 import { SubdomainService } from '../dns/subdomain.service';
+import { ApiKeyStatusEnum } from '@mod/common/enums/api-key.enum';
+import { InvitationStatusEnum } from '@mod/common/enums/invitation.enum';
 import { randomStringGenerator } from '@nestjs/common/utils/random-string-generator.util';
 import { CurrentUserType } from '@mod/common/auth/current-user.decorator';
 
@@ -35,8 +37,44 @@ export class AwareTenantService {
         return this.tenantRepository.findOneTenantContext(field, relations);
     }
 
+    async getTenantProfileStatistics(tenantId: string) {
+        const query = this.tenantRepository.manager
+            .createQueryBuilder()
+            .select((subQuery) => {
+                return subQuery.select('count(*)', 'count').from('team_members', 'tm').where('tm.tenantId = :tenantId', { tenantId });
+            }, 'memberCount')
+            .addSelect((subQuery) => {
+                return subQuery
+                    .select('count(*)', 'count')
+                    .from('invitations', 'i')
+                    .where('i.tenantId = :tenantId', { tenantId })
+                    .andWhere('i.status = :invStatus', { invStatus: InvitationStatusEnum.PENDING });
+            }, 'pendingInvitationCount')
+            .addSelect((subQuery) => {
+                return subQuery
+                    .select('count(*)', 'count')
+                    .from('api_keys', 'ak')
+                    .where('ak.tenantId = :tenantId', { tenantId })
+                    .andWhere('ak.status = :akStatus', { akStatus: ApiKeyStatusEnum.ACTIVE });
+            }, 'activeApiKeyCount');
+
+        const result = await query.getRawOne();
+        return {
+            memberCount: parseInt(result.memberCount || '0', 10),
+            pendingInvitationCount: parseInt(result.pendingInvitationCount || '0', 10),
+            activeApiKeyCount: parseInt(result.activeApiKeyCount || '0', 10)
+        };
+    }
+
     async findOneOrFail(field: FindOptionsWhere<TenantEntity>): Promise<TenantEntity> {
         return this.tenantRepository.findOneOrFailTenantContext(field);
+    }
+
+    async getProfile(id: string): Promise<TenantEntity & { memberCount: number; pendingInvitationCount: number; activeApiKeyCount: number }> {
+        const tenant = await this.findOneOrFail({ id });
+        const stats = await this.getTenantProfileStatistics(id);
+
+        return Object.assign(tenant, stats);
     }
 
     async update(

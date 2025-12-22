@@ -26,6 +26,10 @@ export class TeamMemberService {
         return await this.teamMemberRepository.paginateTenantContext(query, this.teamMemberRepository, tenantMemberPaginationConfig);
     }
 
+    async countMembers(): Promise<number> {
+        return await this.teamMemberRepository.getTotalTenantContext();
+    }
+
     async findOne(
         field: FindOptionsWhere<TeamMemberEntity>,
         relations?: FindOptionsRelations<TeamMemberEntity>
