@@ -1,4 +1,4 @@
-import { Module } from '@nestjs/common';
+import { Module, forwardRef } from '@nestjs/common';
 import { TeamMemberEntity } from './team-member.entity';
 import { TeamMemberController } from './team-member.controller';
 import { TeamMemberService } from './team-member.service';
@@ -14,7 +14,7 @@ import { TenantAwareRepositoryModule } from '@mod/common/tenant/tenant-aware.rep
     imports: [
         TenantAwareRepositoryModule.forEntities([TeamMemberEntity]),
         FilesModule,
-        TenantModule,
+        forwardRef(() => TenantModule),
         BullModule.registerQueue({
             name: TENANT_DELETION_QUEUE
         })

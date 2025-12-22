@@ -5,6 +5,8 @@ import { CreateTenantSettingDto } from '../dto/create-tenant-setting.dto';
 import { UpdateTenantSettingDto } from '../dto/update-tenant-setting.dto';
 import { NullableType } from '@mod/types/nullable.type';
 import { InjectTenantAwareRepository, TenantAwareRepository } from '@mod/common/tenant/tenant-aware.repository';
+import { Paginated, PaginateQuery } from 'nestjs-paginate';
+import { tenantSettingPaginationConfig } from '@mod/tenant-setting/config/tenant-setting-pagination-config';
 
 @Injectable()
 export class AwareTenantSettingService {
@@ -17,8 +19,8 @@ export class AwareTenantSettingService {
         return this.repository.saveTenantContext(this.repository.createTenantContext(createDto));
     }
 
-    async findAll(): Promise<TenantSettingEntity[]> {
-        return this.repository.findTenantContext();
+    async findAll(query: PaginateQuery): Promise<Paginated<TenantSettingEntity>> {
+        return await this.repository.paginateTenantContext(query, this.repository, tenantSettingPaginationConfig);
     }
 
     async findOne(

@@ -16,6 +16,7 @@ import { DeleteResult } from 'typeorm';
 
 @ApiTags('Team Members')
 @ApiBearerAuth()
+@UseGuards(JwtAuthGuard, KetoGuard)
 @Controller({ path: 'tenant-members', version: '1' })
 export class TeamMemberController {
     constructor(
@@ -24,10 +25,8 @@ export class TeamMemberController {
     ) {}
 
     @ApiPaginationQuery(tenantMemberPaginationConfig)
-    @ApiOkResponse({ type: TeamMemberDto, description: 'List of team members' })
-    @UseGuards(JwtAuthGuard, KetoGuard)
+    @ApiOkResponse({ type: PaginatedDto<TeamMemberEntity, TeamMemberDto>, description: 'List of team members' })
     @RequirePermission({ namespace: KetoNamespace.TENANT, relation: KetoPermission.VIEW, objectParam: 'id' })
-    @UseInterceptors(MapInterceptor(TeamMemberEntity, TeamMemberDto, { isArray: true }))
     @HttpCode(HttpStatus.OK)
     @Get()
     async listMembers(@Paginate() query: PaginateQuery): Promise<PaginatedDto<TeamMemberEntity, TeamMemberDto>> {
@@ -36,7 +35,6 @@ export class TeamMemberController {
     }
 
     @ApiOkResponse({ type: TeamMemberDto, description: 'Team member role updated' })
-    @UseGuards(JwtAuthGuard, KetoGuard)
     @RequirePermission({ namespace: KetoNamespace.TENANT, relation: KetoPermission.UPDATE, objectParam: 'tenantId' })
     @UseInterceptors(MapInterceptor(TeamMemberEntity, TeamMemberDto))
     @HttpCode(HttpStatus.OK)
@@ -46,7 +44,6 @@ export class TeamMemberController {
     }
 
     @ApiOkResponse({ description: 'Team member removed' })
-    @UseGuards(JwtAuthGuard, KetoGuard)
     @RequirePermission({ namespace: KetoNamespace.TENANT, relation: KetoPermission.UPDATE, objectParam: 'tenantId' })
     @HttpCode(HttpStatus.OK)
     @Delete(':id')

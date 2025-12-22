@@ -10,7 +10,7 @@ export type CurrentUserType = {
 
 export function getCurrentUser(request: { user: JwtPayload }): CurrentUserType {
     const user = request.user;
-    console.log('JwtPayload', user);
+
     return {
         id: user.sub,
         email: user.email,
