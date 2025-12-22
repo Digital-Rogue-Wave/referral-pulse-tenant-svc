@@ -49,7 +49,6 @@ export class TenantListener {
         // 1. Audit Log
         await this.auditService.log({
             tenantId: tenant.id,
-            // @ts-ignore
             userId: 'system',
             action: AuditAction.DOMAIN_VERIFIED,
             description: `Domain ${tenant.customDomain} verified`,
@@ -89,19 +88,15 @@ export class TenantListener {
         await this.auditService.log(auditLogDto);
 
         // 2. Publish SNS Event
-        const tenantData = { ...tenant };
-        if (tenantData.setting) {
-            tenantData.setting = { ...tenantData.setting } as any;
-            delete (tenantData.setting as any).tenant;
-        }
-
         const snsEventDto = await Utils.validateDtoOrFail(PublishSnsEventDto, {
             eventId: tenant.id,
             eventType: 'tenant.created',
             data: {
-                ...tenantData,
-                ownerId: ownerId
-            } as any,
+                name: tenant.name,
+                slug: tenant.slug,
+                customDomain: tenant.customDomain,
+                ownerId
+            },
             timestamp: new Date().toISOString()
         });
         const snsOptionsDto = await Utils.validateDtoOrFail(SnsPublishOptionsDto, {
@@ -110,7 +105,7 @@ export class TenantListener {
             deduplicationId: tenant.id
         });
 
-        await this.sns.publish(snsEventDto as any, snsOptionsDto);
+        await this.sns.publish(snsEventDto, snsOptionsDto);
     }
 
     @OnEvent('tenant.updated')
@@ -136,28 +131,27 @@ export class TenantListener {
         });
 
         // 2. Publish SNS Event
-        const tenantData = { ...tenant };
-        if (tenantData.setting) {
-            tenantData.setting = { ...tenantData.setting } as any;
-            delete (tenantData.setting as any).tenant;
-        }
-
-        await this.sns.publish(
-            {
+        const snsEventDto = {
+            eventId: tenant.id,
+            eventType: 'tenant.created',
+            data: {
                 eventId: tenant.id,
                 eventType: 'tenant.updated',
                 data: {
-                    ...tenantData,
+                    name: tenant.name,
+                    slug: tenant.slug,
+                    customDomain: tenant.customDomain,
                     changes: changes
-                } as unknown as any,
+                },
                 timestamp: new Date().toISOString()
-            },
-            {
-                topic: 'tenant-events',
-                groupId: tenant.id,
-                deduplicationId: `${tenant.id}-${Date.now()}`
             }
-        );
+        };
+        const snsOptionsDto = {
+            topic: 'tenant-events',
+            groupId: tenant.id,
+            deduplicationId: `${tenant.id}-${Date.now()}`
+        };
+        await this.sns.publish(snsEventDto, snsOptionsDto);
     }
 
     @OnEvent('tenant.deletion.scheduled')
@@ -179,8 +173,10 @@ export class TenantListener {
         });
 
         // 2. Publish SNS Event
-        await this.sns.publish(
-            {
+        const snsEventDto = {
+            eventId: tenant.id,
+            eventType: 'tenant.created',
+            data: {
                 eventId: tenant.id,
                 eventType: 'tenant.deletion.scheduled',
                 data: {
@@ -189,15 +185,16 @@ export class TenantListener {
                     scheduledAt: scheduledAt.toISOString(),
                     executionDate: executionDate.toISOString(),
                     reason
-                } as unknown as any,
+                },
                 timestamp: new Date().toISOString()
-            },
-            {
-                topic: 'tenant-events',
-                groupId: tenant.id,
-                deduplicationId: `${tenant.id}-deletion-scheduled-${Date.now()}`
             }
-        );
+        };
+        const snsOptionsDto = {
+            topic: 'tenant-events',
+            groupId: tenant.id,
+            deduplicationId: `${tenant.id}-deletion-scheduled-${Date.now()}`
+        };
+        await this.sns.publish(snsEventDto, snsOptionsDto);
 
         // 3. Schedule Background Job
         const delay = executionDate.getTime() - Date.now();
@@ -233,22 +230,21 @@ export class TenantListener {
         });
 
         // 2. Publish SNS Event
-        await this.sns.publish(
-            {
-                eventId: tenant.id,
-                eventType: 'tenant.deletion.cancelled',
-                data: {
-                    tenantId: tenant.id,
-                    tenantName: tenant.name
-                } as unknown as any,
-                timestamp: new Date().toISOString()
+        const snsEventDto = {
+            eventId: tenant.id,
+            eventType: 'tenant.deletion.cancelled',
+            data: {
+                tenantId: tenant.id,
+                tenantName: tenant.name
             },
-            {
-                topic: 'tenant-events',
-                groupId: tenant.id,
-                deduplicationId: `${tenant.id}-deletion-cancelled-${Date.now()}`
-            }
-        );
+            timestamp: new Date().toISOString()
+        };
+        const snsOptionsDto = {
+            topic: 'tenant-events',
+            groupId: tenant.id,
+            deduplicationId: `${tenant.id}-deletion-cancelled-${Date.now()}`
+        };
+        await this.sns.publish(snsEventDto, snsOptionsDto);
 
         // 3. Cancel Background Job
         const job = await this.deletionQueue.getJob(`deletion-${tenant.id}`);
@@ -273,24 +269,23 @@ export class TenantListener {
         });
 
         // 2. Publish SNS Event
-        await this.sns.publish(
-            {
-                eventId: tenant.id,
-                eventType: 'tenant.deleted',
-                data: {
-                    tenantId: tenant.id,
-                    tenantName: tenant.name,
-                    tenantSlug: tenant.slug,
-                    deletedAt: deletedAt.toISOString()
-                } as unknown as any,
-                timestamp: new Date().toISOString()
+        const snsEventDto = {
+            eventId: tenant.id,
+            eventType: 'tenant.deleted',
+            data: {
+                tenantId: tenant.id,
+                tenantName: tenant.name,
+                tenantSlug: tenant.slug,
+                deletedAt: deletedAt.toISOString()
             },
-            {
-                topic: 'tenant-events',
-                groupId: tenant.id,
-                deduplicationId: `${tenant.id}-deleted-${Date.now()}`
-            }
-        );
+            timestamp: new Date().toISOString()
+        };
+        const snsOptionsDto = {
+            topic: 'tenant-events',
+            groupId: tenant.id,
+            deduplicationId: `${tenant.id}-deleted-${Date.now()}`
+        };
+        await this.sns.publish(snsEventDto, snsOptionsDto);
 
         // 3. Cleanup Tasks
         // 3a. Remove all Keto relations for this tenant

@@ -19,6 +19,7 @@ import { TenantSerializationProfile } from '../serialization/tenant-serializatio
 import { Repository } from 'typeorm';
 
 import { createMock, DeepMocked } from '@golevelup/ts-jest';
+import Stubber from '@mod/common/mock/typeorm-faker';
 
 describe('Tenant Registration Integration', () => {
     let app: INestApplication;
@@ -38,11 +39,7 @@ describe('Tenant Registration Integration', () => {
         eventEmitter = createMock<EventEmitter2>();
 
         // Setup some default behaviors for the mocks
-        tenantRepository.create.mockImplementation((dto: any) => {
-            const tenant = new TenantEntity();
-            Object.assign(tenant, dto);
-            return tenant;
-        });
+        tenantRepository.create.mockImplementation((dto: any) => Stubber.stubOne(TenantEntity, dto));
         tenantRepository.save.mockImplementation((entity: any) => {
             if (!entity.id) entity.id = 'new-id';
             return Promise.resolve(entity);

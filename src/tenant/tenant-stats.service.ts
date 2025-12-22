@@ -5,6 +5,7 @@ import { RedisService } from '@mod/common/aws-redis/redis.service';
 import { RedisKeyBuilder } from '@mod/common/aws-redis/redis-key.builder';
 import { TenantStatsDto } from './dto/stats/tenant-stats.dto';
 import servicesConfig from '@mod/config/services.config';
+import { TeamMemberService } from '@mod/team-member/team-member.service';
 
 @Injectable()
 export class TenantStatsService {
@@ -17,7 +18,8 @@ export class TenantStatsService {
         private readonly configService: ConfigService,
         private readonly httpClient: HttpClient,
         private readonly redisService: RedisService,
-        private readonly keyBuilder: RedisKeyBuilder
+        private readonly keyBuilder: RedisKeyBuilder,
+        private readonly teamMemberService: TeamMemberService
     ) {
         const srvCfg = this.configService.getOrThrow<ConfigType<typeof servicesConfig>>('servicesConfig', { infer: true });
         this.campaignServiceUrl = srvCfg.campaigns;
@@ -61,8 +63,11 @@ export class TenantStatsService {
         if (results[3].status === 'fulfilled') stats.totalRevenue = results[3].value.data?.amount || 0;
         if (results[4].status === 'fulfilled') stats.pendingPayouts = results[4].value.data?.amount || 0;
 
-        // For plan usage, we could call billing service or use a placeholder for now
-        stats.planUsagePercentage = 0; // Default or fetched from billing
+        // For plan usage, calculate members usage
+        // Note: Assuming a hardcoded limit of 10 members for now, or fetch from plan definitions if available
+        const memberCount = await this.teamMemberService.countMembers();
+        const MEMBER_LIMIT = 10;
+        stats.planUsagePercentage = Math.min((memberCount / MEMBER_LIMIT) * 100, 100);
 
         // 3. Cache results (5 minutes = 300 seconds)
         await this.redisService.setJson(cacheKey, stats as any, 300);

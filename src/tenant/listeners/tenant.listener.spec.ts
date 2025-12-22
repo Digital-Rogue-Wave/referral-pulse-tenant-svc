@@ -12,6 +12,7 @@ import { Queue } from 'bullmq';
 import { HttpClient } from '@mod/common/http/http.client';
 import { ConfigService } from '@nestjs/config';
 import { DomainProvisioningService } from '../dns/domain-provisioning.service';
+import Stubber from '@mod/common/mock/typeorm-faker';
 
 describe('TenantListener', () => {
     let listener: TenantListener;
@@ -23,11 +24,11 @@ describe('TenantListener', () => {
     let configService: DeepMocked<ConfigService>;
     let domainProvisioningService: DeepMocked<DomainProvisioningService>;
 
-    const mockTenant = {
+    const mockTenant = Stubber.stubOne(TenantEntity, {
         id: 'tenant-123',
         name: 'Test Tenant',
         slug: 'test-tenant'
-    } as TenantEntity;
+    });
 
     beforeEach(async () => {
         queue = createMock<Queue>();

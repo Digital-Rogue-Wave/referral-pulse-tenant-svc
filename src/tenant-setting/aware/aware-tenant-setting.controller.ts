@@ -8,6 +8,12 @@ import { NullableType } from '@mod/types/nullable.type';
 import { KetoNamespace, KetoPermission } from '@mod/common/auth/keto.constants';
 import { RequirePermission } from '@mod/common/auth/keto.guard';
 import { JwtAuthGuard } from '@mod/common/auth/jwt-auth.guard';
+import { ApiPaginationQuery, Paginate, PaginateQuery } from 'nestjs-paginate';
+import { tenantSettingPaginationConfig } from '../config/tenant-setting-pagination-config';
+import { PaginatedDto } from '@mod/common/serialization/paginated.dto';
+import { TenantSettingDto } from '@mod/tenant-setting/dto/tenant-setting.dto';
+import { InjectMapper } from '@automapper/nestjs';
+import { Mapper } from '@automapper/core';
 
 @ApiTags('Tenant Settings')
 @ApiHeader({
@@ -20,7 +26,10 @@ import { JwtAuthGuard } from '@mod/common/auth/jwt-auth.guard';
 @UseGuards(JwtAuthGuard)
 @Controller({ path: 'tenant-settings', version: '1' })
 export class AwareTenantSettingController {
-    constructor(private readonly tenantSettingService: AwareTenantSettingService) {}
+    constructor(
+        private readonly tenantSettingService: AwareTenantSettingService,
+        @InjectMapper() private readonly mapper: Mapper
+    ) {}
 
     @Post()
     @ApiBody({ type: CreateTenantSettingDto })
@@ -31,10 +40,12 @@ export class AwareTenantSettingController {
     }
 
     @Get()
-    @ApiOkResponse({ description: 'List of tenant settings', type: TenantSettingEntity, isArray: true })
+    @ApiPaginationQuery(tenantSettingPaginationConfig)
+    @ApiOkResponse({ description: 'List of tenant settings', type: PaginatedDto<TenantSettingEntity, TenantSettingDto>, isArray: true })
     @HttpCode(HttpStatus.OK)
-    async findAll(): Promise<TenantSettingEntity[]> {
-        return await this.tenantSettingService.findAll();
+    async list(@Paginate() query: PaginateQuery): Promise<PaginatedDto<TenantSettingEntity, TenantSettingDto>> {
+        const settings = await this.tenantSettingService.findAll(query);
+        return new PaginatedDto<TenantSettingEntity, TenantSettingDto>(this.mapper, settings, TenantSettingEntity, TenantSettingDto);
     }
 
     @Get(':id')
