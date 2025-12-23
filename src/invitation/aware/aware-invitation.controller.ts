@@ -59,4 +59,13 @@ export class AwareInvitationController {
     async revoke(@Param('id') invitationId: string): Promise<void> {
         return this.invitationService.revoke(invitationId);
     }
+
+    @ApiOkResponse({ type: InvitationDto, description: 'The invitation has been successfully resent' })
+    @RequirePermission({ namespace: KetoNamespace.TENANT, relation: KetoPermission.INVITE })
+    @UseInterceptors(MapInterceptor(InvitationEntity, InvitationDto))
+    @HttpCode(HttpStatus.OK)
+    @Post(':id/resend')
+    async resend(@Param('id') invitationId: string): Promise<InvitationEntity> {
+        return this.invitationService.resend(invitationId);
+    }
 }

@@ -72,8 +72,8 @@ describe('AwareTenantService', () => {
         it('should update basic tenant details', async () => {
             tenantRepository.findOneOrFailTenantContext
                 .mockResolvedValueOnce(mockTenant)
-                .mockResolvedValueOnce({ ...mockTenant, name: 'Updated Name' } as any);
-            tenantRepository.save.mockResolvedValue({ ...mockTenant, name: 'Updated Name' } as any);
+                .mockResolvedValueOnce(Stubber.stubOne(TenantEntity, { ...mockTenant, name: 'Updated Name' }));
+            tenantRepository.save.mockResolvedValue(Stubber.stubOne(TenantEntity, { ...mockTenant, name: 'Updated Name' }) as any);
 
             const result = await service.update('tenant-123', { name: 'Updated Name' }, mockUser);
 
@@ -143,7 +143,7 @@ describe('AwareTenantService', () => {
         it('should emit tenant.updated event with correct payload', async () => {
             tenantRepository.findOneOrFailTenantContext
                 .mockResolvedValueOnce(mockTenant)
-                .mockResolvedValueOnce({ ...mockTenant, name: 'Updated' } as any);
+                .mockResolvedValueOnce(Stubber.stubOne(TenantEntity, { ...mockTenant, name: 'Updated' }));
             tenantRepository.save.mockImplementation((entity) => entity as any);
 
             await service.update('tenant-123', { name: 'Updated' }, mockUser, undefined, '127.0.0.1');
@@ -161,15 +161,17 @@ describe('AwareTenantService', () => {
 
     describe('verifyCustomDomain', () => {
         it('should verify domain successfully', async () => {
-            const tenantWithDomain = {
+            const tenantWithDomain = Stubber.stubOne(TenantEntity, {
                 ...mockTenant,
                 customDomain: 'verified.com',
                 domainVerificationToken: 'token-123'
-            } as TenantEntity;
+            });
 
             tenantRepository.findOneOrFailTenantContext.mockResolvedValue(tenantWithDomain);
             dnsVerificationService.verifyTxtRecord.mockResolvedValue(true);
-            tenantRepository.save.mockResolvedValue({ ...tenantWithDomain, domainVerificationStatus: DomainVerificationStatusEnum.VERIFIED } as any);
+            tenantRepository.save.mockResolvedValue(
+                Stubber.stubOne(TenantEntity, { ...tenantWithDomain, domainVerificationStatus: DomainVerificationStatusEnum.VERIFIED }) as any
+            );
 
             const result = await service.verifyCustomDomain('tenant-123');
 
@@ -178,11 +180,11 @@ describe('AwareTenantService', () => {
         });
 
         it('should throw error if verification fails', async () => {
-            const tenantWithDomain = {
+            const tenantWithDomain = Stubber.stubOne(TenantEntity, {
                 ...mockTenant,
                 customDomain: 'failed.com',
                 domainVerificationToken: 'token-123'
-            } as TenantEntity;
+            });
 
             tenantRepository.findOneOrFailTenantContext.mockResolvedValue(tenantWithDomain);
             dnsVerificationService.verifyTxtRecord.mockResolvedValue(false);

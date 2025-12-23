@@ -1,11 +1,12 @@
-import { Entity, Column, PrimaryGeneratedColumn, CreateDateColumn, Index } from 'typeorm';
+import { Entity, Column, PrimaryGeneratedColumn, Index } from 'typeorm';
 import { AuditAction } from './audit-action.enum';
+import EntityHelper from '../entities/entity-helper';
 
 @Entity({ name: 'audit_logs' })
 @Index(['tenantId', 'createdAt'])
 @Index(['userId', 'createdAt'])
 @Index(['action', 'createdAt'])
-export class AuditLog {
+export class AuditLogEntity extends EntityHelper {
     @PrimaryGeneratedColumn('uuid')
     id: string;
 
@@ -35,7 +36,4 @@ export class AuditLog {
 
     @Column({ name: 'user_agent', nullable: true })
     userAgent: string;
-
-    @CreateDateColumn({ name: 'created_at' })
-    createdAt: Date;
 }

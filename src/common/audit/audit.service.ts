@@ -1,8 +1,10 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
-import { AuditLog } from './audit-log.entity';
+import { AuditLogEntity } from './audit-log.entity';
 import { AuditAction } from './audit-action.enum';
+import { paginate, Paginated, PaginateQuery } from 'nestjs-paginate';
+import { auditLogPaginationConfig } from './config/audit-log-pagination.config';
 
 export interface CreateAuditLogDto {
     tenantId: string;
@@ -18,14 +20,14 @@ export interface CreateAuditLogDto {
 @Injectable()
 export class AuditService {
     constructor(
-        @InjectRepository(AuditLog)
-        private readonly auditLogRepository: Repository<AuditLog>
+        @InjectRepository(AuditLogEntity)
+        private readonly auditLogRepository: Repository<AuditLogEntity>
     ) {}
 
     /**
      * Create an audit log entry
      */
-    async log(data: CreateAuditLogDto): Promise<AuditLog> {
+    async log(data: CreateAuditLogDto): Promise<AuditLogEntity> {
         const auditLog = this.auditLogRepository.create(data);
         return await this.auditLogRepository.save(auditLog);
     }
@@ -33,48 +35,9 @@ export class AuditService {
     /**
      * Get audit logs for a tenant with pagination and filtering
      */
-    async findByTenant(
-        tenantId: string,
-        options?: {
-            action?: AuditAction;
-            userId?: string;
-            startDate?: Date;
-            endDate?: Date;
-            limit?: number;
-            offset?: number;
-        }
-    ): Promise<{ logs: AuditLog[]; total: number }> {
-        const query = this.auditLogRepository.createQueryBuilder('audit_log').where('audit_log.tenant_id = :tenantId', { tenantId });
-
-        if (options?.action) {
-            query.andWhere('audit_log.action = :action', { action: options.action });
-        }
-
-        if (options?.userId) {
-            query.andWhere('audit_log.user_id = :userId', { userId: options.userId });
-        }
-
-        if (options?.startDate) {
-            query.andWhere('audit_log.created_at >= :startDate', { startDate: options.startDate });
-        }
-
-        if (options?.endDate) {
-            query.andWhere('audit_log.created_at <= :endDate', { endDate: options.endDate });
-        }
-
-        query.orderBy('audit_log.created_at', 'DESC');
-
-        if (options?.limit) {
-            query.limit(options.limit);
-        }
-
-        if (options?.offset) {
-            query.offset(options.offset);
-        }
-
-        const [logs, total] = await query.getManyAndCount();
-
-        return { logs, total };
+    async findAll(tenantId: string, query: PaginateQuery): Promise<Paginated<AuditLogEntity>> {
+        const queryBuilder = this.auditLogRepository.createQueryBuilder('audit_log').where('audit_log.tenantId = :tenantId', { tenantId });
+        return await paginate<AuditLogEntity>(query, queryBuilder, auditLogPaginationConfig);
     }
 
     /**
@@ -84,5 +47,31 @@ export class AuditService {
         const result = await this.auditLogRepository.createQueryBuilder().delete().where('created_at < :date', { date }).execute();
 
         return result.affected || 0;
+    }
+
+    /**
+     * Export all audit logs for a tenant as CSV
+     */
+    async exportCsv(tenantId: string): Promise<string> {
+        const logs = await this.auditLogRepository.find({
+            where: { tenantId },
+            order: { createdAt: 'DESC' }
+        });
+
+        const header = ['ID', 'Action', 'User ID', 'User Email', 'Metadata', 'IP Address', 'User Agent', 'Created At'].join(',');
+        const rows = logs.map((log) => {
+            return [
+                log.id,
+                log.action,
+                log.userId || '',
+                log.userEmail || '',
+                `"${JSON.stringify(log.metadata || {}).replace(/"/g, '""')}"`,
+                log.ipAddress || '',
+                `"${(log.userAgent || '').replace(/"/g, '""')}"`,
+                log.createdAt.toISOString()
+            ].join(',');
+        });
+
+        return [header, ...rows].join('\n');
     }
 }

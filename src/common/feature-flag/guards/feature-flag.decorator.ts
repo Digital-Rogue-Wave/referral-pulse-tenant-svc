@@ -1,3 +1,4 @@
 import { SetMetadata } from '@nestjs/common';
 
-export const FeatureFlag = (key: string) => SetMetadata('feature_flag_key', key);
+export const FEATURE_FLAG_KEY = 'feature_flag_key';
+export const RequireFeature = (key: string) => SetMetadata(FEATURE_FLAG_KEY, key);

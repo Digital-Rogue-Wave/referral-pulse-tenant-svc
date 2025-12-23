@@ -15,12 +15,15 @@ import { AgnosticTenantService } from './agnostic/agnostic-tenant.service';
 import { AwareTenantService } from './aware/aware-tenant.service';
 import { AwareTenantController } from './aware/aware-tenant.controller';
 import { AgnosticTenantController } from './agnostic/agnostic-tenant.controller';
+import { AdminTenantController } from './agnostic/admin-tenant.controller';
 import { DnsVerificationService } from './dns/dns-verification.service';
 import { DomainProvisioningService } from './dns/domain-provisioning.service';
 import { SubdomainService } from './dns/subdomain.service';
 
 import { TenantStatsService } from './tenant-stats.service';
 import { TeamMemberModule } from '@mod/team-member/team-member.module';
+
+import { TenantStatusGuard } from './guards/tenant-status.guard';
 
 @Module({
     imports: [
@@ -34,7 +37,7 @@ import { TeamMemberModule } from '@mod/team-member/team-member.module';
         TenantSettingModule,
         forwardRef(() => TeamMemberModule)
     ],
-    controllers: [AwareTenantController, AgnosticTenantController],
+    controllers: [AwareTenantController, AgnosticTenantController, AdminTenantController],
     providers: [
         AwareTenantService,
         AgnosticTenantService,
@@ -44,8 +47,9 @@ import { TeamMemberModule } from '@mod/team-member/team-member.module';
         DnsVerificationService,
         DomainProvisioningService,
         SubdomainService,
-        TenantStatsService
+        TenantStatsService,
+        TenantStatusGuard
     ],
-    exports: [AwareTenantService, AgnosticTenantService, SubdomainService, TenantStatsService]
+    exports: [AwareTenantService, AgnosticTenantService, SubdomainService, TenantStatsService, TenantStatusGuard]
 })
 export class TenantModule {}

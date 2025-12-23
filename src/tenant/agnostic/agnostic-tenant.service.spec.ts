@@ -14,6 +14,7 @@ import { HttpException, HttpStatus } from '@nestjs/common';
 import Stubber from '@mod/common/mock/typeorm-faker';
 import { createMock, DeepMocked } from '@golevelup/ts-jest';
 import { TenantSettingEntity } from '@mod/tenant-setting/tenant-setting.entity';
+import { TenantStatusEnum } from '@mod/common/enums/tenant.enum';
 
 describe('AgnosticTenantService', () => {
     let service: AgnosticTenantService;
@@ -136,6 +137,42 @@ describe('AgnosticTenantService', () => {
 
             expect(filesService.uploadFile).toHaveBeenCalledWith(file);
             expect(tenantStub.image).toMatchObject({ path: 'image-url' });
+        });
+    });
+
+    describe('suspend', () => {
+        it('should suspend a tenant successfully', async () => {
+            const tenant = Stubber.stubOne(TenantEntity, { id: 'tenant-1', status: TenantStatusEnum.ACTIVE });
+            tenantRepository.findOne.mockResolvedValue(tenant);
+            tenantRepository.save.mockResolvedValue(Stubber.stubOne(TenantEntity, { ...tenant, status: TenantStatusEnum.SUSPENDED }));
+
+            const result = await service.suspend('tenant-1', 'test reason');
+
+            expect(result.status).toBe(TenantStatusEnum.SUSPENDED);
+            expect(eventEmitter.emit).toHaveBeenCalledWith('tenant.suspended', {
+                tenantId: 'tenant-1',
+                reason: 'test reason'
+            });
+        });
+
+        it('should throw if tenant not found', async () => {
+            tenantRepository.findOne.mockResolvedValue(null);
+            await expect(service.suspend('non-existent')).rejects.toThrow(HttpException);
+        });
+    });
+
+    describe('unsuspend', () => {
+        it('should unsuspend a tenant successfully', async () => {
+            const tenant = Stubber.stubOne(TenantEntity, { id: 'tenant-1', status: TenantStatusEnum.SUSPENDED });
+            tenantRepository.findOne.mockResolvedValue(tenant);
+            tenantRepository.save.mockResolvedValue(Stubber.stubOne(TenantEntity, { ...tenant, status: TenantStatusEnum.ACTIVE }));
+
+            const result = await service.unsuspend('tenant-1');
+
+            expect(result.status).toBe(TenantStatusEnum.ACTIVE);
+            expect(eventEmitter.emit).toHaveBeenCalledWith('tenant.unsuspended', {
+                tenantId: 'tenant-1'
+            });
         });
     });
 });

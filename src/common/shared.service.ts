@@ -33,6 +33,13 @@ export class SharedService {
     }
 
     /**
+     * Compare a raw API key with a hashed one
+     */
+    async compareApiKeys(rawKey: string, hashedKey: string): Promise<boolean> {
+        return await bcrypt.compare(rawKey, hashedKey);
+    }
+
+    /**
      * Extract the prefix from an API key for identification
      */
     extractApiKeyPrefix(rawKey: string): string {

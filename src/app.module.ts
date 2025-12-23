@@ -13,7 +13,7 @@ import { allConfigs } from '@mod/config';
 import { ClsModule } from 'nestjs-cls';
 import { TerminusModule } from '@nestjs/terminus';
 import { HttpMetricsInterceptor } from '@mod/common/monitoring/http-metrics.interceptor';
-import { APP_INTERCEPTOR } from '@nestjs/core';
+import { APP_GUARD, APP_INTERCEPTOR } from '@nestjs/core';
 import { TracingEnrichmentInterceptor } from '@mod/common/tracing/tracing.interceptor';
 import { CommonModule } from '@mod/common/common.module';
 import { TransactionalOrmModule } from '@mod/database/transactional-orm.module';
@@ -40,6 +40,8 @@ import { TenantSettingModule } from './tenant-setting/tenant-setting.module';
 import { AwareInvitationController } from './invitation/aware/aware-invitation.controller';
 import { TeamMemberController } from './team-member/team-member.controller';
 import { AwareTenantController } from './tenant/aware/aware-tenant.controller';
+import { ApiKeyMiddleware } from './api-key/middleware/api-key.middleware';
+import { TenantStatusGuard } from './tenant/guards/tenant-status.guard';
 
 @Module({
     imports: [
@@ -73,14 +75,16 @@ import { AwareTenantController } from './tenant/aware/aware-tenant.controller';
         { provide: APP_INTERCEPTOR, useClass: TracingEnrichmentInterceptor },
         { provide: APP_INTERCEPTOR, useClass: HttpMetricsInterceptor },
         { provide: APP_INTERCEPTOR, useClass: HttpLoggingInterceptor }, // KEEP
-        { provide: APP_INTERCEPTOR, useClass: RpcLoggingInterceptor }
+        { provide: APP_INTERCEPTOR, useClass: RpcLoggingInterceptor },
+        TenantStatusGuard,
+        { provide: APP_GUARD, useClass: TenantStatusGuard }
     ]
 })
 export class AppModule implements NestModule {
     configure(consumer: MiddlewareConsumer) {
         consumer.apply(RequestIdMiddleware).forRoutes({ path: '*', method: RequestMethod.ALL });
         consumer
-            .apply(TenantMiddleware)
+            .apply(ApiKeyMiddleware, TenantMiddleware)
             .forRoutes(
                 AwareTenantController,
                 ApiKeyController,

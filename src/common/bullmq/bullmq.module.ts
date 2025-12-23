@@ -19,7 +19,6 @@ import type { ConnectionOptions } from 'bullmq';
                     username: config.username,
                     password: config.password,
                     db: config.db,
-                    keyPrefix: config.keyPrefix ? `${config.keyPrefix}:bull:` : 'bull:',
                     maxRetriesPerRequest: config.maxRetriesPerRequest,
                     enableReadyCheck: true,
                     enableOfflineQueue: true,
@@ -54,6 +53,7 @@ import type { ConnectionOptions } from 'bullmq';
 
                 return {
                     connection,
+                    prefix: config.keyPrefix ? `${config.keyPrefix}:bull:` : 'bull:',
                     defaultJobOptions: {
                         attempts: 3,
                         backoff: {

@@ -63,4 +63,20 @@ export class KratosService {
             return false;
         }
     }
+
+    async updateIdentityMetadata(identityId: string, metadata: { public?: any; admin?: any }): Promise<void> {
+        const payload: any = {};
+        if (metadata.public) payload.metadata_public = metadata.public;
+        if (metadata.admin) payload.metadata_admin = metadata.admin;
+
+        await this.http.patch(`${this.adminUrl}/admin/identities/${identityId}`, payload);
+    }
+
+    /**
+     * Revoke all sessions for a user
+     * @param identityId - The Kratos identity ID
+     */
+    async revokeSessions(identityId: string): Promise<void> {
+        await this.http.delete(`${this.adminUrl}/admin/identities/${identityId}/sessions`);
+    }
 }
