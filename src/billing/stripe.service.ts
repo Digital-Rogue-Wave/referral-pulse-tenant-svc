@@ -19,6 +19,46 @@ export class StripeService {
         return new Stripe(secretKey);
     }
 
+    async listActiveRecurringPricesWithProducts(): Promise<Stripe.Price[]> {
+        const stripe = this.stripeClient();
+
+        const prices: Stripe.Price[] = [];
+        let startingAfter: string | undefined;
+
+        // Paginate through all active recurring prices, expanding the related product
+        // to have enough information for local plan sync.
+        // NOTE: This intentionally does not filter by specific product IDs; consumers
+        // of this method are expected to apply any domain-specific filtering.
+        // The method is defensive against Stripe pagination and can be safely reused
+        // by background jobs or admin-triggered sync flows.
+        // Stripe API returns up to 100 items per page.
+        // See: https://docs.stripe.com/api/prices/list
+        while (true) {
+            const page = await stripe.prices.list({
+                active: true,
+                limit: 100,
+                expand: ['data.product'],
+                ...(startingAfter ? { starting_after: startingAfter } : {})
+            });
+
+            prices.push(...page.data);
+
+            if (!page.has_more) {
+                break;
+            }
+
+            const last = page.data[page.data.length - 1];
+            if (!last) {
+                break;
+            }
+            startingAfter = last.id;
+        }
+
+        this.logger.log(`Fetched ${prices.length} active recurring Stripe prices for plan sync`);
+
+        return prices;
+    }
+
     private priceIdForPlan(plan: BillingPlanEnum): string {
         const cfg = this.configService.get('stripeConfig', { infer: true });
 

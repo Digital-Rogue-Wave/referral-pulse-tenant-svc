@@ -38,7 +38,7 @@ export class PlanService {
         }
     }
 
-    private async invalidateCaches(): Promise<void> {
+    public async invalidateCaches(): Promise<void> {
         const publicKey = this.buildPublicPlansCacheKey();
         try {
             await this.redisService.del(publicKey);
