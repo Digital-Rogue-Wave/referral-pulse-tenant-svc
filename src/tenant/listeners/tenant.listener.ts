@@ -21,7 +21,9 @@ import {
     TenantDeletionCancelledEvent,
     TenantDeletionScheduledEvent,
     TenantDomainVerifiedEvent,
-    TenantUpdatedEvent
+    TenantUpdatedEvent,
+    TenantSuspendedEvent,
+    TenantUnsuspendedEvent
 } from '@mod/common/interfaces/tenant-events.interface';
 
 @Injectable()
@@ -332,5 +334,61 @@ export class TenantListener {
         });
 
         return data.relation_tuples || [];
+    }
+
+    @OnEvent('tenant.suspended')
+    async handleTenantSuspendedEvent(payload: TenantSuspendedEvent) {
+        const { tenantId, reason } = payload;
+        this.logger.log(`tenant.suspended event received for tenant ${tenantId}`);
+
+        // 1. Audit Log
+        await this.auditService.log({
+            tenantId,
+            action: AuditAction.TENANT_SUSPENDED,
+            description: `Tenant account suspended`,
+            metadata: { reason }
+        });
+
+        // 2. Publish SNS Event (for Campaign Svc etc)
+        const snsEventDto = {
+            eventId: tenantId,
+            eventType: 'tenant.suspended',
+            data: { tenantId, reason },
+            timestamp: new Date().toISOString()
+        };
+        const snsOptionsDto = {
+            topic: 'tenant-events',
+            groupId: tenantId,
+            deduplicationId: `${tenantId}-suspended-${Date.now()}`
+        };
+        await this.sns.publish(snsEventDto as any, snsOptionsDto as any);
+    }
+
+    @OnEvent('tenant.unsuspended')
+    async handleTenantUnsuspendedEvent(payload: TenantUnsuspendedEvent) {
+        const { tenantId } = payload;
+        this.logger.log(`tenant.unsuspended event received for tenant ${tenantId}`);
+
+        // 1. Audit Log
+        await this.auditService.log({
+            tenantId,
+            action: AuditAction.TENANT_UNSUSPENDED,
+            description: `Tenant account unsuspended`,
+            metadata: {}
+        });
+
+        // 2. Publish SNS Event
+        const snsEventDto = {
+            eventId: tenantId,
+            eventType: 'tenant.unsuspended',
+            data: { tenantId },
+            timestamp: new Date().toISOString()
+        };
+        const snsOptionsDto = {
+            topic: 'tenant-events',
+            groupId: tenantId,
+            deduplicationId: `${tenantId}-unsuspended-${Date.now()}`
+        };
+        await this.sns.publish(snsEventDto as any, snsOptionsDto as any);
     }
 }

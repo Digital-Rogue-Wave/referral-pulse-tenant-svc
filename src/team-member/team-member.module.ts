@@ -9,11 +9,13 @@ import { TENANT_DELETION_QUEUE } from '@mod/common/bullmq/queues/tenant-deletion
 import { TenantDeletionProcessor } from '@mod/tenant/processors/tenant-deletion.processor';
 import { TenantModule } from '@mod/tenant/tenant.module';
 import { TenantAwareRepositoryModule } from '@mod/common/tenant/tenant-aware.repository';
+import { AuditModule } from '@mod/common/audit/audit.module';
 
 @Module({
     imports: [
         TenantAwareRepositoryModule.forEntities([TeamMemberEntity]),
         FilesModule,
+        AuditModule,
         forwardRef(() => TenantModule),
         BullModule.registerQueue({
             name: TENANT_DELETION_QUEUE

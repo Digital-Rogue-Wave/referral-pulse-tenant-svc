@@ -38,3 +38,12 @@ export interface TenantDeletedEvent {
     tenant: TenantEntity;
     deletedAt: Date;
 }
+
+export interface TenantSuspendedEvent {
+    tenantId: string;
+    reason?: string;
+}
+
+export interface TenantUnsuspendedEvent {
+    tenantId: string;
+}

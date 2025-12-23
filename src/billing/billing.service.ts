@@ -1,7 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { EventEmitter2 } from '@nestjs/event-emitter';
-import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
 import { BillingEntity } from './billing.entity';
 import { BillingPlanEnum, SubscriptionStatusEnum, PaymentStatusEnum } from '@mod/common/enums/billing.enum';
 import { SubscriptionCheckoutResponseDto } from './dto/subscription-checkout-response.dto';
@@ -18,7 +16,7 @@ import { InjectTenantAwareRepository, TenantAwareRepository } from '@mod/common/
 
 @Injectable()
 export class BillingService {
-	private readonly logger = new Logger(BillingService.name);
+    private readonly logger = new Logger(BillingService.name);
     constructor(
         @InjectTenantAwareRepository(BillingEntity)
         private readonly billingRepository: TenantAwareRepository<BillingEntity>,
@@ -49,20 +47,12 @@ export class BillingService {
         const invoiceId = invoice.id;
 
         const rawInvoice = invoice as any;
-        const paymentIntentId =
-            typeof rawInvoice.payment_intent === 'string'
-                ? rawInvoice.payment_intent
-                : rawInvoice.payment_intent?.id;
+        const paymentIntentId = typeof rawInvoice.payment_intent === 'string' ? rawInvoice.payment_intent : rawInvoice.payment_intent?.id;
 
-        const subscriptionId =
-            typeof rawInvoice.subscription === 'string'
-                ? rawInvoice.subscription
-                : rawInvoice.subscription?.id;
+        const subscriptionId = typeof rawInvoice.subscription === 'string' ? rawInvoice.subscription : rawInvoice.subscription?.id;
 
         if (!subscriptionId) {
-            this.logger.warn(
-                `invoice.payment_succeeded missing subscription reference: eventId=${event.id}, invoiceId=${invoiceId}`
-            );
+            this.logger.warn(`invoice.payment_succeeded missing subscription reference: eventId=${event.id}, invoiceId=${invoiceId}`);
             return;
         }
 
@@ -99,9 +89,7 @@ export class BillingService {
             plan
         });
 
-        this.logger.log(
-            `Created Stripe Checkout Session ${session.id} via BillingService for tenant ${billing.tenantId}, plan ${plan}`
-        );
+        this.logger.log(`Created Stripe Checkout Session ${session.id} via BillingService for tenant ${billing.tenantId}, plan ${plan}`);
 
         return {
             plan,
@@ -121,8 +109,8 @@ export class BillingService {
                 billing.status === SubscriptionStatusEnum.ACTIVE
                     ? PaymentStatusEnum.COMPLETED
                     : billing.status === SubscriptionStatusEnum.CANCELED
-                    ? PaymentStatusEnum.FAILED
-                    : PaymentStatusEnum.PENDING,
+                      ? PaymentStatusEnum.FAILED
+                      : PaymentStatusEnum.PENDING,
             stripeCustomerId: billing.stripeCustomerId ?? null,
             stripeSubscriptionId: billing.stripeSubscriptionId ?? null,
             stripeTransactionId: billing.stripeTransactionId ?? null
@@ -147,9 +135,7 @@ export class BillingService {
         if (eventId) {
             const alreadyProcessed = await this.eventIdempotency.isProcessed(eventId, consumerName);
             if (alreadyProcessed) {
-                this.logger.warn(
-                    `Stripe webhook event already processed - eventId: ${eventId}, type: ${event.type}, consumerName: ${consumerName}`
-                );
+                this.logger.warn(`Stripe webhook event already processed - eventId: ${eventId}, type: ${event.type}, consumerName: ${consumerName}`);
                 this.metrics.incCounter('billing_subscription_events_total', { event: event.type, result: 'duplicate' });
                 return;
             }
@@ -176,10 +162,7 @@ export class BillingService {
             }
         } catch (err) {
             result = 'error';
-            this.logger.error(
-                `Error handling Stripe webhook event ${event.type} (id=${eventId ?? 'unknown'})`,
-                err as Error
-            );
+            this.logger.error(`Error handling Stripe webhook event ${event.type} (id=${eventId ?? 'unknown'})`, err as Error);
             throw err;
         } finally {
             this.metrics.incCounter('billing_subscription_events_total', { event: event.type, result });
@@ -229,10 +212,7 @@ export class BillingService {
         }
 
         const rawSession = session as any;
-        const paymentIntentId =
-            typeof rawSession.payment_intent === 'string'
-                ? rawSession.payment_intent
-                : rawSession.payment_intent?.id;
+        const paymentIntentId = typeof rawSession.payment_intent === 'string' ? rawSession.payment_intent : rawSession.payment_intent?.id;
 
         billing.stripeTransactionId = paymentIntentId ?? billing.stripeTransactionId ?? null;
 
@@ -265,19 +245,13 @@ export class BillingService {
         });
     }
 
-    private async handleInvoicePaymentFailed(event: Stripe.Event): Promise<void> {
+    private handleInvoicePaymentFailed(event: Stripe.Event): void {
         const invoice = event.data.object as Stripe.Invoice;
         const invoiceId = invoice.id;
-        const customerId =
-            typeof invoice.customer === 'string'
-                ? invoice.customer
-                : invoice.customer?.id;
+        const customerId = typeof invoice.customer === 'string' ? invoice.customer : invoice.customer?.id;
 
         const rawInvoice = invoice as any;
-        const paymentIntentId =
-            typeof rawInvoice.payment_intent === 'string'
-                ? rawInvoice.payment_intent
-                : rawInvoice.payment_intent?.id;
+        const paymentIntentId = typeof rawInvoice.payment_intent === 'string' ? rawInvoice.payment_intent : rawInvoice.payment_intent?.id;
 
         this.logger.warn(
             `Processed invoice.payment_failed from Stripe: eventId=${event.id}, invoiceId=${invoiceId}, customerId=${customerId ?? 'unknown'}, paymentIntentId=${paymentIntentId ?? 'unknown'}`

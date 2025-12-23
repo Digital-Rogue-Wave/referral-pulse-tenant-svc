@@ -5,7 +5,6 @@ import { CreateApiKeyDto } from './dto/create-api-key.dto';
 import { UpdateApiKeyDto } from './dto/update-api-key.dto';
 import { UpdateApiKeyStatusDto } from './dto/update-api-key-status.dto';
 import { EventEmitter2 } from '@nestjs/event-emitter';
-import * as bcrypt from 'bcryptjs';
 import { ApiKeyStatusEnum } from '@mod/common/enums/api-key.enum';
 import { InjectTenantAwareRepository, TenantAwareRepository } from '@mod/common/tenant/tenant-aware.repository';
 import { NullableType } from '@mod/types/nullable.type';
@@ -160,12 +159,17 @@ export class ApiKeyService {
     async validateKey(rawKey: string): Promise<ApiKeyEntity | null> {
         const keyPrefix = this.sharedService.extractApiKeyPrefix(rawKey);
 
-        // Find by prefix first (indexed)
-        const apiKey = await this.findOne({ keyPrefix, status: ApiKeyStatusEnum.ACTIVE });
+        // Find by prefix first (indexed) - use QueryBuilder to BYPASS tenant context check
+        // because we don't know the tenant yet (we are authenticating!)
+        const apiKey = await this.apiKeyRepository
+            .createQueryBuilder('k')
+            .where('k.keyPrefix = :keyPrefix', { keyPrefix })
+            .andWhere('k.status = :status', { status: ApiKeyStatusEnum.ACTIVE })
+            .getOne();
 
         // Check each key's hash
         if (apiKey) {
-            const isValid = await bcrypt.compare(rawKey, apiKey.keyHash);
+            const isValid = await this.sharedService.compareApiKeys(rawKey, apiKey.keyHash);
             if (isValid) {
                 // Check expiration
                 if (apiKey.expiresAt && new Date() > apiKey.expiresAt) {

@@ -82,12 +82,14 @@ describe('AwareTenantService - Deletion', () => {
 
             kratosService.verifyPassword.mockResolvedValue(true);
             tenantRepository.findOneOrFailTenantContext.mockResolvedValue(mockTenant);
-            tenantRepository.save.mockResolvedValue({
-                ...mockTenant,
-                status: TenantStatusEnum.DELETION_SCHEDULED,
-                deletionScheduledAt: new Date(),
-                deletionReason: dto.reason
-            } as any);
+            tenantRepository.save.mockResolvedValue(
+                Stubber.stubOne(TenantEntity, {
+                    ...mockTenant,
+                    status: TenantStatusEnum.DELETION_SCHEDULED,
+                    deletionScheduledAt: new Date(),
+                    deletionReason: dto.reason
+                }) as any
+            );
 
             const result = await service.scheduleDeletion(mockTenant.id, dto, userId, identityId);
 
@@ -111,13 +113,13 @@ describe('AwareTenantService - Deletion', () => {
             const userId = 'user-123';
             const identityId = 'identity-123';
 
-            const scheduledTenant = {
+            const scheduledTenant = Stubber.stubOne(TenantEntity, {
                 ...mockTenant,
                 status: TenantStatusEnum.DELETION_SCHEDULED
-            };
+            });
 
             kratosService.verifyPassword.mockResolvedValue(true);
-            tenantRepository.findOneOrFailTenantContext.mockResolvedValue(scheduledTenant as any);
+            tenantRepository.findOneOrFailTenantContext.mockResolvedValue(scheduledTenant);
 
             await expect(service.scheduleDeletion(mockTenant.id, dto, userId, identityId)).rejects.toThrow(HttpException);
         });
@@ -129,21 +131,23 @@ describe('AwareTenantService - Deletion', () => {
             const userId = 'user-123';
             const identityId = 'identity-123';
 
-            const scheduledTenant = {
+            const scheduledTenant = Stubber.stubOne(TenantEntity, {
                 ...mockTenant,
                 status: TenantStatusEnum.DELETION_SCHEDULED,
                 deletionScheduledAt: new Date(),
                 deletionReason: 'Test reason'
-            };
+            });
 
             kratosService.verifyPassword.mockResolvedValue(true);
-            tenantRepository.findOneOrFailTenantContext.mockResolvedValue(scheduledTenant as any);
-            tenantRepository.save.mockResolvedValue({
-                ...scheduledTenant,
-                status: TenantStatusEnum.ACTIVE,
-                deletionScheduledAt: undefined,
-                deletionReason: undefined
-            } as any);
+            tenantRepository.findOneOrFailTenantContext.mockResolvedValue(scheduledTenant);
+            tenantRepository.save.mockResolvedValue(
+                Stubber.stubOne(TenantEntity, {
+                    ...scheduledTenant,
+                    status: TenantStatusEnum.ACTIVE,
+                    deletionScheduledAt: undefined,
+                    deletionReason: undefined
+                }) as any
+            );
 
             await service.cancelDeletion(mockTenant.id, dto, userId, identityId);
 
@@ -156,13 +160,13 @@ describe('AwareTenantService - Deletion', () => {
             const identityId = 'identity-123';
 
             // Create a fresh mock with ACTIVE status
-            const activeTenant = {
+            const activeTenant = Stubber.stubOne(TenantEntity, {
                 ...mockTenant,
                 status: TenantStatusEnum.ACTIVE
-            };
+            });
 
             kratosService.verifyPassword.mockResolvedValue(true);
-            tenantRepository.findOneOrFailTenantContext.mockResolvedValue(activeTenant as any);
+            tenantRepository.findOneOrFailTenantContext.mockResolvedValue(activeTenant);
 
             await expect(service.cancelDeletion(mockTenant.id, dto, userId, identityId)).rejects.toThrow(HttpException);
         });
@@ -173,13 +177,13 @@ describe('AwareTenantService - Deletion', () => {
             const scheduledDate = new Date();
             scheduledDate.setDate(scheduledDate.getDate() - 31); // 31 days ago
 
-            const scheduledTenant = {
+            const scheduledTenant = Stubber.stubOne(TenantEntity, {
                 ...mockTenant,
                 status: TenantStatusEnum.DELETION_SCHEDULED,
                 deletionScheduledAt: scheduledDate
-            };
+            });
 
-            tenantRepository.findOneOrFailTenantContext.mockResolvedValue(scheduledTenant as any);
+            tenantRepository.findOneOrFailTenantContext.mockResolvedValue(scheduledTenant);
             tenantRepository.delete.mockResolvedValue({ affected: 1 } as any);
 
             await service.executeDeletion(mockTenant.id);
@@ -192,19 +196,19 @@ describe('AwareTenantService - Deletion', () => {
             const scheduledDate = new Date();
             scheduledDate.setDate(scheduledDate.getDate() - 15); // Only 15 days ago
 
-            const scheduledTenant = {
+            const scheduledTenant = Stubber.stubOne(TenantEntity, {
                 ...mockTenant,
                 status: TenantStatusEnum.DELETION_SCHEDULED,
                 deletionScheduledAt: scheduledDate
-            };
+            });
 
-            tenantRepository.findOneOrFailTenantContext.mockResolvedValue(scheduledTenant as any);
+            tenantRepository.findOneOrFailTenantContext.mockResolvedValue(scheduledTenant);
 
             await expect(service.executeDeletion(mockTenant.id)).rejects.toThrow(HttpException);
         });
 
         it('should throw error if tenant is not scheduled for deletion', async () => {
-            tenantRepository.findOneOrFailTenantContext.mockResolvedValue(mockTenant as any);
+            tenantRepository.findOneOrFailTenantContext.mockResolvedValue(mockTenant);
 
             await expect(service.executeDeletion(mockTenant.id)).rejects.toThrow(HttpException);
         });

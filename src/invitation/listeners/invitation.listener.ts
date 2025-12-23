@@ -3,6 +3,11 @@ import { OnEvent } from '@nestjs/event-emitter';
 import { SesService } from '@mod/common/aws-ses/ses.service';
 import { KetoService } from '@mod/common/auth/keto.service';
 import { KetoNamespace, KetoRelation } from '@mod/common/auth/keto.constants';
+import { SnsPublisher } from '@mod/common/aws-sqs/sns.publisher';
+import { KratosService } from '@mod/common/auth/kratos.service';
+import { MemberInvitedEvent } from '@mod/common/interfaces/invitation-events.interface';
+import { PublishSnsEventDto, SnsPublishOptionsDto } from '@mod/common/dto/sns-publish.dto';
+import { Utils } from '@mod/common/utils/utils';
 
 import { InvitationCreatedEvent, MemberJoinedEvent } from '@mod/common/interfaces/invitation-events.interface';
 
@@ -10,7 +15,9 @@ import { InvitationCreatedEvent, MemberJoinedEvent } from '@mod/common/interface
 export class InvitationListener {
     constructor(
         private readonly sesService: SesService,
-        private readonly ketoService: KetoService
+        private readonly ketoService: KetoService,
+        private readonly kratosService: KratosService,
+        private readonly sns: SnsPublisher
     ) {}
 
     @OnEvent('invitation.created')
@@ -23,9 +30,36 @@ export class InvitationListener {
         console.log(`Email sent to ${email}`);
     }
 
+    @OnEvent('member.invited')
+    async handleMemberInvitedEvent(payload: MemberInvitedEvent) {
+        const { invitationId, email, tenantId, role, expiresAt } = payload;
+
+        // Publish SNS Event
+        const snsEventDto = await Utils.validateDtoOrFail(PublishSnsEventDto, {
+            eventId: invitationId,
+            eventType: 'member.invited',
+            data: {
+                email,
+                tenantId,
+                role,
+                expiresAt
+            },
+            timestamp: new Date().toISOString()
+        });
+
+        const snsOptionsDto = await Utils.validateDtoOrFail(SnsPublishOptionsDto, {
+            topic: 'tenant-events',
+            groupId: tenantId,
+            deduplicationId: invitationId
+        });
+
+        await this.sns.publish(snsEventDto, snsOptionsDto);
+        console.log(`Published member.invited event to SNS for ${email}`);
+    }
+
     @OnEvent('member.joined')
     async handleMemberJoinedEvent(payload: MemberJoinedEvent) {
-        const { userId, tenantId, role } = payload;
+        const { userId, tenantId, role, invitationId } = payload;
 
         // Create Keto relation tuple: user is member of tenant
         await this.ketoService.createTuple({
@@ -35,6 +69,38 @@ export class InvitationListener {
             subject_id: userId
         });
 
-        console.log(`Created Keto relation: user ${userId} is ${KetoRelation.MEMBER} of tenant ${tenantId} with role ${role}`);
+        // Publish SNS Event
+        const snsEventDto = await Utils.validateDtoOrFail(PublishSnsEventDto, {
+            eventId: invitationId || `${tenantId}:${userId}`,
+            eventType: 'member.joined',
+            data: {
+                userId,
+                tenantId,
+                role
+            },
+            timestamp: new Date().toISOString()
+        });
+
+        const snsOptionsDto = await Utils.validateDtoOrFail(SnsPublishOptionsDto, {
+            topic: 'tenant-events',
+            groupId: tenantId,
+            deduplicationId: invitationId || `${tenantId}:${userId}`
+        });
+
+        await this.sns.publish(snsEventDto, snsOptionsDto);
+
+        // Update Ory Kratos metadata
+        try {
+            await this.kratosService.updateIdentityMetadata(userId, {
+                public: {
+                    tenantId: tenantId
+                }
+            });
+            console.log(`Updated Ory Kratos metadata for user ${userId} with tenantId ${tenantId}`);
+        } catch (error) {
+            console.error(`Failed to update Ory Kratos metadata for user ${userId}:`, error);
+        }
+
+        console.log(`Created Keto relation and published member.joined event to SNS for user ${userId} in tenant ${tenantId}`);
     }
 }

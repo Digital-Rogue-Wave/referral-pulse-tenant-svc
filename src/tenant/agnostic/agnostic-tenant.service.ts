@@ -12,6 +12,7 @@ import { KetoService } from '@mod/common/auth/keto.service';
 import { Utils } from '@mod/common/utils/utils';
 import { KetoRelationTupleDto } from '@mod/common/auth/dto/keto-relation-tuple.dto';
 import { KetoNamespace, KetoRelation } from '@mod/common/auth/keto.constants';
+import { TenantStatusEnum } from '@mod/common/enums/tenant.enum';
 
 @Injectable()
 export class AgnosticTenantService {
@@ -89,5 +90,42 @@ export class AgnosticTenantService {
         });
 
         return savedTenant;
+    }
+
+    async findById(id: string): Promise<TenantEntity | null> {
+        return await this.tenantRepository.findOne({ where: { id } });
+    }
+
+    async suspend(id: string, reason?: string): Promise<TenantEntity> {
+        const tenant = await this.tenantRepository.findOne({ where: { id } });
+        if (!tenant) {
+            throw new HttpException({ message: 'Tenant not found', code: HttpStatus.NOT_FOUND }, HttpStatus.NOT_FOUND);
+        }
+
+        tenant.status = TenantStatusEnum.SUSPENDED;
+        const updatedTenant = await this.tenantRepository.save(tenant);
+
+        this.eventEmitter.emit('tenant.suspended', {
+            tenantId: id,
+            reason
+        });
+
+        return updatedTenant;
+    }
+
+    async unsuspend(id: string): Promise<TenantEntity> {
+        const tenant = await this.tenantRepository.findOne({ where: { id } });
+        if (!tenant) {
+            throw new HttpException({ message: 'Tenant not found', code: HttpStatus.NOT_FOUND }, HttpStatus.NOT_FOUND);
+        }
+
+        tenant.status = TenantStatusEnum.ACTIVE;
+        const updatedTenant = await this.tenantRepository.save(tenant);
+
+        this.eventEmitter.emit('tenant.unsuspended', {
+            tenantId: id
+        });
+
+        return updatedTenant;
     }
 }

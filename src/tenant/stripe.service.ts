@@ -37,10 +37,7 @@ export class StripeService {
         }
     }
 
-    async createSubscriptionCheckoutSession(params: {
-        tenantId: string;
-        plan: BillingPlanEnum;
-    }): Promise<{ id: string; url: string | null }> {
+    async createSubscriptionCheckoutSession(params: { tenantId: string; plan: BillingPlanEnum }): Promise<{ id: string; url: string | null }> {
         const stripe = this.stripeClient();
 
         const successUrl = this.configService.get('stripeConfig.successUrl', { infer: true });

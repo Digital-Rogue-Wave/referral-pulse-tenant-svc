@@ -8,6 +8,7 @@ import { NullableType } from '@mod/types/nullable.type';
 import { Utils } from '@mod/common/utils/utils';
 import { CreateTeamMemberDto } from '@mod/team-member/dto/create-team-member.dto';
 import { TeamMemberService } from '@mod/team-member/team-member.service';
+import { TeamMemberStatusEnum } from '@mod/common/enums/team-member-status.enum';
 
 @Injectable()
 export class AgnosticInvitationService {
@@ -45,14 +46,16 @@ export class AgnosticInvitationService {
             throw new HttpException({ message: 'Invitation expired', code: HttpStatus.BAD_REQUEST }, HttpStatus.BAD_REQUEST);
         }
 
+        // 1. Update invitation status
         invitation.status = InvitationStatusEnum.ACCEPTED;
         await this.invitationRepository.save(invitation);
 
-        // Create Team Member
+        // 2. Update TeamMember status (Create as ACTIVE)
         const createTeamMemberDto = await Utils.validateDtoOrFail(CreateTeamMemberDto, {
             userId,
             tenantId: invitation.tenantId,
-            role: invitation.role
+            role: invitation.role,
+            status: TeamMemberStatusEnum.ACTIVE
         });
 
         await this.teamMemberService.create(createTeamMemberDto);
