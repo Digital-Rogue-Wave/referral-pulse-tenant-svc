@@ -101,10 +101,15 @@ These items come from `openspec/changes/add-subscription-checkout/specs/tenant-b
   - Public listing endpoint only returns active public plans; admin listing supports filters.
 
 - [ ] 2.4 Stripe Products/Prices sync
-  - Scheduled job to sync Stripe Products/Prices into `PlanEntity`.
+  - Sync Stripe Products/Prices into `PlanEntity`.
   - Update `stripe_price_id`, `stripe_product_id`, limits and metadata.
   - Handle new/updated/deleted products.
-  - **Status:** `PlanStripeSyncService` skeleton added; full sync logic and scheduling still pending.
+  - **Status:** Core sync logic implemented in `PlanStripeSyncService`; scheduling and optional automation tracked separately.
+
+- [ ] 2.4.1 (optional) BullMQ-based recurring sync job
+  - Background BullMQ job to call `PlanStripeSyncService.syncFromStripe` on a schedule (e.g. hourly).
+  - Config flag to enable/disable the recurring sync.
+  - Logging/metrics around sync runs and failures.
 
 - [x] 2.5 Redis plan caching
   - Cache public plan data with TTL (~1h) using `RedisService` and `RedisKeyBuilder`.
