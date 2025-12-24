@@ -22,6 +22,7 @@ export interface TenantUpdatedEvent {
 export interface TenantDeletionScheduledEvent {
     tenant: TenantEntity;
     userId: string;
+    userEmail: string;
     scheduledAt: Date;
     executionDate: Date;
     reason?: string;
@@ -31,6 +32,7 @@ export interface TenantDeletionScheduledEvent {
 export interface TenantDeletionCancelledEvent {
     tenant: TenantEntity;
     userId: string;
+    userEmail: string;
     ipAddress?: string;
 }
 

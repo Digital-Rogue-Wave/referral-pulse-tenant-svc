@@ -7,7 +7,9 @@ import { TenantSerializationProfile } from './serialization/tenant-serialization
 import { TenantListener } from './listeners/tenant.listener';
 import { BullModule } from '@nestjs/bullmq';
 import { TENANT_DELETION_QUEUE } from '@mod/common/bullmq/queues/tenant-deletion.queue';
+import { TENANT_UNLOCK_QUEUE } from '@mod/common/bullmq/queues/tenant-unlock.queue';
 import { TenantDeletionProcessor } from './processors/tenant-deletion.processor';
+import { TenantUnlockProcessor } from './processors/tenant-unlock.processor';
 import { HttpClientsModule } from '@mod/common/http/http-clients.module';
 import { TenantSettingModule } from '@mod/tenant-setting/tenant-setting.module';
 import { TenantAwareRepositoryModule } from '@mod/common/tenant/tenant-aware.repository';
@@ -24,6 +26,7 @@ import { TenantStatsService } from './tenant-stats.service';
 import { TeamMemberModule } from '@mod/team-member/team-member.module';
 
 import { TenantStatusGuard } from './guards/tenant-status.guard';
+import { TenantLockGuard } from './guards/tenant-lock.guard';
 
 @Module({
     imports: [
@@ -31,9 +34,7 @@ import { TenantStatusGuard } from './guards/tenant-status.guard';
         TenantAwareRepositoryModule.forEntities([TenantEntity, ReservedSubdomainEntity]),
         FilesModule,
         HttpClientsModule,
-        BullModule.registerQueue({
-            name: TENANT_DELETION_QUEUE
-        }),
+        BullModule.registerQueue({ name: TENANT_DELETION_QUEUE }, { name: TENANT_UNLOCK_QUEUE }),
         TenantSettingModule,
         forwardRef(() => TeamMemberModule)
     ],
@@ -44,12 +45,14 @@ import { TenantStatusGuard } from './guards/tenant-status.guard';
         TenantSerializationProfile,
         TenantListener,
         TenantDeletionProcessor,
+        TenantUnlockProcessor,
         DnsVerificationService,
         DomainProvisioningService,
         SubdomainService,
         TenantStatsService,
-        TenantStatusGuard
+        TenantStatusGuard,
+        TenantLockGuard
     ],
-    exports: [AwareTenantService, AgnosticTenantService, SubdomainService, TenantStatsService, TenantStatusGuard]
+    exports: [AwareTenantService, AgnosticTenantService, SubdomainService, TenantStatsService, TenantStatusGuard, TenantLockGuard]
 })
 export class TenantModule {}
