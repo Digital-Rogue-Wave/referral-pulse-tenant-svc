@@ -1,4 +1,4 @@
-import { BillingPlanEnum, SubscriptionStatusEnum } from '@mod/common/enums/tenant.enum';
+import { BillingPlanEnum, SubscriptionStatusEnum } from '@mod/common/enums/billing.enum';
 
 export interface SubscriptionChangedEvent {
     tenantId: string;

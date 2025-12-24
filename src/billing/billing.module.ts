@@ -14,6 +14,8 @@ import { PlanAdminController } from './plan-admin.controller';
 import { PlanPublicController } from './plan-public.controller';
 import { PlanSerializationProfile } from './serialization/plan-serialization.profile';
 import { PlanStripeSyncService } from './plan-stripe-sync.service';
+import { TenantModule } from '@mod/tenant/tenant.module';
+import { TestBillingController } from './test-billing.controller';
 
 @Module({
     imports: [
@@ -22,9 +24,10 @@ import { PlanStripeSyncService } from './plan-stripe-sync.service';
             BillingEntity,
             TenantUsageEntity,
             BillingEventEntity
-        ])
+        ]),
+        TenantModule
     ],
-    controllers: [BillingController, PlanAdminController, PlanPublicController],
+    controllers: [BillingController, PlanAdminController, PlanPublicController, TestBillingController],
     providers: [BillingService, StripeService, BillingListener, PlanService, PlanSerializationProfile, PlanStripeSyncService],
     exports: [BillingService, PlanService]
 })

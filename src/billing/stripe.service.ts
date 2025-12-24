@@ -80,7 +80,12 @@ export class StripeService {
         }
     }
 
-    async createSubscriptionCheckoutSession(params: { tenantId: string; plan: BillingPlanEnum }): Promise<{ id: string; url: string | null }> {
+    async createSubscriptionCheckoutSession(params: {
+        tenantId: string;
+        plan: BillingPlanEnum;
+        userId?: string;
+        couponCode?: string;
+    }): Promise<{ id: string; url: string | null }> {
         const stripe = this.stripeClient();
 
         const successUrl = this.configService.get('stripeConfig.successUrl', { infer: true });
@@ -92,20 +97,62 @@ export class StripeService {
 
         const priceId = this.priceIdForPlan(params.plan);
 
+        let promotionCode: Stripe.PromotionCode | null = null;
+
+        if (params.couponCode) {
+            const promoList = await stripe.promotionCodes.list({
+                code: params.couponCode,
+                active: true,
+                limit: 1
+            });
+
+            promotionCode = promoList.data[0] ?? null;
+
+            if (!promotionCode) {
+                throw new HttpException('Invalid or inactive coupon code', HttpStatus.BAD_REQUEST);
+            }
+        }
+
+        const metadata: Record<string, string> = {
+            tenantId: params.tenantId,
+            planId: params.plan
+        };
+
+        if (params.userId) {
+            metadata.userId = params.userId;
+        }
+
+        if (params.couponCode) {
+            metadata.couponCode = params.couponCode;
+        }
+
         const session = await stripe.checkout.sessions.create({
             mode: 'subscription',
             line_items: [{ price: priceId, quantity: 1 }],
             success_url: successUrl,
             cancel_url: cancelUrl,
-            metadata: {
-                tenantId: params.tenantId,
-                planId: params.plan
-            }
+            metadata,
+            ...(promotionCode
+                ? {
+                      discounts: [
+                          {
+                              promotion_code: promotionCode.id
+                          }
+                      ]
+                  }
+                : {})
         });
 
         this.logger.log(`Created Stripe Checkout Session ${session.id} for tenant ${params.tenantId}, plan ${params.plan}`);
 
         return { id: session.id, url: session.url };
+    }
+
+    async getSubscription(stripeSubscriptionId: string): Promise<Stripe.Subscription> {
+        const stripe = this.stripeClient();
+        const subscription = await stripe.subscriptions.retrieve(stripeSubscriptionId);
+        this.logger.log(`Fetched Stripe subscription ${stripeSubscriptionId}`);
+        return subscription;
     }
 
     async cancelSubscription(stripeSubscriptionId: string): Promise<void> {
