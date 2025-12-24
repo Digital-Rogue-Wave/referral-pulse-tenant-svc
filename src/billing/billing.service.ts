@@ -13,6 +13,8 @@ import { MonitoringService } from '@mod/common/monitoring/monitoring.service';
 import { AuditService } from '@mod/common/audit/audit.service';
 import { AuditAction } from '@mod/common/audit/audit-action.enum';
 import { InjectTenantAwareRepository, TenantAwareRepository } from '@mod/common/tenant/tenant-aware.repository';
+import { AgnosticTenantService } from '@mod/tenant/agnostic/agnostic-tenant.service';
+import { TenantStatsService } from '@mod/tenant/tenant-stats.service';
 
 @Injectable()
 export class BillingService {
@@ -25,7 +27,9 @@ export class BillingService {
         private readonly cls: ClsService<ClsRequestContext>,
         private readonly eventIdempotency: EventIdempotencyService,
         private readonly metrics: MonitoringService,
-        private readonly auditService: AuditService
+        private readonly auditService: AuditService,
+        private readonly tenantService: AgnosticTenantService,
+        private readonly tenantStatsService: TenantStatsService
     ) {}
 
     private async createBillingForTenant(): Promise<BillingEntity> {
@@ -81,12 +85,16 @@ export class BillingService {
         return this.createBillingForTenant();
     }
 
-    async subscriptionCheckout(plan: BillingPlanEnum): Promise<SubscriptionCheckoutResponseDto> {
+    async subscriptionCheckout(plan: BillingPlanEnum, couponCode?: string): Promise<SubscriptionCheckoutResponseDto> {
         const billing = await this.getOrCreateBillingForCurrentTenant();
+
+        const userId = this.cls.get('userId');
 
         const session = await this.stripeService.createSubscriptionCheckoutSession({
             tenantId: billing.tenantId,
-            plan
+            plan,
+            userId,
+            couponCode
         });
 
         this.logger.log(`Created Stripe Checkout Session ${session.id} via BillingService for tenant ${billing.tenantId}, plan ${plan}`);
@@ -101,19 +109,88 @@ export class BillingService {
 
     async getCurrentSubscription(): Promise<SubscriptionStatusDto> {
         const billing = await this.getOrCreateBillingForCurrentTenant();
+        const tenantId = billing.tenantId;
+
+        const paymentStatus =
+            billing.status === SubscriptionStatusEnum.ACTIVE
+                ? PaymentStatusEnum.COMPLETED
+                : billing.status === SubscriptionStatusEnum.CANCELED
+                  ? PaymentStatusEnum.FAILED
+                  : PaymentStatusEnum.PENDING;
+
+        // Trial information from TenantEntity
+        let trialActive: boolean | undefined;
+        let trialEndsAt: Date | null = null;
+        let trialDaysRemaining: number | null = null;
+
+        try {
+            const tenant = await this.tenantService.findById(tenantId);
+            if (tenant?.trialEndsAt) {
+                trialEndsAt = tenant.trialEndsAt;
+                const now = new Date();
+                if (tenant.trialEndsAt > now) {
+                    trialActive = true;
+                    const diffMs = tenant.trialEndsAt.getTime() - now.getTime();
+                    trialDaysRemaining = Math.ceil(diffMs / (1000 * 60 * 60 * 24));
+                } else {
+                    trialActive = false;
+                    trialDaysRemaining = 0;
+                }
+            } else {
+                trialActive = false;
+            }
+        } catch (err) {
+            this.logger.error(`Failed to load tenant trial info for tenant ${tenantId}`, err as Error);
+        }
+
+        // Usage summary via TenantStatsService
+        let planUsagePercentage: number | null = null;
+        try {
+            const stats = await this.tenantStatsService.getStats(tenantId);
+            planUsagePercentage = stats.planUsagePercentage ?? null;
+        } catch (err) {
+            this.logger.error(`Failed to load usage stats for tenant ${tenantId}`, err as Error);
+        }
+
+        // Live Stripe subscription details
+        let stripeSubscriptionStatus: string | null = null;
+        let stripeCurrentPeriodEnd: string | null = null;
+        let stripeCancelAtPeriodEnd: boolean | null = null;
+
+        if (billing.stripeSubscriptionId) {
+            try {
+                const subscription = await this.stripeService.getSubscription(billing.stripeSubscriptionId);
+                stripeSubscriptionStatus = subscription.status;
+
+                const rawSubscription = subscription as any;
+                if (rawSubscription.current_period_end) {
+                    const endDate = new Date(rawSubscription.current_period_end * 1000);
+                    stripeCurrentPeriodEnd = endDate.toISOString();
+                }
+
+                stripeCancelAtPeriodEnd = !!rawSubscription.cancel_at_period_end;
+            } catch (err) {
+                this.logger.error(
+                    `Failed to fetch Stripe subscription ${billing.stripeSubscriptionId} for tenant ${tenantId}`,
+                    err as Error
+                );
+            }
+        }
 
         return {
             plan: billing.plan,
             subscriptionStatus: billing.status,
-            paymentStatus:
-                billing.status === SubscriptionStatusEnum.ACTIVE
-                    ? PaymentStatusEnum.COMPLETED
-                    : billing.status === SubscriptionStatusEnum.CANCELED
-                      ? PaymentStatusEnum.FAILED
-                      : PaymentStatusEnum.PENDING,
+            paymentStatus,
             stripeCustomerId: billing.stripeCustomerId ?? null,
             stripeSubscriptionId: billing.stripeSubscriptionId ?? null,
-            stripeTransactionId: billing.stripeTransactionId ?? null
+            stripeTransactionId: billing.stripeTransactionId ?? null,
+            trialActive,
+            trialEndsAt,
+            trialDaysRemaining,
+            planUsagePercentage,
+            stripeSubscriptionStatus,
+            stripeCurrentPeriodEnd,
+            stripeCancelAtPeriodEnd
         };
     }
 
@@ -178,6 +255,7 @@ export class BillingService {
         const metadata = session.metadata || {};
         const tenantId = metadata.tenantId as string | undefined;
         const planId = metadata.planId as BillingPlanEnum | undefined;
+        const userId = metadata.userId as string | undefined;
 
         if (!tenantId || !planId) {
             this.logger.warn('Stripe checkout.session.completed missing tenantId or planId metadata');
@@ -240,7 +318,8 @@ export class BillingService {
                 stripeCustomerId: billing.stripeCustomerId,
                 stripeSubscriptionId: billing.stripeSubscriptionId,
                 stripeEventId: event.id,
-                stripeCheckoutSessionId: session.id
+                stripeCheckoutSessionId: session.id,
+                checkoutUserId: userId ?? null
             }
         });
     }

@@ -32,6 +32,6 @@ export class BillingController {
     @Post('subscription/checkout')
     async subscriptionCheckout(@Body() dto: SubscriptionCheckoutDto): Promise<SubscriptionCheckoutResponseDto> {
         const validated = await Utils.validateDtoOrFail(SubscriptionCheckoutDto, dto);
-        return await this.billingService.subscriptionCheckout(validated.plan);
+        return await this.billingService.subscriptionCheckout(validated.plan, validated.couponCode);
     }
 }

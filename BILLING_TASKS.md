@@ -1,6 +1,9 @@
 # Billing Module Tasks – Phases 1–9
 
 Canonical feature list: `BILLING.md` (Phases 1–9)
+- Treat `BILLING.md` as the primary backlog / source of truth for billing tickets.
+- Always add or refine work items in `BILLING.md` first, then reflect them here.
+- If there is ever a mismatch, **BILLING.md takes priority** and this file must be updated to match it.
 Supporting spec: `openspec/changes/add-subscription-checkout/specs/tenant-billing/spec.md`
 
 Status legend:
@@ -8,6 +11,10 @@ Status legend:
 - `[ ]` Not implemented yet or needs refactor/extension to meet the spec.
 
 This checklist is intended to be **kept up to date as implementation progresses**.
+
+Architecture note:
+- All billing-related endpoints, services and data access should live under the **billing** domain (e.g. `BillingModule`, `/billings` routes).
+- Assume billing may be extracted into a separate microservice later; avoid putting billing logic into tenant, campaign or other modules to minimize refactoring.
 
 ---
 
@@ -128,12 +135,12 @@ These items come from `openspec/changes/add-subscription-checkout/specs/tenant-b
 > The core "subscription checkout + webhook" flow is implemented and tracked in section **0** above.
 > The items below cover **remaining work and alignment** with `BILLING.md` Phase 3.
 
-- [ ] 3.1 GET subscription endpoint per spec
+- [x] 3.1 GET subscription endpoint per spec
   - `GET /billings/subscription` to fetch subscription details from Stripe.
   - Include current usage metrics, trial status and days remaining.
   - Return a `SubscriptionDTO` matching the spec.
 
-- [ ] 3.2 Subscription checkout – additional features
+- [x] 3.2 Subscription checkout – additional features
   - Align with `BILLING.md` 3.2 (e.g. coupon validation, any extra metadata requirements).
   - Ensure all plan types (Free, Starter, Growth, Enterprise) are supported and documented.
 

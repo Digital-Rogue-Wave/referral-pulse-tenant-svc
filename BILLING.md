@@ -77,16 +77,16 @@
 
 ## Phase 3: Subscription Management
 
-- [x] 3.1 Implement GET /tenants/:id/subscription endpoint (REFER-259)
+- [x] 3.1 Implement GET /billings/subscription endpoint (REFER-259)
     - Fetch subscription details from Stripe API
     - Calculate current usage metrics (REFER-261)
     - Include trial status and days remaining
     - Return SubscriptionDTO with all relevant data (REFER-262)
 
 - [x] 3.2 Implement Stripe checkout session creation (REFER-264)
-    - Create `POST /tenants/:id/subscription/checkout` endpoint (REFER-265)
+    - Create `POST /billings/subscription/checkout` endpoint (REFER-265)
     - Support for all plan types (Free, Starter, Growth, Enterprise)
-    - Include metadata: `tenantId`, `planId`, `userId`
+    - Include metadata: `tenantId` (tenant account id), `planId` (billing plan id), `userId` (authenticated tenant **user** initiating checkout – never a tenant id or referee id)
     - Handle coupon validation (REFER-268)
     - Return session URL for redirect
 
@@ -97,7 +97,7 @@
     - Send confirmation email
 
 - [x] 3.4 Implement upgrade flow
-    - Create `POST /tenants/:id/subscription/upgrade` endpoint (REFER-272)
+    - Create `POST /billings/subscription/upgrade` endpoint (REFER-272)
     - Implement upgrade preview endpoint with proration (REFER-271)
     - Integrate Stripe subscription update with proration (REFER-273)
     - Update tenant plan immediately (REFER-274)
@@ -105,7 +105,7 @@
     - Publish `subscription.upgraded` event (REFER-276)
 
 - [x] 3.5 Implement downgrade flow
-    - Create `POST /tenants/:id/subscription/downgrade` endpoint (REFER-279)
+    - Create `POST /billings/subscription/downgrade` endpoint (REFER-279)
     - Implement usage vs plan limit validation (REFER-278)
     - Schedule Stripe subscription change for period end (REFER-280)
     - Store pending downgrade in database (REFER-281)
@@ -114,7 +114,7 @@
     - Implement cancel pending downgrade endpoint (REFER-281)
 
 - [x] 3.6 Implement cancellation flow
-    - Create `POST /tenants/:id/subscription/cancel` endpoint (REFER-286)
+    - Create `POST /billings/subscription/cancel` endpoint (REFER-286)
     - Integrate Stripe cancel at period end (REFER-287)
     - Store cancellation reason (REFER-288)
     - Send cancellation confirmation email (REFER-289)
@@ -132,13 +132,13 @@
 
 - [x] 4.1 Payment method management
     - Create Stripe SetupIntent for adding card (REFER-294)
-    - Implement `POST /tenants/:id/payment-methods` endpoint (REFER-295)
-    - Implement `GET /tenants/:id/payment-methods` endpoint (REFER-296)
+    - Implement `POST /billings/payment-methods` endpoint (REFER-295)
+    - Implement `GET /billings/payment-methods` endpoint (REFER-296)
     - Implement `DELETE /payment-methods/:id` endpoint (REFER-297)
     - Handle payment method update in Stripe (REFER-298)
 
 - [x] 4.2 Invoice management
-    - Implement `GET /tenants/:id/invoices` endpoint (REFER-300)
+    - Implement `GET /billings/invoices` endpoint (REFER-300)
     - Integrate Stripe invoice listing (REFER-301)
     - Add invoice PDF download via Stripe (REFER-302)
     - Implement upcoming invoice preview (REFER-303)
@@ -183,7 +183,7 @@
     - Provide upgrade suggestions
     - HTTP 402 status code
 
-- [x] 5.6 Implement GET /tenants/:id/usage endpoint (REFER-323)
+- [x] 5.6 Implement GET /billings/usage endpoint (REFER-323)
     - Return current usage across all metrics
     - Include limits and percentage used
     - Provide historical usage data

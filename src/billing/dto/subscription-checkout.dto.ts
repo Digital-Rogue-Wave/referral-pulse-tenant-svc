@@ -1,5 +1,5 @@
-import { ApiProperty } from '@nestjs/swagger';
-import { IsEnum } from 'class-validator';
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import { IsEnum, IsOptional, IsString } from 'class-validator';
 import { BillingPlanEnum } from '@mod/common/enums/billing.enum';
 
 export class SubscriptionCheckoutDto {
@@ -10,4 +10,11 @@ export class SubscriptionCheckoutDto {
     })
     @IsEnum(BillingPlanEnum)
     plan: BillingPlanEnum;
+
+    @ApiPropertyOptional({
+        description: 'Optional coupon or promotion code to apply to this subscription checkout, when applicable'
+    })
+    @IsOptional()
+    @IsString()
+    couponCode?: string;
 }
