@@ -7,11 +7,19 @@ import { KratosService } from '@mod/common/auth/kratos.service';
 import { TenantStatusEnum, DomainVerificationStatusEnum } from '@mod/common/enums/tenant.enum';
 import { InjectTenantAwareRepository, TenantAwareRepository } from '@mod/common/tenant/tenant-aware.repository';
 import { TenantEntity } from '../tenant.entity';
+import { LockTenantDto } from '../dto/tenant/lock-tenant.dto';
+import { UnlockTenantDto } from '../dto/tenant/unlock-tenant.dto';
 import { UpdateTenantDto } from '../dto/tenant/update-tenant.dto';
 import { ScheduleDeletionDto } from '../dto/schedule-deletion.dto';
 import { CancelDeletionDto } from '../dto/cancel-deletion.dto';
+import { TransferOwnershipDto } from '../dto/transfer-ownership.dto';
+import { AuditService } from '@mod/common/audit/audit.service';
+import { AuditAction } from '@mod/common/audit/audit-action.enum';
 import { DnsVerificationService } from '../dns/dns-verification.service';
 import { SubdomainService } from '../dns/subdomain.service';
+import { InjectQueue } from '@nestjs/bullmq';
+import { Queue } from 'bullmq';
+import { TENANT_UNLOCK_QUEUE, TenantUnlockJobData } from '@mod/common/bullmq/queues/tenant-unlock.queue';
 import { ApiKeyStatusEnum } from '@mod/common/enums/api-key.enum';
 import { InvitationStatusEnum } from '@mod/common/enums/invitation.enum';
 import { randomStringGenerator } from '@nestjs/common/utils/random-string-generator.util';
@@ -26,7 +34,10 @@ export class AwareTenantService {
         private readonly eventEmitter: EventEmitter2,
         private readonly kratosService: KratosService,
         private readonly dnsVerificationService: DnsVerificationService,
-        private readonly subdomainService: SubdomainService
+        private readonly subdomainService: SubdomainService,
+        @InjectQueue(TENANT_UNLOCK_QUEUE)
+        private readonly unlockQueue: Queue<TenantUnlockJobData>,
+        private readonly auditService: AuditService
     ) {}
 
     async findAll(): Promise<TenantEntity[]> {
@@ -168,15 +179,37 @@ export class AwareTenantService {
         return { available };
     }
 
-    async transferOwnership(id: string, newOwnerId: string, currentOwnerId: string): Promise<void> {
+    async transferOwnership(id: string, dto: TransferOwnershipDto, user: CurrentUserType, ipAddress?: string): Promise<void> {
+        // Task 73: Password verification
+        const passwordValid = await this.kratosService.verifyPassword(user.identityId, dto.password);
+        if (!passwordValid) {
+            throw new HttpException({ message: 'Invalid password', code: HttpStatus.UNAUTHORIZED }, HttpStatus.UNAUTHORIZED);
+        }
+
         const tenant = await this.findOneOrFail({ id });
 
-        // Emit event for Keto relation updates
+        // Task 75: Audit logging
+        await this.auditService.log({
+            tenantId: id,
+            userId: user.id,
+            action: AuditAction.OWNERSHIP_TRANSFERRED,
+            description: `Transferred ownership of tenant ${id} to ${dto.newOwnerId}`,
+            metadata: {
+                tenantId: id,
+                oldOwnerId: user.id,
+                newOwnerId: dto.newOwnerId
+            },
+            ipAddress,
+            userAgent: 'system' // Controller doesn't pass user agent yet, can be updated later
+        });
+
+        // Emit event for Keto relation updates and notifications
         this.eventEmitter.emit('ownership.transferred', {
             tenantId: id,
-            oldOwnerId: currentOwnerId,
-            newOwnerId,
-            tenantName: tenant.name
+            oldOwnerId: user.id,
+            newOwnerId: dto.newOwnerId,
+            tenantName: tenant.name,
+            ipAddress
         });
     }
 
@@ -187,12 +220,11 @@ export class AwareTenantService {
     async scheduleDeletion(
         id: string,
         dto: ScheduleDeletionDto,
-        userId: string,
-        identityId: string,
+        user: CurrentUserType,
         ipAddress?: string
     ): Promise<{ scheduledAt: Date; executionDate: Date }> {
         // Verify password
-        const passwordValid = await this.kratosService.verifyPassword(identityId, dto.password);
+        const passwordValid = await this.kratosService.verifyPassword(user.identityId, dto.password);
         if (!passwordValid) {
             throw new HttpException({ message: 'Invalid password', code: HttpStatus.UNAUTHORIZED }, HttpStatus.UNAUTHORIZED);
         }
@@ -219,7 +251,8 @@ export class AwareTenantService {
         // Emit event for side effects (Audit, SNS, Notification, Job Queue)
         this.eventEmitter.emit('tenant.deletion.scheduled', {
             tenant,
-            userId,
+            userId: user.id,
+            userEmail: user.email,
             scheduledAt,
             executionDate,
             reason: dto.reason,
@@ -233,9 +266,9 @@ export class AwareTenantService {
      * Cancel a scheduled tenant deletion
      * Requires password verification for security
      */
-    async cancelDeletion(id: string, dto: CancelDeletionDto, userId: string, identityId: string, ipAddress?: string): Promise<void> {
+    async cancelDeletion(id: string, dto: CancelDeletionDto, user: CurrentUserType, ipAddress?: string): Promise<void> {
         // Verify password
-        const passwordValid = await this.kratosService.verifyPassword(identityId, dto.password);
+        const passwordValid = await this.kratosService.verifyPassword(user.identityId, dto.password);
         if (!passwordValid) {
             throw new HttpException({ message: 'Invalid password', code: HttpStatus.UNAUTHORIZED }, HttpStatus.UNAUTHORIZED);
         }
@@ -257,7 +290,8 @@ export class AwareTenantService {
         // Emit event for side effects (Audit, SNS, Notification)
         this.eventEmitter.emit('tenant.deletion.cancelled', {
             tenant,
-            userId,
+            userId: user.id,
+            userEmail: user.email,
             ipAddress
         });
     }
@@ -300,5 +334,125 @@ export class AwareTenantService {
 
     async remove(id: string): Promise<DeleteResult> {
         return await this.tenantRepository.delete(id);
+    }
+
+    /**
+     * Lock a tenant account
+     * Requires password verification for security
+     */
+    async lock(id: string, dto: LockTenantDto, userId: string, identityId: string, ipAddress?: string): Promise<TenantEntity> {
+        // Verify password
+        const passwordValid = await this.kratosService.verifyPassword(identityId, dto.password);
+        if (!passwordValid) {
+            throw new HttpException({ message: 'Invalid password', code: HttpStatus.UNAUTHORIZED }, HttpStatus.UNAUTHORIZED);
+        }
+
+        const tenant = await this.findOneOrFail({ id });
+
+        // Check if already locked
+        if (tenant.status === TenantStatusEnum.LOCKED) {
+            throw new HttpException({ message: 'Tenant is already locked', code: HttpStatus.CONFLICT }, HttpStatus.CONFLICT);
+        }
+
+        // Update tenant status
+        tenant.status = TenantStatusEnum.LOCKED;
+        tenant.lockedAt = new Date();
+        tenant.lockUntil = dto.lockUntil;
+        tenant.lockReason = dto.reason;
+
+        await this.tenantRepository.save(tenant);
+
+        // Schedule auto-unlock job if lockUntil is set
+        if (dto.lockUntil) {
+            const delay = new Date(dto.lockUntil).getTime() - Date.now();
+            if (delay > 0) {
+                await this.unlockQueue.add(
+                    'auto-unlock',
+                    {
+                        tenantId: id,
+                        lockUntil: new Date(dto.lockUntil).toISOString()
+                    },
+                    {
+                        delay,
+                        jobId: `unlock-${id}` // Prevent multiple parallel unlock jobs for same tenant
+                    }
+                );
+            }
+        }
+
+        // Emit event for side effects
+        this.eventEmitter.emit('tenant.locked', {
+            tenant,
+            userId,
+            lockedAt: tenant.lockedAt,
+            lockUntil: tenant.lockUntil,
+            reason: tenant.lockReason,
+            ipAddress
+        });
+
+        return tenant;
+    }
+
+    /**
+     * Unlock a tenant account
+     * Requires password verification for security
+     */
+    async unlock(id: string, dto: UnlockTenantDto, userId: string, identityId: string, ipAddress?: string): Promise<TenantEntity> {
+        // Verify password
+        const passwordValid = await this.kratosService.verifyPassword(identityId, dto.password);
+        if (!passwordValid) {
+            throw new HttpException({ message: 'Invalid password', code: HttpStatus.UNAUTHORIZED }, HttpStatus.UNAUTHORIZED);
+        }
+
+        const tenant = await this.findOneOrFail({ id });
+
+        // Check if locked
+        if (tenant.status !== TenantStatusEnum.LOCKED) {
+            throw new HttpException({ message: 'Tenant is not locked', code: HttpStatus.BAD_REQUEST }, HttpStatus.BAD_REQUEST);
+        }
+
+        // Restore tenant to active status
+        tenant.status = TenantStatusEnum.ACTIVE;
+        tenant.lockedAt = undefined;
+        tenant.lockUntil = undefined;
+        tenant.lockReason = undefined;
+
+        await this.tenantRepository.save(tenant);
+
+        // Emit event for side effects
+        this.eventEmitter.emit('tenant.unlocked', {
+            tenant,
+            userId,
+            ipAddress
+        });
+
+        return tenant;
+    }
+
+    /**
+     * Automatically unlock a tenant account
+     * This is called by the system (e.g., Bull job)
+     */
+    async autoUnlock(id: string): Promise<void> {
+        const tenant = await this.tenantRepository.findOneOrFailTenantContext({ id });
+
+        if (tenant.status !== TenantStatusEnum.LOCKED) {
+            return;
+        }
+
+        // Restore tenant to active status
+        tenant.status = TenantStatusEnum.ACTIVE;
+        tenant.lockedAt = undefined;
+        tenant.lockUntil = undefined;
+        tenant.lockReason = undefined;
+
+        await this.tenantRepository.save(tenant);
+
+        // Emit event for side effects
+        this.eventEmitter.emit('tenant.unlocked', {
+            tenant,
+            userId: 'system',
+            reason: 'auto-unlock'
+        });
     }
 }

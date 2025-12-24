@@ -1,4 +1,4 @@
-import { CanActivate, ExecutionContext, Injectable, UnauthorizedException } from '@nestjs/common';
+import { CanActivate, ExecutionContext, HttpException, HttpStatus, Injectable, UnauthorizedException } from '@nestjs/common';
 import { ApiKeyService } from '../api-key.service';
 import { ClsService } from 'nestjs-cls';
 import { ClsRequestContext } from '@mod/domains/context/cls-request-context';
@@ -27,7 +27,7 @@ export class ApiKeyGuard implements CanActivate {
         const apiKey = await this.apiKeyService.validateKey(apiKeyHeader as string);
 
         if (!apiKey) {
-            throw new UnauthorizedException('Invalid or expired API Key');
+            throw new HttpException({ message: 'Invalid or expired API Key' }, HttpStatus.EXPECTATION_FAILED);
         }
 
         // Set CLS Context

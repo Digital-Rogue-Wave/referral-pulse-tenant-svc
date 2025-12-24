@@ -11,6 +11,9 @@ import { TenantStatusEnum } from '@mod/common/enums/tenant.enum';
 import { createMock, DeepMocked } from '@golevelup/ts-jest';
 import { DnsVerificationService } from './dns/dns-verification.service';
 import { SubdomainService } from './dns/subdomain.service';
+import { getQueueToken } from '@nestjs/bullmq';
+import { TENANT_UNLOCK_QUEUE } from '@mod/common/bullmq/queues/tenant-unlock.queue';
+import { AuditService } from '@mod/common/audit/audit.service';
 
 import { TenantAwareRepository } from '@mod/common/tenant/tenant-aware.repository';
 import Stubber from '@mod/common/mock/typeorm-faker';
@@ -30,6 +33,13 @@ describe('AwareTenantService - Deletion', () => {
         deletionScheduledAt: undefined,
         deletionReason: undefined
     });
+
+    const mockUser = {
+        id: 'user-123',
+        email: 'test@example.com',
+        identityId: 'user-123',
+        sub: 'user-123'
+    };
 
     beforeEach(async () => {
         tenantRepository = createMock<TenantAwareRepository<TenantEntity>>();
@@ -67,6 +77,14 @@ describe('AwareTenantService - Deletion', () => {
                 {
                     provide: SubdomainService,
                     useValue: createMock<SubdomainService>()
+                },
+                {
+                    provide: getQueueToken(TENANT_UNLOCK_QUEUE),
+                    useValue: createMock()
+                },
+                {
+                    provide: AuditService,
+                    useValue: createMock<AuditService>()
                 }
             ]
         }).compile();
@@ -77,8 +95,6 @@ describe('AwareTenantService - Deletion', () => {
     describe('scheduleDeletion', () => {
         it('should schedule deletion successfully', async () => {
             const dto = { password: 'correct-password', reason: 'No longer needed' };
-            const userId = 'user-123';
-            const identityId = 'identity-123';
 
             kratosService.verifyPassword.mockResolvedValue(true);
             tenantRepository.findOneOrFailTenantContext.mockResolvedValue(mockTenant);
@@ -91,7 +107,7 @@ describe('AwareTenantService - Deletion', () => {
                 }) as any
             );
 
-            const result = await service.scheduleDeletion(mockTenant.id, dto, userId, identityId);
+            const result = await service.scheduleDeletion(mockTenant.id, dto, mockUser);
 
             expect(result).toHaveProperty('scheduledAt');
             expect(result).toHaveProperty('executionDate');
@@ -100,18 +116,14 @@ describe('AwareTenantService - Deletion', () => {
 
         it('should throw error if password is invalid', async () => {
             const dto = { password: 'wrong-password' };
-            const userId = 'user-123';
-            const identityId = 'identity-123';
 
             kratosService.verifyPassword.mockResolvedValue(false);
 
-            await expect(service.scheduleDeletion(mockTenant.id, dto, userId, identityId)).rejects.toThrow(HttpException);
+            await expect(service.scheduleDeletion(mockTenant.id, dto, mockUser)).rejects.toThrow(HttpException);
         });
 
         it('should throw error if deletion is already scheduled', async () => {
             const dto = { password: 'correct-password' };
-            const userId = 'user-123';
-            const identityId = 'identity-123';
 
             const scheduledTenant = Stubber.stubOne(TenantEntity, {
                 ...mockTenant,
@@ -121,15 +133,13 @@ describe('AwareTenantService - Deletion', () => {
             kratosService.verifyPassword.mockResolvedValue(true);
             tenantRepository.findOneOrFailTenantContext.mockResolvedValue(scheduledTenant);
 
-            await expect(service.scheduleDeletion(mockTenant.id, dto, userId, identityId)).rejects.toThrow(HttpException);
+            await expect(service.scheduleDeletion(mockTenant.id, dto, mockUser)).rejects.toThrow(HttpException);
         });
     });
 
     describe('cancelDeletion', () => {
         it('should cancel deletion successfully', async () => {
             const dto = { password: 'correct-password' };
-            const userId = 'user-123';
-            const identityId = 'identity-123';
 
             const scheduledTenant = Stubber.stubOne(TenantEntity, {
                 ...mockTenant,
@@ -149,15 +159,13 @@ describe('AwareTenantService - Deletion', () => {
                 }) as any
             );
 
-            await service.cancelDeletion(mockTenant.id, dto, userId, identityId);
+            await service.cancelDeletion(mockTenant.id, dto, mockUser);
 
             expect(eventEmitter.emit).toHaveBeenCalledWith('tenant.deletion.cancelled', expect.any(Object));
         });
 
         it('should throw error if deletion is not scheduled', async () => {
             const dto = { password: 'correct-password' };
-            const userId = 'user-123';
-            const identityId = 'identity-123';
 
             // Create a fresh mock with ACTIVE status
             const activeTenant = Stubber.stubOne(TenantEntity, {
@@ -168,7 +176,7 @@ describe('AwareTenantService - Deletion', () => {
             kratosService.verifyPassword.mockResolvedValue(true);
             tenantRepository.findOneOrFailTenantContext.mockResolvedValue(activeTenant);
 
-            await expect(service.cancelDeletion(mockTenant.id, dto, userId, identityId)).rejects.toThrow(HttpException);
+            await expect(service.cancelDeletion(mockTenant.id, dto, mockUser)).rejects.toThrow(HttpException);
         });
     });
 

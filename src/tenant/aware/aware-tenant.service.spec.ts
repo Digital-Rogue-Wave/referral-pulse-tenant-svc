@@ -12,6 +12,11 @@ import { TenantStatusEnum, DomainVerificationStatusEnum } from '@mod/common/enum
 import { HttpException, HttpStatus } from '@nestjs/common';
 import { TenantAwareRepository } from '@mod/common/tenant/tenant-aware.repository';
 import Stubber from '@mod/common/mock/typeorm-faker';
+import { getQueueToken } from '@nestjs/bullmq';
+import { TENANT_UNLOCK_QUEUE } from '@mod/common/bullmq/queues/tenant-unlock.queue';
+import { AuditService } from '@mod/common/audit/audit.service';
+import { AuditAction } from '@mod/common/audit/audit-action.enum';
+import { TransferOwnershipDto } from '../dto/transfer-ownership.dto';
 
 describe('AwareTenantService', () => {
     let service: AwareTenantService;
@@ -21,6 +26,8 @@ describe('AwareTenantService', () => {
     let kratosService: DeepMocked<KratosService>;
     let dnsVerificationService: DeepMocked<DnsVerificationService>;
     let subdomainService: DeepMocked<SubdomainService>;
+    let unlockQueue: DeepMocked<any>;
+    let auditService: DeepMocked<AuditService>;
 
     const mockTenant = Stubber.stubOne(TenantEntity, {
         id: 'tenant-123',
@@ -51,7 +58,12 @@ describe('AwareTenantService', () => {
                 { provide: EventEmitter2, useValue: createMock<EventEmitter2>() },
                 { provide: KratosService, useValue: createMock<KratosService>() },
                 { provide: DnsVerificationService, useValue: createMock<DnsVerificationService>() },
-                { provide: SubdomainService, useValue: createMock<SubdomainService>() }
+                { provide: SubdomainService, useValue: createMock<SubdomainService>() },
+                {
+                    provide: getQueueToken(TENANT_UNLOCK_QUEUE),
+                    useValue: createMock<any>()
+                },
+                { provide: AuditService, useValue: createMock<AuditService>() }
             ]
         }).compile();
 
@@ -62,6 +74,9 @@ describe('AwareTenantService', () => {
         kratosService = module.get(KratosService);
         dnsVerificationService = module.get(DnsVerificationService);
         subdomainService = module.get(SubdomainService);
+        subdomainService = module.get(SubdomainService);
+        unlockQueue = module.get(getQueueToken(TENANT_UNLOCK_QUEUE));
+        auditService = module.get(AuditService);
     });
 
     it('should be defined', () => {
@@ -204,12 +219,7 @@ describe('AwareTenantService', () => {
             kratosService.verifyPassword.mockResolvedValue(true);
             tenantRepository.save.mockImplementation((entity) => entity as any);
 
-            const result = await service.scheduleDeletion(
-                'tenant-123',
-                { password: 'valid-password', reason: 'leaving' },
-                mockUser.id,
-                'identity-123'
-            );
+            const result = await service.scheduleDeletion('tenant-123', { password: 'valid-password', reason: 'leaving' }, mockUser);
 
             expect(result.scheduledAt).toBeDefined();
             expect(result.executionDate).toBeDefined();
@@ -224,9 +234,50 @@ describe('AwareTenantService', () => {
         it('should reject invalid password', async () => {
             kratosService.verifyPassword.mockResolvedValue(false);
 
-            await expect(
-                service.scheduleDeletion('tenant-123', { password: 'wrong', reason: 'leaving' }, mockUser.id, 'identity-123')
-            ).rejects.toThrow(HttpException);
+            await expect(service.scheduleDeletion('tenant-123', { password: 'wrong', reason: 'leaving' }, mockUser)).rejects.toThrow(HttpException);
+        });
+    });
+
+    describe('cancelDeletion', () => {
+        it('should cancel scheduled deletion', async () => {
+            const scheduledTenant = Stubber.stubOne(TenantEntity, {
+                ...mockTenant,
+                status: TenantStatusEnum.DELETION_SCHEDULED,
+                deletionScheduledAt: new Date()
+            });
+            tenantRepository.findOneOrFailTenantContext.mockResolvedValue(scheduledTenant);
+            kratosService.verifyPassword.mockResolvedValue(true);
+            tenantRepository.save.mockImplementation((entity) => entity as any);
+
+            await service.cancelDeletion('tenant-123', { password: 'valid' }, mockUser);
+
+            expect(tenantRepository.save).toHaveBeenCalledWith(
+                expect.objectContaining({
+                    status: TenantStatusEnum.ACTIVE,
+                    deletionScheduledAt: undefined
+                })
+            );
+            expect(eventEmitter.emit).toHaveBeenCalledWith('tenant.deletion.cancelled', expect.anything());
+        });
+    });
+
+    describe('executeDeletion', () => {
+        it('should perform hard delete', async () => {
+            const scheduledAt = new Date();
+            scheduledAt.setDate(scheduledAt.getDate() - 31); // 31 days ago
+
+            const scheduledTenant = Stubber.stubOne(TenantEntity, {
+                ...mockTenant,
+                status: TenantStatusEnum.DELETION_SCHEDULED,
+                deletionScheduledAt: scheduledAt
+            });
+            tenantRepository.findOneOrFailTenantContext.mockResolvedValue(scheduledTenant);
+            tenantRepository.remove.mockResolvedValue({} as any);
+
+            await service.executeDeletion('tenant-123');
+
+            expect(tenantRepository.delete).toHaveBeenCalledWith('tenant-123');
+            expect(eventEmitter.emit).toHaveBeenCalledWith('tenant.deleted', expect.anything());
         });
     });
 
@@ -271,6 +322,111 @@ describe('AwareTenantService', () => {
             expect(result.memberCount).toBe(5);
             expect(result.pendingInvitationCount).toBe(2);
             expect(result.activeApiKeyCount).toBe(3);
+        });
+    });
+
+    describe('lock', () => {
+        it('should lock tenant and schedule job', async () => {
+            const lockUntil = new Date();
+            lockUntil.setDate(lockUntil.getDate() + 1);
+
+            tenantRepository.findOneOrFailTenantContext.mockResolvedValue(mockTenant);
+            kratosService.verifyPassword.mockResolvedValue(true);
+            tenantRepository.save.mockImplementation((entity) => entity as any);
+
+            await service.lock('tenant-123', { password: 'valid', reason: 'locked', lockUntil }, mockUser.id, mockUser.identityId);
+
+            expect(tenantRepository.save).toHaveBeenCalledWith(
+                expect.objectContaining({
+                    status: TenantStatusEnum.LOCKED,
+                    lockReason: 'locked',
+                    lockUntil
+                })
+            );
+            expect(unlockQueue.add).toHaveBeenCalledWith('auto-unlock', expect.anything(), expect.anything());
+            expect(eventEmitter.emit).toHaveBeenCalledWith('tenant.locked', expect.anything());
+        });
+
+        it('should throw error if already locked', async () => {
+            const lockedTenant = Stubber.stubOne(TenantEntity, { ...mockTenant, status: TenantStatusEnum.LOCKED });
+            tenantRepository.findOneOrFailTenantContext.mockResolvedValue(lockedTenant);
+            kratosService.verifyPassword.mockResolvedValue(true);
+
+            await expect(service.lock('tenant-123', { password: 'valid' }, mockUser.id, mockUser.identityId)).rejects.toThrow(HttpException);
+        });
+    });
+
+    describe('unlock', () => {
+        it('should unlock tenant', async () => {
+            const lockedTenant = Stubber.stubOne(TenantEntity, { ...mockTenant, status: TenantStatusEnum.LOCKED });
+            tenantRepository.findOneOrFailTenantContext.mockResolvedValue(lockedTenant);
+            kratosService.verifyPassword.mockResolvedValue(true);
+            tenantRepository.save.mockImplementation((entity) => entity as any);
+
+            await service.unlock('tenant-123', { password: 'valid' }, mockUser.id, mockUser.identityId);
+
+            expect(tenantRepository.save).toHaveBeenCalledWith(
+                expect.objectContaining({
+                    status: TenantStatusEnum.ACTIVE,
+                    lockedAt: undefined
+                })
+            );
+            expect(eventEmitter.emit).toHaveBeenCalledWith('tenant.unlocked', expect.anything());
+        });
+    });
+
+    describe('autoUnlock', () => {
+        it('should automatically unlock tenant', async () => {
+            const lockedTenant = Stubber.stubOne(TenantEntity, { ...mockTenant, status: TenantStatusEnum.LOCKED });
+            tenantRepository.findOneOrFailTenantContext.mockResolvedValue(lockedTenant);
+            tenantRepository.save.mockImplementation((entity) => entity as any);
+
+            await service.autoUnlock('tenant-123');
+
+            expect(tenantRepository.save).toHaveBeenCalledWith(
+                expect.objectContaining({
+                    status: TenantStatusEnum.ACTIVE
+                })
+            );
+        });
+    });
+    describe('transferOwnership', () => {
+        const dto: TransferOwnershipDto = {
+            newOwnerId: 'new-owner-123',
+            password: 'valid-password'
+        };
+
+        it('should transfer ownership successfully', async () => {
+            kratosService.verifyPassword.mockResolvedValue(true);
+            tenantRepository.findOneOrFailTenantContext.mockResolvedValue(mockTenant);
+
+            await service.transferOwnership('tenant-123', dto, mockUser);
+
+            expect(kratosService.verifyPassword).toHaveBeenCalledWith(mockUser.identityId, dto.password);
+            expect(auditService.log).toHaveBeenCalledWith(
+                expect.objectContaining({
+                    action: AuditAction.OWNERSHIP_TRANSFERRED,
+                    userId: mockUser.id,
+                    tenantId: 'tenant-123'
+                })
+            );
+            expect(eventEmitter.emit).toHaveBeenCalledWith(
+                'ownership.transferred',
+                expect.objectContaining({
+                    tenantId: 'tenant-123',
+                    oldOwnerId: mockUser.id,
+                    newOwnerId: dto.newOwnerId
+                })
+            );
+        });
+
+        it('should throw error if password is invalid', async () => {
+            kratosService.verifyPassword.mockResolvedValue(false);
+
+            await expect(service.transferOwnership('tenant-123', dto, mockUser)).rejects.toThrow(HttpException);
+
+            expect(auditService.log).not.toHaveBeenCalled();
+            expect(eventEmitter.emit).not.toHaveBeenCalled();
         });
     });
 });

@@ -13,6 +13,7 @@ import { HttpClient } from '@mod/common/http/http.client';
 import { ConfigService } from '@nestjs/config';
 import { DomainProvisioningService } from '../dns/domain-provisioning.service';
 import Stubber from '@mod/common/mock/typeorm-faker';
+import { SesService } from '@mod/common/aws-ses/ses.service';
 
 describe('TenantListener', () => {
     let listener: TenantListener;
@@ -23,6 +24,7 @@ describe('TenantListener', () => {
     let httpClient: DeepMocked<HttpClient>;
     let configService: DeepMocked<ConfigService>;
     let domainProvisioningService: DeepMocked<DomainProvisioningService>;
+    let sesService: DeepMocked<SesService>;
 
     const mockTenant = Stubber.stubOne(TenantEntity, {
         id: 'tenant-123',
@@ -38,6 +40,7 @@ describe('TenantListener', () => {
         httpClient = createMock<HttpClient>();
         configService = createMock<ConfigService>();
         domainProvisioningService = createMock<DomainProvisioningService>();
+        sesService = createMock<SesService>();
 
         configService.getOrThrow.mockReturnValue({
             keto: {
@@ -55,7 +58,8 @@ describe('TenantListener', () => {
                 { provide: getQueueToken(TENANT_DELETION_QUEUE), useValue: queue },
                 { provide: HttpClient, useValue: httpClient },
                 { provide: ConfigService, useValue: configService },
-                { provide: DomainProvisioningService, useValue: domainProvisioningService }
+                { provide: DomainProvisioningService, useValue: domainProvisioningService },
+                { provide: SesService, useValue: sesService }
             ]
         }).compile();
 
@@ -73,6 +77,7 @@ describe('TenantListener', () => {
             const payload = {
                 tenant: mockTenant,
                 userId: 'user-1',
+                userEmail: 'user@example.com',
                 scheduledAt,
                 executionDate,
                 reason: 'Test reason'
@@ -102,7 +107,8 @@ describe('TenantListener', () => {
         it('should remove the deletion job if it exists', async () => {
             const payload = {
                 tenant: mockTenant,
-                userId: 'user-1'
+                userId: 'user-1',
+                userEmail: 'user@example.com'
             };
 
             const jobMock = { remove: jest.fn() };
@@ -119,7 +125,8 @@ describe('TenantListener', () => {
         it('should do nothing if job does not exist', async () => {
             const payload = {
                 tenant: mockTenant,
-                userId: 'user-1'
+                userId: 'user-1',
+                userEmail: 'user@example.com'
             };
 
             queue.getJob.mockResolvedValue(null as any);

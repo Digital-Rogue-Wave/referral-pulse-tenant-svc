@@ -35,6 +35,8 @@ import { ScheduleDeletionDto } from '../dto/schedule-deletion.dto';
 import { CancelDeletionDto } from '../dto/cancel-deletion.dto';
 import { TenantStatsDto } from '../dto/stats/tenant-stats.dto';
 import { TenantStatsService } from '../tenant-stats.service';
+import { LockTenantDto } from '../dto/tenant/lock-tenant.dto';
+import { UnlockTenantDto } from '../dto/tenant/unlock-tenant.dto';
 
 @ApiTags('tenants')
 @ApiHeader({
@@ -161,8 +163,13 @@ export class AwareTenantController {
     @RequirePermission({ namespace: KetoNamespace.TENANT, relation: KetoPermission.UPDATE, objectParam: 'id' })
     @HttpCode(HttpStatus.OK)
     @Put(':id/transfer-ownership')
-    async transferOwnership(@Param('id') id: string, @Body() dto: TransferOwnershipDto, @CurrentUser() user: CurrentUserType): Promise<void> {
-        return await this.tenantService.transferOwnership(id, dto.newOwnerId, user.id);
+    async transferOwnership(
+        @Param('id') id: string,
+        @Body() dto: TransferOwnershipDto,
+        @CurrentUser() user: CurrentUserType,
+        @Ip() ipAddress: string
+    ): Promise<void> {
+        return await this.tenantService.transferOwnership(id, dto, user, ipAddress);
     }
 
     @ApiBody({ type: ScheduleDeletionDto })
@@ -187,7 +194,7 @@ export class AwareTenantController {
         @Ip() ipAddress: string
     ): Promise<{ scheduledAt: Date; executionDate: Date }> {
         const validatedDto = await Utils.validateDtoOrFail(ScheduleDeletionDto, dto);
-        return await this.tenantService.scheduleDeletion(id, validatedDto, user.id, user.identityId, ipAddress);
+        return await this.tenantService.scheduleDeletion(id, validatedDto, user, ipAddress);
     }
 
     @ApiBody({ type: CancelDeletionDto })
@@ -203,7 +210,7 @@ export class AwareTenantController {
         @Ip() ipAddress: string
     ): Promise<void> {
         const validatedDto = await Utils.validateDtoOrFail(CancelDeletionDto, dto);
-        return await this.tenantService.cancelDeletion(id, validatedDto, user.id, user.identityId, ipAddress);
+        return await this.tenantService.cancelDeletion(id, validatedDto, user, ipAddress);
     }
 
     @ApiOkResponse({ type: DeleteResult })
@@ -213,5 +220,39 @@ export class AwareTenantController {
     @Delete(':id')
     async remove(@Param('id') id: string): Promise<DeleteResult> {
         return await this.tenantService.remove(id);
+    }
+
+    @ApiBody({ type: LockTenantDto })
+    @ApiOkResponse({ type: TenantDto })
+    @UseInterceptors(MapInterceptor(TenantEntity, TenantDto))
+    @UseGuards(KetoGuard)
+    @RequirePermission({ namespace: KetoNamespace.TENANT, relation: KetoPermission.UPDATE, objectParam: 'id' })
+    @HttpCode(HttpStatus.OK)
+    @Post(':id/lock')
+    async lock(
+        @Param('id') id: string,
+        @Body() dto: LockTenantDto,
+        @CurrentUser() user: CurrentUserType,
+        @Ip() ipAddress: string
+    ): Promise<TenantEntity> {
+        const validatedDto = await Utils.validateDtoOrFail(LockTenantDto, dto);
+        return await this.tenantService.lock(id, validatedDto, user.id, user.identityId, ipAddress);
+    }
+
+    @ApiBody({ type: UnlockTenantDto })
+    @ApiOkResponse({ type: TenantDto })
+    @UseInterceptors(MapInterceptor(TenantEntity, TenantDto))
+    @UseGuards(KetoGuard)
+    @RequirePermission({ namespace: KetoNamespace.TENANT, relation: KetoPermission.UPDATE, objectParam: 'id' })
+    @HttpCode(HttpStatus.OK)
+    @Post(':id/unlock')
+    async unlock(
+        @Param('id') id: string,
+        @Body() dto: UnlockTenantDto,
+        @CurrentUser() user: CurrentUserType,
+        @Ip() ipAddress: string
+    ): Promise<TenantEntity> {
+        const validatedDto = await Utils.validateDtoOrFail(UnlockTenantDto, dto);
+        return await this.tenantService.unlock(id, validatedDto, user.id, user.identityId, ipAddress);
     }
 }

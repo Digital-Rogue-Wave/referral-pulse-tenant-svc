@@ -4,6 +4,7 @@ import { SnsPublisher } from '@mod/common/aws-sqs/sns.publisher';
 import { AuditService } from '@mod/common/audit/audit.service';
 import { KetoService } from '@mod/common/auth/keto.service';
 import { Utils } from '@mod/common/utils/utils';
+import { SesService } from '@mod/common/aws-ses/ses.service';
 import { KetoNamespace } from '@mod/common/auth/keto.constants';
 import { CreateAuditLogDto } from '@mod/common/audit/create-audit-log.dto';
 import { AuditAction } from '@mod/common/audit/audit-action.enum';
@@ -38,7 +39,8 @@ export class TenantListener {
         @InjectQueue(TENANT_DELETION_QUEUE) private readonly deletionQueue: Queue<TenantDeletionJobData>,
         private readonly httpClient: HttpClient,
         private readonly configService: ConfigService,
-        private readonly domainProvisioningService: DomainProvisioningService
+        private readonly domainProvisioningService: DomainProvisioningService,
+        private readonly sesService: SesService
     ) {
         const oryCfg = this.configService.getOrThrow<ConfigType<typeof oryConfig>>('oryConfig', { infer: true });
         this.ketoReadUrl = oryCfg.keto.readUrl;
@@ -213,6 +215,24 @@ export class TenantListener {
                 delay: Math.max(0, delay) // Ensure non-negative delay
             }
         );
+
+        // 4. Send Email Notification
+        await this.sesService.sendEmail(
+            payload.userEmail,
+            'Account Deletion Scheduled - Referral Pulse',
+            `Hi,
+
+We are confirming that your account for tenant "${tenant.name}" has been scheduled for deletion.
+
+Your account will be permanently deleted on ${executionDate.toLocaleDateString()} at ${executionDate.toLocaleTimeString()}.
+
+If you did not request this, please log in and cancel the deletion immediately or contact support.
+
+Note: You can cancel this request at any time before the execution date.
+
+Best regards,
+The Referral Pulse Team`
+        );
     }
 
     @OnEvent('tenant.deletion.cancelled')
@@ -253,6 +273,22 @@ export class TenantListener {
         if (job) {
             await job.remove();
         }
+
+        // 4. Send Email Notification
+        await this.sesService.sendEmail(
+            payload.userEmail,
+            'Account Deletion Cancelled - Referral Pulse',
+            `Hi,
+
+Good news! The scheduled deletion for your tenant account "${tenant.name}" has been successfully cancelled.
+
+Your account is now active and will not be deleted.
+
+If you have any questions, feel free to contact our support team.
+
+Best regards,
+The Referral Pulse Team`
+        );
     }
 
     @OnEvent('tenant.deleted')
