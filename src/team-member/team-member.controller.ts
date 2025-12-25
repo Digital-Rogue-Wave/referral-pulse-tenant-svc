@@ -24,29 +24,29 @@ export class TeamMemberController {
         @InjectMapper() private readonly mapper: Mapper
     ) {}
 
+    @Get()
     @ApiPaginationQuery(tenantMemberPaginationConfig)
     @ApiOkResponse({ type: PaginatedDto<TeamMemberEntity, TeamMemberDto>, description: 'List of team members' })
     @RequirePermission({ namespace: KetoNamespace.TENANT, relation: KetoPermission.VIEW, objectParam: 'id' })
     @HttpCode(HttpStatus.OK)
-    @Get()
     async listMembers(@Paginate() query: PaginateQuery): Promise<PaginatedDto<TeamMemberEntity, TeamMemberDto>> {
         const member = await this.teamMemberService.findAll(query);
         return new PaginatedDto<TeamMemberEntity, TeamMemberDto>(this.mapper, member, TeamMemberEntity, TeamMemberDto);
     }
 
+    @Put(':id')
     @ApiOkResponse({ type: TeamMemberDto, description: 'Team member role updated' })
     @RequirePermission({ namespace: KetoNamespace.TENANT, relation: KetoPermission.UPDATE, objectParam: 'tenantId' })
     @UseInterceptors(MapInterceptor(TeamMemberEntity, TeamMemberDto))
     @HttpCode(HttpStatus.OK)
-    @Put(':id')
     async updateMember(@Param('id') memberId: string, @Body() updateDto: UpdateTeamMemberDto): Promise<TeamMemberEntity> {
         return this.teamMemberService.updateRole(memberId, updateDto);
     }
 
+    @Delete(':id')
     @ApiOkResponse({ description: 'Team member removed' })
     @RequirePermission({ namespace: KetoNamespace.TENANT, relation: KetoPermission.UPDATE, objectParam: 'tenantId' })
     @HttpCode(HttpStatus.OK)
-    @Delete(':id')
     async removeMember(@Param('id') memberId: string): Promise<DeleteResult> {
         return await this.teamMemberService.remove(memberId);
     }

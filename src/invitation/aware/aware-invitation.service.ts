@@ -33,7 +33,7 @@ export class AwareInvitationService {
         const expiresAt = new Date();
         expiresAt.setDate(expiresAt.getDate() + expiryDays);
 
-        // Calculate fields
+        // Create/validate all invitation domains
         const createFullInvitationDto = await Utils.validateDtoOrFail(CreateFullInvitationDto, {
             ...createInvitationDto,
             token,

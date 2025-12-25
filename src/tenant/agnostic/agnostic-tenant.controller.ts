@@ -10,7 +10,7 @@ import { CreateTenantDto } from '../dto/tenant/create-tenant.dto';
 import { TenantDto } from '../dto/tenant/tenant.dto';
 import { TenantEntity } from '../tenant.entity';
 
-@ApiTags('tenants')
+@ApiTags('Agnostic Tenants')
 @ApiBearerAuth()
 @Controller({ path: 'tenants', version: '1' })
 export class AgnosticTenantController {

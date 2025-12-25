@@ -24,6 +24,7 @@ import { ApiKeyStatusEnum } from '@mod/common/enums/api-key.enum';
 import { InvitationStatusEnum } from '@mod/common/enums/invitation.enum';
 import { randomStringGenerator } from '@nestjs/common/utils/random-string-generator.util';
 import { CurrentUserType } from '@mod/common/auth/current-user.decorator';
+import { DomainDto } from '@mod/tenant/dto/domain/domain.dto';
 
 @Injectable()
 export class AwareTenantService {
@@ -161,11 +162,7 @@ export class AwareTenantService {
         return tenant;
     }
 
-    async getDomainStatus(id: string): Promise<{
-        customDomain?: string;
-        domainVerificationStatus?: DomainVerificationStatusEnum;
-        domainVerificationToken?: string;
-    }> {
+    async getDomainStatus(id: string): Promise<Partial<DomainDto>> {
         const tenant = await this.findOneOrFail({ id });
         return {
             customDomain: tenant.customDomain,

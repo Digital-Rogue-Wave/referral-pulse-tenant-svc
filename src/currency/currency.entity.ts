@@ -1,22 +1,22 @@
 import EntityHelper from '@mod/common/entities/entity-helper';
 import { Entity, Column, PrimaryColumn } from 'typeorm';
-import { ApiProperty } from '@nestjs/swagger';
+import { AutoMap } from '@automapper/classes';
 
 @Entity({ name: 'currencies' })
 export class CurrencyEntity extends EntityHelper {
-    @ApiProperty({ example: 'USD', description: 'ISO 4217 Currency Code' })
+    @AutoMap()
     @PrimaryColumn({ length: 3 })
     code: string;
 
-    @ApiProperty({ example: 'US Dollar', description: 'Currency Name' })
+    @AutoMap()
     @Column()
     name: string;
 
-    @ApiProperty({ example: '$', description: 'Currency Symbol' })
+    @AutoMap()
     @Column()
     symbol: string;
 
-    @ApiProperty({ example: 2, description: 'Number of decimal places' })
+    @AutoMap()
     @Column({ type: 'int', default: 2 })
     decimals: number;
 }

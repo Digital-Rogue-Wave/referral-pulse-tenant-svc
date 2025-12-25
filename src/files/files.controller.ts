@@ -12,7 +12,7 @@ import {
     UseGuards,
     UseInterceptors
 } from '@nestjs/common';
-import { ApiBearerAuth, ApiBody, ApiConsumes, ApiOperation, ApiTags } from '@nestjs/swagger';
+import { ApiBearerAuth, ApiBody, ApiConsumes, ApiTags } from '@nestjs/swagger';
 import { AuthGuard } from '@nestjs/passport';
 import { FilesService } from './files.service';
 import { DeleteResult } from 'typeorm';
@@ -39,8 +39,8 @@ export class FilesController {
         @InjectMapper() private readonly mapper: Mapper
     ) {}
 
-    @ApiBearerAuth()
     @Post('upload')
+    @ApiBearerAuth()
     @ApiConsumes('multipart/form-data')
     @ApiBody({
         schema: {
@@ -60,6 +60,7 @@ export class FilesController {
         return this.filesService.uploadFile(file);
     }
 
+    @Post('upload-multiple')
     @ApiConsumes('multipart/form-data')
     @ApiBody({
         schema: {
@@ -78,28 +79,28 @@ export class FilesController {
     @UseInterceptors(FilesInterceptor('files', 10))
     @UseInterceptors(MapInterceptor(FileEntity, FileDto, { isArray: true }))
     @HttpCode(HttpStatus.CREATED)
-    @Post('upload-multiple')
     async uploadMultipleFiles(@UploadedFiles() files: Array<Express.Multer.File | Express.MulterS3.File>): Promise<FileEntity[]> {
         return this.filesService.uploadMultipleFiles(files);
     }
 
+    @Get('presigned/:type')
     @ApiBearerAuth()
     @UseGuards(AuthGuard('jwt'))
-    @Get('presigned/:type')
     async getPresignedUrl(@Param('type') type: string): Promise<PresignedUrlResponseDto> {
         return await this.filesService.getPresignedUrl(type);
     }
 
+    @Get()
     @ApiPaginationQuery(filePaginationConfig)
     @HttpCode(HttpStatus.OK)
-    @Get()
     async findAllPaginated(@Paginate() query: PaginateQuery): Promise<PaginatedDto<FileEntity, FileDto>> {
         const files = await this.filesService.findAllPaginated(query);
         return new PaginatedDto<FileEntity, FileDto>(this.mapper, files, FileEntity, FileDto);
     }
+
+    @Get(':id')
     @UseInterceptors(MapInterceptor(FileEntity, FileDto))
     @HttpCode(HttpStatus.OK)
-    @Get(':id')
     async findOne(@Param('id') id: string): Promise<NullableType<FileEntity>> {
         return this.filesService.findOne({ id });
     }
@@ -110,10 +111,6 @@ export class FilesController {
      * @param id
      * @param file {Express.Multer.File | Express.MulterS3.File} file to update
      */
-    @ApiOperation({
-        summary: 'Update a file in storage and database',
-        description: 'This endpoint update a file in storage and database.'
-    })
     @Put(':id')
     @HttpCode(HttpStatus.OK)
     @ApiConsumes('multipart/form-data')
@@ -140,13 +137,9 @@ export class FilesController {
      * @returns {Promise<DeleteResult>} updated file
      * @param id file id
      */
-    @ApiOperation({
-        summary: 'Delete a file in storage and database',
-        description: 'This endpoint delete a file from storage and database.'
-    })
+    @Delete(':id')
     @UseGuards(AuthGuard('jwt'))
     @HttpCode(HttpStatus.OK)
-    @Delete(':id')
     async deleteFile(@Param('id') id: string): Promise<DeleteResult> {
         return await this.filesService.deleteFile(id);
     }

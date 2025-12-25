@@ -1,6 +1,6 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { UserNotificationPreferenceService } from './user-notification-preference.service';
-import { UserNotificationPreferenceEntity } from './user-notification-preference.entity';
+import { UserNotificationPreferenceEntity } from '../user-notification-preference.entity';
 import { TenantAwareRepository } from '@mod/common/tenant/tenant-aware.repository';
 import { ClsService } from 'nestjs-cls';
 import { SnsPublisher } from '@mod/common/aws-sqs/sns.publisher';

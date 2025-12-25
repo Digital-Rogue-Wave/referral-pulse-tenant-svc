@@ -4,7 +4,9 @@ import { ConfigService } from '@nestjs/config';
 import { Public } from '@mod/common/auth/jwt-auth.guard';
 import { BillingService } from '../billing/billing.service';
 import { Request } from 'express';
+import { ApiTags } from '@nestjs/swagger';
 
+@ApiTags('Webhooks')
 @Controller({ path: 'webhook', version: '1' })
 @Public()
 export class WebhookController {

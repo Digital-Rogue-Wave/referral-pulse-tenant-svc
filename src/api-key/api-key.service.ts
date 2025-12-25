@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { HttpException, HttpStatus, Injectable } from '@nestjs/common';
 import { FindOptionsRelations, FindOptionsWhere } from 'typeorm';
 import { ApiKeyEntity } from './api-key.entity';
 import { CreateApiKeyDto } from './dto/create-api-key.dto';
@@ -87,12 +87,7 @@ export class ApiKeyService {
         const apiKey = await this.findOneOrFail({ id });
 
         // Update fields
-        if (updateDto.name !== undefined) {
-            apiKey.name = updateDto.name;
-        }
-        if (updateDto.scopes !== undefined) {
-            apiKey.scopes = updateDto.scopes;
-        }
+        Object.assign(apiKey, updateDto);
 
         const updatedKey = await this.apiKeyRepository.saveTenantContext(apiKey);
 
@@ -156,7 +151,7 @@ export class ApiKeyService {
      * Validate an API key (for authentication middleware)
      * Returns the API key entity if valid, null otherwise
      */
-    async validateKey(rawKey: string): Promise<ApiKeyEntity | null> {
+    async validateKey(rawKey: string): Promise<NullableType<ApiKeyEntity>> {
         const keyPrefix = this.sharedService.extractApiKeyPrefix(rawKey);
 
         // Find by prefix first (indexed) - use QueryBuilder to BYPASS tenant context check
@@ -167,25 +162,28 @@ export class ApiKeyService {
             .andWhere('k.status = :status', { status: ApiKeyStatusEnum.ACTIVE })
             .getOne();
 
-        // Check each key's hash
-        if (apiKey) {
-            const isValid = await this.sharedService.compareApiKeys(rawKey, apiKey.keyHash);
-            if (isValid) {
-                // Check expiration
-                if (apiKey.expiresAt && new Date() > apiKey.expiresAt) {
-                    return null;
-                }
-
-                // Update last used timestamp (async, don't await)
-                this.updateLastUsed(apiKey.id).catch((err) => {
-                    console.error('Failed to update lastUsedAt:', err);
-                });
-
-                return apiKey;
-            }
+        if (!apiKey) {
+            return null;
         }
 
-        return null;
+        // Verify the key hash
+        const isValid = await this.sharedService.compareApiKeys(rawKey, apiKey.keyHash);
+        if (!isValid) {
+            return null;
+        }
+
+        // Check expiration before updating last used timestamp
+        if (apiKey.expiresAt && new Date() > apiKey.expiresAt) {
+            throw new HttpException({ message: 'The API key has expired' }, HttpStatus.UNAUTHORIZED);
+        }
+
+        // Update last used timestamp asynchronously (fire and forget)
+        this.updateLastUsed(apiKey.id).catch((error) => {
+            // Log error but don't fail the authentication
+            console.error('Failed to update API key last used timestamp:', error);
+        });
+
+        return apiKey;
     }
 
     /**

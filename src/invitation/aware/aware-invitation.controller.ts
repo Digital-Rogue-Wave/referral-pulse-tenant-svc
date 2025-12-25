@@ -1,4 +1,4 @@
-import { Controller, Post, Body, Param, UseGuards, HttpCode, HttpStatus, UseInterceptors, Delete, Get } from '@nestjs/common';
+import { Controller, Post, Body, Param, UseGuards, HttpCode, HttpStatus, UseInterceptors, Delete, Get, Put } from '@nestjs/common';
 import { AwareInvitationService } from './aware-invitation.service';
 import { CreateInvitationDto } from '../dto/create-invitation.dto';
 import { JwtAuthGuard } from '@mod/common/auth/jwt-auth.guard';
@@ -14,7 +14,7 @@ import { ApiPaginationQuery, Paginate, PaginateQuery } from 'nestjs-paginate';
 import { PaginatedDto } from '@mod/common/serialization/paginated.dto';
 import { Mapper } from '@automapper/core';
 
-@ApiTags('Invitations')
+@ApiTags('Aware Invitations')
 @ApiBearerAuth()
 @UseGuards(JwtAuthGuard, KetoGuard)
 @Controller({ path: 'invitations', version: '1' })
@@ -24,32 +24,41 @@ export class AwareInvitationController {
         @InjectMapper() private readonly mapper: Mapper
     ) {}
 
+    @Post()
     @ApiBody({ type: CreateInvitationDto })
     @ApiCreatedResponse({ type: InvitationDto, description: 'The invitation has been successfully created' })
     @RequirePermission({ namespace: KetoNamespace.TENANT, relation: KetoPermission.INVITE })
     @UseInterceptors(MapInterceptor(InvitationEntity, InvitationDto))
     @HttpCode(HttpStatus.CREATED)
-    @Post()
     async invite(@Body() createInvitationDto: CreateInvitationDto): Promise<InvitationEntity> {
         return this.invitationService.create(createInvitationDto);
     }
 
+    @Get()
     @ApiPaginationQuery(invitationPaginationConfig)
     @ApiOkResponse({ type: PaginatedDto<InvitationEntity, InvitationDto>, description: 'The invitations have been successfully retrieved' })
     @UseInterceptors(MapInterceptor(InvitationEntity, InvitationDto))
     @HttpCode(HttpStatus.OK)
-    @Get()
     async listInvitations(@Paginate() query: PaginateQuery): Promise<PaginatedDto<InvitationEntity, InvitationDto>> {
         const invitations = await this.invitationService.findAll(query);
         return new PaginatedDto<InvitationEntity, InvitationDto>(this.mapper, invitations, InvitationEntity, InvitationDto);
     }
 
+    @Get(':id')
     @ApiOkResponse({ type: InvitationDto, description: 'The invitation has been successfully validated' })
     @UseInterceptors(MapInterceptor(InvitationEntity, InvitationDto))
     @HttpCode(HttpStatus.OK)
-    @Get(':id')
     async validate(@Param('id') invitationId: string): Promise<NullableType<InvitationEntity>> {
         return this.invitationService.findOne({ id: invitationId });
+    }
+
+    @Put(':id/resend')
+    @ApiOkResponse({ type: InvitationDto, description: 'The invitation has been successfully resent' })
+    @RequirePermission({ namespace: KetoNamespace.TENANT, relation: KetoPermission.INVITE })
+    @UseInterceptors(MapInterceptor(InvitationEntity, InvitationDto))
+    @HttpCode(HttpStatus.OK)
+    async resend(@Param('id') invitationId: string): Promise<InvitationEntity> {
+        return this.invitationService.resend(invitationId);
     }
 
     @ApiOkResponse({ description: 'The invitation has been successfully revoked' })
@@ -58,14 +67,5 @@ export class AwareInvitationController {
     @Delete(':id')
     async revoke(@Param('id') invitationId: string): Promise<void> {
         return this.invitationService.revoke(invitationId);
-    }
-
-    @ApiOkResponse({ type: InvitationDto, description: 'The invitation has been successfully resent' })
-    @RequirePermission({ namespace: KetoNamespace.TENANT, relation: KetoPermission.INVITE })
-    @UseInterceptors(MapInterceptor(InvitationEntity, InvitationDto))
-    @HttpCode(HttpStatus.OK)
-    @Post(':id/resend')
-    async resend(@Param('id') invitationId: string): Promise<InvitationEntity> {
-        return this.invitationService.resend(invitationId);
     }
 }
