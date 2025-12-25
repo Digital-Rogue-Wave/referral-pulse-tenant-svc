@@ -1,3 +1,4 @@
+import { AutoMap } from '@automapper/classes';
 import { EntityHelperDto } from '@mod/common/dto/entity-helper.dto';
 import { ApiKeyStatusEnum } from '@mod/common/enums/api-key.enum';
 import { ApiProperty } from '@nestjs/swagger';
@@ -7,24 +8,28 @@ export class ApiKeyDto extends EntityHelperDto {
         description: 'Unique identifier for the API key',
         example: '550e8400-e29b-41d4-a716-446655440000'
     })
+    @AutoMap()
     id: string;
 
     @ApiProperty({
         description: 'Tenant ID this API key belongs to',
         example: '550e8400-e29b-41d4-a716-446655440000'
     })
+    @AutoMap()
     tenantId: string;
 
     @ApiProperty({
         description: 'Friendly name for the API key',
         example: 'Production API Key'
     })
+    @AutoMap()
     name: string;
 
     @ApiProperty({
         description: 'Prefix of the API key for identification',
         example: 'sk_live_abc'
     })
+    @AutoMap()
     keyPrefix: string;
 
     @ApiProperty({
@@ -32,6 +37,7 @@ export class ApiKeyDto extends EntityHelperDto {
         enum: ApiKeyStatusEnum,
         example: ApiKeyStatusEnum.ACTIVE
     })
+    @AutoMap()
     status: ApiKeyStatusEnum;
 
     @ApiProperty({
@@ -39,6 +45,7 @@ export class ApiKeyDto extends EntityHelperDto {
         example: ['campaigns:read', 'campaigns:write'],
         type: [String]
     })
+    @AutoMap()
     scopes: string[];
 
     @ApiProperty({
@@ -46,6 +53,7 @@ export class ApiKeyDto extends EntityHelperDto {
         example: '2024-12-11T10:30:00Z',
         nullable: true
     })
+    @AutoMap()
     lastUsedAt: Date | null;
 
     @ApiProperty({
@@ -53,5 +61,6 @@ export class ApiKeyDto extends EntityHelperDto {
         example: '2025-12-31T23:59:59Z',
         nullable: false
     })
+    @AutoMap()
     expiresAt: Date;
 }

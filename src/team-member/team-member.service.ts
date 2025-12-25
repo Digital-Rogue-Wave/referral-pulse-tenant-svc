@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { HttpException, HttpStatus, Injectable } from '@nestjs/common';
 import { DeleteResult, FindOptionsRelations, FindOptionsWhere } from 'typeorm';
 import { TeamMemberEntity } from './team-member.entity';
 import { UpdateTeamMemberDto } from './dto/update-team-member.dto';
@@ -8,8 +8,6 @@ import { Paginated, PaginateQuery } from 'nestjs-paginate';
 import { tenantMemberPaginationConfig } from './config/tenant-member-pagination-config';
 import { InjectTenantAwareRepository, TenantAwareRepository } from '@mod/common/tenant/tenant-aware.repository';
 import { CreateTeamMemberDto } from './dto/create-team-member.dto';
-import { AuditService } from '@mod/common/audit/audit.service';
-import { AuditAction } from '@mod/common/audit/audit-action.enum';
 import { ClsService } from 'nestjs-cls';
 import { ClsRequestContext } from '@mod/domains/context/cls-request-context';
 import { RoleEnum } from '@mod/common/enums/role.enum';
@@ -22,7 +20,6 @@ export class TeamMemberService {
         @InjectTenantAwareRepository(TeamMemberEntity)
         private readonly teamMemberRepository: TenantAwareRepository<TeamMemberEntity>,
         private readonly eventEmitter: EventEmitter2,
-        private readonly auditService: AuditService,
         private readonly cls: ClsService<ClsRequestContext>
     ) {}
 
@@ -67,35 +64,21 @@ export class TeamMemberService {
             });
 
             if (adminCount <= 1) {
-                throw new BadRequestException('Cannot downgrade the last administrator in the tenant');
+                throw new HttpException({ message: 'Cannot downgrade the last administrator in the tenant' }, HttpStatus.FORBIDDEN);
             }
         }
 
         member.role = newRole;
         const updatedMember = await this.teamMemberRepository.saveTenantContext(member);
 
-        // Task 58: Audit logging
-        await this.auditService.log({
-            tenantId: member.tenantId,
-            userId: this.cls.get().userId,
-            action: AuditAction.MEMBER_ROLE_UPDATED,
-            description: `Updated role for member ${member.userId} from ${oldRole} to ${newRole}`,
-            metadata: {
-                memberId: member.id,
-                targetUserId: member.userId,
-                oldRole,
-                newRole
-            },
-            ipAddress: this.cls.get().ip,
-            userAgent: this.cls.get().userAgent
-        });
-
         // Emit event for audit/Keto updates
         this.eventEmitter.emit('member.role.updated', {
             memberId: member.id,
             userId: member.userId,
             oldRole,
-            newRole: updateDto.role
+            newRole: updateDto.role,
+            ipAddress: this.cls.get().ip,
+            userAgent: this.cls.get().userAgent
         });
 
         return updatedMember;
@@ -115,26 +98,13 @@ export class TeamMemberService {
             }
         }
 
-        // Task 58: Audit logging
-        await this.auditService.log({
-            tenantId: member.tenantId,
-            userId: this.cls.get().userId,
-            action: AuditAction.MEMBER_REMOVED,
-            description: `Removed member ${member.userId} from tenant`,
-            metadata: {
-                memberId: member.id,
-                targetUserId: member.userId,
-                role: member.role
-            },
-            ipAddress: this.cls.get().ip,
-            userAgent: this.cls.get().userAgent
-        });
-
         // Emit event for Keto cleanup, session invalidation, and notification
         this.eventEmitter.emit('member.removed', {
             memberId: member.id,
             userId: member.userId,
-            tenantId: member.tenantId
+            tenantId: member.tenantId,
+            ipAddress: this.cls.get().ip,
+            userAgent: this.cls.get().userAgent
         });
 
         return await this.teamMemberRepository.deleteTenantContext({ id: memberId });

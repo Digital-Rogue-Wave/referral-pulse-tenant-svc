@@ -9,8 +9,8 @@ import { AgnosticTenantSettingService } from './agnostic/agnostic-tenant-setting
 import { AwareTenantSettingService } from './aware/aware-tenant-setting.service';
 import { TenantAwareRepositoryModule } from '@mod/common/tenant/tenant-aware.repository';
 import { UserNotificationPreferenceEntity } from './user-notification-preference.entity';
-import { UserNotificationPreferenceService } from './user-notification-preference.service';
-import { UserNotificationPreferenceController } from './user-notification-preference.controller';
+import { UserNotificationPreferenceService } from './aware/user-notification-preference.service';
+import { UserNotificationPreferenceController } from './aware/user-notification-preference.controller';
 import { SnsModule } from '@mod/common/aws-sqs/sns.module';
 
 @Module({

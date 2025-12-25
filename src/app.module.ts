@@ -43,6 +43,7 @@ import { AwareTenantController } from './tenant/aware/aware-tenant.controller';
 import { ApiKeyMiddleware } from './api-key/middleware/api-key.middleware';
 import { TenantStatusGuard } from './tenant/guards/tenant-status.guard';
 import { TestBillingController } from './billing/test-billing.controller';
+import { UserNotificationPreferenceController } from './tenant-setting/aware/user-notification-preference.controller';
 
 @Module({
     imports: [
@@ -91,6 +92,7 @@ export class AppModule implements NestModule {
                 ApiKeyController,
                 TeamMemberController,
                 AwareInvitationController,
+                UserNotificationPreferenceController,
                 BillingController,
                 PlanAdminController,
                 PlanPublicController,

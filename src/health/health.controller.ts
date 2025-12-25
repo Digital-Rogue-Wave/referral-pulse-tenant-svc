@@ -4,7 +4,9 @@ import { ConfigService } from '@nestjs/config';
 import { DataSource } from 'typeorm';
 import { RedisHealthIndicator } from '@mod/health/redis.health';
 import { Public } from '@mod/common/auth/jwt-auth.guard';
+import { ApiTags } from '@nestjs/swagger';
 
+@ApiTags('Health')
 @Controller({ path: 'health', version: '1' })
 @Public()
 export class HealthController {
