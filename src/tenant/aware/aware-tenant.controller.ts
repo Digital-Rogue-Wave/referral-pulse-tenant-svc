@@ -141,7 +141,6 @@ export class AwareTenantController {
     @Put(':id/schedule-deletion')
     @ApiBody({ type: ScheduleDeletionDto })
     @ApiOkResponse({ description: 'Deletion scheduled successfully' })
-    @UseGuards(KetoGuard)
     @RequirePermission({ namespace: KetoNamespace.TENANT, relation: KetoPermission.DELETE, objectParam: 'id' })
     @HttpCode(HttpStatus.OK)
     async scheduleDeletion(
@@ -157,7 +156,6 @@ export class AwareTenantController {
     @Put(':id/cancel-deletion')
     @ApiBody({ type: CancelDeletionDto })
     @ApiOkResponse({ description: 'Deletion cancelled successfully' })
-    @UseGuards(KetoGuard)
     @RequirePermission({ namespace: KetoNamespace.TENANT, relation: KetoPermission.UPDATE, objectParam: 'id' })
     @HttpCode(HttpStatus.OK)
     async cancelDeletion(
@@ -174,7 +172,6 @@ export class AwareTenantController {
     @ApiBody({ type: LockTenantDto })
     @ApiOkResponse({ type: TenantDto })
     @UseInterceptors(MapInterceptor(TenantEntity, TenantDto))
-    @UseGuards(KetoGuard)
     @RequirePermission({ namespace: KetoNamespace.TENANT, relation: KetoPermission.UPDATE, objectParam: 'id' })
     @HttpCode(HttpStatus.OK)
     async lock(
@@ -191,7 +188,6 @@ export class AwareTenantController {
     @ApiBody({ type: UnlockTenantDto })
     @ApiOkResponse({ type: TenantDto })
     @UseInterceptors(MapInterceptor(TenantEntity, TenantDto))
-    @UseGuards(KetoGuard)
     @RequirePermission({ namespace: KetoNamespace.TENANT, relation: KetoPermission.UPDATE, objectParam: 'id' })
     @HttpCode(HttpStatus.OK)
     async unlock(
@@ -205,7 +201,6 @@ export class AwareTenantController {
 
     @Delete(':id')
     @ApiOkResponse({ type: DeleteResult })
-    @UseGuards(KetoGuard)
     @RequirePermission({ namespace: KetoNamespace.TENANT, relation: KetoPermission.DELETE, objectParam: 'id' })
     @HttpCode(HttpStatus.OK)
     async remove(@Param('id') id: string): Promise<DeleteResult> {
