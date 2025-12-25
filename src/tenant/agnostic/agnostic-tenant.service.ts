@@ -13,6 +13,7 @@ import { Utils } from '@mod/common/utils/utils';
 import { KetoRelationTupleDto } from '@mod/common/auth/dto/keto-relation-tuple.dto';
 import { KetoNamespace, KetoRelation } from '@mod/common/auth/keto.constants';
 import { TenantStatusEnum } from '@mod/common/enums/tenant.enum';
+import { NullableType } from '@mod/types/nullable.type';
 
 @Injectable()
 export class AgnosticTenantService {
@@ -92,12 +93,12 @@ export class AgnosticTenantService {
         return savedTenant;
     }
 
-    async findById(id: string): Promise<TenantEntity | null> {
+    async findOne(id: string): Promise<NullableType<TenantEntity>> {
         return await this.tenantRepository.findOne({ where: { id } });
     }
 
     async suspend(id: string, reason?: string): Promise<TenantEntity> {
-        const tenant = await this.tenantRepository.findOne({ where: { id } });
+        const tenant = await this.findOne(id);
         if (!tenant) {
             throw new HttpException({ message: 'Tenant not found', code: HttpStatus.NOT_FOUND }, HttpStatus.NOT_FOUND);
         }

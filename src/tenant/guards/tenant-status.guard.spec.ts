@@ -45,7 +45,7 @@ describe('TenantStatusGuard', () => {
 
     it('should allow access if tenant is ACTIVE', async () => {
         cls.get.mockReturnValue('tenant-1');
-        tenantService.findById.mockResolvedValue({ id: 'tenant-1', status: TenantStatusEnum.ACTIVE } as any);
+        tenantService.findOne.mockResolvedValue({ id: 'tenant-1', status: TenantStatusEnum.ACTIVE } as any);
         const context = createMock<ExecutionContext>();
         const result = await guard.canActivate(context);
         expect(result).toBe(true);
@@ -53,7 +53,7 @@ describe('TenantStatusGuard', () => {
 
     it('should throw FORBIDDEN if tenant is SUSPENDED', async () => {
         cls.get.mockReturnValue('tenant-1');
-        tenantService.findById.mockResolvedValue({ id: 'tenant-1', status: TenantStatusEnum.SUSPENDED } as any);
+        tenantService.findOne.mockResolvedValue({ id: 'tenant-1', status: TenantStatusEnum.SUSPENDED } as any);
         const context = createMock<ExecutionContext>();
 
         await expect(guard.canActivate(context)).rejects.toThrow(HttpException);
@@ -67,7 +67,7 @@ describe('TenantStatusGuard', () => {
 
     it('should throw FORBIDDEN if tenant is LOCKED', async () => {
         cls.get.mockReturnValue('tenant-1');
-        tenantService.findById.mockResolvedValue({ id: 'tenant-1', status: TenantStatusEnum.LOCKED } as any);
+        tenantService.findOne.mockResolvedValue({ id: 'tenant-1', status: TenantStatusEnum.LOCKED } as any);
         const context = createMock<ExecutionContext>();
 
         await expect(guard.canActivate(context)).rejects.toThrow(HttpException);
@@ -81,7 +81,7 @@ describe('TenantStatusGuard', () => {
 
     it('should throw NOT_FOUND if tenant not in DB', async () => {
         cls.get.mockReturnValue('non-existent');
-        tenantService.findById.mockResolvedValue(null);
+        tenantService.findOne.mockResolvedValue(null);
         const context = createMock<ExecutionContext>();
 
         await expect(guard.canActivate(context)).rejects.toThrow(HttpException);

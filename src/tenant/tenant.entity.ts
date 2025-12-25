@@ -56,6 +56,14 @@ export class TenantEntity extends EntityHelper {
     @Column({ type: 'timestamp', nullable: true })
     lockedAt?: Date;
 
+    @Column({ type: 'timestamp', nullable: true })
+    @AutoMap()
+    lockUntil?: Date;
+
+    @Column({ type: 'text', nullable: true })
+    @AutoMap()
+    lockReason?: string;
+
     @OneToOne(() => TenantSettingEntity, (setting) => setting.tenant, {
         cascade: true
     })

@@ -6,7 +6,7 @@ import { AgnosticTenantService } from '../agnostic/agnostic-tenant.service';
 import { Request } from 'express';
 
 @Injectable()
-export class TenantStatusGuard implements CanActivate {
+export class TenantLockGuard implements CanActivate {
     constructor(
         private readonly tenantService: AgnosticTenantService,
         private readonly cls: ClsService<ClsRequestContext>
@@ -27,16 +27,15 @@ export class TenantStatusGuard implements CanActivate {
             throw new HttpException({ message: 'Tenant not found' }, HttpStatus.NOT_FOUND);
         }
 
-        if (tenant.status === TenantStatusEnum.SUSPENDED) {
-            throw new HttpException(
-                { message: 'This account has been suspended. Please contact support.', code: 'TENANT_SUSPENDED' },
-                HttpStatus.FORBIDDEN
-            );
-        }
-
         if (tenant.status === TenantStatusEnum.LOCKED) {
             throw new HttpException(
-                { message: 'This account has been locked due to security concerns.', code: 'TENANT_LOCKED' },
+                {
+                    message: 'This account has been locked. Please unlock it using your password.',
+                    code: 'TENANT_LOCKED',
+                    lockedAt: tenant.lockedAt,
+                    lockUntil: tenant.lockUntil,
+                    reason: tenant.lockReason
+                },
                 HttpStatus.FORBIDDEN
             );
         }

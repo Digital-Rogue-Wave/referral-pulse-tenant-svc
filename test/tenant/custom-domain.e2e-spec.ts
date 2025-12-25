@@ -21,6 +21,9 @@ import { SubdomainService } from '@mod/tenant/dns/subdomain.service';
 import { TenantStatsService } from '@mod/tenant/tenant-stats.service';
 import { JwtAuthGuard } from '@mod/common/auth/jwt-auth.guard';
 import { KetoGuard } from '@mod/common/auth/keto.guard';
+import { getQueueToken } from '@nestjs/bullmq';
+import { TENANT_UNLOCK_QUEUE } from '@mod/common/bullmq/queues/tenant-unlock.queue';
+import { AuditService } from '@mod/common/audit/audit.service';
 
 describe('Custom Domain (Integration)', () => {
     let app: INestApplication;
@@ -68,7 +71,9 @@ describe('Custom Domain (Integration)', () => {
                 { provide: EventEmitter2, useValue: createMock<EventEmitter2>() },
                 { provide: KratosService, useValue: createMock<KratosService>() },
                 { provide: SubdomainService, useValue: createMock<SubdomainService>() },
-                { provide: TenantStatsService, useValue: createMock<TenantStatsService>() }
+                { provide: TenantStatsService, useValue: createMock<TenantStatsService>() },
+                { provide: getQueueToken(TENANT_UNLOCK_QUEUE), useValue: createMock() },
+                { provide: AuditService, useValue: createMock<AuditService>() }
             ]
         })
             .overrideGuard(JwtAuthGuard)
