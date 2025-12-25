@@ -155,6 +155,87 @@ export class StripeService {
         return subscription;
     }
 
+    async previewSubscriptionUpgrade(params: {
+        stripeSubscriptionId: string;
+        targetPlan: BillingPlanEnum;
+    }): Promise<{ amountDueNow: number; currency: string; nextInvoiceDate: Date | null }> {
+        const stripe = this.stripeClient();
+
+        const subscription = await stripe.subscriptions.retrieve(params.stripeSubscriptionId);
+
+        const rawSubscription = subscription as any;
+        const customerId =
+            typeof rawSubscription.customer === 'string' ? rawSubscription.customer : rawSubscription.customer?.id;
+
+        if (!customerId) {
+            throw new HttpException('Stripe subscription is missing customer for upgrade preview', HttpStatus.BAD_REQUEST);
+        }
+
+        const items = subscription.items?.data ?? [];
+        const firstItem = items[0];
+
+        if (!firstItem) {
+            throw new HttpException('Stripe subscription has no items for upgrade preview', HttpStatus.BAD_REQUEST);
+        }
+
+        const newPriceId = this.priceIdForPlan(params.targetPlan);
+
+        const invoices = stripe.invoices as any;
+
+        const upcoming = await invoices.retrieveUpcoming({
+            customer: customerId,
+            subscription: params.stripeSubscriptionId,
+            subscription_items: [
+                {
+                    id: firstItem.id,
+                    price: newPriceId
+                }
+            ]
+        });
+
+        const amountDueNow = (upcoming.amount_due ?? 0) / 100;
+        const currency = upcoming.currency ?? 'usd';
+        const nextInvoiceDate = upcoming.next_payment_attempt
+            ? new Date(upcoming.next_payment_attempt * 1000)
+            : null;
+
+        this.logger.log(
+            `Calculated Stripe subscription upgrade preview for subscription ${params.stripeSubscriptionId} to plan ${params.targetPlan}: amountDueNow=${amountDueNow} ${currency}`
+        );
+
+        return { amountDueNow, currency, nextInvoiceDate };
+    }
+
+    async upgradeSubscription(params: { stripeSubscriptionId: string; targetPlan: BillingPlanEnum }): Promise<void> {
+        const stripe = this.stripeClient();
+
+        const subscription = await stripe.subscriptions.retrieve(params.stripeSubscriptionId);
+
+        const items = subscription.items?.data ?? [];
+        const firstItem = items[0];
+
+        if (!firstItem) {
+            throw new HttpException('Stripe subscription has no items to upgrade', HttpStatus.BAD_REQUEST);
+        }
+
+        const newPriceId = this.priceIdForPlan(params.targetPlan);
+
+        await stripe.subscriptions.update(params.stripeSubscriptionId, {
+            items: [
+                {
+                    id: firstItem.id,
+                    price: newPriceId
+                }
+            ],
+            proration_behavior: 'create_prorations',
+            cancel_at_period_end: false
+        });
+
+        this.logger.log(
+            `Upgraded Stripe subscription ${params.stripeSubscriptionId} to plan ${params.targetPlan} with proration`
+        );
+    }
+
     async cancelSubscription(stripeSubscriptionId: string): Promise<void> {
         const stripe = this.stripeClient();
         await stripe.subscriptions.cancel(stripeSubscriptionId);
