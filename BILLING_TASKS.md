@@ -144,20 +144,22 @@ These items come from `openspec/changes/add-subscription-checkout/specs/tenant-b
   - Align with `BILLING.md` 3.2 (e.g. coupon validation, any extra metadata requirements).
   - Ensure all plan types (Free, Starter, Growth, Enterprise) are supported and documented.
 
-- [ ] 3.3 Webhook behaviors beyond `add-subscription-checkout`
+- [x] 3.3 Webhook behaviors beyond `add-subscription-checkout`
   - Any additional events (e.g. `subscription.created` vs `subscription.changed`) required by `BILLING.md`.
   - Confirmation email on successful subscription where applicable.
 
-- [ ] 3.4 Upgrade flow
+- [x] 3.4 Upgrade flow
   - `POST /billings/subscription/upgrade` and upgrade preview endpoint.
   - Stripe subscription upgrade with proration.
   - Immediate tenant plan update, confirmation email, `subscription.upgraded` event.
 
 - [ ] 3.5 Downgrade flow
-  - `POST /billings/subscription/downgrade` plus cancel‑pending‑downgrade endpoint.
-  - Usage vs plan‑limit validation.
-  - Schedule change at period end in Stripe.
-  - Email + `subscription.downgrade_scheduled` event.
+  - `POST /billings/subscription/downgrade` endpoint (REFER-279) plus cancel‑pending‑downgrade endpoint (REFER-281).
+  - Usage vs plan‑limit validation (REFER-278).
+  - Schedule Stripe subscription change for period end (REFER-280).
+  - Store pending downgrade in database (REFER-281).
+  - Send downgrade scheduled email (REFER-282).
+  - Publish `subscription.downgrade_scheduled` event (REFER-283).
 
 - [ ] 3.6 Cancellation flow
   - `POST /billings/subscription/cancel` and reactivation endpoint.

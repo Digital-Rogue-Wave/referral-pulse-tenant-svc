@@ -1,9 +1,10 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { HttpException, HttpStatus, Injectable, Logger } from '@nestjs/common';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { BillingEntity } from './billing.entity';
 import { BillingPlanEnum, SubscriptionStatusEnum, PaymentStatusEnum } from '@mod/common/enums/billing.enum';
 import { SubscriptionCheckoutResponseDto } from './dto/subscription-checkout-response.dto';
 import { SubscriptionStatusDto } from './dto/subscription-status.dto';
+import { SubscriptionUpgradePreviewResponseDto } from './dto/subscription-upgrade-preview-response.dto';
 import { StripeService } from './stripe.service';
 import { ClsService } from 'nestjs-cls';
 import type { ClsRequestContext } from '@domains/context/cls-request-context';
@@ -15,6 +16,7 @@ import { AuditAction } from '@mod/common/audit/audit-action.enum';
 import { InjectTenantAwareRepository, TenantAwareRepository } from '@mod/common/tenant/tenant-aware.repository';
 import { AgnosticTenantService } from '@mod/tenant/agnostic/agnostic-tenant.service';
 import { TenantStatsService } from '@mod/tenant/tenant-stats.service';
+import { SubscriptionCreatedEvent, SubscriptionUpgradedEvent } from '@mod/common/interfaces/billing-events.interface';
 
 @Injectable()
 export class BillingService {
@@ -163,10 +165,8 @@ export class BillingService {
                 stripeSubscriptionStatus = subscription.status;
 
                 const rawSubscription = subscription as any;
-                if (rawSubscription.current_period_end) {
-                    const endDate = new Date(rawSubscription.current_period_end * 1000);
-                    stripeCurrentPeriodEnd = endDate.toISOString();
-                }
+                const endDate = new Date(rawSubscription.current_period_end * 1000);
+                stripeCurrentPeriodEnd = endDate.toISOString();
 
                 stripeCancelAtPeriodEnd = !!rawSubscription.cancel_at_period_end;
             } catch (err) {
@@ -192,6 +192,77 @@ export class BillingService {
             stripeCurrentPeriodEnd,
             stripeCancelAtPeriodEnd
         };
+    }
+
+    async previewSubscriptionUpgrade(targetPlan: BillingPlanEnum): Promise<SubscriptionUpgradePreviewResponseDto> {
+        const billing = await this.getOrCreateBillingForCurrentTenant();
+
+        if (!billing.stripeSubscriptionId) {
+            throw new HttpException('No active subscription to upgrade for this tenant', HttpStatus.BAD_REQUEST);
+        }
+
+        const preview = await this.stripeService.previewSubscriptionUpgrade({
+            stripeSubscriptionId: billing.stripeSubscriptionId,
+            targetPlan
+        });
+
+        return {
+            targetPlan,
+            amountDueNow: preview.amountDueNow,
+            currency: preview.currency,
+            nextInvoiceDate: preview.nextInvoiceDate
+        };
+    }
+
+    async upgradeSubscription(targetPlan: BillingPlanEnum): Promise<SubscriptionStatusDto> {
+        const billing = await this.getOrCreateBillingForCurrentTenant();
+
+        if (!billing.stripeSubscriptionId) {
+            throw new HttpException('No active subscription to upgrade for this tenant', HttpStatus.BAD_REQUEST);
+        }
+
+        const previousPlan = billing.plan;
+        const previousStatus = billing.status;
+
+        const userId = this.cls.get('userId');
+
+        await this.stripeService.upgradeSubscription({
+            stripeSubscriptionId: billing.stripeSubscriptionId,
+            targetPlan
+        });
+
+        billing.plan = targetPlan;
+        billing.status = SubscriptionStatusEnum.ACTIVE;
+
+        await this.billingRepository.save(billing);
+
+        const upgradedEvent: SubscriptionUpgradedEvent = {
+            tenantId: billing.tenantId,
+            previousPlan,
+            billingPlan: billing.plan,
+            subscriptionStatus: billing.status,
+            stripeCustomerId: billing.stripeCustomerId ?? undefined,
+            stripeSubscriptionId: billing.stripeSubscriptionId ?? undefined,
+            upgradeUserId: userId ?? null
+        };
+
+        this.eventEmitter.emit('subscription.upgraded', upgradedEvent);
+
+        await this.auditService.log({
+            tenantId: billing.tenantId,
+            action: AuditAction.SUBSCRIPTION_UPDATED,
+            description: `Subscription upgraded from plan ${previousPlan} to ${billing.plan}`,
+            metadata: {
+                previousPlan,
+                previousStatus,
+                plan: billing.plan,
+                status: billing.status,
+                stripeCustomerId: billing.stripeCustomerId,
+                stripeSubscriptionId: billing.stripeSubscriptionId
+            }
+        });
+
+        return await this.getCurrentSubscription();
     }
 
     async handleStripeWebhook(rawBody: Buffer | string, signature: string): Promise<void> {
@@ -295,6 +366,24 @@ export class BillingService {
         billing.stripeTransactionId = paymentIntentId ?? billing.stripeTransactionId ?? null;
 
         await this.billingRepository.save(billing);
+
+        const isNewPaidSubscription =
+            planId !== BillingPlanEnum.FREE &&
+            billing.status === SubscriptionStatusEnum.ACTIVE &&
+            (previousStatus !== SubscriptionStatusEnum.ACTIVE || !previousStripeSubscriptionId);
+
+        if (isNewPaidSubscription) {
+            const createdEvent: SubscriptionCreatedEvent = {
+                tenantId: billing.tenantId,
+                billingPlan: billing.plan,
+                subscriptionStatus: billing.status,
+                stripeCustomerId: billing.stripeCustomerId ?? undefined,
+                stripeSubscriptionId: billing.stripeSubscriptionId ?? undefined,
+                checkoutUserId: userId ?? null
+            };
+
+            this.eventEmitter.emit('subscription.created', createdEvent);
+        }
 
         this.eventEmitter.emit('subscription.changed', {
             tenantId: billing.tenantId,
