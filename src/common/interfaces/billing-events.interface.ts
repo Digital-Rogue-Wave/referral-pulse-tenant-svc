@@ -26,3 +26,26 @@ export interface SubscriptionUpgradedEvent {
     stripeSubscriptionId?: string;
     upgradeUserId?: string | null;
 }
+
+export interface SubscriptionDowngradeScheduledEvent {
+    tenantId: string;
+    previousPlan: BillingPlanEnum;
+    billingPlan: BillingPlanEnum;
+    subscriptionStatus: SubscriptionStatusEnum;
+    stripeCustomerId?: string;
+    stripeSubscriptionId?: string;
+    downgradeUserId?: string | null;
+    effectiveDate?: string | null;
+}
+
+export interface SubscriptionCancelledEvent {
+    tenantId: string;
+    previousPlan: BillingPlanEnum;
+    billingPlan: BillingPlanEnum;
+    subscriptionStatus: SubscriptionStatusEnum;
+    stripeCustomerId?: string;
+    stripeSubscriptionId?: string;
+    cancelUserId?: string | null;
+    cancellationReason?: string | null;
+    cancellationEffectiveDate?: string | null;
+}

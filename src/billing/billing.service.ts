@@ -5,6 +5,7 @@ import { BillingPlanEnum, SubscriptionStatusEnum, PaymentStatusEnum } from '@mod
 import { SubscriptionCheckoutResponseDto } from './dto/subscription-checkout-response.dto';
 import { SubscriptionStatusDto } from './dto/subscription-status.dto';
 import { SubscriptionUpgradePreviewResponseDto } from './dto/subscription-upgrade-preview-response.dto';
+import { SubscriptionCancelRequestDto } from './dto/subscription-cancel-request.dto';
 import { StripeService } from './stripe.service';
 import { ClsService } from 'nestjs-cls';
 import type { ClsRequestContext } from '@domains/context/cls-request-context';
@@ -15,8 +16,14 @@ import { AuditService } from '@mod/common/audit/audit.service';
 import { AuditAction } from '@mod/common/audit/audit-action.enum';
 import { InjectTenantAwareRepository, TenantAwareRepository } from '@mod/common/tenant/tenant-aware.repository';
 import { AgnosticTenantService } from '@mod/tenant/agnostic/agnostic-tenant.service';
+import { TenantEntity } from '@mod/tenant/tenant.entity';
 import { TenantStatsService } from '@mod/tenant/tenant-stats.service';
-import { SubscriptionCreatedEvent, SubscriptionUpgradedEvent } from '@mod/common/interfaces/billing-events.interface';
+import {
+    SubscriptionCreatedEvent,
+    SubscriptionDowngradeScheduledEvent,
+    SubscriptionUpgradedEvent,
+    SubscriptionCancelledEvent
+} from '@mod/common/interfaces/billing-events.interface';
 
 @Injectable()
 export class BillingService {
@@ -126,7 +133,7 @@ export class BillingService {
         let trialDaysRemaining: number | null = null;
 
         try {
-            const tenant = await this.tenantService.findById(tenantId);
+            const tenant = await this.tenantService.findOne(tenantId);
             if (tenant?.trialEndsAt) {
                 trialEndsAt = tenant.trialEndsAt;
                 const now = new Date();
@@ -190,7 +197,12 @@ export class BillingService {
             planUsagePercentage,
             stripeSubscriptionStatus,
             stripeCurrentPeriodEnd,
-            stripeCancelAtPeriodEnd
+            stripeCancelAtPeriodEnd,
+            pendingDowngradePlan: billing.pendingDowngradePlan ?? null,
+            downgradeScheduledAt: billing.downgradeScheduledAt ?? null,
+            cancellationReason: billing.cancellationReason ?? null,
+            cancellationRequestedAt: billing.cancellationRequestedAt ?? null,
+            cancellationEffectiveAt: billing.cancellationEffectiveAt ?? null
         };
     }
 
@@ -265,6 +277,255 @@ export class BillingService {
         return await this.getCurrentSubscription();
     }
 
+    async cancelSubscription(dto: SubscriptionCancelRequestDto): Promise<SubscriptionStatusDto> {
+        const billing = await this.getOrCreateBillingForCurrentTenant();
+
+        if (!billing.stripeSubscriptionId) {
+            throw new HttpException('No active subscription to cancel for this tenant', HttpStatus.BAD_REQUEST);
+        }
+
+        if (billing.status !== SubscriptionStatusEnum.ACTIVE) {
+            throw new HttpException('Only active subscriptions can be cancelled', HttpStatus.BAD_REQUEST);
+        }
+
+        const now = new Date();
+
+        if (billing.cancellationRequestedAt && billing.cancellationEffectiveAt && billing.cancellationEffectiveAt > now) {
+            throw new HttpException('Subscription cancellation is already scheduled', HttpStatus.BAD_REQUEST);
+        }
+
+        const userId = this.cls.get('userId');
+
+        const schedule = await this.stripeService.scheduleSubscriptionCancellation(billing.stripeSubscriptionId);
+
+        billing.cancellationReason = dto.reason ?? null;
+        billing.cancellationRequestedAt = now;
+        billing.cancellationEffectiveAt = schedule.effectiveDate ?? null;
+
+        await this.billingRepository.save(billing);
+
+        const cancelledEvent: SubscriptionCancelledEvent = {
+            tenantId: billing.tenantId,
+            previousPlan: billing.plan,
+            billingPlan: billing.plan,
+            subscriptionStatus: billing.status,
+            stripeCustomerId: billing.stripeCustomerId ?? undefined,
+            stripeSubscriptionId: billing.stripeSubscriptionId ?? undefined,
+            cancelUserId: userId ?? null,
+            cancellationReason: billing.cancellationReason ?? null,
+            cancellationEffectiveDate: billing.cancellationEffectiveAt
+                ? billing.cancellationEffectiveAt.toISOString()
+                : null
+        };
+
+        this.eventEmitter.emit('subscription.cancelled', cancelledEvent);
+
+        await this.auditService.log({
+            tenantId: billing.tenantId,
+            action: AuditAction.SUBSCRIPTION_CANCELLED,
+            description: `Subscription cancellation scheduled to take effect at ${
+                billing.cancellationEffectiveAt?.toISOString() ?? 'the end of the current period'
+            }`,
+            metadata: {
+                plan: billing.plan,
+                status: billing.status,
+                cancellationReason: billing.cancellationReason,
+                cancellationRequestedAt: billing.cancellationRequestedAt,
+                cancellationEffectiveAt: billing.cancellationEffectiveAt,
+                stripeCustomerId: billing.stripeCustomerId,
+                stripeSubscriptionId: billing.stripeSubscriptionId,
+                cancelUserId: userId ?? null
+            }
+        });
+
+        return await this.getCurrentSubscription();
+    }
+
+    async reactivateSubscription(): Promise<SubscriptionStatusDto> {
+        const billing = await this.getOrCreateBillingForCurrentTenant();
+
+        if (!billing.stripeSubscriptionId) {
+            throw new HttpException('No active subscription to reactivate for this tenant', HttpStatus.BAD_REQUEST);
+        }
+
+        const now = new Date();
+
+        if (!billing.cancellationRequestedAt || !billing.cancellationEffectiveAt) {
+            throw new HttpException('No pending cancellation to reactivate', HttpStatus.BAD_REQUEST);
+        }
+
+        if (billing.cancellationEffectiveAt <= now) {
+            throw new HttpException('Cancellation is already effective and cannot be reactivated', HttpStatus.BAD_REQUEST);
+        }
+
+        const previousRequestedAt = billing.cancellationRequestedAt;
+        const previousEffectiveAt = billing.cancellationEffectiveAt;
+
+        await this.stripeService.reactivateSubscription(billing.stripeSubscriptionId);
+
+        billing.cancellationReason = null;
+        billing.cancellationRequestedAt = null;
+        billing.cancellationEffectiveAt = null;
+
+        await this.billingRepository.save(billing);
+
+        await this.auditService.log({
+            tenantId: billing.tenantId,
+            action: AuditAction.SUBSCRIPTION_UPDATED,
+            description: `Subscription cancellation scheduled at ${previousEffectiveAt?.toISOString()} was reactivated`,
+            metadata: {
+                plan: billing.plan,
+                status: billing.status,
+                previousCancellationRequestedAt: previousRequestedAt,
+                previousCancellationEffectiveAt: previousEffectiveAt,
+                stripeCustomerId: billing.stripeCustomerId,
+                stripeSubscriptionId: billing.stripeSubscriptionId
+            }
+        });
+
+        return await this.getCurrentSubscription();
+    }
+
+    private async validateDowngradeUsageOrThrow(targetPlan: BillingPlanEnum): Promise<void> {
+        const tenantId = this.billingRepository.getTenantId();
+
+        try {
+            const stats = await this.tenantStatsService.getStats(tenantId);
+            const usage = stats.planUsagePercentage ?? null;
+
+            this.logger.log(
+                `Downgrade usage validation placeholder for tenant ${tenantId}, targetPlan=${targetPlan}, planUsagePercentage=${
+                    usage ?? 'unknown'
+                }`
+            );
+        } catch (err) {
+            this.logger.error(
+                `Failed to perform downgrade usage validation for tenant ${tenantId} and plan ${targetPlan}`,
+                err as Error
+            );
+        }
+    }
+
+    async downgradeSubscription(targetPlan: BillingPlanEnum): Promise<SubscriptionStatusDto> {
+        const billing = await this.getOrCreateBillingForCurrentTenant();
+
+        if (!billing.stripeSubscriptionId) {
+            throw new HttpException('No active subscription to downgrade for this tenant', HttpStatus.BAD_REQUEST);
+        }
+
+        if (billing.plan === targetPlan) {
+            throw new HttpException('Target plan must be different from current plan', HttpStatus.BAD_REQUEST);
+        }
+
+        const planOrder = [
+            BillingPlanEnum.FREE,
+            BillingPlanEnum.STARTER,
+            BillingPlanEnum.GROWTH,
+            BillingPlanEnum.ENTERPRISE
+        ];
+
+        const currentIndex = planOrder.indexOf(billing.plan);
+        const targetIndex = planOrder.indexOf(targetPlan);
+
+        if (currentIndex === -1 || targetIndex === -1) {
+            throw new HttpException('Unsupported billing plan for downgrade', HttpStatus.BAD_REQUEST);
+        }
+
+        if (targetIndex >= currentIndex) {
+            throw new HttpException('Target plan must be lower than current plan for downgrade', HttpStatus.BAD_REQUEST);
+        }
+
+        if (billing.pendingDowngradePlan) {
+            throw new HttpException('There is already a pending downgrade scheduled for this subscription', HttpStatus.BAD_REQUEST);
+        }
+
+        await this.validateDowngradeUsageOrThrow(targetPlan);
+
+        const previousPlan = billing.plan;
+        const previousStatus = billing.status;
+
+        const userId = this.cls.get('userId');
+
+        const schedule = await this.stripeService.scheduleSubscriptionDowngrade({
+            stripeSubscriptionId: billing.stripeSubscriptionId,
+            targetPlan
+        });
+
+        billing.pendingDowngradePlan = targetPlan;
+        billing.downgradeScheduledAt = schedule.effectiveDate ?? null;
+
+        await this.billingRepository.save(billing);
+
+        const downgradeEvent: SubscriptionDowngradeScheduledEvent = {
+            tenantId: billing.tenantId,
+            previousPlan,
+            billingPlan: targetPlan,
+            subscriptionStatus: billing.status,
+            stripeCustomerId: billing.stripeCustomerId ?? undefined,
+            stripeSubscriptionId: billing.stripeSubscriptionId ?? undefined,
+            downgradeUserId: userId ?? null,
+            effectiveDate: schedule.effectiveDate ? schedule.effectiveDate.toISOString() : null
+        };
+
+        this.eventEmitter.emit('subscription.downgrade_scheduled', downgradeEvent);
+
+        await this.auditService.log({
+            tenantId: billing.tenantId,
+            action: AuditAction.SUBSCRIPTION_DOWNGRADE_SCHEDULED,
+            description: `Subscription downgrade scheduled from plan ${previousPlan} to ${targetPlan}`,
+            metadata: {
+                previousPlan,
+                previousStatus,
+                plan: billing.plan,
+                status: billing.status,
+                pendingDowngradePlan: billing.pendingDowngradePlan,
+                downgradeScheduledAt: billing.downgradeScheduledAt,
+                stripeCustomerId: billing.stripeCustomerId,
+                stripeSubscriptionId: billing.stripeSubscriptionId
+            }
+        });
+
+        return await this.getCurrentSubscription();
+    }
+
+    async cancelPendingDowngrade(): Promise<SubscriptionStatusDto> {
+        const billing = await this.getOrCreateBillingForCurrentTenant();
+
+        if (!billing.stripeSubscriptionId) {
+            throw new HttpException('No active subscription to cancel downgrade for this tenant', HttpStatus.BAD_REQUEST);
+        }
+
+        if (!billing.pendingDowngradePlan) {
+            throw new HttpException('No pending downgrade to cancel for this subscription', HttpStatus.BAD_REQUEST);
+        }
+
+        await this.stripeService.cancelPendingSubscriptionDowngrade(billing.stripeSubscriptionId);
+
+        const previousPendingPlan = billing.pendingDowngradePlan;
+        const previousScheduledAt = billing.downgradeScheduledAt;
+
+        billing.pendingDowngradePlan = null;
+        billing.downgradeScheduledAt = null;
+
+        await this.billingRepository.save(billing);
+
+        await this.auditService.log({
+            tenantId: billing.tenantId,
+            action: AuditAction.SUBSCRIPTION_UPDATED,
+            description: `Pending subscription downgrade to plan ${previousPendingPlan} scheduled at ${previousScheduledAt} was cancelled`,
+            metadata: {
+                plan: billing.plan,
+                status: billing.status,
+                previousPendingDowngradePlan: previousPendingPlan,
+                previousDowngradeScheduledAt: previousScheduledAt,
+                stripeCustomerId: billing.stripeCustomerId,
+                stripeSubscriptionId: billing.stripeSubscriptionId
+            }
+        });
+
+        return await this.getCurrentSubscription();
+    }
+
     async handleStripeWebhook(rawBody: Buffer | string, signature: string): Promise<void> {
         let event: Stripe.Event;
         try {
@@ -303,6 +564,10 @@ export class BillingService {
                 }
                 case 'invoice.payment_failed': {
                     await this.handleInvoicePaymentFailed(event);
+                    break;
+                }
+                case 'customer.subscription.deleted': {
+                    await this.handleCustomerSubscriptionDeleted(event);
                     break;
                 }
                 default:
@@ -367,6 +632,10 @@ export class BillingService {
 
         await this.billingRepository.save(billing);
 
+        if (planId !== BillingPlanEnum.FREE) {
+            await this.endTenantTrialIfActive(tenantId);
+        }
+
         const isNewPaidSubscription =
             planId !== BillingPlanEnum.FREE &&
             billing.status === SubscriptionStatusEnum.ACTIVE &&
@@ -424,5 +693,79 @@ export class BillingService {
         this.logger.warn(
             `Processed invoice.payment_failed from Stripe: eventId=${event.id}, invoiceId=${invoiceId}, customerId=${customerId ?? 'unknown'}, paymentIntentId=${paymentIntentId ?? 'unknown'}`
         );
+    }
+
+    private async endTenantTrialIfActive(tenantId: string): Promise<void> {
+        try {
+            const tenant = await this.billingRepository.manager.findOne(TenantEntity, {
+                where: { id: tenantId }
+            });
+
+            if (!tenant?.trialEndsAt) {
+                return;
+            }
+
+            const now = new Date();
+
+            if (tenant.trialEndsAt > now) {
+                tenant.trialEndsAt = now;
+                await this.billingRepository.manager.save(tenant);
+
+                this.logger.log(
+                    `Ended trial early for tenant ${tenantId} at ${now.toISOString()} due to paid subscription checkout`
+                );
+            }
+        } catch (err) {
+            this.logger.error(`Failed to end trial early for tenant ${tenantId}`, err as Error);
+        }
+    }
+
+    private async handleCustomerSubscriptionDeleted(event: Stripe.Event): Promise<void> {
+        const subscription = event.data.object as Stripe.Subscription;
+        const subscriptionId = subscription.id;
+
+        const billing = await this.billingRepository.manager.findOne(BillingEntity, {
+            where: { stripeSubscriptionId: subscriptionId }
+        });
+
+        if (!billing) {
+            this.logger.warn(
+                `customer.subscription.deleted: no BillingEntity found for subscriptionId=${subscriptionId}, eventId=${event.id}`
+            );
+            return;
+        }
+
+        const previousPlan = billing.plan;
+        const previousStatus = billing.status;
+
+        const rawSubscription = subscription as any;
+        const endedAt = rawSubscription.ended_at as number | undefined;
+        const effectiveDate = endedAt ? new Date(endedAt * 1000) : new Date();
+
+        billing.status = SubscriptionStatusEnum.CANCELED;
+        billing.cancellationEffectiveAt = billing.cancellationEffectiveAt ?? effectiveDate;
+        billing.stripeSubscriptionId = null;
+
+        await this.billingRepository.manager.save(billing);
+
+        this.logger.log(
+            `Processed customer.subscription.deleted from Stripe: eventId=${event.id}, subscriptionId=${subscriptionId}, tenantId=${billing.tenantId}`
+        );
+
+        await this.auditService.log({
+            tenantId: billing.tenantId,
+            action: AuditAction.SUBSCRIPTION_UPDATED,
+            description: `Stripe subscription ${subscriptionId} expired/cancelled; status updated to ${billing.status}`,
+            metadata: {
+                previousPlan,
+                previousStatus,
+                plan: billing.plan,
+                status: billing.status,
+                cancellationEffectiveAt: billing.cancellationEffectiveAt,
+                stripeCustomerId: billing.stripeCustomerId,
+                previousStripeSubscriptionId: subscriptionId,
+                stripeEventId: event.id
+            }
+        });
     }
 }

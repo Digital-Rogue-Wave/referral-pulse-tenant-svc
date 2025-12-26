@@ -153,7 +153,7 @@ These items come from `openspec/changes/add-subscription-checkout/specs/tenant-b
   - Stripe subscription upgrade with proration.
   - Immediate tenant plan update, confirmation email, `subscription.upgraded` event.
 
-- [ ] 3.5 Downgrade flow
+- [x] 3.5 Downgrade flow
   - `POST /billings/subscription/downgrade` endpoint (REFER-279) plus cancel‑pending‑downgrade endpoint (REFER-281).
   - Usage vs plan‑limit validation (REFER-278).
   - Schedule Stripe subscription change for period end (REFER-280).
@@ -161,13 +161,16 @@ These items come from `openspec/changes/add-subscription-checkout/specs/tenant-b
   - Send downgrade scheduled email (REFER-282).
   - Publish `subscription.downgrade_scheduled` event (REFER-283).
 
-- [ ] 3.6 Cancellation flow
+- [x] 3.6 Cancellation flow
   - `POST /billings/subscription/cancel` and reactivation endpoint.
   - Stripe cancel‑at‑period‑end and reactivation.
   - Store cancellation reason, send emails, handle expiry via webhook.
   - `subscription.cancelled` event.
+  - After cancellation becomes effective, tenant loses access to new billing‑dependent actions and analytics; only historical subscription data remains visible.
+  - Cancelled tenant data remains persisted but hidden in the application for a limited retention window (e.g. ~1 month) and becomes visible again only if the tenant upgrades/reactivates within that window.
+  - After the retention window, relevant tenant billing artefacts are soft‑deleted (interim behavior) while long‑term analytics retention is governed by Phase 9 data retention policies in `BILLING.md`.
 
-- [ ] 3.7 Early upgrade during trial
+- [x] 3.7 Early upgrade during trial
   - Allow upgrading before trial ends.
   - Pro‑rate charges, end trial immediately, update trial status.
 

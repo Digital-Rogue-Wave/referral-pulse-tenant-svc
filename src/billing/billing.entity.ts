@@ -42,4 +42,25 @@ export class BillingEntity extends EntityHelper {
 
     @Column({ name: 'stripe_transaction_id', type: 'varchar', nullable: true })
     stripeTransactionId?: string | null;
+
+    @Column({
+        name: 'pending_downgrade_plan',
+        type: 'enum',
+        enum: BillingPlanEnum,
+        enumName: 'billing_plan_enum',
+        nullable: true
+    })
+    pendingDowngradePlan?: BillingPlanEnum | null;
+
+    @Column({ name: 'downgrade_scheduled_at', type: 'timestamp', nullable: true })
+    downgradeScheduledAt?: Date | null;
+
+    @Column({ name: 'cancellation_reason', type: 'text', nullable: true })
+    cancellationReason?: string | null;
+
+    @Column({ name: 'cancellation_requested_at', type: 'timestamp', nullable: true })
+    cancellationRequestedAt?: Date | null;
+
+    @Column({ name: 'cancellation_effective_at', type: 'timestamp', nullable: true })
+    cancellationEffectiveAt?: Date | null;
 }

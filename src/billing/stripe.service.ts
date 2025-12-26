@@ -236,6 +236,75 @@ export class StripeService {
         );
     }
 
+    async scheduleSubscriptionDowngrade(params: {
+        stripeSubscriptionId: string;
+        targetPlan: BillingPlanEnum;
+    }): Promise<{ effectiveDate: Date | null }> {
+        const stripe = this.stripeClient();
+
+        const subscription = await stripe.subscriptions.update(params.stripeSubscriptionId, {
+            cancel_at_period_end: true
+        });
+
+        const rawSubscription = subscription as any;
+        const periodEnd = rawSubscription.current_period_end
+            ? new Date(rawSubscription.current_period_end * 1000)
+            : null;
+
+        this.logger.log(
+            `Scheduled subscription downgrade for ${params.stripeSubscriptionId} to plan ${params.targetPlan} at period end ${
+                periodEnd ? periodEnd.toISOString() : 'unknown'
+            }`
+        );
+
+        return { effectiveDate: periodEnd };
+    }
+
+    async cancelPendingSubscriptionDowngrade(stripeSubscriptionId: string): Promise<void> {
+        const stripe = this.stripeClient();
+
+        await stripe.subscriptions.update(stripeSubscriptionId, {
+            cancel_at_period_end: false
+        });
+
+        this.logger.log(
+            `Canceled pending subscription downgrade (cancel_at_period_end=false) for Stripe subscription ${stripeSubscriptionId}`
+        );
+    }
+
+    async scheduleSubscriptionCancellation(stripeSubscriptionId: string): Promise<{ effectiveDate: Date | null }> {
+        const stripe = this.stripeClient();
+
+        const subscription = await stripe.subscriptions.update(stripeSubscriptionId, {
+            cancel_at_period_end: true
+        });
+
+        const rawSubscription = subscription as any;
+        const periodEnd = rawSubscription.current_period_end
+            ? new Date(rawSubscription.current_period_end * 1000)
+            : null;
+
+        this.logger.log(
+            `Scheduled subscription cancellation at period end for Stripe subscription ${stripeSubscriptionId} with effective date ${
+                periodEnd ? periodEnd.toISOString() : 'unknown'
+            }`
+        );
+
+        return { effectiveDate: periodEnd };
+    }
+
+    async reactivateSubscription(stripeSubscriptionId: string): Promise<void> {
+        const stripe = this.stripeClient();
+
+        await stripe.subscriptions.update(stripeSubscriptionId, {
+            cancel_at_period_end: false
+        });
+
+        this.logger.log(
+            `Reactivated Stripe subscription ${stripeSubscriptionId} by clearing cancel_at_period_end`
+        );
+    }
+
     async cancelSubscription(stripeSubscriptionId: string): Promise<void> {
         const stripe = this.stripeClient();
         await stripe.subscriptions.cancel(stripeSubscriptionId);
