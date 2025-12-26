@@ -14,8 +14,8 @@ import { TenantSerializationProfile } from '@mod/tenant/serialization/tenant-ser
 import { FilesService } from '@mod/files/files.service';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { KratosService } from '@mod/common/auth/kratos.service';
-import { SubdomainService } from '@mod/tenant/dns/subdomain.service';
-import { TenantStatsService } from '@mod/tenant/tenant-stats.service';
+import { SubdomainService } from '@mod/dns/subdomain.service';
+import { TenantStatsService } from '@mod/tenant/aware/tenant-stats.service';
 import { JwtAuthGuard } from '@mod/common/auth/jwt-auth.guard';
 import { KetoGuard } from '@mod/common/auth/keto.guard';
 import { getQueueToken } from '@nestjs/bullmq';

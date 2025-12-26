@@ -7,7 +7,7 @@ import { TenantEntity } from '../tenant.entity';
 import { FilesService } from '@mod/files/files.service';
 import { AgnosticTenantSettingService } from '@mod/tenant-setting/agnostic/agnostic-tenant-setting.service';
 import { EventEmitter2 } from '@nestjs/event-emitter';
-import { SubdomainService } from '../dns/subdomain.service';
+import { SubdomainService } from '../../dns/subdomain.service';
 import { KetoService } from '@mod/common/auth/keto.service';
 import { CreateTenantDto } from '../dto/tenant/create-tenant.dto';
 import { HttpException, HttpStatus } from '@nestjs/common';

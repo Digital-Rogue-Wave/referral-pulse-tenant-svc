@@ -39,7 +39,7 @@ export class AgnosticTenantController {
     @Post()
     async create(
         @CurrentUser() user: CurrentUserType,
-        @Body('data', ParseFormdataPipe) data: any,
+        @Body('data', ParseFormdataPipe) data: CreateTenantDto,
         @UploadedFile() file?: Express.Multer.File | Express.MulterS3.File
     ): Promise<TenantEntity> {
         const createTenantDto = await Utils.validateDtoOrFail(CreateTenantDto, data);

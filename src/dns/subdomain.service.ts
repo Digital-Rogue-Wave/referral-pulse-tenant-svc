@@ -1,8 +1,8 @@
 import { Injectable, HttpStatus, HttpException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, MoreThan } from 'typeorm';
-import { TenantEntity } from '../tenant.entity';
-import { ReservedSubdomainEntity } from '../reserved-subdomain.entity';
+import { TenantEntity } from '../tenant/tenant.entity';
+import { ReservedSubdomainEntity } from './reserved-subdomain.entity';
 import { RESERVED_SUBDOMAINS } from './reserved-subdomains.constant';
 
 @Injectable()

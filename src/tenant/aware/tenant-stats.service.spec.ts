@@ -6,7 +6,7 @@ import { RedisKeyBuilder } from '@mod/common/aws-redis/redis-key.builder';
 import { TeamMemberService } from '@mod/team-member/team-member.service';
 import { TenantStatsService } from './tenant-stats.service';
 import { createMock, DeepMocked } from '@golevelup/ts-jest';
-import { TenantStatsDto } from './dto/stats/tenant-stats.dto';
+import { TenantStatsDto } from '../dto/stats/tenant-stats.dto';
 
 describe('TenantStatsService', () => {
     let service: TenantStatsService;
