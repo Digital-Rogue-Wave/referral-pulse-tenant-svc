@@ -10,6 +10,8 @@ import { SubscriptionCheckoutResponseDto } from './dto/subscription-checkout-res
 import { SubscriptionStatusDto } from './dto/subscription-status.dto';
 import { SubscriptionUpgradeRequestDto } from './dto/subscription-upgrade-request.dto';
 import { SubscriptionUpgradePreviewResponseDto } from './dto/subscription-upgrade-preview-response.dto';
+import { SubscriptionDowngradeRequestDto } from './dto/subscription-downgrade-request.dto';
+import { SubscriptionCancelRequestDto } from './dto/subscription-cancel-request.dto';
 
 @ApiTags('billings')
 @ApiBearerAuth()
@@ -57,5 +59,43 @@ export class BillingController {
     async upgradeSubscription(@Body() dto: SubscriptionUpgradeRequestDto): Promise<SubscriptionStatusDto> {
         const validated = await Utils.validateDtoOrFail(SubscriptionUpgradeRequestDto, dto);
         return await this.billingService.upgradeSubscription(validated.targetPlan);
+    }
+
+    @ApiOkResponse({ type: SubscriptionStatusDto })
+    // @UseGuards(KetoGuard)
+    @RequirePermission({ namespace: KetoNamespace.TENANT, relation: KetoRelation.MANAGE_BILLING })
+    @HttpCode(HttpStatus.OK)
+    @Post('subscription/downgrade')
+    async downgradeSubscription(@Body() dto: SubscriptionDowngradeRequestDto): Promise<SubscriptionStatusDto> {
+        const validated = await Utils.validateDtoOrFail(SubscriptionDowngradeRequestDto, dto);
+        return await this.billingService.downgradeSubscription(validated.targetPlan);
+    }
+
+    @ApiOkResponse({ type: SubscriptionStatusDto })
+    // @UseGuards(KetoGuard)
+    @RequirePermission({ namespace: KetoNamespace.TENANT, relation: KetoRelation.MANAGE_BILLING })
+    @HttpCode(HttpStatus.OK)
+    @Post('subscription/downgrade/cancel')
+    async cancelPendingDowngrade(): Promise<SubscriptionStatusDto> {
+        return await this.billingService.cancelPendingDowngrade();
+    }
+
+    @ApiOkResponse({ type: SubscriptionStatusDto })
+    // @UseGuards(KetoGuard)
+    @RequirePermission({ namespace: KetoNamespace.TENANT, relation: KetoRelation.MANAGE_BILLING })
+    @HttpCode(HttpStatus.OK)
+    @Post('subscription/cancel')
+    async cancelSubscription(@Body() dto: SubscriptionCancelRequestDto): Promise<SubscriptionStatusDto> {
+        const validated = await Utils.validateDtoOrFail(SubscriptionCancelRequestDto, dto);
+        return await this.billingService.cancelSubscription(validated);
+    }
+
+    @ApiOkResponse({ type: SubscriptionStatusDto })
+    // @UseGuards(KetoGuard)
+    @RequirePermission({ namespace: KetoNamespace.TENANT, relation: KetoRelation.MANAGE_BILLING })
+    @HttpCode(HttpStatus.OK)
+    @Post('subscription/reactivate')
+    async reactivateSubscription(): Promise<SubscriptionStatusDto> {
+        return await this.billingService.reactivateSubscription();
     }
 }

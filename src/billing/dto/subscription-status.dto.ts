@@ -72,4 +72,31 @@ export class SubscriptionStatusDto {
         description: 'Whether the Stripe subscription is configured to cancel at the end of the current period'
     })
     stripeCancelAtPeriodEnd?: boolean | null;
+
+    @ApiPropertyOptional({
+        enum: BillingPlanEnum,
+        enumName: 'BillingPlanEnum',
+        description: 'If set, indicates a pending downgrade target plan that will take effect at downgradeScheduledAt'
+    })
+    pendingDowngradePlan?: BillingPlanEnum | null;
+
+    @ApiPropertyOptional({
+        description: 'Timestamp at which a pending downgrade will take effect, when applicable'
+    })
+    downgradeScheduledAt?: Date | null;
+
+    @ApiPropertyOptional({
+        description: 'Optional reason provided when the subscription was cancelled, when applicable'
+    })
+    cancellationReason?: string | null;
+
+    @ApiPropertyOptional({
+        description: 'Timestamp at which cancellation was requested, when applicable'
+    })
+    cancellationRequestedAt?: Date | null;
+
+    @ApiPropertyOptional({
+        description: 'Timestamp at which cancellation becomes or became effective, when applicable'
+    })
+    cancellationEffectiveAt?: Date | null;
 }

@@ -6,7 +6,13 @@ import { PublishSnsEventDto, SnsPublishOptionsDto } from '@mod/common/dto/sns-pu
 import { MonitoringService } from '@mod/common/monitoring/monitoring.service';
 import { SesService } from '@mod/common/aws-ses/ses.service';
 import { KratosService } from '@mod/common/auth/kratos.service';
-import { SubscriptionChangedEvent, SubscriptionCreatedEvent, SubscriptionUpgradedEvent } from '@mod/common/interfaces/billing-events.interface';
+import {
+    SubscriptionChangedEvent,
+    SubscriptionCreatedEvent,
+    SubscriptionDowngradeScheduledEvent,
+    SubscriptionUpgradedEvent,
+    SubscriptionCancelledEvent
+} from '@mod/common/interfaces/billing-events.interface';
 
 @Injectable()
 export class BillingListener {
@@ -64,6 +70,92 @@ export class BillingListener {
                 if (email) {
                     const subject = 'Subscription Confirmed';
                     const body = `Your subscription for plan ${payload.billingPlan} is now active.`;
+                    await this.sesService.sendEmail(email, subject, body);
+                }
+            } catch {
+            }
+        }
+    }
+
+    @OnEvent('subscription.cancelled')
+    async handleSubscriptionCancelledEvent(payload: SubscriptionCancelledEvent) {
+        const snsEventDto = await Utils.validateDtoOrFail(PublishSnsEventDto, {
+            eventId: payload.tenantId,
+            eventType: 'subscription.cancelled',
+            data: payload as any,
+            timestamp: new Date().toISOString()
+        });
+
+        const snsOptionsDto = await Utils.validateDtoOrFail(SnsPublishOptionsDto, {
+            topic: 'tenant-events',
+            groupId: payload.tenantId,
+            deduplicationId: `${payload.tenantId}-subscription-cancelled-${Date.now()}`
+        });
+
+        await this.sns.publish(snsEventDto as any, snsOptionsDto);
+
+        this.metrics.incCounter('billing_subscription_events_total', {
+            event: 'subscription.cancelled',
+            result: 'ok'
+        });
+
+        if (payload.cancelUserId) {
+            try {
+                const identity = await this.kratosService.getIdentity(payload.cancelUserId);
+                const email = (identity as any)?.traits?.email as string | undefined;
+
+                if (email) {
+                    const subject = 'Subscription Cancellation Scheduled';
+                    const effectiveDate = payload.cancellationEffectiveDate
+                        ? new Date(payload.cancellationEffectiveDate)
+                        : null;
+                    const dateString = effectiveDate?.toISOString() ?? 'the end of the current billing period';
+                    const reasonText = payload.cancellationReason
+                        ? ` Reason: ${payload.cancellationReason}`
+                        : '';
+                    const body =
+                        `Your subscription to plan ${payload.billingPlan} has been scheduled for cancellation effective at ${dateString}.` +
+                        reasonText +
+                        ' You can reactivate your subscription from the billing settings page before this date.';
+                    await this.sesService.sendEmail(email, subject, body);
+                }
+            } catch {
+            }
+        }
+    }
+
+    @OnEvent('subscription.downgrade_scheduled')
+    async handleSubscriptionDowngradeScheduledEvent(payload: SubscriptionDowngradeScheduledEvent) {
+        const snsEventDto = await Utils.validateDtoOrFail(PublishSnsEventDto, {
+            eventId: payload.tenantId,
+            eventType: 'subscription.downgrade_scheduled',
+            data: payload as any,
+            timestamp: new Date().toISOString()
+        });
+
+        const snsOptionsDto = await Utils.validateDtoOrFail(SnsPublishOptionsDto, {
+            topic: 'tenant-events',
+            groupId: payload.tenantId,
+            deduplicationId: `${payload.tenantId}-subscription-downgrade-scheduled-${Date.now()}`
+        });
+
+        await this.sns.publish(snsEventDto as any, snsOptionsDto);
+
+        this.metrics.incCounter('billing_subscription_events_total', {
+            event: 'subscription.downgrade_scheduled',
+            result: 'ok'
+        });
+
+        if (payload.downgradeUserId) {
+            try {
+                const identity = await this.kratosService.getIdentity(payload.downgradeUserId);
+                const email = (identity as any)?.traits?.email as string | undefined;
+
+                if (email) {
+                    const subject = 'Subscription Downgrade Scheduled';
+                    const effectiveDate = payload.effectiveDate ? new Date(payload.effectiveDate) : null;
+                    const dateString = effectiveDate?.toISOString() ?? 'the end of the current billing period';
+                    const body = `Your subscription will be downgraded from plan ${payload.previousPlan} to ${payload.billingPlan} at ${dateString}.`;
                     await this.sesService.sendEmail(email, subject, body);
                 }
             } catch {

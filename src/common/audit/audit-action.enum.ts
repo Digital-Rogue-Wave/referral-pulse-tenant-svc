@@ -30,6 +30,7 @@ export enum AuditAction {
     SUBSCRIPTION_CREATED = 'subscription.created',
     SUBSCRIPTION_UPDATED = 'subscription.updated',
     SUBSCRIPTION_CANCELLED = 'subscription.cancelled',
+    SUBSCRIPTION_DOWNGRADE_SCHEDULED = 'subscription.downgrade_scheduled',
     PAYMENT_METHOD_UPDATED = 'payment_method.updated',
 
     // Ownership actions
