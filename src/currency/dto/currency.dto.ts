@@ -1,25 +1,21 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { IsString, IsNotEmpty, IsInt, Min, MaxLength } from 'class-validator';
+import { AutoMap } from '@automapper/classes';
+import { EntityHelperDto } from '@mod/common/dto/entity-helper.dto';
 
-export class CurrencyDto {
-    @ApiProperty({ example: 'USD' })
-    @IsString()
-    @IsNotEmpty()
-    @MaxLength(3)
+export class CurrencyDto extends EntityHelperDto {
+    @ApiProperty()
+    @AutoMap()
     code: string;
 
-    @ApiProperty({ example: 'US Dollar' })
-    @IsString()
-    @IsNotEmpty()
+    @ApiProperty()
+    @AutoMap()
     name: string;
 
-    @ApiProperty({ example: '$' })
-    @IsString()
-    @IsNotEmpty()
+    @ApiProperty()
+    @AutoMap()
     symbol: string;
 
-    @ApiProperty({ example: 2 })
-    @IsInt()
-    @Min(0)
+    @ApiProperty()
+    @AutoMap()
     decimals: number;
 }

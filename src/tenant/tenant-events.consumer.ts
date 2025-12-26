@@ -1,22 +1,14 @@
 import { Injectable } from '@nestjs/common';
 import { SqsMessageHandler } from '@ssut/nestjs-sqs';
 import { Message } from '@aws-sdk/client-sqs';
-import { MonitoringService } from '@mod/common/monitoring/monitoring.service';
-import { ClsService } from 'nestjs-cls';
 import { AppLoggingService } from '@mod/common/logger/app-logging.service';
 import { SqsEventHandler } from '@mod/common/aws-sqs/sqs-event-handler.decorator';
 import { EventEnvelope } from '@mod/types/app.interface';
-import { EventIdempotencyService } from '@mod/common/idempotency/event-idempotency.service';
 import { CampaignEvents } from '@domains/commons/domain.event';
 
 @Injectable()
 export class CampaignEventsConsumer {
-    constructor(
-        private readonly metrics: MonitoringService,
-        private readonly eventIdempotency: EventIdempotencyService,
-        private readonly cls: ClsService,
-        private readonly logger: AppLoggingService
-    ) {}
+    constructor(private readonly logger: AppLoggingService) {}
 
     @SqsMessageHandler('campaign-events', false)
     @SqsEventHandler({ queue: 'campaign-events', consumerName: 'campaign-events-consumer' })
@@ -48,21 +40,21 @@ export class CampaignEventsConsumer {
 
     private handleCreated(payload: CampaignEvents.Created): void {
         this.logger.info(`Campaign created processed - campaignId: ${payload.campaignId}`);
-        // Business logic
+        // TODO: handleCreated Business logic
     }
 
     private handleUpdated(payload: CampaignEvents.Updated): void {
         this.logger.info(`Campaign updated processed - campaignId: ${payload.campaignId}`);
-        // Business logic
+        // TODO: handleUpdated Business logic
     }
 
     private handleInvitationSent(payload: CampaignEvents.InvitationSent): void {
         this.logger.info(`Campaign invitation sent processed - campaignId: ${payload.campaignId}, invitationId: ${payload.invitationId}`);
-        // Business logic
+        // TODO: handleInvitationSent Business logic
     }
 
     private handleActivated(payload: CampaignEvents.Activated): void {
         this.logger.info(`Campaign activated processed - campaignId: ${payload.campaignId}`);
-        // Business logic
+        // TODO: handleActivated Business logic
     }
 }

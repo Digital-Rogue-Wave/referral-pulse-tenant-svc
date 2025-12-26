@@ -6,7 +6,7 @@ import { AutoMap } from '@automapper/classes';
 import { Entity, Column, PrimaryGeneratedColumn, ManyToOne, OneToMany, OneToOne } from 'typeorm';
 import { InvitationEntity } from '@mod/invitation/invitation.entity';
 import { TeamMemberEntity } from '../team-member/team-member.entity';
-import { TenantSettingEntity } from '@mod/tenant-setting/tenant-setting.entity';
+import type { TenantSettingEntity } from '@mod/tenant-setting/tenant-setting.entity';
 
 @Entity({ name: 'tenants' })
 export class TenantEntity extends EntityHelper {
@@ -64,7 +64,7 @@ export class TenantEntity extends EntityHelper {
     @AutoMap()
     lockReason?: string;
 
-    @OneToOne(() => TenantSettingEntity, (setting) => setting.tenant, {
+    @OneToOne('TenantSettingEntity', 'tenant', {
         cascade: true
     })
     setting: TenantSettingEntity;

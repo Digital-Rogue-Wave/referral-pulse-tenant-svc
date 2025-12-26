@@ -8,7 +8,7 @@ import { AgnosticInvitationService } from './agnostic-invitation.service';
 import { CurrentUser, CurrentUserType } from '@mod/common/auth/current-user.decorator';
 import { JwtAuthGuard } from '@mod/common/auth/jwt-auth.guard';
 
-@ApiTags('Public Invitations')
+@ApiTags('Agnostic Invitations')
 @Controller({ path: 'invitations/public', version: '1' })
 export class AgnosticInvitationController {
     constructor(private readonly invitationService: AgnosticInvitationService) {}

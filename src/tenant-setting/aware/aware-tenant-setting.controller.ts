@@ -1,5 +1,5 @@
-import { Controller, Get, Post, Body, Param, Delete, HttpStatus, HttpCode, Put, UseGuards } from '@nestjs/common';
-import { ApiTags, ApiResponse, ApiBody, ApiOkResponse, ApiHeader, ApiBearerAuth } from '@nestjs/swagger';
+import { Controller, Get, Post, Body, Param, Delete, HttpStatus, HttpCode, Put, UseGuards, UseInterceptors } from '@nestjs/common';
+import { ApiTags, ApiResponse, ApiBody, ApiOkResponse, ApiHeader, ApiBearerAuth, ApiCreatedResponse } from '@nestjs/swagger';
 import { AwareTenantSettingService } from './aware-tenant-setting.service';
 import { CreateTenantSettingDto } from '../dto/create-tenant-setting.dto';
 import { UpdateTenantSettingDto } from '../dto/update-tenant-setting.dto';
@@ -12,7 +12,7 @@ import { ApiPaginationQuery, Paginate, PaginateQuery } from 'nestjs-paginate';
 import { tenantSettingPaginationConfig } from '../config/tenant-setting-pagination-config';
 import { PaginatedDto } from '@mod/common/serialization/paginated.dto';
 import { TenantSettingDto } from '@mod/tenant-setting/dto/tenant-setting.dto';
-import { InjectMapper } from '@automapper/nestjs';
+import { InjectMapper, MapInterceptor } from '@automapper/nestjs';
 import { Mapper } from '@automapper/core';
 
 @ApiTags('Tenant Settings')
@@ -33,7 +33,8 @@ export class AwareTenantSettingController {
 
     @Post()
     @ApiBody({ type: CreateTenantSettingDto })
-    @ApiResponse({ status: HttpStatus.CREATED, description: 'Created successfully' })
+    @ApiCreatedResponse({ type: TenantSettingDto, description: 'Created successfully' })
+    @UseInterceptors(MapInterceptor(TenantSettingEntity, TenantSettingDto))
     @HttpCode(HttpStatus.CREATED)
     async create(@Body() createDto: CreateTenantSettingDto): Promise<TenantSettingEntity> {
         return await this.tenantSettingService.create(createDto);
@@ -50,6 +51,7 @@ export class AwareTenantSettingController {
 
     @Get(':id')
     @ApiOkResponse({ description: 'Tenant setting', type: TenantSettingEntity })
+    @UseInterceptors(MapInterceptor(TenantSettingEntity, TenantSettingDto))
     @HttpCode(HttpStatus.OK)
     async findOne(@Param('id') id: string): Promise<NullableType<TenantSettingEntity>> {
         return await this.tenantSettingService.findOne({ id });
@@ -59,6 +61,7 @@ export class AwareTenantSettingController {
     @RequirePermission({ namespace: KetoNamespace.TENANT, relation: KetoPermission.UPDATE, objectParam: 'id' })
     @ApiBody({ type: UpdateTenantSettingDto })
     @ApiOkResponse({ description: 'Updated successfully', type: TenantSettingEntity })
+    @UseInterceptors(MapInterceptor(TenantSettingEntity, TenantSettingDto))
     @HttpCode(HttpStatus.OK)
     async update(@Param('id') id: string, @Body() updateDto: UpdateTenantSettingDto): Promise<TenantSettingEntity> {
         return await this.tenantSettingService.update(id, updateDto);

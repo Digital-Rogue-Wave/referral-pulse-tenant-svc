@@ -1,24 +1,8 @@
-import {
-    Controller,
-    Get,
-    Body,
-    Param,
-    Delete,
-    Put,
-    Post,
-    HttpCode,
-    HttpStatus,
-    UseInterceptors,
-    UploadedFile,
-    UseGuards,
-    Ip,
-    Query
-} from '@nestjs/common';
+import { Controller, Get, Body, Param, Delete, Put, HttpCode, HttpStatus, UseInterceptors, UploadedFile, UseGuards, Ip, Query } from '@nestjs/common';
 import { AwareTenantService } from './aware-tenant.service';
 import { NullableType } from '@mod/types/nullable.type';
 import { DeleteResult } from 'typeorm';
 import { ApiBody, ApiConsumes, ApiExtraModels, ApiOkResponse, ApiTags, getSchemaPath, ApiBearerAuth, ApiHeader } from '@nestjs/swagger';
-import { DomainVerificationStatusEnum } from '@mod/common/enums/tenant.enum';
 import { ParseFormdataPipe } from '@mod/common/pipes/parse-formdata.pipe';
 import { Utils } from '@mod/common/utils/utils';
 import { MapInterceptor } from '@automapper/nestjs';
@@ -37,8 +21,9 @@ import { TenantStatsDto } from '../dto/stats/tenant-stats.dto';
 import { TenantStatsService } from '../tenant-stats.service';
 import { LockTenantDto } from '../dto/tenant/lock-tenant.dto';
 import { UnlockTenantDto } from '../dto/tenant/unlock-tenant.dto';
+import { DomainDto } from '@mod/tenant/dto/domain/domain.dto';
 
-@ApiTags('tenants')
+@ApiTags('Aware Tenants')
 @ApiHeader({
     name: 'tenant-id',
     required: true,
@@ -46,7 +31,7 @@ import { UnlockTenantDto } from '../dto/tenant/unlock-tenant.dto';
     schema: { type: 'string' }
 })
 @ApiBearerAuth()
-@UseGuards(JwtAuthGuard)
+@UseGuards(JwtAuthGuard, KetoGuard)
 @Controller({ path: 'tenants', version: '1' })
 export class AwareTenantController {
     constructor(
@@ -54,47 +39,50 @@ export class AwareTenantController {
         private readonly statsService: TenantStatsService
     ) {}
 
+    @Get()
+    @ApiOkResponse({ type: TenantDto, isArray: true })
+    @UseInterceptors(MapInterceptor(TenantEntity, TenantDto, { isArray: true }))
+    @HttpCode(HttpStatus.OK)
+    async findAll() {
+        return await this.tenantService.findAll();
+    }
+
+    @Get('subdomain/check')
+    @ApiOkResponse({ description: 'Check if subdomain is available' })
+    @HttpCode(HttpStatus.OK)
+    async checkSubdomain(@Query('subdomain') subdomain: string) {
+        return await this.tenantService.checkSubdomainAvailability(subdomain);
+    }
+
+    @Get(':id/stats')
     @ApiOkResponse({
         description: 'Get dashboard stats for current tenant',
         type: TenantStatsDto
     })
     @HttpCode(HttpStatus.OK)
-    @Get(':id/stats')
     async getStats(@Param('id') id: string): Promise<TenantStatsDto> {
         return await this.statsService.getStats(id);
     }
 
-    @ApiOkResponse({ type: TenantDto, isArray: true })
-    @UseInterceptors(MapInterceptor(TenantEntity, TenantDto, { isArray: true }))
-    @HttpCode(HttpStatus.OK)
-    @Get()
-    async findAll() {
-        return await this.tenantService.findAll();
-    }
-
+    @Get(':id/custom-domain/status')
     @ApiOkResponse({
-        description: 'Check if subdomain is available',
-        schema: {
-            type: 'object',
-            properties: {
-                available: { type: 'boolean' }
-            }
-        }
+        description: 'Get custom domain verification status',
+        type: DomainDto
     })
     @HttpCode(HttpStatus.OK)
-    @Get('subdomain/check')
-    async checkSubdomain(@Query('subdomain') subdomain: string) {
-        return await this.tenantService.checkSubdomainAvailability(subdomain);
+    async getDomainStatus(@Param('id') id: string): Promise<Partial<DomainDto>> {
+        return await this.tenantService.getDomainStatus(id);
     }
 
+    @Get(':id')
     @ApiOkResponse({ type: TenantProfileDto })
     @UseInterceptors(MapInterceptor(TenantEntity, TenantProfileDto))
     @HttpCode(HttpStatus.OK)
-    @Get(':id')
     async findOne(@Param('id') id: string): Promise<NullableType<TenantEntity>> {
         return await this.tenantService.getProfile(id);
     }
 
+    @Put(':id')
     @ApiConsumes('multipart/form-data')
     @ApiExtraModels(UpdateTenantDto)
     @ApiBody({
@@ -113,10 +101,8 @@ export class AwareTenantController {
     })
     @ApiOkResponse({ type: TenantDto })
     @UseInterceptors(MapInterceptor(TenantEntity, TenantDto))
-    @UseGuards(KetoGuard)
     @RequirePermission({ namespace: KetoNamespace.TENANT, relation: KetoPermission.UPDATE, objectParam: 'id' })
     @HttpCode(HttpStatus.OK)
-    @Put(':id')
     async update(
         @CurrentUser() user: CurrentUserType,
         @Param('id') id: string,
@@ -127,42 +113,22 @@ export class AwareTenantController {
         return await this.tenantService.update(id, updateTenantDto, user, file);
     }
 
+    @Put(':id/custom-domain/verify')
     @ApiOkResponse({
         description: 'Domain verified successfully',
         type: TenantDto
     })
     @UseInterceptors(MapInterceptor(TenantEntity, TenantDto))
-    @UseGuards(KetoGuard)
     @RequirePermission({ namespace: KetoNamespace.TENANT, relation: KetoPermission.UPDATE, objectParam: 'id' })
     @HttpCode(HttpStatus.OK)
-    @Post(':id/custom-domain/verify')
     async verifyCustomDomain(@Param('id') id: string): Promise<TenantEntity> {
         return await this.tenantService.verifyCustomDomain(id);
     }
 
-    @ApiOkResponse({
-        description: 'Get custom domain verification status',
-        schema: {
-            type: 'object',
-            properties: {
-                customDomain: { type: 'string' },
-                domainVerificationStatus: { enum: Object.values(DomainVerificationStatusEnum) },
-                domainVerificationToken: { type: 'string' }
-            }
-        }
-    })
-    @HttpCode(HttpStatus.OK)
-    @Get(':id/custom-domain/status')
-    async getDomainStatus(@Param('id') id: string) {
-        return await this.tenantService.getDomainStatus(id);
-    }
-
+    @Put(':id/transfer-ownership')
     @ApiOkResponse({ description: 'Ownership transferred successfully' })
-    @ApiBearerAuth()
-    @UseGuards(JwtAuthGuard, KetoGuard)
     @RequirePermission({ namespace: KetoNamespace.TENANT, relation: KetoPermission.UPDATE, objectParam: 'id' })
     @HttpCode(HttpStatus.OK)
-    @Put(':id/transfer-ownership')
     async transferOwnership(
         @Param('id') id: string,
         @Body() dto: TransferOwnershipDto,
@@ -172,21 +138,11 @@ export class AwareTenantController {
         return await this.tenantService.transferOwnership(id, dto, user, ipAddress);
     }
 
+    @Put(':id/schedule-deletion')
     @ApiBody({ type: ScheduleDeletionDto })
-    @ApiOkResponse({
-        description: 'Deletion scheduled successfully',
-        schema: {
-            type: 'object',
-            properties: {
-                scheduledAt: { type: 'string', format: 'date-time' },
-                executionDate: { type: 'string', format: 'date-time' }
-            }
-        }
-    })
-    @UseGuards(KetoGuard)
+    @ApiOkResponse({ description: 'Deletion scheduled successfully' })
     @RequirePermission({ namespace: KetoNamespace.TENANT, relation: KetoPermission.DELETE, objectParam: 'id' })
     @HttpCode(HttpStatus.OK)
-    @Put(':id/schedule-deletion')
     async scheduleDeletion(
         @Param('id') id: string,
         @Body() dto: ScheduleDeletionDto,
@@ -197,12 +153,11 @@ export class AwareTenantController {
         return await this.tenantService.scheduleDeletion(id, validatedDto, user, ipAddress);
     }
 
+    @Put(':id/cancel-deletion')
     @ApiBody({ type: CancelDeletionDto })
     @ApiOkResponse({ description: 'Deletion cancelled successfully' })
-    @UseGuards(KetoGuard)
     @RequirePermission({ namespace: KetoNamespace.TENANT, relation: KetoPermission.UPDATE, objectParam: 'id' })
     @HttpCode(HttpStatus.OK)
-    @Put(':id/cancel-deletion')
     async cancelDeletion(
         @Param('id') id: string,
         @Body() dto: CancelDeletionDto,
@@ -213,22 +168,12 @@ export class AwareTenantController {
         return await this.tenantService.cancelDeletion(id, validatedDto, user, ipAddress);
     }
 
-    @ApiOkResponse({ type: DeleteResult })
-    @UseGuards(KetoGuard)
-    @RequirePermission({ namespace: KetoNamespace.TENANT, relation: KetoPermission.DELETE, objectParam: 'id' })
-    @HttpCode(HttpStatus.OK)
-    @Delete(':id')
-    async remove(@Param('id') id: string): Promise<DeleteResult> {
-        return await this.tenantService.remove(id);
-    }
-
+    @Put(':id/lock')
     @ApiBody({ type: LockTenantDto })
     @ApiOkResponse({ type: TenantDto })
     @UseInterceptors(MapInterceptor(TenantEntity, TenantDto))
-    @UseGuards(KetoGuard)
     @RequirePermission({ namespace: KetoNamespace.TENANT, relation: KetoPermission.UPDATE, objectParam: 'id' })
     @HttpCode(HttpStatus.OK)
-    @Post(':id/lock')
     async lock(
         @Param('id') id: string,
         @Body() dto: LockTenantDto,
@@ -239,20 +184,26 @@ export class AwareTenantController {
         return await this.tenantService.lock(id, validatedDto, user.id, user.identityId, ipAddress);
     }
 
+    @Put(':id/unlock')
     @ApiBody({ type: UnlockTenantDto })
     @ApiOkResponse({ type: TenantDto })
     @UseInterceptors(MapInterceptor(TenantEntity, TenantDto))
-    @UseGuards(KetoGuard)
     @RequirePermission({ namespace: KetoNamespace.TENANT, relation: KetoPermission.UPDATE, objectParam: 'id' })
     @HttpCode(HttpStatus.OK)
-    @Post(':id/unlock')
     async unlock(
         @Param('id') id: string,
-        @Body() dto: UnlockTenantDto,
+        @Body() unlockTenantDto: UnlockTenantDto,
         @CurrentUser() user: CurrentUserType,
         @Ip() ipAddress: string
     ): Promise<TenantEntity> {
-        const validatedDto = await Utils.validateDtoOrFail(UnlockTenantDto, dto);
-        return await this.tenantService.unlock(id, validatedDto, user.id, user.identityId, ipAddress);
+        return await this.tenantService.unlock(id, unlockTenantDto, user.id, user.identityId, ipAddress);
+    }
+
+    @Delete(':id')
+    @ApiOkResponse({ type: DeleteResult })
+    @RequirePermission({ namespace: KetoNamespace.TENANT, relation: KetoPermission.DELETE, objectParam: 'id' })
+    @HttpCode(HttpStatus.OK)
+    async remove(@Param('id') id: string): Promise<DeleteResult> {
+        return await this.tenantService.remove(id);
     }
 }

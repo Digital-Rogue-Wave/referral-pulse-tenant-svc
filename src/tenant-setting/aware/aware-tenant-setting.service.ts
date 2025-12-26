@@ -16,7 +16,8 @@ export class AwareTenantSettingService {
     ) {}
 
     async create(createDto: CreateTenantSettingDto): Promise<TenantSettingEntity> {
-        return this.repository.saveTenantContext(this.repository.createTenantContext(createDto));
+        const setting = this.repository.createTenantContext(createDto);
+        return await this.repository.saveTenantContext(setting);
     }
 
     async findAll(query: PaginateQuery): Promise<Paginated<TenantSettingEntity>> {
@@ -27,19 +28,19 @@ export class AwareTenantSettingService {
         field: FindOptionsWhere<TenantSettingEntity>,
         relations?: FindOptionsRelations<TenantSettingEntity>
     ): Promise<NullableType<TenantSettingEntity>> {
-        return this.repository.findOneTenantContext(field, relations);
+        return await this.repository.findOneTenantContext(field, relations);
     }
 
     async findOneOrFail(
         field: FindOptionsWhere<TenantSettingEntity>,
         relations?: FindOptionsRelations<TenantSettingEntity>
     ): Promise<TenantSettingEntity> {
-        return this.repository.findOneOrFailTenantContext(field, relations);
+        return await this.repository.findOneOrFailTenantContext(field, relations);
     }
 
     async update(id: string, updateDto: UpdateTenantSettingDto): Promise<TenantSettingEntity> {
-        await this.repository.update(id, updateDto);
-        return this.findOneOrFail({ id });
+        await this.repository.updateTenantContext(id, updateDto);
+        return await this.findOneOrFail({ id });
     }
 
     async remove(id: string): Promise<void> {
