@@ -9,7 +9,7 @@ import { TenantEntity } from '../tenant.entity';
 import { FilesService } from '@mod/files/files.service';
 import { AgnosticTenantSettingService } from '@mod/tenant-setting/agnostic/agnostic-tenant-setting.service';
 import { EventEmitter2 } from '@nestjs/event-emitter';
-import { SubdomainService } from '../dns/subdomain.service';
+import { SubdomainService } from '../../dns/subdomain.service';
 import { KetoService } from '@mod/common/auth/keto.service';
 import { JwtAuthGuard } from '@mod/common/auth/jwt-auth.guard';
 import { KetoGuard } from '@mod/common/auth/keto.guard';

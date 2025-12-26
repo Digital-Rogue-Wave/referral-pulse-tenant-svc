@@ -18,10 +18,12 @@ import { TransferOwnershipDto } from '../dto/transfer-ownership.dto';
 import { ScheduleDeletionDto } from '../dto/schedule-deletion.dto';
 import { CancelDeletionDto } from '../dto/cancel-deletion.dto';
 import { TenantStatsDto } from '../dto/stats/tenant-stats.dto';
-import { TenantStatsService } from '../tenant-stats.service';
+import { TenantStatsService } from './tenant-stats.service';
 import { LockTenantDto } from '../dto/tenant/lock-tenant.dto';
 import { UnlockTenantDto } from '../dto/tenant/unlock-tenant.dto';
 import { DomainDto } from '@mod/tenant/dto/domain/domain.dto';
+import { TenantStatusGuard } from '../guards/tenant-status.guard';
+import { TenantLockGuard } from '../guards/tenant-lock.guard';
 
 @ApiTags('Aware Tenants')
 @ApiHeader({
@@ -31,7 +33,7 @@ import { DomainDto } from '@mod/tenant/dto/domain/domain.dto';
     schema: { type: 'string' }
 })
 @ApiBearerAuth()
-@UseGuards(JwtAuthGuard, KetoGuard)
+@UseGuards(JwtAuthGuard, KetoGuard, TenantStatusGuard, TenantLockGuard)
 @Controller({ path: 'tenants', version: '1' })
 export class AwareTenantController {
     constructor(
@@ -108,7 +110,7 @@ export class AwareTenantController {
         @Param('id') id: string,
         @Body('data', ParseFormdataPipe) data: any,
         @UploadedFile() file?: Express.Multer.File | Express.MulterS3.File
-    ) {
+    ): Promise<TenantEntity> {
         const updateTenantDto = await Utils.validateDtoOrFail(UpdateTenantDto, data);
         return await this.tenantService.update(id, updateTenantDto, user, file);
     }

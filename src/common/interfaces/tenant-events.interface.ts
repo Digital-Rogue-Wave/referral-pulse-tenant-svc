@@ -49,3 +49,11 @@ export interface TenantSuspendedEvent {
 export interface TenantUnsuspendedEvent {
     tenantId: string;
 }
+
+export interface TenantOwnershipTransferredEvent {
+    tenantId: string;
+    oldOwnerId: string;
+    newOwnerId: string;
+    tenantName: string;
+    ipAddress?: string;
+}

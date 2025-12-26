@@ -3,7 +3,7 @@ import { ConfigService, ConfigType } from '@nestjs/config';
 import { HttpClient } from '@mod/common/http/http.client';
 import { RedisService } from '@mod/common/aws-redis/redis.service';
 import { RedisKeyBuilder } from '@mod/common/aws-redis/redis-key.builder';
-import { TenantStatsDto } from './dto/stats/tenant-stats.dto';
+import { TenantStatsDto } from '../dto/stats/tenant-stats.dto';
 import servicesConfig from '@mod/config/services.config';
 import { TeamMemberService } from '@mod/team-member/team-member.service';
 
