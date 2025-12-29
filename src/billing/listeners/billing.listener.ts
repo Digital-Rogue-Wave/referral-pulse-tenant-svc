@@ -11,7 +11,8 @@ import {
     SubscriptionCreatedEvent,
     SubscriptionDowngradeScheduledEvent,
     SubscriptionUpgradedEvent,
-    SubscriptionCancelledEvent
+    SubscriptionCancelledEvent,
+    PaymentFailedEvent
 } from '@mod/common/interfaces/billing-events.interface';
 
 @Injectable()
@@ -195,5 +196,28 @@ export class BillingListener {
             } catch {
             }
         }
+    }
+
+    @OnEvent('billing.payment_failed')
+    async handlePaymentFailedEvent(payload: PaymentFailedEvent) {
+        const snsEventDto = await Utils.validateDtoOrFail(PublishSnsEventDto, {
+            eventId: payload.tenantId,
+            eventType: 'billing.payment_failed',
+            data: payload as any,
+            timestamp: new Date().toISOString()
+        });
+
+        const snsOptionsDto = await Utils.validateDtoOrFail(SnsPublishOptionsDto, {
+            topic: 'tenant-events',
+            groupId: payload.tenantId,
+            deduplicationId: `${payload.tenantId}-billing-payment-failed-${Date.now()}`
+        });
+
+        await this.sns.publish(snsEventDto as any, snsOptionsDto as any);
+
+        this.metrics.incCounter('billing_subscription_events_total', {
+            event: 'billing.payment_failed',
+            result: 'ok'
+        });
     }
 }

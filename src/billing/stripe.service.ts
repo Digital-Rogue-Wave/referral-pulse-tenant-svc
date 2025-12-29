@@ -321,4 +321,197 @@ export class StripeService {
 
         return stripe.webhooks.constructEvent(payload, signature, webhookSecret);
     }
+
+    async createSetupIntent(customerId: string): Promise<Stripe.SetupIntent> {
+        const stripe = this.stripeClient();
+
+        const setupIntent = await stripe.setupIntents.create({
+            customer: customerId,
+            usage: 'off_session',
+            payment_method_types: ['card']
+        });
+
+        this.logger.log(`Created Stripe SetupIntent ${setupIntent.id} for customer ${customerId}`);
+
+        return setupIntent;
+    }
+
+    async listPaymentMethods(customerId: string): Promise<
+        {
+            id: string;
+            brand: string | null;
+            last4: string | null;
+            expMonth: number | null;
+            expYear: number | null;
+            isDefault: boolean;
+        }[]
+    > {
+        const stripe = this.stripeClient();
+
+        const customer = await stripe.customers.retrieve(customerId);
+        const rawCustomer = customer as any;
+        const defaultPm = rawCustomer.invoice_settings?.default_payment_method;
+        const defaultPaymentMethodId =
+            typeof defaultPm === 'string' ? defaultPm : defaultPm?.id ?? null;
+
+        const list = await stripe.paymentMethods.list({
+            customer: customerId,
+            type: 'card',
+            limit: 100
+        });
+
+        this.logger.log(
+            `Listed ${list.data.length} Stripe payment methods for customer ${customerId}, default=${
+                defaultPaymentMethodId ?? 'none'
+            }`
+        );
+
+        return list.data.map((pm) => {
+            const card = pm.card;
+            return {
+                id: pm.id,
+                brand: card?.brand ?? null,
+                last4: card?.last4 ?? null,
+                expMonth: card?.exp_month ?? null,
+                expYear: card?.exp_year ?? null,
+                isDefault: pm.id === defaultPaymentMethodId
+            };
+        });
+    }
+
+    async detachPaymentMethodForCustomer(customerId: string, paymentMethodId: string): Promise<void> {
+        const stripe = this.stripeClient();
+
+        const pm = await stripe.paymentMethods.retrieve(paymentMethodId);
+        const rawPm = pm as any;
+        const pmCustomer = rawPm.customer;
+        const pmCustomerId = typeof pmCustomer === 'string' ? pmCustomer : pmCustomer?.id ?? null;
+
+        if (pmCustomerId !== customerId) {
+            throw new HttpException('Payment method not found for this customer', HttpStatus.NOT_FOUND);
+        }
+
+        await stripe.paymentMethods.detach(paymentMethodId);
+
+        this.logger.log(`Detached Stripe payment method ${paymentMethodId} from customer ${customerId}`);
+    }
+
+    async setDefaultPaymentMethodForCustomer(customerId: string, paymentMethodId: string): Promise<void> {
+        const stripe = this.stripeClient();
+
+        const pm = await stripe.paymentMethods.retrieve(paymentMethodId);
+        const rawPm = pm as any;
+        const pmCustomer = rawPm.customer;
+        const pmCustomerId = typeof pmCustomer === 'string' ? pmCustomer : pmCustomer?.id ?? null;
+
+        if (pmCustomerId !== customerId) {
+            throw new HttpException('Payment method not found for this customer', HttpStatus.NOT_FOUND);
+        }
+
+        await stripe.customers.update(customerId, {
+            invoice_settings: {
+                default_payment_method: paymentMethodId
+            }
+        });
+
+        this.logger.log(`Set default payment method ${paymentMethodId} for customer ${customerId}`);
+    }
+
+    async listInvoicesForCustomer(customerId: string): Promise<
+        {
+            id: string;
+            number: string | null;
+            status: string | null;
+            currency: string;
+            amountDue: number;
+            amountPaid: number;
+            createdAt: Date;
+            periodStart: Date | null;
+            periodEnd: Date | null;
+            hostedInvoiceUrl: string | null;
+            invoicePdfUrl: string | null;
+        }[]
+    > {
+        const stripe = this.stripeClient();
+
+        const list = await stripe.invoices.list({
+            customer: customerId,
+            limit: 100
+        });
+
+        this.logger.log(
+            `Listed ${list.data.length} Stripe invoices for customer ${customerId}`
+        );
+
+        return list.data.map((invoice) => {
+            const createdTs = invoice.created ?? 0;
+            const periodStartTs = (invoice as any).period_start as number | undefined;
+            const periodEndTs = (invoice as any).period_end as number | undefined;
+
+            return {
+                id: invoice.id,
+                number: invoice.number ?? null,
+                status: invoice.status ?? null,
+                currency: invoice.currency ?? 'usd',
+                amountDue: (invoice.amount_due ?? 0) / 100,
+                amountPaid: (invoice.amount_paid ?? 0) / 100,
+                createdAt: new Date(createdTs * 1000),
+                periodStart: periodStartTs ? new Date(periodStartTs * 1000) : null,
+                periodEnd: periodEndTs ? new Date(periodEndTs * 1000) : null,
+                hostedInvoiceUrl: invoice.hosted_invoice_url ?? null,
+                invoicePdfUrl: invoice.invoice_pdf ?? null
+            };
+        });
+    }
+
+    async retrieveUpcomingInvoiceForCustomer(params: {
+        customerId: string;
+        subscriptionId?: string | null;
+    }): Promise<{
+        amountDue: number;
+        currency: string;
+        nextPaymentAttempt: Date | null;
+        periodStart: Date | null;
+        periodEnd: Date | null;
+    }> {
+        const stripe = this.stripeClient();
+
+        const invoices = stripe.invoices as any;
+
+        const upcoming = await invoices.retrieveUpcoming({
+            customer: params.customerId,
+            ...(params.subscriptionId
+                ? {
+                      subscription: params.subscriptionId
+                  }
+                : {})
+        });
+
+        const amountDue = (upcoming.amount_due ?? 0) / 100;
+        const currency = upcoming.currency ?? 'usd';
+
+        const nextPaymentAttempt = upcoming.next_payment_attempt
+            ? new Date(upcoming.next_payment_attempt * 1000)
+            : null;
+
+        const periodStartTs = (upcoming as any).period_start as number | undefined;
+        const periodEndTs = (upcoming as any).period_end as number | undefined;
+
+        const periodStart = periodStartTs ? new Date(periodStartTs * 1000) : null;
+        const periodEnd = periodEndTs ? new Date(periodEndTs * 1000) : null;
+
+        this.logger.log(
+            `Retrieved upcoming Stripe invoice preview for customer ${params.customerId} (subscription=${
+                params.subscriptionId ?? 'none'
+            }): amountDue=${amountDue} ${currency}`
+        );
+
+        return {
+            amountDue,
+            currency,
+            nextPaymentAttempt,
+            periodStart,
+            periodEnd
+        };
+    }
 }

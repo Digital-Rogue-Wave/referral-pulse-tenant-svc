@@ -1,4 +1,4 @@
-import { Body, Controller, Get, HttpCode, HttpStatus, Post, UseGuards } from '@nestjs/common';
+import { Body, Controller, Delete, Get, HttpCode, HttpStatus, Param, Post, UseGuards } from '@nestjs/common';
 import { ApiBearerAuth, ApiOkResponse, ApiTags } from '@nestjs/swagger';
 import { JwtAuthGuard } from '@mod/common/auth/jwt-auth.guard';
 import { KetoGuard, RequirePermission } from '@mod/common/auth/keto.guard';
@@ -12,6 +12,10 @@ import { SubscriptionUpgradeRequestDto } from './dto/subscription-upgrade-reques
 import { SubscriptionUpgradePreviewResponseDto } from './dto/subscription-upgrade-preview-response.dto';
 import { SubscriptionDowngradeRequestDto } from './dto/subscription-downgrade-request.dto';
 import { SubscriptionCancelRequestDto } from './dto/subscription-cancel-request.dto';
+import { PaymentMethodSetupResponseDto } from './dto/payment-method-setup-response.dto';
+import { PaymentMethodDto } from './dto/payment-method.dto';
+import { InvoiceDto } from './dto/invoice.dto';
+import { UpcomingInvoiceDto } from './dto/upcoming-invoice.dto';
 
 @ApiTags('billings')
 @ApiBearerAuth()
@@ -97,5 +101,57 @@ export class BillingController {
     @Post('subscription/reactivate')
     async reactivateSubscription(): Promise<SubscriptionStatusDto> {
         return await this.billingService.reactivateSubscription();
+    }
+
+    @ApiOkResponse({ type: PaymentMethodSetupResponseDto })
+    // @UseGuards(KetoGuard)
+    @RequirePermission({ namespace: KetoNamespace.TENANT, relation: KetoRelation.MANAGE_BILLING })
+    @HttpCode(HttpStatus.OK)
+    @Post('payment-methods')
+    async createPaymentMethodSetupIntent(): Promise<PaymentMethodSetupResponseDto> {
+        return await this.billingService.createPaymentMethodSetupIntent();
+    }
+
+    @ApiOkResponse({ type: PaymentMethodDto, isArray: true })
+    // @UseGuards(KetoGuard)
+    @RequirePermission({ namespace: KetoNamespace.TENANT, relation: KetoRelation.MANAGE_BILLING })
+    @HttpCode(HttpStatus.OK)
+    @Get('payment-methods')
+    async listPaymentMethods(): Promise<PaymentMethodDto[]> {
+        return await this.billingService.listPaymentMethods();
+    }
+
+    // @UseGuards(KetoGuard)
+    @RequirePermission({ namespace: KetoNamespace.TENANT, relation: KetoRelation.MANAGE_BILLING })
+    @HttpCode(HttpStatus.NO_CONTENT)
+    @Delete('payment-methods/:id')
+    async deletePaymentMethod(@Param('id') id: string): Promise<void> {
+        await this.billingService.deletePaymentMethod(id);
+    }
+
+    // @UseGuards(KetoGuard)
+    @RequirePermission({ namespace: KetoNamespace.TENANT, relation: KetoRelation.MANAGE_BILLING })
+    @HttpCode(HttpStatus.NO_CONTENT)
+    @Post('payment-methods/:id/default')
+    async setDefaultPaymentMethod(@Param('id') id: string): Promise<void> {
+        await this.billingService.setDefaultPaymentMethod(id);
+    }
+
+    @ApiOkResponse({ type: InvoiceDto, isArray: true })
+    // @UseGuards(KetoGuard)
+    @RequirePermission({ namespace: KetoNamespace.TENANT, relation: KetoRelation.MANAGE_BILLING })
+    @HttpCode(HttpStatus.OK)
+    @Get('invoices')
+    async listInvoices(): Promise<InvoiceDto[]> {
+        return await this.billingService.listInvoices();
+    }
+
+    @ApiOkResponse({ type: UpcomingInvoiceDto })
+    // @UseGuards(KetoGuard)
+    @RequirePermission({ namespace: KetoNamespace.TENANT, relation: KetoRelation.MANAGE_BILLING })
+    @HttpCode(HttpStatus.OK)
+    @Get('invoices/upcoming')
+    async getUpcomingInvoice(): Promise<UpcomingInvoiceDto> {
+        return await this.billingService.getUpcomingInvoice();
     }
 }

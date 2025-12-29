@@ -178,17 +178,17 @@ These items come from `openspec/changes/add-subscription-checkout/specs/tenant-b
 
 ## Phase 4 – Payment & Invoice Management (`BILLING.md` §131–152)
 
-- [ ] 4.1 Payment method management
+- [x] 4.1 Payment method management
   - Create Stripe SetupIntent for adding cards.
   - `POST /billings/payment-methods`, `GET /billings/payment-methods`, `DELETE /billings/payment-methods/:id`.
   - Handle payment method updates in Stripe.
 
-- [ ] 4.2 Invoice management
+- [x] 4.2 Invoice management
   - `GET /billings/invoices` endpoint.
   - Stripe invoice listing and PDF download.
   - Upcoming invoice preview.
 
-- [ ] 4.3 Payment failure handling
+- [x] 4.3 Payment failure handling
   - Handle `invoice.payment_failed` webhook with grace‑period logic.
   - Send failed payment notifications.
   - Payment‑required guard and restoration on `invoice.paid`.
@@ -196,12 +196,14 @@ These items come from `openspec/changes/add-subscription-checkout/specs/tenant-b
 ---
 
 ## Phase 5 – Usage Tracking System (`BILLING.md` §153–218)
+ 
+ - [ ] Docs: Example of applying `PaymentRequiredGuard` to protected routes.
 
-- [ ] 5.1 `UsageTracker` service
+ - [x] 5.1 `UsageTracker` service
   - Track usage across metrics.
   - Store usage in DB with daily rollups.
 
-- [ ] 5.2 Usage check middleware/guard
+- [x] 5.2 Usage check middleware/guard
   - Intercept resource creation requests.
   - Block requests that exceed plan limits.
 
