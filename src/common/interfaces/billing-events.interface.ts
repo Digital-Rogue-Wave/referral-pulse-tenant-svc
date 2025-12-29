@@ -49,3 +49,10 @@ export interface SubscriptionCancelledEvent {
     cancellationReason?: string | null;
     cancellationEffectiveDate?: string | null;
 }
+
+export interface PaymentFailedEvent {
+    tenantId: string;
+    stripeCustomerId?: string;
+    stripeSubscriptionId?: string;
+    stripeInvoiceId?: string;
+}

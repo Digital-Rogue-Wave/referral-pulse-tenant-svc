@@ -5,7 +5,11 @@ import { BillingPlanEnum, SubscriptionStatusEnum, PaymentStatusEnum } from '@mod
 import { SubscriptionCheckoutResponseDto } from './dto/subscription-checkout-response.dto';
 import { SubscriptionStatusDto } from './dto/subscription-status.dto';
 import { SubscriptionUpgradePreviewResponseDto } from './dto/subscription-upgrade-preview-response.dto';
+import { PaymentMethodSetupResponseDto } from './dto/payment-method-setup-response.dto';
+import { PaymentMethodDto } from './dto/payment-method.dto';
 import { SubscriptionCancelRequestDto } from './dto/subscription-cancel-request.dto';
+import { InvoiceDto } from './dto/invoice.dto';
+import { UpcomingInvoiceDto } from './dto/upcoming-invoice.dto';
 import { StripeService } from './stripe.service';
 import { ClsService } from 'nestjs-cls';
 import type { ClsRequestContext } from '@domains/context/cls-request-context';
@@ -22,7 +26,8 @@ import {
     SubscriptionCreatedEvent,
     SubscriptionDowngradeScheduledEvent,
     SubscriptionUpgradedEvent,
-    SubscriptionCancelledEvent
+    SubscriptionCancelledEvent,
+    PaymentFailedEvent
 } from '@mod/common/interfaces/billing-events.interface';
 
 @Injectable()
@@ -60,12 +65,20 @@ export class BillingService {
         const invoiceId = invoice.id;
 
         const rawInvoice = invoice as any;
-        const paymentIntentId = typeof rawInvoice.payment_intent === 'string' ? rawInvoice.payment_intent : rawInvoice.payment_intent?.id;
+        const paymentIntentId =
+            typeof rawInvoice.payment_intent === 'string'
+                ? rawInvoice.payment_intent
+                : rawInvoice.payment_intent?.id;
 
-        const subscriptionId = typeof rawInvoice.subscription === 'string' ? rawInvoice.subscription : rawInvoice.subscription?.id;
+        const subscriptionId =
+            typeof rawInvoice.subscription === 'string'
+                ? rawInvoice.subscription
+                : rawInvoice.subscription?.id;
 
         if (!subscriptionId) {
-            this.logger.warn(`invoice.payment_succeeded missing subscription reference: eventId=${event.id}, invoiceId=${invoiceId}`);
+            this.logger.warn(
+                `invoice.payment_succeeded missing subscription reference: eventId=${event.id}, invoiceId=${invoiceId}`
+            );
             return;
         }
 
@@ -85,8 +98,32 @@ export class BillingService {
             await this.billingRepository.manager.save(billing);
         }
 
+        try {
+            const tenant = await this.billingRepository.manager.findOne(TenantEntity, {
+                where: { id: billing.tenantId }
+            });
+
+            if (!tenant) {
+                this.logger.warn(
+                    `invoice.payment_succeeded: no TenantEntity found for tenantId=${billing.tenantId}, eventId=${event.id}, invoiceId=${invoiceId}`
+                );
+            } else {
+                if (tenant.paymentStatus !== PaymentStatusEnum.COMPLETED) {
+                    tenant.paymentStatus = PaymentStatusEnum.COMPLETED;
+                    await this.billingRepository.manager.save(tenant);
+                }
+            }
+        } catch (err) {
+            this.logger.error(
+                `Failed to update tenant paymentStatus for invoice.payment_succeeded: tenantId=${billing.tenantId}, eventId=${event.id}, invoiceId=${invoiceId}`,
+                err as Error
+            );
+        }
+
         this.logger.log(
-            `Processed invoice.payment_succeeded from Stripe: eventId=${event.id}, invoiceId=${invoiceId}, subscriptionId=${subscriptionId}, paymentIntentId=${paymentIntentId ?? 'unknown'}`
+            `Processed invoice.payment_succeeded from Stripe: eventId=${event.id}, invoiceId=${invoiceId}, subscriptionId=${subscriptionId}, paymentIntentId=${
+                paymentIntentId ?? 'unknown'
+            }`
         );
     }
 
@@ -120,7 +157,7 @@ export class BillingService {
         const billing = await this.getOrCreateBillingForCurrentTenant();
         const tenantId = billing.tenantId;
 
-        const paymentStatus =
+        let paymentStatus: PaymentStatusEnum =
             billing.status === SubscriptionStatusEnum.ACTIVE
                 ? PaymentStatusEnum.COMPLETED
                 : billing.status === SubscriptionStatusEnum.CANCELED
@@ -143,7 +180,10 @@ export class BillingService {
                     trialDaysRemaining = Math.ceil(diffMs / (1000 * 60 * 60 * 24));
                 } else {
                     trialActive = false;
-                    trialDaysRemaining = 0;
+                }
+
+                if (tenant.paymentStatus) {
+                    paymentStatus = tenant.paymentStatus;
                 }
             } else {
                 trialActive = false;
@@ -275,6 +315,84 @@ export class BillingService {
         });
 
         return await this.getCurrentSubscription();
+    }
+
+    async createPaymentMethodSetupIntent(): Promise<PaymentMethodSetupResponseDto> {
+        const billing = await this.getOrCreateBillingForCurrentTenant();
+
+        if (!billing.stripeCustomerId) {
+            throw new HttpException('No Stripe customer configured for this tenant', HttpStatus.BAD_REQUEST);
+        }
+
+        const setupIntent = await this.stripeService.createSetupIntent(billing.stripeCustomerId);
+
+        if (!setupIntent.client_secret) {
+            throw new HttpException('Failed to create Stripe SetupIntent', HttpStatus.INTERNAL_SERVER_ERROR);
+        }
+
+        return {
+            clientSecret: setupIntent.client_secret,
+            customerId: billing.stripeCustomerId
+        };
+    }
+
+    async listPaymentMethods(): Promise<PaymentMethodDto[]> {
+        const billing = await this.getOrCreateBillingForCurrentTenant();
+
+        if (!billing.stripeCustomerId) {
+            throw new HttpException('No Stripe customer configured for this tenant', HttpStatus.BAD_REQUEST);
+        }
+
+        const methods = await this.stripeService.listPaymentMethods(billing.stripeCustomerId);
+
+        return methods;
+    }
+
+    async deletePaymentMethod(paymentMethodId: string): Promise<void> {
+        const billing = await this.getOrCreateBillingForCurrentTenant();
+
+        if (!billing.stripeCustomerId) {
+            throw new HttpException('No Stripe customer configured for this tenant', HttpStatus.BAD_REQUEST);
+        }
+
+        await this.stripeService.detachPaymentMethodForCustomer(billing.stripeCustomerId, paymentMethodId);
+    }
+
+    async setDefaultPaymentMethod(paymentMethodId: string): Promise<void> {
+        const billing = await this.getOrCreateBillingForCurrentTenant();
+
+        if (!billing.stripeCustomerId) {
+            throw new HttpException('No Stripe customer configured for this tenant', HttpStatus.BAD_REQUEST);
+        }
+
+        await this.stripeService.setDefaultPaymentMethodForCustomer(billing.stripeCustomerId, paymentMethodId);
+    }
+
+    async listInvoices(): Promise<InvoiceDto[]> {
+        const billing = await this.getOrCreateBillingForCurrentTenant();
+
+        if (!billing.stripeCustomerId) {
+            throw new HttpException('No Stripe customer configured for this tenant', HttpStatus.BAD_REQUEST);
+        }
+
+        const invoices = await this.stripeService.listInvoicesForCustomer(billing.stripeCustomerId);
+
+        return invoices;
+    }
+
+    async getUpcomingInvoice(): Promise<UpcomingInvoiceDto> {
+        const billing = await this.getOrCreateBillingForCurrentTenant();
+
+        if (!billing.stripeCustomerId || !billing.stripeSubscriptionId) {
+            throw new HttpException('No active subscription to preview upcoming invoice for this tenant', HttpStatus.BAD_REQUEST);
+        }
+
+        const upcoming = await this.stripeService.retrieveUpcomingInvoiceForCustomer({
+            customerId: billing.stripeCustomerId,
+            subscriptionId: billing.stripeSubscriptionId
+        });
+
+        return upcoming;
     }
 
     async cancelSubscription(dto: SubscriptionCancelRequestDto): Promise<SubscriptionStatusDto> {
@@ -558,7 +676,8 @@ export class BillingService {
                     await this.handleCheckoutSessionCompleted(event);
                     break;
                 }
-                case 'invoice.payment_succeeded': {
+                case 'invoice.payment_succeeded':
+                case 'invoice.paid': {
                     await this.handleInvoicePaymentSucceeded(event);
                     break;
                 }
@@ -682,17 +801,103 @@ export class BillingService {
         });
     }
 
-    private handleInvoicePaymentFailed(event: Stripe.Event): void {
+    private async handleInvoicePaymentFailed(event: Stripe.Event): Promise<void> {
         const invoice = event.data.object as Stripe.Invoice;
         const invoiceId = invoice.id;
-        const customerId = typeof invoice.customer === 'string' ? invoice.customer : invoice.customer?.id;
 
         const rawInvoice = invoice as any;
-        const paymentIntentId = typeof rawInvoice.payment_intent === 'string' ? rawInvoice.payment_intent : rawInvoice.payment_intent?.id;
+        const paymentIntentId =
+            typeof rawInvoice.payment_intent === 'string'
+                ? rawInvoice.payment_intent
+                : rawInvoice.payment_intent?.id;
+
+        const subscriptionId =
+            typeof rawInvoice.subscription === 'string'
+                ? rawInvoice.subscription
+                : rawInvoice.subscription?.id;
+
+        const customerId =
+            typeof invoice.customer === 'string' ? invoice.customer : invoice.customer?.id;
+
+        if (!subscriptionId && !customerId) {
+            this.logger.warn(
+                `invoice.payment_failed missing subscription/customer reference: eventId=${event.id}, invoiceId=${invoiceId}`
+            );
+            return;
+        }
+
+        let billing: BillingEntity | null = null;
+
+        if (subscriptionId) {
+            billing = await this.billingRepository.manager.findOne(BillingEntity, {
+                where: { stripeSubscriptionId: subscriptionId }
+            });
+        }
+
+        if (!billing && customerId) {
+            billing = await this.billingRepository.manager.findOne(BillingEntity, {
+                where: { stripeCustomerId: customerId }
+            });
+        }
+
+        if (!billing) {
+            this.logger.warn(
+                `invoice.payment_failed: no BillingEntity found for subscriptionId=${subscriptionId ?? 'unknown'}, customerId=${
+                    customerId ?? 'unknown'
+                }, eventId=${event.id}, invoiceId=${invoiceId}`
+            );
+            return;
+        }
+
+        const nextAttempt = invoice.next_payment_attempt
+            ? new Date(invoice.next_payment_attempt * 1000)
+            : null;
+
+        try {
+            const tenant = await this.billingRepository.manager.findOne(TenantEntity, {
+                where: { id: billing.tenantId }
+            });
+
+            if (!tenant) {
+                this.logger.warn(
+                    `invoice.payment_failed: no TenantEntity found for tenantId=${billing.tenantId}, eventId=${event.id}, invoiceId=${invoiceId}`
+                );
+            } else {
+                if (nextAttempt && nextAttempt > new Date()) {
+                    tenant.paymentStatus = PaymentStatusEnum.PENDING;
+                    this.logger.warn(
+                        `Set tenant ${tenant.id} paymentStatus=PENDING due to invoice.payment_failed within Stripe grace period (next_attempt=${nextAttempt.toISOString()})`
+                    );
+                } else {
+                    tenant.paymentStatus = PaymentStatusEnum.FAILED;
+                    this.logger.warn(
+                        `Set tenant ${tenant.id} paymentStatus=FAILED due to invoice.payment_failed with no further automatic retries`
+                    );
+                }
+
+                await this.billingRepository.manager.save(tenant);
+            }
+        } catch (err) {
+            this.logger.error(
+                `Failed to update tenant paymentStatus for invoice.payment_failed: tenantId=${billing.tenantId}, eventId=${event.id}, invoiceId=${invoiceId}`,
+                err as Error
+            );
+        }
 
         this.logger.warn(
-            `Processed invoice.payment_failed from Stripe: eventId=${event.id}, invoiceId=${invoiceId}, customerId=${customerId ?? 'unknown'}, paymentIntentId=${paymentIntentId ?? 'unknown'}`
+            `Processed invoice.payment_failed from Stripe: eventId=${event.id}, invoiceId=${invoiceId}, subscriptionId=${subscriptionId ?? 'unknown'}, customerId=${
+                customerId ?? 'unknown'
+            }, paymentIntentId=${paymentIntentId ?? 'unknown'}`
         );
+
+        const paymentFailedEvent: PaymentFailedEvent = {
+            tenantId: billing.tenantId,
+            stripeCustomerId: billing.stripeCustomerId ?? undefined,
+            stripeSubscriptionId: billing.stripeSubscriptionId ?? undefined,
+            stripeInvoiceId: invoiceId
+        };
+
+        this.eventEmitter.emit('billing.payment_failed', paymentFailedEvent);
     }
 
     private async endTenantTrialIfActive(tenantId: string): Promise<void> {

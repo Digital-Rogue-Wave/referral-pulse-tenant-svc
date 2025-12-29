@@ -16,6 +16,9 @@ import { PlanSerializationProfile } from './serialization/plan-serialization.pro
 import { PlanStripeSyncService } from './plan-stripe-sync.service';
 import { TenantModule } from '@mod/tenant/tenant.module';
 import { TestBillingController } from './test-billing.controller';
+import { PaymentRequiredGuard } from './guards/payment-required.guard';
+import { UsageTrackerService } from './usage-tracker.service';
+import { UsageCheckGuard } from './guards/usage-check.guard';
 
 @Module({
     imports: [
@@ -28,7 +31,7 @@ import { TestBillingController } from './test-billing.controller';
         TenantModule
     ],
     controllers: [BillingController, PlanAdminController, PlanPublicController, TestBillingController],
-    providers: [BillingService, StripeService, BillingListener, PlanService, PlanSerializationProfile, PlanStripeSyncService],
-    exports: [BillingService, PlanService]
+    providers: [BillingService, StripeService, BillingListener, PlanService, PlanSerializationProfile, PlanStripeSyncService, PaymentRequiredGuard, UsageTrackerService, UsageCheckGuard],
+    exports: [BillingService, PlanService, PaymentRequiredGuard, UsageTrackerService, UsageCheckGuard]
 })
 export class BillingModule {}
