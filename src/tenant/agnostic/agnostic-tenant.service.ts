@@ -7,7 +7,7 @@ import { AgnosticTenantSettingService } from '@mod/tenant-setting/agnostic/agnos
 import { TenantEntity } from '../tenant.entity';
 import { CreateTenantDto } from '../dto/tenant/create-tenant.dto';
 import { EventEmitter2 } from '@nestjs/event-emitter';
-import { SubdomainService } from '../dns/subdomain.service';
+import { SubdomainService } from '../../dns/subdomain.service';
 import { KetoService } from '@mod/common/auth/keto.service';
 import { Utils } from '@mod/common/utils/utils';
 import { KetoRelationTupleDto } from '@mod/common/auth/dto/keto-relation-tuple.dto';

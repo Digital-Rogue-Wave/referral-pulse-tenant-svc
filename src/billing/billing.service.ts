@@ -217,10 +217,7 @@ export class BillingService {
 
                 stripeCancelAtPeriodEnd = !!rawSubscription.cancel_at_period_end;
             } catch (err) {
-                this.logger.error(
-                    `Failed to fetch Stripe subscription ${billing.stripeSubscriptionId} for tenant ${tenantId}`,
-                    err as Error
-                );
+                this.logger.error(`Failed to fetch Stripe subscription ${billing.stripeSubscriptionId} for tenant ${tenantId}`, err as Error);
             }
         }
 
@@ -431,9 +428,7 @@ export class BillingService {
             stripeSubscriptionId: billing.stripeSubscriptionId ?? undefined,
             cancelUserId: userId ?? null,
             cancellationReason: billing.cancellationReason ?? null,
-            cancellationEffectiveDate: billing.cancellationEffectiveAt
-                ? billing.cancellationEffectiveAt.toISOString()
-                : null
+            cancellationEffectiveDate: billing.cancellationEffectiveAt ? billing.cancellationEffectiveAt.toISOString() : null
         };
 
         this.eventEmitter.emit('subscription.cancelled', cancelledEvent);
@@ -512,15 +507,10 @@ export class BillingService {
             const usage = stats.planUsagePercentage ?? null;
 
             this.logger.log(
-                `Downgrade usage validation placeholder for tenant ${tenantId}, targetPlan=${targetPlan}, planUsagePercentage=${
-                    usage ?? 'unknown'
-                }`
+                `Downgrade usage validation placeholder for tenant ${tenantId}, targetPlan=${targetPlan}, planUsagePercentage=${usage ?? 'unknown'}`
             );
         } catch (err) {
-            this.logger.error(
-                `Failed to perform downgrade usage validation for tenant ${tenantId} and plan ${targetPlan}`,
-                err as Error
-            );
+            this.logger.error(`Failed to perform downgrade usage validation for tenant ${tenantId} and plan ${targetPlan}`, err as Error);
         }
     }
 
@@ -535,12 +525,7 @@ export class BillingService {
             throw new HttpException('Target plan must be different from current plan', HttpStatus.BAD_REQUEST);
         }
 
-        const planOrder = [
-            BillingPlanEnum.FREE,
-            BillingPlanEnum.STARTER,
-            BillingPlanEnum.GROWTH,
-            BillingPlanEnum.ENTERPRISE
-        ];
+        const planOrder = [BillingPlanEnum.FREE, BillingPlanEnum.STARTER, BillingPlanEnum.GROWTH, BillingPlanEnum.ENTERPRISE];
 
         const currentIndex = planOrder.indexOf(billing.plan);
         const targetIndex = planOrder.indexOf(targetPlan);
@@ -916,9 +901,7 @@ export class BillingService {
                 tenant.trialEndsAt = now;
                 await this.billingRepository.manager.save(tenant);
 
-                this.logger.log(
-                    `Ended trial early for tenant ${tenantId} at ${now.toISOString()} due to paid subscription checkout`
-                );
+                this.logger.log(`Ended trial early for tenant ${tenantId} at ${now.toISOString()} due to paid subscription checkout`);
             }
         } catch (err) {
             this.logger.error(`Failed to end trial early for tenant ${tenantId}`, err as Error);
@@ -934,9 +917,7 @@ export class BillingService {
         });
 
         if (!billing) {
-            this.logger.warn(
-                `customer.subscription.deleted: no BillingEntity found for subscriptionId=${subscriptionId}, eventId=${event.id}`
-            );
+            this.logger.warn(`customer.subscription.deleted: no BillingEntity found for subscriptionId=${subscriptionId}, eventId=${event.id}`);
             return;
         }
 

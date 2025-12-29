@@ -4,6 +4,8 @@ import { NullableType } from '@mod/types/nullable.type';
 import { FilesService } from '@mod/files/files.service';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { KratosService } from '@mod/common/auth/kratos.service';
+import { KetoService } from '@mod/common/auth/keto.service';
+import { KetoNamespace } from '@mod/common/auth/keto.constants';
 import { TenantStatusEnum, DomainVerificationStatusEnum } from '@mod/common/enums/tenant.enum';
 import { InjectTenantAwareRepository, TenantAwareRepository } from '@mod/common/tenant/tenant-aware.repository';
 import { TenantEntity } from '../tenant.entity';
@@ -13,10 +15,8 @@ import { UpdateTenantDto } from '../dto/tenant/update-tenant.dto';
 import { ScheduleDeletionDto } from '../dto/schedule-deletion.dto';
 import { CancelDeletionDto } from '../dto/cancel-deletion.dto';
 import { TransferOwnershipDto } from '../dto/transfer-ownership.dto';
-import { AuditService } from '@mod/common/audit/audit.service';
-import { AuditAction } from '@mod/common/audit/audit-action.enum';
-import { DnsVerificationService } from '../dns/dns-verification.service';
-import { SubdomainService } from '../dns/subdomain.service';
+import { DnsVerificationService } from '../../dns/dns-verification.service';
+import { SubdomainService } from '../../dns/subdomain.service';
 import { InjectQueue } from '@nestjs/bullmq';
 import { Queue } from 'bullmq';
 import { TENANT_UNLOCK_QUEUE, TenantUnlockJobData } from '@mod/common/bullmq/queues/tenant-unlock.queue';
@@ -38,7 +38,7 @@ export class AwareTenantService {
         private readonly subdomainService: SubdomainService,
         @InjectQueue(TENANT_UNLOCK_QUEUE)
         private readonly unlockQueue: Queue<TenantUnlockJobData>,
-        private readonly auditService: AuditService
+        private readonly ketoService: KetoService
     ) {}
 
     async findAll(): Promise<TenantEntity[]> {
@@ -185,22 +185,24 @@ export class AwareTenantService {
 
         const tenant = await this.findOneOrFail({ id });
 
-        // Task 75: Audit logging
-        await this.auditService.log({
-            tenantId: id,
-            userId: user.id,
-            action: AuditAction.OWNERSHIP_TRANSFERRED,
-            description: `Transferred ownership of tenant ${id} to ${dto.newOwnerId}`,
-            metadata: {
-                tenantId: id,
-                oldOwnerId: user.id,
-                newOwnerId: dto.newOwnerId
-            },
-            ipAddress,
-            userAgent: 'system' // Controller doesn't pass user agent yet, can be updated later
+        // Update Keto relations
+        // Remove owner relation for old owner
+        await this.ketoService.deleteTuple({
+            namespace: KetoNamespace.TENANT,
+            object: id,
+            relation: 'owner',
+            subject_id: user.id
         });
 
-        // Emit event for Keto relation updates and notifications
+        // Add owner relation for new owner
+        await this.ketoService.createTuple({
+            namespace: KetoNamespace.TENANT,
+            object: id,
+            relation: 'owner',
+            subject_id: dto.newOwnerId
+        });
+
+        // Emit event for notifications and audit log
         this.eventEmitter.emit('ownership.transferred', {
             tenantId: id,
             oldOwnerId: user.id,

@@ -2,8 +2,8 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { SubdomainService } from './subdomain.service';
-import { TenantEntity } from '../tenant.entity';
-import { ReservedSubdomainEntity } from '../reserved-subdomain.entity';
+import { TenantEntity } from '../tenant/tenant.entity';
+import { ReservedSubdomainEntity } from './reserved-subdomain.entity';
 import { HttpException } from '@nestjs/common';
 import { createMock, DeepMocked } from '@golevelup/ts-jest';
 

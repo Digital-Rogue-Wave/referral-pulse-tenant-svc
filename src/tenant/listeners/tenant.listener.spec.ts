@@ -11,7 +11,7 @@ import { createMock, DeepMocked } from '@golevelup/ts-jest';
 import { Queue } from 'bullmq';
 import { HttpClient } from '@mod/common/http/http.client';
 import { ConfigService } from '@nestjs/config';
-import { DomainProvisioningService } from '../dns/domain-provisioning.service';
+import { DomainProvisioningService } from '../../dns/domain-provisioning.service';
 import Stubber from '@mod/common/mock/typeorm-faker';
 import { SesService } from '@mod/common/aws-ses/ses.service';
 

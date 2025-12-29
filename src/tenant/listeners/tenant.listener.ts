@@ -10,7 +10,7 @@ import { CreateAuditLogDto } from '@mod/common/audit/create-audit-log.dto';
 import { AuditAction } from '@mod/common/audit/audit-action.enum';
 import { PublishSnsEventDto, SnsPublishOptionsDto } from '@mod/common/dto/sns-publish.dto';
 import { HttpClient } from '@mod/common/http/http.client';
-import { DomainProvisioningService } from '../dns/domain-provisioning.service';
+import { DomainProvisioningService } from '../../dns/domain-provisioning.service';
 import { ConfigService, ConfigType } from '@nestjs/config';
 import oryConfig from '@mod/config/ory.config';
 import { InjectQueue } from '@nestjs/bullmq';
@@ -24,7 +24,8 @@ import {
     TenantDomainVerifiedEvent,
     TenantUpdatedEvent,
     TenantSuspendedEvent,
-    TenantUnsuspendedEvent
+    TenantUnsuspendedEvent,
+    TenantOwnershipTransferredEvent
 } from '@mod/common/interfaces/tenant-events.interface';
 
 @Injectable()
@@ -424,6 +425,46 @@ The Referral Pulse Team`
             topic: 'tenant-events',
             groupId: tenantId,
             deduplicationId: `${tenantId}-unsuspended-${Date.now()}`
+        };
+        await this.sns.publish(snsEventDto as any, snsOptionsDto as any);
+    }
+
+    @OnEvent('ownership.transferred')
+    async handleOwnershipTransferredEvent(payload: TenantOwnershipTransferredEvent) {
+        const { tenantId, oldOwnerId, newOwnerId, tenantName, ipAddress } = payload;
+        this.logger.log(`ownership.transferred event received for tenant ${tenantId}`);
+
+        // 1. Audit Log
+        await this.auditService.log({
+            tenantId,
+            userId: oldOwnerId,
+            action: AuditAction.OWNERSHIP_TRANSFERRED,
+            description: `Transferred ownership of tenant "${tenantName}" to ${newOwnerId}`,
+            metadata: {
+                tenantId,
+                oldOwnerId,
+                newOwnerId
+            },
+            ipAddress,
+            userAgent: 'system'
+        });
+
+        // 2. Publish SNS Event
+        const snsEventDto = {
+            eventId: tenantId,
+            eventType: 'ownership.transferred',
+            data: {
+                tenantId,
+                oldOwnerId,
+                newOwnerId,
+                tenantName
+            },
+            timestamp: new Date().toISOString()
+        };
+        const snsOptionsDto = {
+            topic: 'tenant-events',
+            groupId: tenantId,
+            deduplicationId: `${tenantId}-ownership-transferred-${Date.now()}`
         };
         await this.sns.publish(snsEventDto as any, snsOptionsDto as any);
     }
