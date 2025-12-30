@@ -207,29 +207,36 @@ These items come from `openspec/changes/add-subscription-checkout/specs/tenant-b
   - Intercept resource creation requests.
   - Block requests that exceed plan limits.
 
-- [ ] 5.3 Increment/decrement on resource changes
-  - Hook into campaign creation, team member adds, referral emails, referral links.
+- [x] 5.3 Increment/decrement on resource changes
+  - Provide internal usage tracking API for other services (e.g. `POST /internal/tenants/:tenantId/usage/increment|decrement`) that delegates to the usage tracking layer.
+  - Define metrics for campaigns, team members, referral emails, referral links.
+  - Ensure campaign, team-member, referral and other services increment on create and decrement on delete via the usage API.
 
-- [ ] 5.4 Monthly usage reset job
+- [x] 5.4 Monthly usage reset job
   - Scheduled job to archive monthly usage and reset counters.
-  - Send usage summary emails.
+  - Archive final monthly usage into `TenantUsageEntity` and `BillingEventEntity`.
+  - Reset Redis monthly counters and usage thresholds for the new billing period.
+  - Prepare data for usage summary emails.
 
-- [ ] 5.5 Limit exceeded exception
+- [x] 5.5 Limit exceeded exception
   - Custom HTTP 402 with metric, current usage, limit and upgrade suggestions.
 
-- [ ] 5.6 `GET /billings/usage` endpoint
+- [x] 5.6 `GET /billings/usage` endpoint
   - Return current usage, limits, percentage used and history.
 
-- [ ] 5.7 Redis counters for real‑time tracking
-  - `RedisUsageService` with key structure and atomic INCR/DECR.
-  - TTL management for counters and thresholds.
+- [x] 5.7 Redis counters for real‑time tracking
+  - Implement `RedisUsageService` with atomic INCR/DECR operations.
+  - Define Redis key structure (e.g. `usage:{tenant_id}:{metric}:{YYYY-MM}`, `limits:{tenant_id}:{metric}`, `thresholds:{tenant_id}:{metric}:{percentage}`).
+  - TTL management for counters and thresholds (auto-expire after a retention window).
 
-- [ ] 5.8 SQS consumer for referral events
-  - `ReferralEventProcessor` consuming referral events, validating and tracking usage.
+- [x] 5.8 SQS consumer for referral events
+  - `ReferralEventProcessor` consuming referral events from SQS, validating payloads and calling the usage tracking layer (e.g. `RedisUsageService.trackUsage()`).
+  - Align event schema with SNS/SQS setup and emit analytics events as needed.
 
-- [ ] 5.9 Daily usage calculation cron
-  - Read Redis counters nightly, write snapshots to `TenantUsage`.
+- [x] 5.9 Daily usage calculation cron
+  - Read Redis counters nightly and write snapshots to `TenantUsageEntity`.
   - Check thresholds (80%, 100%) and emit notifications.
+  - Archive or reset Redis keys as needed to keep counters bounded.
 
 ---
 
@@ -255,6 +262,7 @@ These items come from `openspec/changes/add-subscription-checkout/specs/tenant-b
 
 - [ ] 6.6 `PlanLimitService` utility
   - `getPlanLimits`, `canPerformAction`, `getRemainingCapacity`, `enforceLimit` helpers.
+  - After `PlanLimitService` is implemented, refactor `UsageCheckGuard` / `UsageCheck` to derive limits from `PlanEntity.limits` via `PlanLimitService` instead of decorator-provided constants.
 
 ---
 

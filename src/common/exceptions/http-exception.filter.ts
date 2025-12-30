@@ -7,17 +7,22 @@ export class HttpExceptionFilter implements ExceptionFilter {
     constructor(private readonly logger: AppLoggingService) {}
 
     catch(exception: any, host: ArgumentsHost) {
-        const exceptionHandlers: Record<string, (exception: any, host: ArgumentsHost) => void> = {
-            HttpException: this.handleHttpException.bind(this),
-            EntityNotFoundError: this.handleEntityNotFoundError.bind(this),
-            QueryFailedError: this.handleQueryFailedError.bind(this)
-        };
-        const handler = exceptionHandlers[exception.constructor.name];
-        if (handler) {
-            handler(exception, host);
-        } else {
-            this.handleUnknownException(exception, host);
+        if (exception instanceof HttpException) {
+            this.handleHttpException(exception, host);
+            return;
         }
+
+        if (exception instanceof EntityNotFoundError) {
+            this.handleEntityNotFoundError(exception, host);
+            return;
+        }
+
+        if (exception instanceof QueryFailedError) {
+            this.handleQueryFailedError(exception, host);
+            return;
+        }
+
+        this.handleUnknownException(exception, host);
     }
 
     handleHttpException(exception: HttpException, host: ArgumentsHost) {

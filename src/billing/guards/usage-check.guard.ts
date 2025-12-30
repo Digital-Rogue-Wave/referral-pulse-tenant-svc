@@ -1,10 +1,11 @@
-import { CanActivate, ExecutionContext, HttpException, HttpStatus, Injectable } from '@nestjs/common';
+import { CanActivate, ExecutionContext, Injectable } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
 import { Request } from 'express';
 import { ClsService } from 'nestjs-cls';
 import { ClsRequestContext } from '@mod/domains/context/cls-request-context';
 import { UsageTrackerService } from '../usage-tracker.service';
 import { USAGE_CHECK_KEY, UsageCheckOptions } from '../decorators/usage-check.decorator';
+import { LimitExceededException } from '../exceptions/limit-exceeded.exception';
 
 @Injectable()
 export class UsageCheckGuard implements CanActivate {
@@ -43,18 +44,15 @@ export class UsageCheckGuard implements CanActivate {
         const nextValue = current + amount;
 
         if (nextValue > options.limit) {
-            throw new HttpException(
-                {
-                    message: 'Plan limit exceeded for this resource.',
-                    code: 'PLAN_LIMIT_EXCEEDED',
-                    details: {
-                        metric: options.metric,
-                        currentUsage: current,
-                        limit: options.limit
-                    }
-                },
-                HttpStatus.PAYMENT_REQUIRED
-            );
+            throw new LimitExceededException({
+                metric: options.metric,
+                currentUsage: current,
+                limit: options.limit,
+                upgradeSuggestions: [
+                    `Upgrade your subscription plan to increase the allowed ${options.metric} limit.`
+                ],
+                upgradeUrl: null
+            });
         }
 
         return true;

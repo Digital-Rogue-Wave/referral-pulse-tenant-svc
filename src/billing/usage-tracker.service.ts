@@ -1,12 +1,14 @@
 import { Injectable } from '@nestjs/common';
 import { InjectTenantAwareRepository, TenantAwareRepository } from '@mod/common/tenant/tenant-aware.repository';
 import { TenantUsageEntity } from './tenant-usage.entity';
+import { RedisUsageService } from './redis-usage.service';
 
 @Injectable()
 export class UsageTrackerService {
     constructor(
         @InjectTenantAwareRepository(TenantUsageEntity)
-        private readonly usageRepository: TenantAwareRepository<TenantUsageEntity>
+        private readonly usageRepository: TenantAwareRepository<TenantUsageEntity>,
+        private readonly redisUsageService: RedisUsageService
     ) {}
 
     private getTodayDate(): string {
@@ -37,6 +39,12 @@ export class UsageTrackerService {
         }
 
         const periodDate = this.getTodayDate();
+        const tenantId = this.usageRepository.getTenantId();
+
+        if (tenantId) {
+            await this.redisUsageService.incrementUsage(tenantId, metricName, amount);
+        }
+
         let row = await this.getOrCreateUsageRow(metricName, periodDate);
         row.currentUsage += amount;
         row = await this.usageRepository.saveTenantContext(row);
@@ -50,6 +58,12 @@ export class UsageTrackerService {
         }
 
         const periodDate = this.getTodayDate();
+        const tenantId = this.usageRepository.getTenantId();
+
+        if (tenantId) {
+            await this.redisUsageService.decrementUsage(tenantId, metricName, amount);
+        }
+
         let row = await this.getOrCreateUsageRow(metricName, periodDate);
         row.currentUsage = Math.max(0, row.currentUsage - amount);
         row = await this.usageRepository.saveTenantContext(row);

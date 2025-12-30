@@ -158,6 +158,15 @@ export default registerAs('sqsConfig', () => {
                 waitTimeSeconds: 20,
                 visibilityTimeout: 30,
                 dlqUrl: process.env.SQS_REWARD_EVENTS_DLQ_URL
+            },
+            {
+                name: 'analytics-events',
+                queueUrl: process.env.SQS_ANALYTICS_EVENTS_QUEUE_URL || '',
+                fifo: true,
+                batchSize: 1,
+                waitTimeSeconds: 20,
+                visibilityTimeout: 30,
+                dlqUrl: process.env.SQS_ANALYTICS_EVENTS_DLQ_URL
             }
         ]
     };
