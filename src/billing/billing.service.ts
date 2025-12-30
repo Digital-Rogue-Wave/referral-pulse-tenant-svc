@@ -21,7 +21,7 @@ import { AuditAction } from '@mod/common/audit/audit-action.enum';
 import { InjectTenantAwareRepository, TenantAwareRepository } from '@mod/common/tenant/tenant-aware.repository';
 import { AgnosticTenantService } from '@mod/tenant/agnostic/agnostic-tenant.service';
 import { TenantEntity } from '@mod/tenant/tenant.entity';
-import { TenantStatsService } from '@mod/tenant/tenant-stats.service';
+import { TenantStatsService } from '@mod/tenant/aware/tenant-stats.service';
 import { TenantUsageEntity } from './tenant-usage.entity';
 import { UsageSummaryDto, UsageMetricSummaryDto, UsageMetricHistoryPointDto } from './dto/usage-summary.dto';
 import { In } from 'typeorm';
