@@ -22,6 +22,9 @@ import { InjectTenantAwareRepository, TenantAwareRepository } from '@mod/common/
 import { AgnosticTenantService } from '@mod/tenant/agnostic/agnostic-tenant.service';
 import { TenantEntity } from '@mod/tenant/tenant.entity';
 import { TenantStatsService } from '@mod/tenant/tenant-stats.service';
+import { TenantUsageEntity } from './tenant-usage.entity';
+import { UsageSummaryDto, UsageMetricSummaryDto, UsageMetricHistoryPointDto } from './dto/usage-summary.dto';
+import { In } from 'typeorm';
 import {
     SubscriptionCreatedEvent,
     SubscriptionDowngradeScheduledEvent,
@@ -36,6 +39,8 @@ export class BillingService {
     constructor(
         @InjectTenantAwareRepository(BillingEntity)
         private readonly billingRepository: TenantAwareRepository<BillingEntity>,
+        @InjectTenantAwareRepository(TenantUsageEntity)
+        private readonly usageRepository: TenantAwareRepository<TenantUsageEntity>,
         private readonly eventEmitter: EventEmitter2,
         private readonly stripeService: StripeService,
         private readonly cls: ClsService<ClsRequestContext>,
@@ -58,6 +63,73 @@ export class BillingService {
         }
 
         return billing;
+    }
+
+    async getUsageSummary(): Promise<UsageSummaryDto> {
+        const billing = await this.getOrCreateBillingForCurrentTenant();
+
+        const today = new Date();
+        const todayStr = today.toISOString().slice(0, 10);
+
+        const periodDates: string[] = [];
+        for (let i = 0; i < 7; i++) {
+            const d = new Date(today);
+            d.setDate(d.getDate() - i);
+            periodDates.push(d.toISOString().slice(0, 10));
+        }
+
+        const rows = await this.usageRepository.find({
+            where: { periodDate: In(periodDates) }
+        });
+
+        const metricsMap = new Map<
+            string,
+            {
+                currentUsage: number;
+                history: UsageMetricHistoryPointDto[];
+            }
+        >();
+
+        for (const row of rows) {
+            let entry = metricsMap.get(row.metricName);
+            if (!entry) {
+                entry = {
+                    currentUsage: 0,
+                    history: []
+                };
+                metricsMap.set(row.metricName, entry);
+            }
+
+            entry.history.push({ periodDate: row.periodDate, usage: row.currentUsage });
+
+            if (row.periodDate === todayStr) {
+                entry.currentUsage = row.currentUsage;
+            }
+        }
+
+        const metrics: UsageMetricSummaryDto[] = [];
+
+        for (const [metricName, value] of metricsMap.entries()) {
+            const limit: number | null = null;
+            const percentageUsed: number | null = limit && limit > 0 ? Math.min((value.currentUsage / limit) * 100, 100) : null;
+
+            const history = [...value.history].sort((a, b) => a.periodDate.localeCompare(b.periodDate));
+
+            metrics.push({
+                metric: metricName,
+                currentUsage: value.currentUsage,
+                limit,
+                percentageUsed,
+                history
+            });
+        }
+
+        metrics.sort((a, b) => a.metric.localeCompare(b.metric));
+
+        return {
+            plan: billing.plan,
+            metrics
+        };
     }
 
     private async handleInvoicePaymentSucceeded(event: Stripe.Event): Promise<void> {

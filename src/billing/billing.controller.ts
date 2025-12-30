@@ -16,6 +16,7 @@ import { PaymentMethodSetupResponseDto } from './dto/payment-method-setup-respon
 import { PaymentMethodDto } from './dto/payment-method.dto';
 import { InvoiceDto } from './dto/invoice.dto';
 import { UpcomingInvoiceDto } from './dto/upcoming-invoice.dto';
+import { UsageSummaryDto } from './dto/usage-summary.dto';
 
 @ApiTags('billings')
 @ApiBearerAuth()
@@ -153,5 +154,14 @@ export class BillingController {
     @Get('invoices/upcoming')
     async getUpcomingInvoice(): Promise<UpcomingInvoiceDto> {
         return await this.billingService.getUpcomingInvoice();
+    }
+
+    @ApiOkResponse({ type: UsageSummaryDto })
+    // @UseGuards(KetoGuard)
+    @RequirePermission({ namespace: KetoNamespace.TENANT, relation: KetoRelation.MANAGE_BILLING })
+    @HttpCode(HttpStatus.OK)
+    @Get('usage')
+    async getUsageSummary(): Promise<UsageSummaryDto> {
+        return await this.billingService.getUsageSummary();
     }
 }

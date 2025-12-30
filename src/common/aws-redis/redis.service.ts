@@ -57,6 +57,15 @@ export class RedisService {
         return this.client.smembers(key);
     }
 
+    // Numeric counters
+    async incrBy(key: string, amount: number): Promise<number> {
+        return this.client.incrby(key, amount);
+    }
+
+    async decrBy(key: string, amount: number): Promise<number> {
+        return this.client.decrby(key, amount);
+    }
+
     // TTL / existence
     async expire(key: string, ttlSeconds: number): Promise<number> {
         return this.client.expire(key, ttlSeconds);
