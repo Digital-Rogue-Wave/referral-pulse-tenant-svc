@@ -14,6 +14,8 @@ import { KetoRelationTupleDto } from '@mod/common/auth/dto/keto-relation-tuple.d
 import { KetoNamespace, KetoRelation } from '@mod/common/auth/keto.constants';
 import { TenantStatusEnum } from '@mod/common/enums/tenant.enum';
 import { NullableType } from '@mod/types/nullable.type';
+import { ConfigService } from '@nestjs/config';
+import type { AllConfigType } from '@mod/config/config.type';
 
 @Injectable()
 export class AgnosticTenantService {
@@ -25,7 +27,8 @@ export class AgnosticTenantService {
         private readonly tenantSettingService: AgnosticTenantSettingService,
         private readonly eventEmitter: EventEmitter2,
         private readonly subdomainService: SubdomainService,
-        private readonly ketoService: KetoService
+        private readonly ketoService: KetoService,
+        private readonly configService: ConfigService<AllConfigType>
     ) {}
 
     async create(createTenantDto: CreateTenantDto, file?: Express.Multer.File | Express.MulterS3.File): Promise<TenantEntity> {
@@ -46,9 +49,17 @@ export class AgnosticTenantService {
         }
 
         // 1. Create and save the tenant entity
+        const now = new Date();
+        const appConfig = this.configService.get('appConfig', { infer: true });
+        const trialDurationDays = appConfig?.trialDurationDays ?? 14;
+        const trialStartedAt = now;
+        const trialEndsAt = new Date(now.getTime() + trialDurationDays * 24 * 60 * 60 * 1000);
+
         const tenant = this.tenantRepository.create({
             ...createTenantDto,
-            slug: tenantSlug
+            slug: tenantSlug,
+            trialStartedAt,
+            trialEndsAt
         });
 
         if (file) {
