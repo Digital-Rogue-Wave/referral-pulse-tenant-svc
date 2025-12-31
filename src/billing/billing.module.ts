@@ -21,6 +21,8 @@ import { TestBillingController } from './test-billing.controller';
 import { PaymentRequiredGuard } from './guards/payment-required.guard';
 import { UsageTrackerService } from './usage-tracker.service';
 import { UsageCheckGuard } from './guards/usage-check.guard';
+import { PlanLimitService } from './plan-limit.service';
+import { BillingGuard } from './guards/billing.guard';
 import { UsageInternalController } from './usage-internal.controller';
 import { BillingUsageQueueService } from './billing-queue.service';
 import { BillingUsageProcessor } from './processors/billing-usage.processor';
@@ -52,6 +54,8 @@ import { MonthlyUsageResetService } from './monthly-usage-reset.service';
         PaymentRequiredGuard,
         UsageTrackerService,
         UsageCheckGuard,
+        PlanLimitService,
+        BillingGuard,
         BillingUsageQueueService,
         BillingUsageProcessor,
         RedisUsageService,
@@ -65,6 +69,8 @@ import { MonthlyUsageResetService } from './monthly-usage-reset.service';
         PaymentRequiredGuard,
         UsageTrackerService,
         UsageCheckGuard,
+        PlanLimitService,
+        BillingGuard,
         RedisUsageService,
         DailyUsageCalculator,
         ReferralEventProcessor,

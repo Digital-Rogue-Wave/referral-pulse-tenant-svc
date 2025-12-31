@@ -189,7 +189,7 @@
     - Provide historical usage data
     - Show usage trends and projections
 
-- [ ] 5.7 Implement Redis counters for real-time tracking
+- [x] 5.7 Implement Redis counters for real-time tracking
     - Create `RedisUsageService` for atomic operations
     - Define Redis key structure:
         - `usage:{tenant_id}:{metric}:{YYYY-MM}` → counter
@@ -198,7 +198,7 @@
     - Implement atomic INCR/DECR operations
     - Add TTL management (auto-expire after 60 days)
 
-- [ ] 5.8 Create SQS consumer for referral events
+- [x] 5.8 Create SQS consumer for referral events
     - Design SNS event format for referral actions
     - Create `ReferralEventProcessor` service
     - Consume events from referral service SQS queue
@@ -206,7 +206,7 @@
     - Call `RedisUsageService.trackUsage()`
     - Publish to ClickHouse for analytics
 
-- [ ] 5.9 Implement daily usage calculation cron
+- [x] 5.9 Implement daily usage calculation cron
     - Create `DailyUsageCalculator` service
     - Runs at midnight UTC via NestJS scheduler
     - For each tenant:

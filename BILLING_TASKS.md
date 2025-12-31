@@ -242,33 +242,34 @@ These items come from `openspec/changes/add-subscription-checkout/specs/tenant-b
 
 ## Phase 6 – Limit Enforcement (`BILLING.md` §219–258)
 
-- [ ] 6.1 Usage vs plan‑limit validation
+- [x] 6.1 Usage vs plan‑limit validation
   - Service to compare current usage against plan limits, including trials.
 
-- [ ] 6.2 Limit exceeded exception wiring
+- [x] 6.2 Limit exceeded exception wiring
   - Use a shared HTTP 402 exception with helpful upgrade messaging.
 
-- [ ] 6.3 `BillingGuard` for automatic enforcement
+- [x] 6.3 `BillingGuard` for automatic enforcement
   - `CanActivate` guard that checks subscription status and limits.
   - Returns 402 Payment Required when limits exceeded (respecting trial).
 
-- [ ] 6.4 Hard cut‑off at limits
+- [x] 6.4 Hard cut‑off at limits
   - Apply `BillingGuard` to all resource‑creation endpoints.
   - Configurable grace percentage (e.g. 10%).
 
-- [ ] 6.5 Leaderboard limiting
+- [x] 6.5 Leaderboard limiting
   - Limit leaderboard queries to top `leaderboard_entries`.
   - Add "Showing top X of Y (plan limit)" note.
 
-- [ ] 6.6 `PlanLimitService` utility
+- [x] 6.6 `PlanLimitService` utility
   - `getPlanLimits`, `canPerformAction`, `getRemainingCapacity`, `enforceLimit` helpers.
   - After `PlanLimitService` is implemented, refactor `UsageCheckGuard` / `UsageCheck` to derive limits from `PlanEntity.limits` via `PlanLimitService` instead of decorator-provided constants.
+  - Implemented in referral-pulse-tenant-svc billing module (PlanLimitService, BillingGuard, UsageCheckGuard, billing test endpoints).
 
 ---
 
 ## Phase 7 – Trial Management (`BILLING.md` §259–289)
 
-- [ ] 7.1 Trial setup on tenant creation
+- [x] 7.1 Trial setup on tenant creation
   - Automatically set `trial_started_at` and `trial_ends_at` (default 14 days).
   - Initialize starter‑like plan limits during trial.
 
@@ -337,3 +338,9 @@ These items come from `openspec/changes/add-subscription-checkout/specs/tenant-b
 - [ ] 9.6 Billing report generation
   - Monthly tenant usage reports, revenue and trial conversion reports.
   - CSV/PDF export and scheduled email delivery.
+
+---
+
+## Testing & Validation
+
+- During the testing/QA phase, exercise billing flows (usage tracking, plan limits, monthly reset, trial behavior, leaderboard limiting) using the `TestBillingController` endpoints and billing guards to validate end-to-end behavior.

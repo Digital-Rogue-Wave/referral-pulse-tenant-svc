@@ -21,6 +21,7 @@ export type AppConfig = {
     fallbackLanguage: MaybeType<string>;
     headerLanguage: MaybeType<string>;
     invitationExpiryDays: number;
+    trialDurationDays: number;
 };
 
 class EnvironmentVariablesValidator {
@@ -55,6 +56,10 @@ class EnvironmentVariablesValidator {
     @IsNumberString()
     @IsOptional()
     INVITATION_EXPIRY_DAYS: MaybeType<number>;
+
+    @IsNumberString()
+    @IsOptional()
+    TRIAL_DURATION_DAYS: MaybeType<number>;
 }
 
 export default registerAs<AppConfig>('appConfig', () => {
@@ -70,6 +75,7 @@ export default registerAs<AppConfig>('appConfig', () => {
         apiPrefix: process.env.API_PREFIX || 'api',
         fallbackLanguage: process.env.APP_FALLBACK_LANGUAGE || 'en',
         headerLanguage: process.env.APP_HEADER_LANGUAGE || 'x-custom-lang',
-        invitationExpiryDays: process.env.INVITATION_EXPIRY_DAYS ? parseInt(process.env.INVITATION_EXPIRY_DAYS, 10) : 7
+        invitationExpiryDays: process.env.INVITATION_EXPIRY_DAYS ? parseInt(process.env.INVITATION_EXPIRY_DAYS, 10) : 7,
+        trialDurationDays: process.env.TRIAL_DURATION_DAYS ? parseInt(process.env.TRIAL_DURATION_DAYS, 10) : 14
     };
 });
