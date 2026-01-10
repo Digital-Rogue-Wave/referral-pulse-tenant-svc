@@ -69,6 +69,11 @@ export class SubscriptionStatusDto {
     stripeCurrentPeriodEnd?: string | null;
 
     @ApiPropertyOptional({
+        description: 'Number of whole days remaining until stripeCurrentPeriodEnd, when applicable'
+    })
+    stripePeriodDaysRemaining?: number | null;
+
+    @ApiPropertyOptional({
         description: 'Whether the Stripe subscription is configured to cancel at the end of the current period'
     })
     stripeCancelAtPeriodEnd?: boolean | null;

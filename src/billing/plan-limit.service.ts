@@ -1,13 +1,13 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { IsNull, Repository } from 'typeorm';
+import { Repository, IsNull } from 'typeorm';
 import { PlanEntity } from './plan.entity';
 import { BillingEntity } from './billing.entity';
-import type { PlanLimits } from './plan-limits.type';
 import { RedisUsageService } from './redis-usage.service';
+import type { PlanLimits } from './plan-limits.type';
+import { BillingPlanEnum } from '@mod/common/enums/billing.enum';
 import { ConfigService } from '@nestjs/config';
 import type { AllConfigType } from '@mod/config/config.type';
-import { BillingPlanEnum } from '@mod/common/enums/billing.enum';
 import { LimitExceededException } from './exceptions/limit-exceeded.exception';
 
 export interface PlanLimitCheckResult {
@@ -73,8 +73,33 @@ export class PlanLimitService {
         const billing = await this.billingRepository.findOne({ where: { tenantId } });
 
         if (!billing) {
-            this.logger.debug(`No BillingEntity found for tenant ${tenantId} when resolving plan limits`);
-            return null;
+            this.logger.debug(
+                `No BillingEntity found for tenant ${tenantId} when resolving plan limits; defaulting to FREE plan`
+            );
+
+            const freeStripePriceId = this.getStripePriceIdForPlan(BillingPlanEnum.FREE);
+            if (!freeStripePriceId) {
+                this.logger.debug(
+                    `No Stripe price mapping found for plan ${BillingPlanEnum.FREE} when resolving plan limits for tenant ${tenantId}`
+                );
+                return null;
+            }
+
+            const freePlan = await this.planRepository.findOne({
+                where: {
+                    stripePriceId: freeStripePriceId,
+                    tenantId: IsNull(),
+                    isActive: true
+                }
+            });
+
+            if (!freePlan) {
+                this.logger.debug(
+                    `No PlanEntity found for FREE stripePriceId=${freeStripePriceId} when resolving plan limits for tenant ${tenantId}`
+                );
+            }
+
+            return freePlan ?? null;
         }
 
         const stripePriceId = this.getStripePriceIdForPlan(billing.plan);
@@ -105,6 +130,11 @@ export class PlanLimitService {
     async getPlanLimits(tenantId: string): Promise<PlanLimits | null> {
         const plan = await this.resolvePlanForTenant(tenantId);
         return plan?.limits ?? null;
+    }
+
+    async getCurrentPlanForTenant(tenantId: string): Promise<BillingPlanEnum> {
+        const billing = await this.billingRepository.findOne({ where: { tenantId } });
+        return billing?.plan ?? BillingPlanEnum.FREE;
     }
 
     async getRemainingCapacity(tenantId: string, metric: string): Promise<number | null> {
@@ -173,6 +203,7 @@ export class PlanLimitService {
         }
 
         const nextValue = currentUsage + value;
+        const remaining = Math.max(0, effectiveLimit - currentUsage);
 
         if (nextValue > effectiveLimit) {
             const upgradeSuggestions =
@@ -184,6 +215,9 @@ export class PlanLimitService {
                 metric,
                 currentUsage,
                 limit,
+                requestedAmount: value,
+                remaining,
+                effectiveLimit,
                 upgradeSuggestions,
                 upgradeUrl
             });

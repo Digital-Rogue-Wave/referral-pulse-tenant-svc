@@ -34,7 +34,7 @@ async function bootstrap() {
 
     app.enableShutdownHooks();
     app.setGlobalPrefix(configService.getOrThrow('appConfig.apiPrefix', { infer: true }), {
-        exclude: ['/', '/live', '/ready', '/startup']
+        exclude: ['/', '/live', '/ready', '/startup', '/success', '/cancel']
     });
     app.enableVersioning({
         type: VersioningType.URI
