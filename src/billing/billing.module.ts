@@ -31,6 +31,7 @@ import { RedisUsageService } from './redis-usage.service';
 import { DailyUsageCalculator } from './daily-usage-calculator.service';
 import { ReferralEventProcessor } from './listeners/referral-events.consumer';
 import { MonthlyUsageResetService } from './monthly-usage-reset.service';
+import { StripeRedirectController } from './stripe-redirect.controller';
 
 @Module({
     imports: [
@@ -43,7 +44,14 @@ import { MonthlyUsageResetService } from './monthly-usage-reset.service';
         TenantModule,
         BullModule.registerQueue({ name: BILLING_USAGE_QUEUE })
     ],
-    controllers: [BillingController, PlanAdminController, PlanPublicController, TestBillingController, UsageInternalController],
+    controllers: [
+        BillingController,
+        PlanAdminController,
+        PlanPublicController,
+        TestBillingController,
+        UsageInternalController,
+        StripeRedirectController
+    ],
     providers: [
         BillingService,
         StripeService,

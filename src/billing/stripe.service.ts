@@ -15,8 +15,55 @@ export class StripeService {
         if (!secretKey) {
             throw new Error('Stripe secret key is not configured');
         }
-
         return new Stripe(secretKey);
+    }
+
+    resolvePlanFromSubscription(subscription: Stripe.Subscription): BillingPlanEnum | null {
+        const cfg = this.configService.get('stripeConfig', { infer: true });
+        const items = subscription.items?.data ?? [];
+        const firstItem = items[0];
+        const priceId = firstItem?.price?.id ?? null;
+
+        if (!priceId || !cfg) {
+            return null;
+        }
+
+        if (cfg.freePriceId && priceId === cfg.freePriceId) return BillingPlanEnum.FREE;
+        if (cfg.starterPriceId && priceId === cfg.starterPriceId) return BillingPlanEnum.STARTER;
+        if (cfg.growthPriceId && priceId === cfg.growthPriceId) return BillingPlanEnum.GROWTH;
+        if (cfg.enterprisePriceId && priceId === cfg.enterprisePriceId) return BillingPlanEnum.ENTERPRISE;
+
+        return null;
+    }
+
+    async applyScheduledDowngrade(params: { stripeSubscriptionId: string; targetPlan: BillingPlanEnum }): Promise<void> {
+        const stripe = this.stripeClient();
+
+        const subscription = await stripe.subscriptions.retrieve(params.stripeSubscriptionId);
+
+        const items = subscription.items?.data ?? [];
+        const firstItem = items[0];
+
+        if (!firstItem) {
+            throw new HttpException('Stripe subscription has no items to downgrade', HttpStatus.BAD_REQUEST);
+        }
+
+        const newPriceId = this.priceIdForPlan(params.targetPlan);
+
+        await stripe.subscriptions.update(params.stripeSubscriptionId, {
+            items: [
+                {
+                    id: firstItem.id,
+                    price: newPriceId
+                }
+            ],
+            proration_behavior: 'none',
+            cancel_at_period_end: false
+        });
+
+        this.logger.log(
+            `Applied scheduled downgrade for Stripe subscription ${params.stripeSubscriptionId} to plan ${params.targetPlan} (no proration)`
+        );
     }
 
     async listActiveRecurringPricesWithProducts(): Promise<Stripe.Price[]> {
@@ -227,7 +274,8 @@ export class StripeService {
                     price: newPriceId
                 }
             ],
-            proration_behavior: 'create_prorations',
+            proration_behavior: 'always_invoice',
+            payment_behavior: 'error_if_incomplete',
             cancel_at_period_end: false
         });
 
@@ -242,34 +290,82 @@ export class StripeService {
     }): Promise<{ effectiveDate: Date | null }> {
         const stripe = this.stripeClient();
 
-        const subscription = await stripe.subscriptions.update(params.stripeSubscriptionId, {
-            cancel_at_period_end: true
+        const subscription = await stripe.subscriptions.retrieve(params.stripeSubscriptionId);
+        const rawSubscription = subscription as any;
+        const periodEndRaw = (rawSubscription.current_period_end ?? rawSubscription.items?.data?.[0]?.current_period_end) as unknown;
+        const periodEndTs = typeof periodEndRaw === 'number' && Number.isFinite(periodEndRaw) ? periodEndRaw : null;
+        const effectiveDate = periodEndTs ? new Date(periodEndTs * 1000) : null;
+
+        if (!periodEndTs) {
+            this.logger.warn(
+                `Unable to schedule downgrade in Stripe because current_period_end is missing for subscription ${params.stripeSubscriptionId}`
+            );
+            return { effectiveDate: null };
+        }
+
+        const items = subscription.items?.data ?? [];
+        const firstItem = items[0];
+
+        if (!firstItem?.price?.id) {
+            throw new HttpException('Stripe subscription has no price information to schedule downgrade', HttpStatus.BAD_REQUEST);
+        }
+
+        const currentPriceId = firstItem.price.id;
+        const currentQuantity = firstItem.quantity ?? 1;
+        const newPriceId = this.priceIdForPlan(params.targetPlan);
+
+        const scheduleId =
+            typeof rawSubscription.schedule === 'string'
+                ? rawSubscription.schedule
+                : rawSubscription.schedule?.id;
+
+        const schedule = scheduleId
+            ? await stripe.subscriptionSchedules.retrieve(scheduleId)
+            : await stripe.subscriptionSchedules.create({ from_subscription: params.stripeSubscriptionId });
+
+        const startDate = schedule.phases?.[0]?.start_date ?? rawSubscription.start_date ?? rawSubscription.created;
+
+        await stripe.subscriptionSchedules.update(schedule.id, {
+            end_behavior: 'release',
+            phases: [
+                {
+                    start_date: startDate,
+                    end_date: periodEndTs,
+                    items: [{ price: currentPriceId, quantity: currentQuantity }]
+                },
+                {
+                    start_date: periodEndTs,
+                    items: [{ price: newPriceId, quantity: currentQuantity }]
+                }
+            ]
         });
 
-        const rawSubscription = subscription as any;
-        const periodEnd = rawSubscription.current_period_end
-            ? new Date(rawSubscription.current_period_end * 1000)
-            : null;
-
         this.logger.log(
-            `Scheduled subscription downgrade for ${params.stripeSubscriptionId} to plan ${params.targetPlan} at period end ${
-                periodEnd ? periodEnd.toISOString() : 'unknown'
-            }`
+            `Scheduled Stripe subscription ${params.stripeSubscriptionId} to downgrade to plan ${params.targetPlan} at ${
+                effectiveDate ? effectiveDate.toISOString() : 'unknown'
+            } using schedule ${schedule.id}`
         );
 
-        return { effectiveDate: periodEnd };
+        return { effectiveDate };
     }
 
     async cancelPendingSubscriptionDowngrade(stripeSubscriptionId: string): Promise<void> {
         const stripe = this.stripeClient();
 
-        await stripe.subscriptions.update(stripeSubscriptionId, {
-            cancel_at_period_end: false
-        });
+        const subscription = await stripe.subscriptions.retrieve(stripeSubscriptionId);
+        const rawSubscription = subscription as any;
+        const scheduleId =
+            typeof rawSubscription.schedule === 'string'
+                ? rawSubscription.schedule
+                : rawSubscription.schedule?.id;
 
-        this.logger.log(
-            `Canceled pending subscription downgrade (cancel_at_period_end=false) for Stripe subscription ${stripeSubscriptionId}`
-        );
+        if (!scheduleId) {
+            this.logger.log(`No Stripe schedule found to cancel downgrade for subscription ${stripeSubscriptionId}`);
+            return;
+        }
+
+        await stripe.subscriptionSchedules.release(scheduleId);
+        this.logger.log(`Released Stripe subscription schedule ${scheduleId} for subscription ${stripeSubscriptionId}`);
     }
 
     async scheduleSubscriptionCancellation(stripeSubscriptionId: string): Promise<{ effectiveDate: Date | null }> {
@@ -280,9 +376,10 @@ export class StripeService {
         });
 
         const rawSubscription = subscription as any;
-        const periodEnd = rawSubscription.current_period_end
-            ? new Date(rawSubscription.current_period_end * 1000)
-            : null;
+        const periodEndRaw = (rawSubscription.current_period_end ??
+            rawSubscription.items?.data?.[0]?.current_period_end) as unknown;
+        const periodEndTs = typeof periodEndRaw === 'number' && Number.isFinite(periodEndRaw) ? periodEndRaw : null;
+        const periodEnd = periodEndTs ? new Date(periodEndTs * 1000) : null;
 
         this.logger.log(
             `Scheduled subscription cancellation at period end for Stripe subscription ${stripeSubscriptionId} with effective date ${

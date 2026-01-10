@@ -25,6 +25,7 @@ import { TenantStatsService } from '@mod/tenant/aware/tenant-stats.service';
 import { TenantUsageEntity } from './tenant-usage.entity';
 import { UsageSummaryDto, UsageMetricSummaryDto, UsageMetricHistoryPointDto } from './dto/usage-summary.dto';
 import { In } from 'typeorm';
+import { PlanLimitService } from './plan-limit.service';
 import {
     SubscriptionCreatedEvent,
     SubscriptionDowngradeScheduledEvent,
@@ -48,7 +49,8 @@ export class BillingService {
         private readonly metrics: MonitoringService,
         private readonly auditService: AuditService,
         private readonly tenantService: AgnosticTenantService,
-        private readonly tenantStatsService: TenantStatsService
+        private readonly tenantStatsService: TenantStatsService,
+        private readonly planLimitService: PlanLimitService
     ) {}
 
     private async createBillingForTenant(): Promise<BillingEntity> {
@@ -67,6 +69,9 @@ export class BillingService {
 
     async getUsageSummary(): Promise<UsageSummaryDto> {
         const billing = await this.getOrCreateBillingForCurrentTenant();
+        const tenantId = billing.tenantId;
+
+        const limits = await this.planLimitService.getPlanLimits(tenantId);
 
         const today = new Date();
         const todayStr = today.toISOString().slice(0, 10);
@@ -110,8 +115,9 @@ export class BillingService {
         const metrics: UsageMetricSummaryDto[] = [];
 
         for (const [metricName, value] of metricsMap.entries()) {
-            const limit: number | null = null;
-            const percentageUsed: number | null = limit && limit > 0 ? Math.min((value.currentUsage / limit) * 100, 100) : null;
+            const rawLimit = limits ? (limits as Record<string, number | undefined>)[metricName] : undefined;
+            const limit: number | null = rawLimit == null ? null : rawLimit;
+            const percentageUsed: number | null = limit != null && limit > 0 ? Math.min((value.currentUsage / limit) * 100, 100) : null;
 
             const history = [...value.history].sort((a, b) => a.periodDate.localeCompare(b.periodDate));
 
@@ -188,6 +194,51 @@ export class BillingService {
         } catch (err) {
             this.logger.error(
                 `Failed to update tenant paymentStatus for invoice.payment_succeeded: tenantId=${billing.tenantId}, eventId=${event.id}, invoiceId=${invoiceId}`,
+                err as Error
+            );
+        }
+
+        try {
+            const subscription = await this.stripeService.getSubscription(subscriptionId);
+            const resolvedPlan = this.stripeService.resolvePlanFromSubscription(subscription);
+
+            if (resolvedPlan && resolvedPlan !== billing.plan) {
+                const previousPlan = billing.plan;
+                billing.plan = resolvedPlan;
+
+                if (billing.pendingDowngradePlan && billing.pendingDowngradePlan === resolvedPlan) {
+                    billing.pendingDowngradePlan = null;
+                    billing.downgradeScheduledAt = null;
+                }
+
+                await this.billingRepository.manager.save(billing);
+
+                this.eventEmitter.emit('subscription.changed', {
+                    tenantId: billing.tenantId,
+                    billingPlan: billing.plan,
+                    subscriptionStatus: billing.status,
+                    stripeCustomerId: billing.stripeCustomerId,
+                    stripeSubscriptionId: billing.stripeSubscriptionId
+                });
+
+                await this.auditService.log({
+                    tenantId: billing.tenantId,
+                    action: AuditAction.SUBSCRIPTION_UPDATED,
+                    description: `Subscription plan updated from ${previousPlan} to ${billing.plan}`,
+                    metadata: {
+                        previousPlan,
+                        plan: billing.plan,
+                        status: billing.status,
+                        stripeCustomerId: billing.stripeCustomerId,
+                        stripeSubscriptionId: billing.stripeSubscriptionId,
+                        stripeEventId: event.id,
+                        stripeInvoiceId: invoiceId
+                    }
+                });
+            }
+        } catch (err) {
+            this.logger.error(
+                `Failed to reconcile billing plan from Stripe after invoice.payment_succeeded: tenantId=${billing.tenantId}, subscriptionId=${subscriptionId}, invoiceId=${invoiceId}, eventId=${event.id}`,
                 err as Error
             );
         }
@@ -276,6 +327,7 @@ export class BillingService {
         // Live Stripe subscription details
         let stripeSubscriptionStatus: string | null = null;
         let stripeCurrentPeriodEnd: string | null = null;
+        let stripePeriodDaysRemaining: number | null = null;
         let stripeCancelAtPeriodEnd: boolean | null = null;
 
         if (billing.stripeSubscriptionId) {
@@ -284,8 +336,33 @@ export class BillingService {
                 stripeSubscriptionStatus = subscription.status;
 
                 const rawSubscription = subscription as any;
-                const endDate = new Date(rawSubscription.current_period_end * 1000);
-                stripeCurrentPeriodEnd = endDate.toISOString();
+                const currentPeriodEndRaw = (rawSubscription.current_period_end ??
+                    rawSubscription.items?.data?.[0]?.current_period_end) as unknown;
+                let currentPeriodEndMs: number | null = null;
+
+                if (typeof currentPeriodEndRaw === 'number' && Number.isFinite(currentPeriodEndRaw)) {
+                    currentPeriodEndMs = currentPeriodEndRaw > 1_000_000_000_000 ? currentPeriodEndRaw : currentPeriodEndRaw * 1000;
+                } else if (typeof currentPeriodEndRaw === 'string') {
+                    const parsed = Number(currentPeriodEndRaw);
+                    if (Number.isFinite(parsed)) {
+                        currentPeriodEndMs = parsed > 1_000_000_000_000 ? parsed : parsed * 1000;
+                    }
+                }
+
+                if (currentPeriodEndMs != null) {
+                    const endDate = new Date(currentPeriodEndMs);
+                    if (Number.isFinite(endDate.getTime())) {
+                        stripeCurrentPeriodEnd = endDate.toISOString();
+                        const diffMs = endDate.getTime() - Date.now();
+                        stripePeriodDaysRemaining = Math.max(0, Math.ceil(diffMs / (1000 * 60 * 60 * 24)));
+                    } else {
+                        this.logger.warn(
+                            `Stripe subscription ${billing.stripeSubscriptionId} returned invalid current_period_end=${String(
+                                currentPeriodEndRaw
+                            )} for tenant ${tenantId}`
+                        );
+                    }
+                }
 
                 stripeCancelAtPeriodEnd = !!rawSubscription.cancel_at_period_end;
             } catch (err) {
@@ -306,6 +383,7 @@ export class BillingService {
             planUsagePercentage,
             stripeSubscriptionStatus,
             stripeCurrentPeriodEnd,
+            stripePeriodDaysRemaining,
             stripeCancelAtPeriodEnd,
             pendingDowngradePlan: billing.pendingDowngradePlan ?? null,
             downgradeScheduledAt: billing.downgradeScheduledAt ?? null,
@@ -735,6 +813,10 @@ export class BillingService {
                 }
                 case 'invoice.payment_succeeded':
                 case 'invoice.paid': {
+                    await this.handleInvoicePaymentSucceeded(event);
+                    break;
+                }
+                case 'invoice_payment.paid': {
                     await this.handleInvoicePaymentSucceeded(event);
                     break;
                 }
