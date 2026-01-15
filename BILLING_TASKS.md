@@ -15,6 +15,7 @@ This checklist is intended to be **kept up to date as implementation progresses*
 Architecture note:
 - All billing-related endpoints, services and data access should live under the **billing** domain (e.g. `BillingModule`, `/billings` routes).
 - Assume billing may be extracted into a separate microservice later; avoid putting billing logic into tenant, campaign or other modules to minimize refactoring.
+- Per architecture, authenticated requests flow through Ory (Hydra) + Keto authorization, so `tenant-id` should be available in request context for all non-public routes.
 
 ---
 
@@ -193,6 +194,37 @@ These items come from `openspec/changes/add-subscription-checkout/specs/tenant-b
   - Send failed payment notifications.
   - Payment‑required guard and restoration on `invoice.paid`.
 
+- [x] 4.4 Internal tenant billing status endpoint (architecture contract)
+  - Implement `GET /internal/tenants/:id/status` for other services.
+  - Response should include tenant `status`, payment enforcement state, plan and subscription status.
+  - Used by other services for fast allow/deny decisions and caching.
+  - Tasks:
+    - Define a stable DTO/response schema (versionable) for cross-service consumption.
+    - Enforce service-to-service auth (service token + Keto policy).
+    - Source-of-truth fields:
+      - Tenant: `status`, `paymentStatus`, `trialStartedAt`, `trialEndsAt`.
+      - Billing: `plan`, `status` (subscription status), Stripe identifiers if needed.
+    - Ensure safe behavior when a tenant has no `BillingEntity` (default plan enforcement).
+
+- [x] 4.5 Align `payment_status` with architecture state machine
+  - Architecture expects: `active | past_due | restricted | locked`.
+  - Current implementation models: `pending | completed | failed`.
+  - Requires enum + DB migration + guard behavior updates (breaking).
+  - Required direction: full alignment in tenant-svc.
+  - Tasks:
+    - Update `PaymentStatusEnum` to: `ACTIVE`, `PAST_DUE`, `RESTRICTED`, `LOCKED`.
+    - Add DB migration for tenant `payment_status` values (map existing values deterministically).
+    - Persist timestamps to support deterministic transitions (e.g. `paymentPastDueAt` / `lastPaymentFailureAt`).
+    - Stripe webhook mapping:
+      - `invoice.payment_failed` => set `paymentStatus=PAST_DUE` and record start timestamp.
+      - `invoice.paid` => set `paymentStatus=ACTIVE` and clear/close failure window.
+    - Transition mechanism:
+      - Scheduled job to move `PAST_DUE -> RESTRICTED -> LOCKED` based on elapsed time.
+    - Enforcement behavior:
+      - Update `PaymentRequiredGuard` to enforce per-state behavior.
+    - Events for workflow side effects:
+      - Publish payment/account-state transition events for Temporal workflows (emails, campaign pausing).
+
 ---
 
 ## Phase 5 – Usage Tracking System (`BILLING.md` §153–218)
@@ -256,9 +288,10 @@ These items come from `openspec/changes/add-subscription-checkout/specs/tenant-b
   - Apply `BillingGuard` to all resource‑creation endpoints.
   - Configurable grace percentage (e.g. 10%).
 
-- [x] 6.5 Leaderboard limiting
+- [ ] 6.5 Leaderboard limiting
   - Limit leaderboard queries to top `leaderboard_entries`.
   - Add "Showing top X of Y (plan limit)" note.
+  - Note: currently only a demo endpoint exists under `TestBillingController`; actual leaderboard queries must be limited at the real leaderboard read path.
 
 - [x] 6.6 `PlanLimitService` utility
   - `getPlanLimits`, `canPerformAction`, `getRemainingCapacity`, `enforceLimit` helpers.
@@ -284,14 +317,14 @@ These items come from `openspec/changes/add-subscription-checkout/specs/tenant-b
   - Automatically downgrade to Free plan after trial.
   - Set reduced limits and update subscription status.
 
-- [ ] 7.5 Early upgrade during trial
+- [x] 7.5 Early upgrade during trial
   - Allow upgrade before trial ends; end trial, handle proration and status updates.
 
 ---
 
 ## Phase 8 – Tenant Status Management (`BILLING.md` §291–340)
 
-- [ ] 8.1 Admin suspend endpoint
+- [x] 8.1 Admin suspend endpoint
   - `POST /admin/tenants/:id/suspend` to set status `suspended`, set `suspended_at`, publish `tenant.suspended`.
 
 - [ ] 8.2 Campaign pausing on suspension
@@ -300,19 +333,19 @@ These items come from `openspec/changes/add-subscription-checkout/specs/tenant-b
 - [ ] 8.3 Suspension notification
   - Email notification to tenant admins with reason, duration and support contacts.
 
-- [ ] 8.4 Unsuspend endpoint
+- [x] 8.4 Unsuspend endpoint
   - Admin endpoint to restore tenants to `active` and resume paused campaigns.
 
-- [ ] 8.5 Lock endpoint
+- [x] 8.5 Lock endpoint
   - `POST /tenants/:id/lock` to set status `locked` and require Ory password confirmation.
 
-- [ ] 8.6 Unlock endpoint
+- [x] 8.6 Unlock endpoint
   - Admin endpoint with Ory verification to unlock tenants, update status to `active`, send notification.
 
-- [ ] 8.7 Auto‑unlock job
+- [x] 8.7 Auto‑unlock job
   - Scheduled job to automatically unlock tenants after configurable duration and send notification.
 
-- [ ] 8.8 Tenant status guard
+- [x] 8.8 Tenant status guard
   - Guard/middleware to block requests for `suspended`/`locked` tenants and expose status via headers.
 
 ---

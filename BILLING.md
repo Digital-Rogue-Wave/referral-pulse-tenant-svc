@@ -26,12 +26,12 @@
     - Add `suspended_at` and `locked_at` timestamps for audit
     - Create migration to update existing tenants
 
-- [ ] 1.5 Create TenantUsage entity for daily snapshots
+- [x] 1.5 Create TenantUsage entity for daily snapshots
     - Fields: `tenant_id`, `metric_name`, `period_date`, `current_usage`, `limit_value`
     - Composite unique index on `(tenant_id, metric_name, period_date)`
     - Purpose: Store daily/monthly usage snapshots for analytics and reporting
 
-- [ ] 1.6 Create BillingEvent entity for ClickHouse sync
+- [x] 1.6 Create BillingEvent entity for ClickHouse sync
     - Fields: `tenant_id`, `event_type`, `metric_name`, `increment`, `timestamp`, `metadata`
     - Index on `tenant_id` and `timestamp` for efficient querying
     - Purpose: Raw event data for debugging and detailed analytics
@@ -57,8 +57,10 @@
     - Implement query filtering in repository
     - Add tenant context to plan queries
 
-- [x] 2.4 Sync plans with Stripe Products/Prices (REFER-315)
-    - Create scheduled job to sync Stripe products to local database
+- [ ] 2.4 Sync plans with Stripe Products/Prices (REFER-315)
+    - Implement Stripe products/prices sync logic in `PlanStripeSyncService`
+    - Expose a safe way to trigger sync (e.g. admin/manual endpoint)
+    - (Optional) Create a scheduled job to sync Stripe products to local database
     - Update `stripe_price_id` and `stripe_product_id` fields
     - Fetch and store Stripe metadata as plan limits
     - Handle new products, updated prices, and deleted products
@@ -150,6 +152,46 @@
     - Create payment required guard (REFER-309)
     - Handle `invoice.paid` webhook for restoration (REFER-310)
 
+- [x] 4.4 Internal tenant billing status endpoint (architecture contract)
+    - Implement `GET /internal/tenants/:id/status` for other services (Tracker/Campaign/etc.)
+    - Response should include:
+        - Tenant status (active/suspended/locked)
+        - Payment enforcement status (see 4.5)
+        - Current billing plan + subscription status
+    - Used by other services for fast allow/deny decisions and caching
+    - Tasks:
+        - Define a stable DTO/response schema (versionable) for cross-service consumption
+        - Enforce service-to-service auth (service token + Keto policy)
+        - Source-of-truth fields:
+            - Tenant: `status`, `paymentStatus`, `trialStartedAt`, `trialEndsAt`
+            - Billing: `plan`, `status` (subscription status), Stripe identifiers if needed
+        - Add caching semantics appropriate for internal calls (short TTL + explicit cache headers if used behind an internal gateway)
+        - Ensure behavior is safe when a tenant has no `BillingEntity` (default plan enforcement)
+
+- [x] 4.5 Align `payment_status` with architecture state machine
+    - Architecture expects: `active | past_due | restricted | locked`
+    - Current implementation models: `pending | completed | failed`
+    - Requires enum + DB migration + guard behavior updates (breaking)
+    - Decide whether to:
+        - Implement full state machine in tenant-svc, or
+        - Document and keep simplified status until the wider platform is ready
+    - Required direction: implement full alignment in tenant-svc
+    - Tasks:
+        - Update `PaymentStatusEnum` to: `ACTIVE`, `PAST_DUE`, `RESTRICTED`, `LOCKED`
+        - Add DB migration for tenant `payment_status` values (map existing values deterministically)
+        - Persist enough timestamps to support deterministic transitions (e.g. `paymentPastDueAt`, `paymentRestrictedAt`, `paymentLockedAt` or `lastPaymentFailureAt` + derived transitions)
+        - Stripe webhook mapping:
+            - `invoice.payment_failed` => set `paymentStatus=PAST_DUE` and record start timestamp
+            - `invoice.paid` (or successful payment signal) => set `paymentStatus=ACTIVE` and clear/close failure window
+        - Transition mechanism:
+            - Scheduled job to move `PAST_DUE -> RESTRICTED -> LOCKED` based on elapsed time
+        - Enforcement behavior:
+            - Update `PaymentRequiredGuard` to enforce per-state behavior (warn/read-only/deny)
+            - Ensure other guards (usage/limits) are consistent with state rules
+        - Events for workflow side effects:
+            - Publish payment/account-state transition events for Temporal workflows (emails, campaign pausing)
+            - Ensure DLQ-safe, idempotent event publishing and consumers (cross-service)
+
 ## Phase 5: Usage Tracking System
 
 - [x] 5.1 Create UsageTracker service (REFER-318)
@@ -230,15 +272,15 @@
     - Suggest upgrade options
     - Link to billing portal
 
-- [ ] 6.3 Create BillingGuard for automatic enforcement
+- [x] 6.3 Create BillingGuard for automatic enforcement
     - Implement `CanActivate` interface
     - Check tenant subscription status
     - Validate usage against plan limits
     - Return 402 Payment Required if limit exceeded
     - Respect trial period (allow during trial)
-    - Apply to all resource creation endpoints
+    - Apply at service boundaries (this service and/or other services calling tenant-svc for enforcement)
 
-- [ ] 6.4 Implement hard cut-off at limits
+- [x] 6.4 Implement hard cut-off at limits
     - Block resource creation when limits reached
     - Return clear error messages
     - Provide upgrade path in response
@@ -249,8 +291,9 @@
     - Only return top N users where N = `leaderboard_entries` limit
     - Add note in response: "Showing top X of Y (plan limit)"
     - Create `LeaderboardService.withLimits()` wrapper
+    - Note: current repo contains only a demo endpoint under `TestBillingController`; actual leaderboard queries must be limited at the real leaderboard read path.
 
-- [ ] 6.6 Create PlanLimitService utility
+- [x] 6.6 Create PlanLimitService utility
     - `getPlanLimits(tenantId)`: Returns current plan limits
     - `canPerformAction(tenantId, action, count = 1)`: Checks if allowed
     - `getRemainingCapacity(tenantId, metric)`: Returns remaining count
@@ -264,19 +307,19 @@
     - Set `trial_started_at` to creation timestamp
     - Initialize with starter plan limits during trial
 
-- [x] 7.2 Create trial expiry check middleware (REFER-337)
+- [ ] 7.2 Create trial expiry check middleware (REFER-337)
     - Check trial status on each request
     - Block actions if trial expired and no subscription
     - Return appropriate error messages
     - Redirect to upgrade page
 
-- [x] 7.3 Schedule trial reminder emails (Bull job) (REFER-338)
+- [ ] 7.3 Schedule trial reminder emails (Bull job) (REFER-338)
     - Send reminder 3 days before trial ends
     - Send final reminder 1 day before trial ends
     - Send trial expired notification
     - Include upgrade links in emails
 
-- [x] 7.4 Handle trial expiry (downgrade to free) (REFER-339)
+- [ ] 7.4 Handle trial expiry (downgrade to free) (REFER-339)
     - Automatically downgrade to free plan after trial
     - Set reduced limits for free tier
     - Send downgrade notification email
@@ -296,13 +339,13 @@
     - Set `suspended_at` timestamp
     - Publish `tenant.suspended` event (REFER-345)
 
-- [x] 8.2 Handle campaign pausing in Campaign Service (REFER-346)
+- [ ] 8.2 Handle campaign pausing in Campaign Service (REFER-346)
     - Listen for `tenant.suspended` event
     - Pause all active campaigns for suspended tenant
     - Stop email sends and referral tracking
     - Update campaign statuses
 
-- [x] 8.3 Send suspension notification (REFER-347)
+- [ ] 8.3 Send suspension notification (REFER-347)
     - Email notification to tenant admin
     - Include suspension reason and duration
     - Provide contact information for support

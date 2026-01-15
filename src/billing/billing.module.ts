@@ -32,6 +32,8 @@ import { DailyUsageCalculator } from './daily-usage-calculator.service';
 import { ReferralEventProcessor } from './listeners/referral-events.consumer';
 import { MonthlyUsageResetService } from './monthly-usage-reset.service';
 import { StripeRedirectController } from './stripe-redirect.controller';
+import { InternalTenantStatusController } from './internal-tenant-status.controller';
+import { PaymentStatusEscalationService } from './payment-status-escalation.service';
 
 @Module({
     imports: [
@@ -50,6 +52,7 @@ import { StripeRedirectController } from './stripe-redirect.controller';
         PlanPublicController,
         TestBillingController,
         UsageInternalController,
+        InternalTenantStatusController,
         StripeRedirectController
     ],
     providers: [
@@ -69,7 +72,8 @@ import { StripeRedirectController } from './stripe-redirect.controller';
         RedisUsageService,
         DailyUsageCalculator,
         ReferralEventProcessor,
-        MonthlyUsageResetService
+        MonthlyUsageResetService,
+        PaymentStatusEscalationService
     ],
     exports: [
         BillingService,
@@ -82,7 +86,8 @@ import { StripeRedirectController } from './stripe-redirect.controller';
         RedisUsageService,
         DailyUsageCalculator,
         ReferralEventProcessor,
-        MonthlyUsageResetService
+        MonthlyUsageResetService,
+        PaymentStatusEscalationService
     ]
 })
 export class BillingModule {}

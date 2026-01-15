@@ -56,3 +56,11 @@ export interface PaymentFailedEvent {
     stripeSubscriptionId?: string;
     stripeInvoiceId?: string;
 }
+
+export interface TenantPaymentStatusChangedEvent {
+    tenantId: string;
+    previousStatus: string;
+    nextStatus: string;
+    changedAt: string;
+    source: 'stripe' | 'escalation';
+}

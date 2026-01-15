@@ -1,4 +1,4 @@
-# Billing Paths (Stripe Dashboard Visible)
+# Billing Verification Playbook (Real Stripe + Dashboard + CLI)
 
 This guide is for **local dev** in **Stripe test mode** where you want to:
 
@@ -113,12 +113,16 @@ In **Stripe Dashboard (Test mode)**:
 Swagger:
 
 - `GET /api/test/billing/subscription`
+- `GET /api/test/billing/entity`
+- `GET /api/test/tenant/payment-status`
+- `GET /api/test/billing/events?limit=20`
 
 Expected:
 
 - `subscriptionStatus` should become `ACTIVE`
 - `plan` should match what you checked out with
 - `stripeCustomerId` / `stripeSubscriptionId` should be populated
+- `paymentStatus` should be `active`
 
 ## 4) Path Scenario B — Upgrade subscription
 
@@ -139,6 +143,7 @@ Body:
 Then verify:
 
 - `GET /api/test/billing/subscription`
+- `GET /api/test/billing/entity`
 
 And in Stripe Dashboard:
 
@@ -162,6 +167,7 @@ Body:
 Verify:
 
 - `GET /api/test/billing/subscription`
+- `GET /api/test/billing/entity`
 
 Look for:
 
@@ -196,6 +202,7 @@ Body:
 Verify:
 
 - `GET /api/test/billing/subscription`
+- `GET /api/test/billing/entity`
 
 Look for:
 
@@ -211,6 +218,7 @@ Swagger:
 Verify:
 
 - `GET /api/test/billing/subscription`
+- `GET /api/test/billing/entity`
 
 Expected:
 
@@ -264,6 +272,10 @@ Swagger:
 
 - `GET /api/test/billing/usage`
 
+Optional verification:
+
+- `GET /api/test/billing/events?limit=20`
+
 This returns a 7-day history per metric.
 
 ### Step E4 — View remaining capacity
@@ -288,16 +300,86 @@ If within limits, it should succeed.
 - **Price IDs must be recurring**: one-time prices won’t work with subscription checkout.
 - **Tenant header is required** for `/api/test/*` endpoints.
 
-## 9) Endpoints added for these scenarios
+## 9) Payment enforcement state machine (tenant.paymentStatus)
+
+The service uses a payment enforcement state machine on `TenantEntity.paymentStatus`:
+
+- `active`
+- `past_due`
+- `restricted`
+- `locked`
+
+### State transitions
+
+- Stripe webhook:
+  - `invoice.payment_failed` => `past_due` + `paymentStatusChangedAt` set
+  - `invoice.paid` / `invoice.payment_succeeded` => `active` + `paymentStatusChangedAt` set
+- Scheduled escalation (BullMQ repeatable job):
+  - `past_due` -> `restricted` after 7 days
+  - `restricted` -> `locked` after 21 days total
+
+### Enforcement behavior
+
+- `PaymentRequiredGuard` denies access (HTTP 402) only when `paymentStatus=locked`.
+
+## 10) Trigger payment failure/restoration (real Stripe webhook endpoint)
+
+Use Stripe CLI to forward real webhook calls into the service:
+
+```powershell
+stripe listen --forward-to http://localhost:5001/api/v1/webhook/stripe
+```
+
+After you have a real subscription (Scenario A), fetch identifiers:
+
+- `GET /api/test/billing/entity` (copy `stripeSubscriptionId`, `stripeCustomerId`)
+
+Use those values to trigger Stripe events that match your subscription/customer:
+
+```powershell
+stripe trigger invoice.payment_failed --add invoice:subscription=<sub_id> --add invoice:customer=<cus_id>
+```
+
+```powershell
+stripe trigger invoice.paid --add invoice:subscription=<sub_id> --add invoice:customer=<cus_id>
+```
+
+Verify the tenant payment enforcement state:
+
+- `GET /api/test/tenant/payment-status`
+- `GET /api/test/billing/events?limit=20`
+
+## 11) Verify escalation job behavior
+
+Payment status escalation runs as a BullMQ repeatable job:
+
+- Queue: `billing-usage`
+- Job: `payment-status-escalation`
+- Schedule: hourly
+
+To test quickly in dev, set a tenant's `paymentStatusChangedAt` in the database to an older timestamp:
+
+- Set `paymentStatus=past_due` and `paymentStatusChangedAt` to > 7 days ago, then wait for the next hourly run.
+- Set `paymentStatus=restricted` and `paymentStatusChangedAt` to > 14 days ago, then wait for the next hourly run.
+
+Expected:
+
+- `past_due` -> `restricted`
+- `restricted` -> `locked`
+
+## 12) Endpoints added for these scenarios
 
 All under `TestBillingController`:
 
 - `POST /api/test/stripe/checkout-session`
 - `GET /api/test/billing/subscription`
+- `GET /api/test/billing/entity`
+- `GET /api/test/billing/events?limit=20`
 - `GET /api/test/billing/usage`
 - `POST /api/test/billing/upgrade`
 - `POST /api/test/billing/downgrade`
 - `POST /api/test/billing/cancel`
 - `POST /api/test/billing/reactivate`
+- `GET /api/test/tenant/payment-status`
 - `POST /api/test/usage/increment`
 - `POST /api/test/usage/decrement`

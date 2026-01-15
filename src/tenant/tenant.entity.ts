@@ -46,9 +46,12 @@ export class TenantEntity extends EntityHelper {
         type: 'enum',
         enum: PaymentStatusEnum,
         enumName: 'payment_status_enum',
-        default: PaymentStatusEnum.PENDING
+        default: PaymentStatusEnum.ACTIVE
     })
     paymentStatus: PaymentStatusEnum;
+
+    @Column({ type: 'timestamp', nullable: true })
+    paymentStatusChangedAt?: Date;
 
     @Column({ type: 'timestamp', nullable: true })
     suspendedAt?: Date;
