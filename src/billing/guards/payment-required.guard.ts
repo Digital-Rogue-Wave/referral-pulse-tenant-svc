@@ -27,7 +27,7 @@ export class PaymentRequiredGuard implements CanActivate {
             throw new HttpException({ message: 'Tenant not found' }, HttpStatus.NOT_FOUND);
         }
 
-        if (tenant.paymentStatus === PaymentStatusEnum.FAILED) {
+        if (tenant.paymentStatus === PaymentStatusEnum.LOCKED) {
             throw new HttpException(
                 {
                     message: 'Payment is required to access this resource.',

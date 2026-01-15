@@ -12,7 +12,8 @@ export enum SubscriptionStatusEnum {
 }
 
 export enum PaymentStatusEnum {
-    PENDING = 'pending',
-    COMPLETED = 'completed',
-    FAILED = 'failed'
+    ACTIVE = 'active',
+    PAST_DUE = 'past_due',
+    RESTRICTED = 'restricted',
+    LOCKED = 'locked'
 }

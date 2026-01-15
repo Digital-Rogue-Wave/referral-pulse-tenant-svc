@@ -1,7 +1,12 @@
 import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { InjectQueue } from '@nestjs/bullmq';
 import { Queue } from 'bullmq';
-import { BILLING_USAGE_QUEUE, MONTHLY_USAGE_RESET_JOB, DAILY_USAGE_SNAPSHOT_JOB } from '@mod/common/bullmq/queues/billing-usage.queue';
+import {
+    BILLING_USAGE_QUEUE,
+    MONTHLY_USAGE_RESET_JOB,
+    DAILY_USAGE_SNAPSHOT_JOB,
+    PAYMENT_STATUS_ESCALATION_JOB
+} from '@mod/common/bullmq/queues/billing-usage.queue';
 
 @Injectable()
 export class BillingUsageQueueService implements OnModuleInit {
@@ -35,6 +40,17 @@ export class BillingUsageQueueService implements OnModuleInit {
                     pattern: '0 0 * * *'
                 },
                 jobId: DAILY_USAGE_SNAPSHOT_JOB
+            }
+        );
+
+        await this.billingUsageQueue.add(
+            PAYMENT_STATUS_ESCALATION_JOB,
+            {},
+            {
+                repeat: {
+                    pattern: '0 * * * *'
+                },
+                jobId: PAYMENT_STATUS_ESCALATION_JOB
             }
         );
 

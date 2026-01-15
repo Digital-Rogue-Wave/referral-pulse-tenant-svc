@@ -1,4 +1,4 @@
-import { BadRequestException, Body, Controller, Get, Param, Post, Req, UseGuards } from '@nestjs/common';
+import { BadRequestException, Body, Controller, Get, Param, Post, Query, Req, UseGuards } from '@nestjs/common';
 import { ApiBearerAuth, ApiBody, ApiHeader, ApiTags } from '@nestjs/swagger';
 import { PlanStripeSyncService } from './plan-stripe-sync.service';
 import { BillingService } from './billing.service';
@@ -8,12 +8,16 @@ import { PlanLimitService } from './plan-limit.service';
 import { BillingGuardConfig } from './decorators/billing-guard.decorator';
 import { BillingGuard } from './guards/billing.guard';
 import { Request } from 'express';
-import crypto from 'crypto';
 import { BillingPlanEnum } from '@mod/common/enums/billing.enum';
 import { DailyUsageCalculator } from './daily-usage-calculator.service';
 import { MonthlyUsageResetService } from './monthly-usage-reset.service';
 import { ClsService } from 'nestjs-cls';
 import { UsageTrackerService } from './usage-tracker.service';
+import { TenantEntity } from '@mod/tenant/tenant.entity';
+import { InjectRepository } from '@nestjs/typeorm';
+import { Repository } from 'typeorm';
+import { BillingEntity } from './billing.entity';
+import { BillingEventEntity } from './billing-event.entity';
 
 @ApiTags('Testing')
 @ApiBearerAuth()
@@ -28,12 +32,14 @@ export class TestBillingController {
     private readonly dailyUsageCalculator: DailyUsageCalculator,
     private readonly monthlyUsageResetService: MonthlyUsageResetService,
     private readonly usageTracker: UsageTrackerService,
-    private readonly cls: ClsService
+    private readonly cls: ClsService,
+    @InjectRepository(TenantEntity)
+    private readonly tenantRepository: Repository<TenantEntity>,
+    @InjectRepository(BillingEntity)
+    private readonly billingEntityRepository: Repository<BillingEntity>,
+    @InjectRepository(BillingEventEntity)
+    private readonly billingEventRepository: Repository<BillingEventEntity>
   ) {}
-
-  private getStripeWebhookSecret(): string | null {
-    return process.env.STRIPE_WEBHOOK_SECRET ?? null;
-  }
 
   @Post('stripe/checkout-session')
   @ApiBody({
@@ -186,29 +192,6 @@ export class TestBillingController {
     return { tenantId, metric: bodyObj.metric, amount, currentUsage, periodDate };
   }
 
-  private signStripePayload(payload: string, webhookSecret: string): string {
-    const timestamp = Math.floor(Date.now() / 1000);
-    const signedPayload = `${timestamp}.${payload}`;
-    const signature = crypto.createHmac('sha256', webhookSecret).update(signedPayload, 'utf8').digest('hex');
-    return `t=${timestamp},v1=${signature}`;
-  }
-
-  private async handleSignedStripeEvent(event: any): Promise<{ received: true; eventId: string; eventType: string }> {
-    const webhookSecret = this.getStripeWebhookSecret();
-    if (!webhookSecret) {
-      return {
-        received: true,
-        eventId: 'missing_webhook_secret',
-        eventType: 'error:STRIPE_WEBHOOK_SECRET_NOT_CONFIGURED'
-      };
-    }
-
-    const payload = JSON.stringify(event);
-    const signature = this.signStripePayload(payload, webhookSecret);
-    await this.billingService.handleStripeWebhook(payload, signature);
-    return { received: true, eventId: event.id, eventType: event.type };
-  }
-
   private ensureObjectBody(body: unknown, errorMessage = 'Request body is required'): Record<string, any> {
     if (!body || typeof body !== 'object') {
       throw new BadRequestException(errorMessage);
@@ -239,6 +222,89 @@ export class TestBillingController {
 
     this.cls.set('tenantId', tenantId);
     return tenantId;
+  }
+
+  @Get('tenant/payment-status')
+  async getTenantPaymentStatus(@Req() req: Request) {
+    const tenantId = this.requireTenantId(req);
+
+    const tenant = await this.tenantRepository.findOne({
+      where: { id: tenantId }
+    });
+
+    if (!tenant) {
+      return {
+        tenantId,
+        found: false
+      };
+    }
+
+    return {
+      tenantId,
+      found: true,
+      status: tenant.status,
+      paymentStatus: tenant.paymentStatus,
+      paymentStatusChangedAt: tenant.paymentStatusChangedAt?.toISOString() ?? null
+    };
+  }
+
+  @Get('billing/entity')
+  async getBillingEntity(@Req() req: Request) {
+    const tenantId = this.requireTenantId(req);
+
+    const billing = await this.billingEntityRepository.findOne({
+      where: { tenantId }
+    });
+
+    if (!billing) {
+      return {
+        tenantId,
+        found: false
+      };
+    }
+
+    return {
+      tenantId,
+      found: true,
+      id: billing.id,
+      plan: billing.plan,
+      subscriptionStatus: billing.status,
+      stripeCustomerId: billing.stripeCustomerId ?? null,
+      stripeSubscriptionId: billing.stripeSubscriptionId ?? null,
+      stripeTransactionId: billing.stripeTransactionId ?? null,
+      pendingDowngradePlan: billing.pendingDowngradePlan ?? null,
+      downgradeScheduledAt: billing.downgradeScheduledAt?.toISOString() ?? null,
+      cancellationReason: billing.cancellationReason ?? null,
+      cancellationRequestedAt: billing.cancellationRequestedAt?.toISOString() ?? null,
+      cancellationEffectiveAt: billing.cancellationEffectiveAt?.toISOString() ?? null
+    };
+  }
+
+  @Get('billing/events')
+  async getRecentBillingEvents(@Req() req: Request, @Query('limit') limitRaw?: string) {
+    const tenantId = this.requireTenantId(req);
+
+    const requested = Number(limitRaw);
+    const limit = Number.isFinite(requested) && requested > 0 ? Math.min(100, Math.floor(requested)) : 20;
+
+    const events = await this.billingEventRepository.find({
+      where: { tenantId },
+      order: { timestamp: 'DESC' },
+      take: limit
+    });
+
+    return {
+      tenantId,
+      limit,
+      events: events.map(e => ({
+        id: e.id,
+        eventType: e.eventType,
+        metricName: e.metricName ?? null,
+        increment: e.increment ?? null,
+        timestamp: e.timestamp?.toISOString() ?? null,
+        metadata: e.metadata ?? null
+      }))
+    };
   }
 
   @Get('health')
@@ -394,285 +460,6 @@ export class TestBillingController {
       ok: true,
       message: 'Monthly usage reset executed'
     };
-  }
-
-  @Post('stripe-webhook/checkout-session-completed')
-  @ApiBody({
-    schema: {
-      type: 'object',
-      required: ['tenantId', 'planId'],
-      properties: {
-        tenantId: { type: 'string', example: 'tenant_uuid' },
-        planId: { type: 'string', enum: Object.values(BillingPlanEnum), example: Object.values(BillingPlanEnum)[0] },
-        userId: { type: 'string', example: 'user_uuid' },
-        customerId: { type: 'string', example: 'cus_test_123' },
-        subscriptionId: { type: 'string', example: 'sub_test_123' },
-        paymentIntentId: { type: 'string', example: 'pi_test_123' },
-        sessionId: { type: 'string', example: 'cs_test_123' }
-      }
-    }
-  })
-  async simulateStripeCheckoutSessionCompleted(
-    @Body()
-    body: {
-      tenantId: string;
-      planId: BillingPlanEnum;
-      userId?: string;
-      customerId?: string;
-      subscriptionId?: string;
-      paymentIntentId?: string;
-      sessionId?: string;
-    }
-  ) {
-    const bodyObj = this.ensureObjectBody(body);
-    this.ensureRequiredString(bodyObj.tenantId, 'tenantId');
-    this.ensurePlanId(bodyObj.planId);
-
-    const created = Math.floor(Date.now() / 1000);
-
-    const sessionId = bodyObj.sessionId ?? `cs_test_${Date.now()}`;
-    const customerId = bodyObj.customerId ?? `cus_test_${Date.now()}`;
-    const subscriptionId = bodyObj.subscriptionId ?? `sub_test_${Date.now()}`;
-    const paymentIntentId = bodyObj.paymentIntentId ?? `pi_test_${Date.now()}`;
-
-    const event = {
-      id: `evt_test_${Date.now()}`,
-      object: 'event',
-      api_version: '2025-11-17.clover',
-      created,
-      livemode: false,
-      pending_webhooks: 1,
-      type: 'checkout.session.completed',
-      data: {
-        object: {
-          id: sessionId,
-          object: 'checkout.session',
-          customer: customerId,
-          subscription: subscriptionId,
-          payment_intent: paymentIntentId,
-          metadata: {
-            tenantId: bodyObj.tenantId,
-            planId: bodyObj.planId,
-            ...(bodyObj.userId ? { userId: bodyObj.userId } : {})
-          }
-        }
-      }
-    };
-
-    return await this.handleSignedStripeEvent(event);
-  }
-
-  @Post('stripe-webhook/invoice-payment-succeeded')
-  @ApiBody({
-    schema: {
-      type: 'object',
-      properties: {
-        invoiceId: { type: 'string', example: 'in_test_123' },
-        customerId: { type: 'string', example: 'cus_test_123' },
-        subscriptionId: { type: 'string', example: 'sub_test_123' },
-        paymentIntentId: { type: 'string', example: 'pi_test_123' }
-      }
-    }
-  })
-  async simulateStripeInvoicePaymentSucceeded(
-    @Body()
-    body: {
-      invoiceId?: string;
-      customerId?: string;
-      subscriptionId?: string;
-      paymentIntentId?: string;
-    }
-  ) {
-    const bodyObj = (body ?? {}) as Record<string, any>;
-    const created = Math.floor(Date.now() / 1000);
-
-    const invoiceId = bodyObj.invoiceId ?? `in_test_${Date.now()}`;
-    const customerId = bodyObj.customerId ?? `cus_test_${Date.now()}`;
-    const subscriptionId = bodyObj.subscriptionId ?? `sub_test_${Date.now()}`;
-    const paymentIntentId = bodyObj.paymentIntentId ?? `pi_test_${Date.now()}`;
-
-    const event = {
-      id: `evt_test_${Date.now()}`,
-      object: 'event',
-      api_version: '2025-11-17.clover',
-      created,
-      livemode: false,
-      pending_webhooks: 1,
-      type: 'invoice.payment_succeeded',
-      data: {
-        object: {
-          id: invoiceId,
-          object: 'invoice',
-          customer: customerId,
-          subscription: subscriptionId,
-          payment_intent: paymentIntentId
-        }
-      }
-    };
-
-    return await this.handleSignedStripeEvent(event);
-  }
-
-  @Post('stripe-webhook/invoice-payment-failed')
-  @ApiBody({
-    schema: {
-      type: 'object',
-      properties: {
-        invoiceId: { type: 'string', example: 'in_test_123' },
-        customerId: { type: 'string', example: 'cus_test_123' },
-        subscriptionId: { type: 'string', example: 'sub_test_123' },
-        paymentIntentId: { type: 'string', example: 'pi_test_123' },
-        nextPaymentAttemptUnix: { type: 'number', nullable: true, example: 1730000000 }
-      }
-    }
-  })
-  async simulateStripeInvoicePaymentFailed(
-    @Body()
-    body: {
-      invoiceId?: string;
-      customerId?: string;
-      subscriptionId?: string;
-      paymentIntentId?: string;
-      nextPaymentAttemptUnix?: number | null;
-    }
-  ) {
-    const bodyObj = (body ?? {}) as Record<string, any>;
-    const created = Math.floor(Date.now() / 1000);
-
-    const invoiceId = bodyObj.invoiceId ?? `in_test_${Date.now()}`;
-    const customerId = bodyObj.customerId ?? `cus_test_${Date.now()}`;
-    const subscriptionId = bodyObj.subscriptionId ?? `sub_test_${Date.now()}`;
-    const paymentIntentId = bodyObj.paymentIntentId ?? `pi_test_${Date.now()}`;
-
-    const event = {
-      id: `evt_test_${Date.now()}`,
-      object: 'event',
-      api_version: '2025-11-17.clover',
-      created,
-      livemode: false,
-      pending_webhooks: 1,
-      type: 'invoice.payment_failed',
-      data: {
-        object: {
-          id: invoiceId,
-          object: 'invoice',
-          customer: customerId,
-          subscription: subscriptionId,
-          payment_intent: paymentIntentId,
-          next_payment_attempt: bodyObj.nextPaymentAttemptUnix ?? null
-        }
-      }
-    };
-
-    return await this.handleSignedStripeEvent(event);
-  }
-
-  @Post('stripe-webhook/customer-subscription-deleted')
-  @ApiBody({
-    schema: {
-      type: 'object',
-      required: ['subscriptionId'],
-      properties: {
-        subscriptionId: { type: 'string', example: 'sub_test_123' },
-        endedAtUnix: { type: 'number', example: 1730000000 }
-      }
-    }
-  })
-  async simulateStripeCustomerSubscriptionDeleted(
-    @Body()
-    body: {
-      subscriptionId: string;
-      endedAtUnix?: number;
-    }
-  ) {
-    const bodyObj = this.ensureObjectBody(body);
-    this.ensureRequiredString(bodyObj.subscriptionId, 'subscriptionId');
-
-    const created = Math.floor(Date.now() / 1000);
-    const endedAtUnix = bodyObj.endedAtUnix ?? created;
-
-    const event = {
-      id: `evt_test_${Date.now()}`,
-      object: 'event',
-      api_version: '2025-11-17.clover',
-      created,
-      livemode: false,
-      pending_webhooks: 1,
-      type: 'customer.subscription.deleted',
-      data: {
-        object: {
-          id: bodyObj.subscriptionId,
-          object: 'subscription',
-          ended_at: endedAtUnix
-        }
-      }
-    };
-
-    return await this.handleSignedStripeEvent(event);
-  }
-
-  @Post('stripe-webhook/invalid-signature')
-  @ApiBody({
-    schema: {
-      type: 'object',
-      required: ['eventType'],
-      properties: {
-        eventType: { type: 'string', example: 'checkout.session.completed' },
-        payload: { type: 'object', additionalProperties: true }
-      }
-    }
-  })
-  async simulateStripeInvalidSignature(
-    @Body()
-    body: {
-      eventType: string;
-      payload?: any;
-    }
-  ) {
-    const bodyObj = this.ensureObjectBody(body);
-    this.ensureRequiredString(bodyObj.eventType, 'eventType');
-
-    const webhookSecret = this.getStripeWebhookSecret();
-    if (!webhookSecret) {
-      return {
-        received: false,
-        error: 'STRIPE_WEBHOOK_SECRET_NOT_CONFIGURED'
-      };
-    }
-
-    const created = Math.floor(Date.now() / 1000);
-    const event = {
-      id: `evt_test_${Date.now()}`,
-      object: 'event',
-      api_version: '2025-11-17.clover',
-      created,
-      livemode: false,
-      pending_webhooks: 1,
-      type: bodyObj.eventType,
-      data: {
-        object: bodyObj.payload ?? { ok: true }
-      }
-    };
-
-    const payload = JSON.stringify(event);
-    const signature = this.signStripePayload(payload, 'whsec_invalid_secret');
-
-    try {
-      await this.billingService.handleStripeWebhook(payload, signature);
-      return {
-        received: true,
-        unexpected: true,
-        eventId: event.id,
-        eventType: event.type
-      };
-    } catch (err) {
-      return {
-        received: false,
-        expected: true,
-        errorType: (err as any)?.name ?? 'Error',
-        message: (err as any)?.message ?? 'Unknown error'
-      };
-    }
   }
 
   @Get('remaining-capacity/:metric')

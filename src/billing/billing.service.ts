@@ -186,9 +186,19 @@ export class BillingService {
                     `invoice.payment_succeeded: no TenantEntity found for tenantId=${billing.tenantId}, eventId=${event.id}, invoiceId=${invoiceId}`
                 );
             } else {
-                if (tenant.paymentStatus !== PaymentStatusEnum.COMPLETED) {
-                    tenant.paymentStatus = PaymentStatusEnum.COMPLETED;
+                if (tenant.paymentStatus !== PaymentStatusEnum.ACTIVE) {
+                    const previousStatus = tenant.paymentStatus;
+                    tenant.paymentStatus = PaymentStatusEnum.ACTIVE;
+                    tenant.paymentStatusChangedAt = new Date();
                     await this.billingRepository.manager.save(tenant);
+
+                    this.eventEmitter.emit('tenant.payment_status.changed', {
+                        tenantId: tenant.id,
+                        previousStatus,
+                        nextStatus: PaymentStatusEnum.ACTIVE,
+                        changedAt: tenant.paymentStatusChangedAt.toISOString(),
+                        source: 'stripe'
+                    });
                 }
             }
         } catch (err) {
@@ -272,7 +282,7 @@ export class BillingService {
             plan,
             checkoutUrl: session.url ?? undefined,
             sessionId: session.id,
-            paymentStatus: PaymentStatusEnum.PENDING
+            paymentStatus: PaymentStatusEnum.ACTIVE
         };
     }
 
@@ -280,12 +290,7 @@ export class BillingService {
         const billing = await this.getOrCreateBillingForCurrentTenant();
         const tenantId = billing.tenantId;
 
-        let paymentStatus: PaymentStatusEnum =
-            billing.status === SubscriptionStatusEnum.ACTIVE
-                ? PaymentStatusEnum.COMPLETED
-                : billing.status === SubscriptionStatusEnum.CANCELED
-                  ? PaymentStatusEnum.FAILED
-                  : PaymentStatusEnum.PENDING;
+        let paymentStatus: PaymentStatusEnum = PaymentStatusEnum.ACTIVE;
 
         // Trial information from TenantEntity
         let trialActive: boolean | undefined;
@@ -1002,19 +1007,27 @@ export class BillingService {
                     `invoice.payment_failed: no TenantEntity found for tenantId=${billing.tenantId}, eventId=${event.id}, invoiceId=${invoiceId}`
                 );
             } else {
-                if (nextAttempt && nextAttempt > new Date()) {
-                    tenant.paymentStatus = PaymentStatusEnum.PENDING;
-                    this.logger.warn(
-                        `Set tenant ${tenant.id} paymentStatus=PENDING due to invoice.payment_failed within Stripe grace period (next_attempt=${nextAttempt.toISOString()})`
-                    );
-                } else {
-                    tenant.paymentStatus = PaymentStatusEnum.FAILED;
-                    this.logger.warn(
-                        `Set tenant ${tenant.id} paymentStatus=FAILED due to invoice.payment_failed with no further automatic retries`
-                    );
-                }
+                if (tenant.paymentStatus !== PaymentStatusEnum.PAST_DUE) {
+                    const previousStatus = tenant.paymentStatus;
+                    const changedAt = new Date();
 
-                await this.billingRepository.manager.save(tenant);
+                    tenant.paymentStatus = PaymentStatusEnum.PAST_DUE;
+                    tenant.paymentStatusChangedAt = changedAt;
+
+                    this.logger.warn(
+                        `Set tenant ${tenant.id} paymentStatus=PAST_DUE due to invoice.payment_failed (next_attempt=${nextAttempt?.toISOString() ?? 'none'})`
+                    );
+
+                    await this.billingRepository.manager.save(tenant);
+
+                    this.eventEmitter.emit('tenant.payment_status.changed', {
+                        tenantId: tenant.id,
+                        previousStatus,
+                        nextStatus: PaymentStatusEnum.PAST_DUE,
+                        changedAt: changedAt.toISOString(),
+                        source: 'stripe'
+                    });
+                }
             }
         } catch (err) {
             this.logger.error(

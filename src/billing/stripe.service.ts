@@ -371,6 +371,20 @@ export class StripeService {
     async scheduleSubscriptionCancellation(stripeSubscriptionId: string): Promise<{ effectiveDate: Date | null }> {
         const stripe = this.stripeClient();
 
+        const existing = await stripe.subscriptions.retrieve(stripeSubscriptionId);
+        const rawExisting = existing as any;
+        const existingScheduleId =
+            typeof rawExisting.schedule === 'string'
+                ? rawExisting.schedule
+                : rawExisting.schedule?.id;
+
+        if (existingScheduleId) {
+            await stripe.subscriptionSchedules.release(existingScheduleId);
+            this.logger.log(
+                `Released Stripe subscription schedule ${existingScheduleId} before scheduling cancellation for subscription ${stripeSubscriptionId}`
+            );
+        }
+
         const subscription = await stripe.subscriptions.update(stripeSubscriptionId, {
             cancel_at_period_end: true
         });

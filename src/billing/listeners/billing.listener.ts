@@ -12,7 +12,8 @@ import {
     SubscriptionDowngradeScheduledEvent,
     SubscriptionUpgradedEvent,
     SubscriptionCancelledEvent,
-    PaymentFailedEvent
+    PaymentFailedEvent,
+    TenantPaymentStatusChangedEvent
 } from '@mod/common/interfaces/billing-events.interface';
 
 @Injectable()
@@ -217,6 +218,29 @@ export class BillingListener {
 
         this.metrics.incCounter('billing_subscription_events_total', {
             event: 'billing.payment_failed',
+            result: 'ok'
+        });
+    }
+
+    @OnEvent('tenant.payment_status.changed')
+    async handleTenantPaymentStatusChangedEvent(payload: TenantPaymentStatusChangedEvent) {
+        const snsEventDto = await Utils.validateDtoOrFail(PublishSnsEventDto, {
+            eventId: payload.tenantId,
+            eventType: 'tenant.payment_status.changed',
+            data: payload as any,
+            timestamp: new Date().toISOString()
+        });
+
+        const snsOptionsDto = await Utils.validateDtoOrFail(SnsPublishOptionsDto, {
+            topic: 'tenant-events',
+            groupId: payload.tenantId,
+            deduplicationId: `${payload.tenantId}-tenant-payment-status-changed-${Date.now()}`
+        });
+
+        await this.sns.publish(snsEventDto as any, snsOptionsDto as any);
+
+        this.metrics.incCounter('billing_subscription_events_total', {
+            event: 'tenant.payment_status.changed',
             result: 'ok'
         });
     }
