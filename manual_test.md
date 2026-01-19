@@ -128,7 +128,7 @@ Complete checkout in the returned `checkoutUrl`.
 ### 4.1 Real Stripe webhook endpoint
 
 Stripe posts to:
-- `POST /api/v1/webhook/stripe`
+- `POST /webhooks/stripe`
 
 This endpoint:
 - Validates `stripe-signature` using `STRIPE_WEBHOOK_SECRET`
@@ -140,122 +140,70 @@ Implemented Stripe event types handled:
 - `invoice.payment_failed`
 - `customer.subscription.deleted`
 
-### 4.2 Easiest manual testing (NO Stripe CLI): Swagger helper endpoints
+### 4.2 Manual webhook testing (real Stripe webhook endpoint via Stripe CLI)
 
-To make webhook testing easy in Swagger, use `TestBillingController` webhook simulators.
-These endpoints:
-- Generate a Stripe-like JSON event payload
-- Generate a **valid** `stripe-signature` header using `STRIPE_WEBHOOK_SECRET`
-- Call `BillingService.handleStripeWebhook()` internally
+Use Stripe CLI to forward real signed webhooks into the service:
 
-#### 4.2.1 Simulate `checkout.session.completed`
-
-- `POST /api/test/stripe-webhook/checkout-session-completed`
-
-Body example:
-```json
-{
-  "tenantId": "<TENANT_ID>",
-  "planId": "starter",
-  "userId": "<USER_ID_OPTIONAL>"
-}
+```powershell
+stripe listen --forward-to http://localhost:5001/webhooks/stripe
 ```
 
-Expected:
-- Billing updated for the tenant
-- Trial ended early (for paid plans)
+#### 4.2.1 Create a real subscription (Checkout)
+
+Use Swagger:
+
+- `POST /api/test/stripe/checkout-session`
+
+Complete checkout in the browser.
 
 Verify:
-- `GET /api/v1/billings/subscription`
-  - `plan` updated
-  - `subscriptionStatus` becomes `active` for paid plans
-  - `stripeCustomerId` and `stripeSubscriptionId` set for paid plans
 
-#### 4.2.2 Simulate `invoice.payment_succeeded`
+- `GET /api/test/billing/subscription`
+- Stripe Dashboard (Test mode) shows Customer + Subscription + Events
 
-- `POST /api/test/stripe-webhook/invoice-payment-succeeded`
+#### 4.2.2 Trigger payment succeeded / paid
 
-Body example:
-```json
-{
-  "subscriptionId": "<STRIPE_SUBSCRIPTION_ID_FROM_SUBSCRIPTION_ENDPOINT>",
-  "customerId": "<STRIPE_CUSTOMER_ID_FROM_SUBSCRIPTION_ENDPOINT>"
-}
+Fetch identifiers:
+
+- `GET /api/test/billing/subscription` (copy `stripeSubscriptionId` and `stripeCustomerId`)
+
+Trigger:
+
+```powershell
+stripe trigger invoice.paid --add invoice:subscription=<sub_id> --add invoice:customer=<cus_id>
 ```
-
-Expected:
-- Tenant `paymentStatus` updated to `COMPLETED` (when billing record is found)
-
-#### 4.2.3 Simulate `invoice.payment_failed`
-
-- `POST /api/test/stripe-webhook/invoice-payment-failed`
-
-Body example (grace period / retry still scheduled):
-```json
-{
-  "subscriptionId": "<STRIPE_SUBSCRIPTION_ID>",
-  "customerId": "<STRIPE_CUSTOMER_ID>",
-  "nextPaymentAttemptUnix": 1893456000
-}
-```
-
-Body example (no retry -> hard fail):
-```json
-{
-  "subscriptionId": "<STRIPE_SUBSCRIPTION_ID>",
-  "customerId": "<STRIPE_CUSTOMER_ID>",
-  "nextPaymentAttemptUnix": null
-}
-```
-
-Expected:
-- With `nextPaymentAttemptUnix` in the future: tenant `paymentStatus = PENDING`
-- With `null` (or in the past): tenant `paymentStatus = FAILED`
-
-#### 4.2.4 Simulate `customer.subscription.deleted`
-
-- `POST /api/test/stripe-webhook/customer-subscription-deleted`
-
-Body example:
-```json
-{
-  "subscriptionId": "<STRIPE_SUBSCRIPTION_ID>"
-}
-```
-
-Expected:
-- Billing status updated to `CANCELED`
-- `stripeSubscriptionId` cleared
 
 Verify:
-- `GET /api/v1/billings/subscription`
 
-#### 4.2.5 Negative test: invalid signature
+- `GET /api/test/tenant/payment-status` => `paymentStatus=active`
 
-- `POST /api/test/stripe-webhook/invalid-signature`
+#### 4.2.3 Trigger payment failed
 
-Body example:
-```json
-{
-  "eventType": "checkout.session.completed",
-  "payload": { "any": "thing" }
-}
+```powershell
+stripe trigger invoice.payment_failed --add invoice:subscription=<sub_id> --add invoice:customer=<cus_id>
 ```
 
-Expected:
-- Request returns `received=false` with an error message
-- No billing state should be updated
+Verify:
+
+- `GET /api/test/tenant/payment-status` => `paymentStatus=past_due`
 
 ---
 
 ## 5) Payment-required behavior (Guard)
 
-When payment fails and there is no grace period left, `tenant.paymentStatus` can become `FAILED`.
+When payment fails, `tenant.paymentStatus` can become `past_due`.
 
 ### 5.1 Validate PaymentRequiredGuard behavior
 
-Find an endpoint that is protected with `PaymentRequiredGuard` (if applied in your routes).
-If `paymentStatus = FAILED`, you should get:
+Use a dedicated testing endpoint protected by `PaymentRequiredGuard`:
+
+- `GET /api/test/protected/payment-required`
+
+Requirements:
+- Provide `tenant-id` header
+- Provide Bearer token
+
+When `tenant.paymentStatus = locked`, you should get:
 
 - HTTP `402 Payment Required`
 
@@ -350,4 +298,4 @@ Cause:
 
 Fix:
 - Configure `STRIPE_WEBHOOK_SECRET`
-- Use `/api/test/stripe-webhook/*` endpoints to generate a valid signature.
+- Ensure Stripe CLI forwarding is running (`stripe listen --forward-to ...`).
