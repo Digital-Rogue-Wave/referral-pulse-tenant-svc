@@ -1,4 +1,3 @@
-/* eslint-disable @typescript-eslint/unbound-method */
 import { ClassTransformOptions, plainToInstance } from 'class-transformer';
 import { SinonSandbox, SinonStatic, SinonStubbedInstance } from 'sinon';
 import { ObjectLiteral, SelectQueryBuilder } from 'typeorm';

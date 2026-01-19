@@ -4,9 +4,6 @@ export class UtilService {
     }
 
     static isEmptyObject(emptyOrNotObject: any): boolean {
-        return (
-            // eslint-disable-next-line @typescript-eslint/no-unsafe-argument
-            Object.keys(emptyOrNotObject).length === 0 && Object.getPrototypeOf(emptyOrNotObject) === Object.prototype
-        );
+        return Object.keys(emptyOrNotObject).length === 0 && Object.getPrototypeOf(emptyOrNotObject) === Object.prototype;
     }
 }

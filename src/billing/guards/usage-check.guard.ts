@@ -23,10 +23,7 @@ export class UsageCheckGuard implements CanActivate {
             return true;
         }
 
-        const options = this.reflector.getAllAndOverride<UsageCheckOptions | undefined>(USAGE_CHECK_KEY, [
-            context.getHandler(),
-            context.getClass()
-        ]);
+        const options = this.reflector.getAllAndOverride<UsageCheckOptions | undefined>(USAGE_CHECK_KEY, [context.getHandler(), context.getClass()]);
 
         if (!options) {
             return true;

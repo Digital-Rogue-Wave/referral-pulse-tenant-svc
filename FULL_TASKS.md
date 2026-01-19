@@ -122,7 +122,7 @@ Current code for:
 
 - `POST /billings/subscription/checkout`
 - [BillingService.subscriptionCheckout](cci:1://file:///d:/Projects/Work/REFERRAL/referral-pulse-tenant-svc/src/billing/billing.service.ts:93:4-111:5)
-- `WebhookController.POST /webhook/stripe`
+- `WebhookController.POST /webhooks/stripe`
 - [BillingService.handleStripeWebhook](cci:1://file:///d:/Projects/Work/REFERRAL/referral-pulse-tenant-svc/src/billing/billing.service.ts:131:4-190:5) → [handleCheckoutSessionCompleted](cci:1://file:///d:/Projects/Work/REFERRAL/referral-pulse-tenant-svc/src/billing/billing.service.ts:192:4-265:5)
 - `BillingListener` → SNS + metrics  
 already **matches** the `add-subscription-checkout` spec:

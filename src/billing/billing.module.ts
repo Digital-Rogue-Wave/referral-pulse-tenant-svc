@@ -34,15 +34,12 @@ import { MonthlyUsageResetService } from './monthly-usage-reset.service';
 import { StripeRedirectController } from './stripe-redirect.controller';
 import { InternalTenantStatusController } from './internal-tenant-status.controller';
 import { PaymentStatusEscalationService } from './payment-status-escalation.service';
+import { TrialLifecycleService } from './trial-lifecycle.service';
 
 @Module({
     imports: [
         TypeOrmModule.forFeature([PlanEntity, BillingEntity, TenantUsageEntity, BillingEventEntity, TenantEntity]),
-        TenantAwareRepositoryModule.forEntities([
-            BillingEntity,
-            TenantUsageEntity,
-            BillingEventEntity
-        ]),
+        TenantAwareRepositoryModule.forEntities([BillingEntity, TenantUsageEntity, BillingEventEntity]),
         TenantModule,
         BullModule.registerQueue({ name: BILLING_USAGE_QUEUE })
     ],
@@ -73,7 +70,8 @@ import { PaymentStatusEscalationService } from './payment-status-escalation.serv
         DailyUsageCalculator,
         ReferralEventProcessor,
         MonthlyUsageResetService,
-        PaymentStatusEscalationService
+        PaymentStatusEscalationService,
+        TrialLifecycleService
     ],
     exports: [
         BillingService,
@@ -87,7 +85,8 @@ import { PaymentStatusEscalationService } from './payment-status-escalation.serv
         DailyUsageCalculator,
         ReferralEventProcessor,
         MonthlyUsageResetService,
-        PaymentStatusEscalationService
+        PaymentStatusEscalationService,
+        TrialLifecycleService
     ]
 })
 export class BillingModule {}

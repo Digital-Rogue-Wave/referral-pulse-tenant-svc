@@ -40,6 +40,10 @@ class SnsEnvValidator {
     @IsString()
     @IsOptional()
     SNS_TENANT_EVENTS_TOPIC_ARN?: string;
+
+    @IsString()
+    @IsOptional()
+    SNS_REFERRAL_PLATFORM_EVENTS_TOPIC_ARN?: string;
 }
 
 export type SnsConfig = {
@@ -89,6 +93,11 @@ export default registerAs('snsConfig', () => {
             {
                 name: 'tenant-events',
                 topicArn: process.env.SNS_TENANT_EVENTS_TOPIC_ARN || '',
+                fifo: true
+            },
+            {
+                name: 'referral-platform-events',
+                topicArn: process.env.SNS_REFERRAL_PLATFORM_EVENTS_TOPIC_ARN || process.env.SNS_TENANT_EVENTS_TOPIC_ARN || '',
                 fifo: true
             }
         ]

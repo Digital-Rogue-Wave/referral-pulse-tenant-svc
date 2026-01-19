@@ -36,12 +36,12 @@ And price IDs mapped to your plans:
 
 Your service expects the Stripe webhook at:
 
-- `POST http://localhost:5001/api/v1/webhook/stripe`
+- `POST http://localhost:5001/webhooks/stripe`
 
 Run:
 
 ```powershell
-stripe listen --forward-to http://localhost:5001/api/v1/webhook/stripe
+stripe listen --forward-to http://localhost:5001/webhooks/stripe
 ```
 
 Copy the printed signing secret into:
@@ -294,7 +294,7 @@ If within limits, it should succeed.
 
 ## 8) Notes / Common gotchas
 
-- **Wrong webhook URL**: the correct forward URL is `http://localhost:5001/api/v1/webhook/stripe`.
+- **Wrong webhook URL**: the correct forward URL is `http://localhost:5001/webhooks/stripe`.
 - **Missing `STRIPE_WEBHOOK_SECRET`**: signature verification will fail.
 - **Success/Cancel URLs**: must be set (`STRIPE_SUCCESS_URL`, `STRIPE_CANCEL_URL`) or checkout session creation will fail.
 - **Price IDs must be recurring**: one-time prices won’t work with subscription checkout.
@@ -327,7 +327,7 @@ The service uses a payment enforcement state machine on `TenantEntity.paymentSta
 Use Stripe CLI to forward real webhook calls into the service:
 
 ```powershell
-stripe listen --forward-to http://localhost:5001/api/v1/webhook/stripe
+stripe listen --forward-to http://localhost:5001/webhooks/stripe
 ```
 
 After you have a real subscription (Scenario A), fetch identifiers:
@@ -355,12 +355,16 @@ Payment status escalation runs as a BullMQ repeatable job:
 
 - Queue: `billing-usage`
 - Job: `payment-status-escalation`
-- Schedule: hourly
+- Schedule: daily at 9 AM
+
+For demo/testing without waiting for the schedule:
+
+- `POST /api/test/jobs/run-payment-status-escalation`
 
 To test quickly in dev, set a tenant's `paymentStatusChangedAt` in the database to an older timestamp:
 
-- Set `paymentStatus=past_due` and `paymentStatusChangedAt` to > 7 days ago, then wait for the next hourly run.
-- Set `paymentStatus=restricted` and `paymentStatusChangedAt` to > 14 days ago, then wait for the next hourly run.
+- Set `paymentStatus=past_due` and `paymentStatusChangedAt` to > 7 days ago, then run `POST /api/test/jobs/run-payment-status-escalation`.
+- Set `paymentStatus=restricted` and `paymentStatusChangedAt` to > 14 days ago, then run `POST /api/test/jobs/run-payment-status-escalation`.
 
 Expected:
 
@@ -383,3 +387,8 @@ All under `TestBillingController`:
 - `GET /api/test/tenant/payment-status`
 - `POST /api/test/usage/increment`
 - `POST /api/test/usage/decrement`
+
+Additional job triggers:
+
+- `POST /api/test/jobs/run-payment-status-escalation`
+- `POST /api/test/jobs/run-trial-lifecycle`

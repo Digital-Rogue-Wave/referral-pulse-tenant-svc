@@ -7,12 +7,8 @@ export class AddTenantBillingFields1734260000000 implements MigrationInterface {
         await queryRunner.query(`CREATE TYPE "billing_plan_enum" AS ENUM('Free', 'Starter', 'Growth', 'Enterprise')`);
         await queryRunner.query(`CREATE TYPE "subscription_status_enum" AS ENUM('none', 'active', 'canceled')`);
 
-        await queryRunner.query(
-            `ALTER TABLE "tenants" ADD "billing_plan" "billing_plan_enum" NOT NULL DEFAULT 'Free'`
-        );
-        await queryRunner.query(
-            `ALTER TABLE "tenants" ADD "subscription_status" "subscription_status_enum" NOT NULL DEFAULT 'none'`
-        );
+        await queryRunner.query(`ALTER TABLE "tenants" ADD "billing_plan" "billing_plan_enum" NOT NULL DEFAULT 'Free'`);
+        await queryRunner.query(`ALTER TABLE "tenants" ADD "subscription_status" "subscription_status_enum" NOT NULL DEFAULT 'none'`);
         await queryRunner.query(`ALTER TABLE "tenants" ADD "stripe_customer_id" character varying`);
         await queryRunner.query(`ALTER TABLE "tenants" ADD "stripe_subscription_id" character varying`);
     }

@@ -49,9 +49,7 @@ export class BillingController {
     @RequirePermission({ namespace: KetoNamespace.TENANT, relation: KetoRelation.MANAGE_BILLING })
     @HttpCode(HttpStatus.OK)
     @Post('subscription/upgrade/preview')
-    async previewSubscriptionUpgrade(
-        @Body() dto: SubscriptionUpgradeRequestDto
-    ): Promise<SubscriptionUpgradePreviewResponseDto> {
+    async previewSubscriptionUpgrade(@Body() dto: SubscriptionUpgradeRequestDto): Promise<SubscriptionUpgradePreviewResponseDto> {
         const validated = await Utils.validateDtoOrFail(SubscriptionUpgradeRequestDto, dto);
         return await this.billingService.previewSubscriptionUpgrade(validated.targetPlan);
     }

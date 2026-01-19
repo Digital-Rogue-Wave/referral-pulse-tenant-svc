@@ -8,6 +8,7 @@ import { KratosService } from '@mod/common/auth/kratos.service';
 import { MemberInvitedEvent } from '@mod/common/interfaces/invitation-events.interface';
 import { PublishSnsEventDto, SnsPublishOptionsDto } from '@mod/common/dto/sns-publish.dto';
 import { Utils } from '@mod/common/utils/utils';
+import { randomUUID } from 'node:crypto';
 
 import { InvitationCreatedEvent, MemberJoinedEvent } from '@mod/common/interfaces/invitation-events.interface';
 
@@ -36,7 +37,8 @@ export class InvitationListener {
 
         // Publish SNS Event
         const snsEventDto = await Utils.validateDtoOrFail(PublishSnsEventDto, {
-            eventId: invitationId,
+            eventId: invitationId ?? randomUUID(),
+            tenantId,
             eventType: 'member.invited',
             data: {
                 email,
@@ -71,7 +73,8 @@ export class InvitationListener {
 
         // Publish SNS Event
         const snsEventDto = await Utils.validateDtoOrFail(PublishSnsEventDto, {
-            eventId: invitationId || `${tenantId}:${userId}`,
+            eventId: invitationId ?? randomUUID(),
+            tenantId,
             eventType: 'member.joined',
             data: {
                 userId,

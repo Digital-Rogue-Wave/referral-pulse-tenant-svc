@@ -4,13 +4,9 @@ export class AlignPaymentStatusStateMachine1734360000000 implements MigrationInt
     name = 'AlignPaymentStatusStateMachine1734360000000';
 
     public async up(queryRunner: QueryRunner): Promise<void> {
-        await queryRunner.query(
-            `ALTER TABLE "tenants" ADD COLUMN IF NOT EXISTS "payment_status_changed_at" TIMESTAMP`
-        );
+        await queryRunner.query(`ALTER TABLE "tenants" ADD COLUMN IF NOT EXISTS "payment_status_changed_at" TIMESTAMP`);
 
-        await queryRunner.query(
-            `UPDATE "tenants" SET "payment_status_changed_at" = now() WHERE "payment_status_changed_at" IS NULL`
-        );
+        await queryRunner.query(`UPDATE "tenants" SET "payment_status_changed_at" = now() WHERE "payment_status_changed_at" IS NULL`);
 
         await queryRunner.query(`
 DO $$

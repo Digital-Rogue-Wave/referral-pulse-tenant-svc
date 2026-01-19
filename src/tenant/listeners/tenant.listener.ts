@@ -95,6 +95,7 @@ export class TenantListener {
         // 2. Publish SNS Event
         const snsEventDto = await Utils.validateDtoOrFail(PublishSnsEventDto, {
             eventId: tenant.id,
+            tenantId: tenant.id,
             eventType: 'tenant.created',
             data: {
                 name: tenant.name,

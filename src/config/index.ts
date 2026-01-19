@@ -18,6 +18,7 @@ import snsConfig from './sns.config';
 import sqsConfig from './sqs.config';
 import stripeConfig from './stripe.config';
 import tracingConfig from './tracing.config';
+import billingConfig from './billing.config';
 
 // Re-export individual configs
 export {
@@ -35,7 +36,8 @@ export {
     snsConfig,
     sqsConfig,
     stripeConfig,
-    tracingConfig
+    tracingConfig,
+    billingConfig
 };
 
 /**
@@ -57,5 +59,6 @@ export const allConfigs = [
     snsConfig,
     sqsConfig,
     stripeConfig,
-    tracingConfig
+    tracingConfig,
+    billingConfig
 ];

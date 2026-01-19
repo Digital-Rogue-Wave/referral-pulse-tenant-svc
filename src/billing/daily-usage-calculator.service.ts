@@ -1,5 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
+import { EventEmitter2 } from '@nestjs/event-emitter';
 import { Repository } from 'typeorm';
 import { TenantEntity } from '@mod/tenant/tenant.entity';
 import { TenantStatusEnum } from '@mod/common/enums/tenant.enum';
@@ -18,7 +19,8 @@ export class DailyUsageCalculator {
         private readonly usageRepository: Repository<TenantUsageEntity>,
         @InjectRepository(BillingEventEntity)
         private readonly billingEventRepository: Repository<BillingEventEntity>,
-        private readonly redisUsageService: RedisUsageService
+        private readonly redisUsageService: RedisUsageService,
+        private readonly eventEmitter: EventEmitter2
     ) {}
 
     async runDailySnapshot(): Promise<void> {
@@ -65,11 +67,7 @@ export class DailyUsageCalculator {
                     const percentage = (usage / limit) * 100;
                     for (const threshold of [80, 100]) {
                         if (percentage >= threshold) {
-                            const alreadyTriggered = await this.redisUsageService.isThresholdTriggered(
-                                tenantId,
-                                metric,
-                                threshold
-                            );
+                            const alreadyTriggered = await this.redisUsageService.isThresholdTriggered(tenantId, metric, threshold);
 
                             if (!alreadyTriggered) {
                                 await this.redisUsageService.markThresholdTriggered(tenantId, metric, threshold);
@@ -93,6 +91,18 @@ export class DailyUsageCalculator {
                                 this.logger.warn(
                                     `Usage threshold ${threshold}% crossed for tenant ${tenantId}, metric ${metric} (usage=${usage}, limit=${limit})`
                                 );
+
+                                this.eventEmitter.emit('usage.threshold_crossed', {
+                                    tenantId,
+                                    metric,
+                                    threshold,
+                                    usage,
+                                    limit,
+                                    percentage,
+                                    periodDate,
+                                    month,
+                                    triggeredAt: now.toISOString()
+                                });
                             }
                         }
                     }

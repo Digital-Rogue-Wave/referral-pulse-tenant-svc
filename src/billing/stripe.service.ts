@@ -211,8 +211,7 @@ export class StripeService {
         const subscription = await stripe.subscriptions.retrieve(params.stripeSubscriptionId);
 
         const rawSubscription = subscription as any;
-        const customerId =
-            typeof rawSubscription.customer === 'string' ? rawSubscription.customer : rawSubscription.customer?.id;
+        const customerId = typeof rawSubscription.customer === 'string' ? rawSubscription.customer : rawSubscription.customer?.id;
 
         if (!customerId) {
             throw new HttpException('Stripe subscription is missing customer for upgrade preview', HttpStatus.BAD_REQUEST);
@@ -242,9 +241,7 @@ export class StripeService {
 
         const amountDueNow = (upcoming.amount_due ?? 0) / 100;
         const currency = upcoming.currency ?? 'usd';
-        const nextInvoiceDate = upcoming.next_payment_attempt
-            ? new Date(upcoming.next_payment_attempt * 1000)
-            : null;
+        const nextInvoiceDate = upcoming.next_payment_attempt ? new Date(upcoming.next_payment_attempt * 1000) : null;
 
         this.logger.log(
             `Calculated Stripe subscription upgrade preview for subscription ${params.stripeSubscriptionId} to plan ${params.targetPlan}: amountDueNow=${amountDueNow} ${currency}`
@@ -279,9 +276,7 @@ export class StripeService {
             cancel_at_period_end: false
         });
 
-        this.logger.log(
-            `Upgraded Stripe subscription ${params.stripeSubscriptionId} to plan ${params.targetPlan} with proration`
-        );
+        this.logger.log(`Upgraded Stripe subscription ${params.stripeSubscriptionId} to plan ${params.targetPlan} with proration`);
     }
 
     async scheduleSubscriptionDowngrade(params: {
@@ -314,10 +309,7 @@ export class StripeService {
         const currentQuantity = firstItem.quantity ?? 1;
         const newPriceId = this.priceIdForPlan(params.targetPlan);
 
-        const scheduleId =
-            typeof rawSubscription.schedule === 'string'
-                ? rawSubscription.schedule
-                : rawSubscription.schedule?.id;
+        const scheduleId = typeof rawSubscription.schedule === 'string' ? rawSubscription.schedule : rawSubscription.schedule?.id;
 
         const schedule = scheduleId
             ? await stripe.subscriptionSchedules.retrieve(scheduleId)
@@ -354,10 +346,7 @@ export class StripeService {
 
         const subscription = await stripe.subscriptions.retrieve(stripeSubscriptionId);
         const rawSubscription = subscription as any;
-        const scheduleId =
-            typeof rawSubscription.schedule === 'string'
-                ? rawSubscription.schedule
-                : rawSubscription.schedule?.id;
+        const scheduleId = typeof rawSubscription.schedule === 'string' ? rawSubscription.schedule : rawSubscription.schedule?.id;
 
         if (!scheduleId) {
             this.logger.log(`No Stripe schedule found to cancel downgrade for subscription ${stripeSubscriptionId}`);
@@ -373,10 +362,7 @@ export class StripeService {
 
         const existing = await stripe.subscriptions.retrieve(stripeSubscriptionId);
         const rawExisting = existing as any;
-        const existingScheduleId =
-            typeof rawExisting.schedule === 'string'
-                ? rawExisting.schedule
-                : rawExisting.schedule?.id;
+        const existingScheduleId = typeof rawExisting.schedule === 'string' ? rawExisting.schedule : rawExisting.schedule?.id;
 
         if (existingScheduleId) {
             await stripe.subscriptionSchedules.release(existingScheduleId);
@@ -390,8 +376,7 @@ export class StripeService {
         });
 
         const rawSubscription = subscription as any;
-        const periodEndRaw = (rawSubscription.current_period_end ??
-            rawSubscription.items?.data?.[0]?.current_period_end) as unknown;
+        const periodEndRaw = (rawSubscription.current_period_end ?? rawSubscription.items?.data?.[0]?.current_period_end) as unknown;
         const periodEndTs = typeof periodEndRaw === 'number' && Number.isFinite(periodEndRaw) ? periodEndRaw : null;
         const periodEnd = periodEndTs ? new Date(periodEndTs * 1000) : null;
 
@@ -411,9 +396,7 @@ export class StripeService {
             cancel_at_period_end: false
         });
 
-        this.logger.log(
-            `Reactivated Stripe subscription ${stripeSubscriptionId} by clearing cancel_at_period_end`
-        );
+        this.logger.log(`Reactivated Stripe subscription ${stripeSubscriptionId} by clearing cancel_at_period_end`);
     }
 
     async cancelSubscription(stripeSubscriptionId: string): Promise<void> {
@@ -462,8 +445,7 @@ export class StripeService {
         const customer = await stripe.customers.retrieve(customerId);
         const rawCustomer = customer as any;
         const defaultPm = rawCustomer.invoice_settings?.default_payment_method;
-        const defaultPaymentMethodId =
-            typeof defaultPm === 'string' ? defaultPm : defaultPm?.id ?? null;
+        const defaultPaymentMethodId = typeof defaultPm === 'string' ? defaultPm : (defaultPm?.id ?? null);
 
         const list = await stripe.paymentMethods.list({
             customer: customerId,
@@ -471,11 +453,7 @@ export class StripeService {
             limit: 100
         });
 
-        this.logger.log(
-            `Listed ${list.data.length} Stripe payment methods for customer ${customerId}, default=${
-                defaultPaymentMethodId ?? 'none'
-            }`
-        );
+        this.logger.log(`Listed ${list.data.length} Stripe payment methods for customer ${customerId}, default=${defaultPaymentMethodId ?? 'none'}`);
 
         return list.data.map((pm) => {
             const card = pm.card;
@@ -496,7 +474,7 @@ export class StripeService {
         const pm = await stripe.paymentMethods.retrieve(paymentMethodId);
         const rawPm = pm as any;
         const pmCustomer = rawPm.customer;
-        const pmCustomerId = typeof pmCustomer === 'string' ? pmCustomer : pmCustomer?.id ?? null;
+        const pmCustomerId = typeof pmCustomer === 'string' ? pmCustomer : (pmCustomer?.id ?? null);
 
         if (pmCustomerId !== customerId) {
             throw new HttpException('Payment method not found for this customer', HttpStatus.NOT_FOUND);
@@ -513,7 +491,7 @@ export class StripeService {
         const pm = await stripe.paymentMethods.retrieve(paymentMethodId);
         const rawPm = pm as any;
         const pmCustomer = rawPm.customer;
-        const pmCustomerId = typeof pmCustomer === 'string' ? pmCustomer : pmCustomer?.id ?? null;
+        const pmCustomerId = typeof pmCustomer === 'string' ? pmCustomer : (pmCustomer?.id ?? null);
 
         if (pmCustomerId !== customerId) {
             throw new HttpException('Payment method not found for this customer', HttpStatus.NOT_FOUND);
@@ -550,9 +528,7 @@ export class StripeService {
             limit: 100
         });
 
-        this.logger.log(
-            `Listed ${list.data.length} Stripe invoices for customer ${customerId}`
-        );
+        this.logger.log(`Listed ${list.data.length} Stripe invoices for customer ${customerId}`);
 
         return list.data.map((invoice) => {
             const createdTs = invoice.created ?? 0;
@@ -575,10 +551,7 @@ export class StripeService {
         });
     }
 
-    async retrieveUpcomingInvoiceForCustomer(params: {
-        customerId: string;
-        subscriptionId?: string | null;
-    }): Promise<{
+    async retrieveUpcomingInvoiceForCustomer(params: { customerId: string; subscriptionId?: string | null }): Promise<{
         amountDue: number;
         currency: string;
         nextPaymentAttempt: Date | null;
@@ -601,9 +574,7 @@ export class StripeService {
         const amountDue = (upcoming.amount_due ?? 0) / 100;
         const currency = upcoming.currency ?? 'usd';
 
-        const nextPaymentAttempt = upcoming.next_payment_attempt
-            ? new Date(upcoming.next_payment_attempt * 1000)
-            : null;
+        const nextPaymentAttempt = upcoming.next_payment_attempt ? new Date(upcoming.next_payment_attempt * 1000) : null;
 
         const periodStartTs = (upcoming as any).period_start as number | undefined;
         const periodEndTs = (upcoming as any).period_end as number | undefined;

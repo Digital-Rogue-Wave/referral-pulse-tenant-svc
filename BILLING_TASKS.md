@@ -17,6 +17,41 @@ Architecture note:
 - Assume billing may be extracted into a separate microservice later; avoid putting billing logic into tenant, campaign or other modules to minimize refactoring.
 - Per architecture, authenticated requests flow through Ory (Hydra) + Keto authorization, so `tenant-id` should be available in request context for all non-public routes.
 
+Architecture ownership note (source of truth: `docs/specs/microservices-architecture.md`):
+- Tenant Service owns billing state transitions and publishes events.
+- Integration Service owns emails/notifications and reacts to events.
+- Campaign Service reacts to tenant billing/status events to pause/resume campaigns.
+
+## Refactor – Architecture Alignment (src/billing)
+
+- [x] A1 Remove direct email sending from billing domain
+  - Tenant Service should publish events only; Integration Service sends emails/notifications.
+
+- [x] A2 Align Stripe webhook route with architecture
+  - Architecture specifies `POST /webhooks/stripe`.
+  - Current implementation supports `POST /webhooks/stripe` (see `src/webhook/webhooks.controller.ts`) while keeping `POST /api/v1/webhook/stripe` (see `src/webhook/webhook.controller.ts`) for backward compatibility.
+
+- [x] A3 Align billing event names with architecture
+  - Architecture event contracts include: `payment.failed`, `payment.restored`, `tenant.restricted`, `tenant.locked`, `tenant.restored`.
+  - Current implementation uses: `billing.payment_failed`, `tenant.payment_status.changed`.
+  - Add/rename events to match the boss contract (and keep internal ones only if necessary).
+
+- [x] A4 Align SNS topic + event envelope schema with architecture
+  - Architecture describes SNS topic `referral-platform-events` and an envelope that includes top-level `tenantId`.
+  - Current implementation publishes to topic `tenant-events` and uses `eventId = tenantId`.
+  - Update publishing to:
+    - Use a unique `eventId` per event.
+    - Include `tenantId` in the envelope (not only inside `data`).
+    - Publish to the correct topic.
+
+- [x] A5 Emit publishable events for usage threshold + monthly summary
+  - `DailyUsageCalculator` writes `BillingEventEntity` rows (`usage.threshold_crossed`) but does not publish an event.
+  - `MonthlyUsageResetService` writes `BillingEventEntity` rows (`usage.monthly_summary`) but does not publish an event.
+  - Emit events so Integration Service can notify.
+
+- [x] A6 Confirm billing route auth matches architecture
+  - Auth is enforced globally via `APP_GUARD` (`JwtAuthGuard` then `KetoGuard`).
+
 ---
 
 ## 0. OpenSpec Change – `add-subscription-checkout`
@@ -36,7 +71,7 @@ These items come from `openspec/changes/add-subscription-checkout/specs/tenant-b
   - Does **not** update `BillingEntity` or cancel any subscription in the handler.
   - Relies on the webhook flow (below) to apply the final billing state.
 
-- [x] 0.3 `POST /webhook/stripe` – successful `checkout.session.completed`
+- [x] 0.3 `POST /webhooks/stripe` – successful `checkout.session.completed`
   - Verifies the Stripe webhook signature using the configured webhook secret.
   - Requires metadata to contain valid `tenantId` and `planId`.
   - Updates the corresponding `BillingEntity` as follows:
@@ -48,7 +83,7 @@ These items come from `openspec/changes/add-subscription-checkout/specs/tenant-b
   - Publishes a `subscription.changed` event which is forwarded to SNS by `BillingListener`.
   - Responds to Stripe with a 2xx status code when processing succeeds.
 
-- [x] 0.4 `POST /webhook/stripe` – invalid signature handling
+- [x] 0.4 `POST /webhooks/stripe` – invalid signature handling
   - When the Stripe webhook signature cannot be validated:
     - Does **not** update any tenant/billing data.
     - Responds to Stripe with a non‑2xx status code.
@@ -91,6 +126,8 @@ These items come from `openspec/changes/add-subscription-checkout/specs/tenant-b
   - Fields: `tenant_id`, `event_type`, `metric_name`, `increment`, `timestamp`, `metadata`.
   - Index on `tenant_id` and `timestamp` for efficient querying.
 
+> Note: Fresh database bootstrap is handled by an initial migration (`InitCoreSchema1734250000000`) so `pnpm migration:run` can be executed against an empty Postgres database.
+
 ---
 
 ## Phase 2 – Plan Management (`BILLING.md` §39–77)
@@ -108,13 +145,13 @@ These items come from `openspec/changes/add-subscription-checkout/specs/tenant-b
   - Enterprise plans: `tenant_id = :tenantId` (handled via tenant context and DTO fields in admin CRUD).
   - Public listing endpoint only returns active public plans; admin listing supports filters.
 
-- [ ] 2.4 Stripe Products/Prices sync
+- [x] 2.4 Stripe Products/Prices sync
   - Sync Stripe Products/Prices into `PlanEntity`.
   - Update `stripe_price_id`, `stripe_product_id`, limits and metadata.
   - Handle new/updated/deleted products.
-  - **Status:** Core sync logic implemented in `PlanStripeSyncService`; scheduling and optional automation tracked separately.
+  - **Status:** Implemented in `PlanStripeSyncService` and wired to a repeatable BullMQ job.
 
-- [ ] 2.4.1 (optional) BullMQ-based recurring sync job
+- [x] 2.4.1 (optional) BullMQ-based recurring sync job
   - Background BullMQ job to call `PlanStripeSyncService.syncFromStripe` on a schedule (e.g. hourly).
   - Config flag to enable/disable the recurring sync.
   - Logging/metrics around sync runs and failures.
@@ -147,25 +184,25 @@ These items come from `openspec/changes/add-subscription-checkout/specs/tenant-b
 
 - [x] 3.3 Webhook behaviors beyond `add-subscription-checkout`
   - Any additional events (e.g. `subscription.created` vs `subscription.changed`) required by `BILLING.md`.
-  - Confirmation email on successful subscription where applicable.
+  - Publish billing events; Integration Service sends confirmation emails/notifications where applicable.
 
 - [x] 3.4 Upgrade flow
   - `POST /billings/subscription/upgrade` and upgrade preview endpoint.
   - Stripe subscription upgrade with proration.
-  - Immediate tenant plan update, confirmation email, `subscription.upgraded` event.
+  - Immediate tenant plan update and `subscription.upgraded` event; Integration Service sends confirmation emails/notifications.
 
 - [x] 3.5 Downgrade flow
   - `POST /billings/subscription/downgrade` endpoint (REFER-279) plus cancel‑pending‑downgrade endpoint (REFER-281).
   - Usage vs plan‑limit validation (REFER-278).
   - Schedule Stripe subscription change for period end (REFER-280).
   - Store pending downgrade in database (REFER-281).
-  - Send downgrade scheduled email (REFER-282).
+  - Publish downgrade scheduled event; Integration Service sends downgrade notifications.
   - Publish `subscription.downgrade_scheduled` event (REFER-283).
 
 - [x] 3.6 Cancellation flow
   - `POST /billings/subscription/cancel` and reactivation endpoint.
   - Stripe cancel‑at‑period‑end and reactivation.
-  - Store cancellation reason, send emails, handle expiry via webhook.
+  - Store cancellation reason, publish events, handle expiry via webhook; Integration Service sends cancellation emails/notifications.
   - `subscription.cancelled` event.
   - After cancellation becomes effective, tenant loses access to new billing‑dependent actions and analytics; only historical subscription data remains visible.
   - Cancelled tenant data remains persisted but hidden in the application for a limited retention window (e.g. ~1 month) and becomes visible again only if the tenant upgrades/reactivates within that window.
@@ -174,6 +211,11 @@ These items come from `openspec/changes/add-subscription-checkout/specs/tenant-b
 - [x] 3.7 Early upgrade during trial
   - Allow upgrading before trial ends.
   - Pro‑rate charges, end trial immediately, update trial status.
+
+- [x] 3.8 Remove in-service email sending from billing flows
+  - Tenant Service publishes billing events only.
+  - Integration Service consumes events and sends emails/notifications.
+  - Remove direct SES email sends from `BillingListener` in this repo.
 
 ---
 
@@ -191,7 +233,7 @@ These items come from `openspec/changes/add-subscription-checkout/specs/tenant-b
 
 - [x] 4.3 Payment failure handling
   - Handle `invoice.payment_failed` webhook with grace‑period logic.
-  - Send failed payment notifications.
+  - Publish payment failure events; Integration Service sends failed payment notifications.
   - Payment‑required guard and restoration on `invoice.paid`.
 
 - [x] 4.4 Internal tenant billing status endpoint (architecture contract)
@@ -229,7 +271,7 @@ These items come from `openspec/changes/add-subscription-checkout/specs/tenant-b
 
 ## Phase 5 – Usage Tracking System (`BILLING.md` §153–218)
  
- - [ ] Docs: Example of applying `PaymentRequiredGuard` to protected routes.
+ - [x] Docs: Example of applying `PaymentRequiredGuard` to protected routes.
 
  - [x] 5.1 `UsageTracker` service
   - Track usage across metrics.
@@ -248,7 +290,7 @@ These items come from `openspec/changes/add-subscription-checkout/specs/tenant-b
   - Scheduled job to archive monthly usage and reset counters.
   - Archive final monthly usage into `TenantUsageEntity` and `BillingEventEntity`.
   - Reset Redis monthly counters and usage thresholds for the new billing period.
-  - Prepare data for usage summary emails.
+  - Publish usage summary events; Integration Service sends usage summary emails/notifications.
 
 - [x] 5.5 Limit exceeded exception
   - Custom HTTP 402 with metric, current usage, limit and upgrade suggestions.
@@ -267,7 +309,7 @@ These items come from `openspec/changes/add-subscription-checkout/specs/tenant-b
 
 - [x] 5.9 Daily usage calculation cron
   - Read Redis counters nightly and write snapshots to `TenantUsageEntity`.
-  - Check thresholds (80%, 100%) and emit notifications.
+  - Check thresholds (80%, 100%) and publish notification-worthy events; Integration Service sends notifications.
   - Archive or reset Redis keys as needed to keep counters bounded.
 
 ---
@@ -288,10 +330,11 @@ These items come from `openspec/changes/add-subscription-checkout/specs/tenant-b
   - Apply `BillingGuard` to all resource‑creation endpoints.
   - Configurable grace percentage (e.g. 10%).
 
-- [ ] 6.5 Leaderboard limiting
+- **(External)** 6.5 Leaderboard limiting
   - Limit leaderboard queries to top `leaderboard_entries`.
   - Add "Showing top X of Y (plan limit)" note.
-  - Note: currently only a demo endpoint exists under `TestBillingController`; actual leaderboard queries must be limited at the real leaderboard read path.
+  - Note: in this repo, only a demo endpoint exists under `TestBillingController`; there is no real leaderboard read/query path here, so the actual limiting must be implemented in the service that owns leaderboard reads.
+  > **Scope/Owner:** Out of scope for Tenant Service microservices update. Owner is the service that owns the real leaderboard read/query path; tenant-svc can only provide plan limits + billing state.
 
 - [x] 6.6 `PlanLimitService` utility
   - `getPlanLimits`, `canPerformAction`, `getRemainingCapacity`, `enforceLimit` helpers.
@@ -306,14 +349,14 @@ These items come from `openspec/changes/add-subscription-checkout/specs/tenant-b
   - Automatically set `trial_started_at` and `trial_ends_at` (default 14 days).
   - Initialize starter‑like plan limits during trial.
 
-- [ ] 7.2 Trial expiry check
+- [x] 7.2 Trial expiry check
   - Middleware/guard that blocks actions when trial expired and no subscription.
   - Return clear error and redirect/URL for upgrade.
 
-- [ ] 7.3 Trial reminder jobs
-  - Reminder emails 3 days and 1 day before expiry; trial expired notification.
+- [x] 7.3 Trial reminder jobs
+  - Tenant Service publishes events (or exposes internal signals) for trial reminder workflows; Integration Service sends reminder emails/notifications.
 
-- [ ] 7.4 Trial expiry downgrade
+- [x] 7.4 Trial expiry downgrade
   - Automatically downgrade to Free plan after trial.
   - Set reduced limits and update subscription status.
 
@@ -327,11 +370,13 @@ These items come from `openspec/changes/add-subscription-checkout/specs/tenant-b
 - [x] 8.1 Admin suspend endpoint
   - `POST /admin/tenants/:id/suspend` to set status `suspended`, set `suspended_at`, publish `tenant.suspended`.
 
-- [ ] 8.2 Campaign pausing on suspension
-  - Listen for `tenant.suspended` in campaign service; pause active campaigns and stop email sends.
+- **(External)** 8.2 Campaign pausing on suspension
+  - Campaign Service listens for `tenant.suspended` and pauses active campaigns / stops sends.
+  > **Scope/Owner:** Out of scope for Tenant Service microservices update. Owner is Campaign Service.
 
-- [ ] 8.3 Suspension notification
-  - Email notification to tenant admins with reason, duration and support contacts.
+- **(External)** 8.3 Suspension notification
+  - Integration Service sends suspension email/notifications (consuming `tenant.suspended`) with reason, duration and support contacts.
+  > **Scope/Owner:** Out of scope for Tenant Service microservices update. Owner is Integration Service.
 
 - [x] 8.4 Unsuspend endpoint
   - Admin endpoint to restore tenants to `active` and resume paused campaigns.
@@ -340,10 +385,10 @@ These items come from `openspec/changes/add-subscription-checkout/specs/tenant-b
   - `POST /tenants/:id/lock` to set status `locked` and require Ory password confirmation.
 
 - [x] 8.6 Unlock endpoint
-  - Admin endpoint with Ory verification to unlock tenants, update status to `active`, send notification.
+  - Admin endpoint with Ory verification to unlock tenants and update status to `active`; Integration Service sends notifications.
 
 - [x] 8.7 Auto‑unlock job
-  - Scheduled job to automatically unlock tenants after configurable duration and send notification.
+  - Scheduled job to automatically unlock tenants after configurable duration and publish events; Integration Service sends notifications.
 
 - [x] 8.8 Tenant status guard
   - Guard/middleware to block requests for `suspended`/`locked` tenants and expose status via headers.
@@ -352,25 +397,34 @@ These items come from `openspec/changes/add-subscription-checkout/specs/tenant-b
 
 ## Phase 9 – Analytics & Monitoring (`BILLING.md` §341–388)
 
-- [ ] 9.1 ClickHouse schema for billing analytics
+> Note: Per `docs/specs/microservices-architecture.md`, ClickHouse storage and analytics endpoints live in the **Analytics Service**.
+> In this repo, the tenant/billing module should focus on persisting billing state + usage snapshots and publishing events.
+
+- **(External)** 9.1 ClickHouse schema for billing analytics
   - Tables for `billing_events`, `tenant_usage_daily`, `subscription_changes` with indexes and retention.
+  > **Scope/Owner:** Out of scope for Tenant Service microservices update. Owner is Analytics Service.
 
-- [ ] 9.2 `ClickHouseService`
+- **(External)** 9.2 `ClickHouseService`
   - Connection pooling, batch inserts, common query helpers, error handling and health check.
+  > **Scope/Owner:** Out of scope for Tenant Service microservices update. Owner is Analytics Service.
 
-- [ ] 9.3 Integrate ClickHouse with event processors
+- **(External)** 9.3 Integrate ClickHouse with event processors
   - Log billing events, usage calculations, threshold crossings, subscription and payment events.
+  > **Scope/Owner:** Out of scope for Tenant Service microservices update. Owner is Analytics Service (ingestion pipeline).
 
-- [ ] 9.4 Billing analytics endpoints
+- **(External)** 9.4 Billing analytics endpoints
   - `GET /billing/analytics/usage-trends`, `/revenue`, `/conversion`, `/debug/events` (admin‑only).
+  > **Scope/Owner:** Out of scope for Tenant Service microservices update. Owner is Analytics Service.
 
-- [ ] 9.5 Monitoring and alerts
+- **(External)** 9.5 Monitoring and alerts
   - Metrics for billing usage and limits, failed webhooks, Redis usage, ClickHouse ingestion.
   - Alerting rules and Grafana dashboards.
+  > **Scope/Owner:** Cross-service. Tenant Service can expose metrics, but alerting/dashboards are owned by Platform/DevOps (and ClickHouse ingestion alerts by Analytics Service).
 
-- [ ] 9.6 Billing report generation
+- **(External)** 9.6 Billing report generation
   - Monthly tenant usage reports, revenue and trial conversion reports.
   - CSV/PDF export and scheduled email delivery.
+  > **Scope/Owner:** Cross-service. Analytics Service owns report generation; Integration Service owns scheduled delivery.
 
 ---
 

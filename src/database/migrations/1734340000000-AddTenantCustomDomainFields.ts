@@ -14,10 +14,14 @@ END$$;
         `);
 
         await queryRunner.query(`ALTER TABLE "tenants" ADD COLUMN IF NOT EXISTS "custom_domain" character varying`);
-        await queryRunner.query(`ALTER TABLE "tenants" ADD COLUMN IF NOT EXISTS "domain_verification_status" "tenants_domain_verification_status_enum" NOT NULL DEFAULT 'unverified'`);
+        await queryRunner.query(
+            `ALTER TABLE "tenants" ADD COLUMN IF NOT EXISTS "domain_verification_status" "tenants_domain_verification_status_enum" NOT NULL DEFAULT 'unverified'`
+        );
         await queryRunner.query(`ALTER TABLE "tenants" ADD COLUMN IF NOT EXISTS "domain_verification_token" character varying`);
 
-        await queryRunner.query(`CREATE UNIQUE INDEX IF NOT EXISTS "IDX_tenants_custom_domain_unique" ON "tenants" ("custom_domain") WHERE "custom_domain" IS NOT NULL`);
+        await queryRunner.query(
+            `CREATE UNIQUE INDEX IF NOT EXISTS "IDX_tenants_custom_domain_unique" ON "tenants" ("custom_domain") WHERE "custom_domain" IS NOT NULL`
+        );
     }
 
     public async down(queryRunner: QueryRunner): Promise<void> {

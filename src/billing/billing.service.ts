@@ -30,8 +30,7 @@ import {
     SubscriptionCreatedEvent,
     SubscriptionDowngradeScheduledEvent,
     SubscriptionUpgradedEvent,
-    SubscriptionCancelledEvent,
-    PaymentFailedEvent
+    SubscriptionCancelledEvent
 } from '@mod/common/interfaces/billing-events.interface';
 
 @Injectable()
@@ -143,20 +142,12 @@ export class BillingService {
         const invoiceId = invoice.id;
 
         const rawInvoice = invoice as any;
-        const paymentIntentId =
-            typeof rawInvoice.payment_intent === 'string'
-                ? rawInvoice.payment_intent
-                : rawInvoice.payment_intent?.id;
+        const paymentIntentId = typeof rawInvoice.payment_intent === 'string' ? rawInvoice.payment_intent : rawInvoice.payment_intent?.id;
 
-        const subscriptionId =
-            typeof rawInvoice.subscription === 'string'
-                ? rawInvoice.subscription
-                : rawInvoice.subscription?.id;
+        const subscriptionId = typeof rawInvoice.subscription === 'string' ? rawInvoice.subscription : rawInvoice.subscription?.id;
 
         if (!subscriptionId) {
-            this.logger.warn(
-                `invoice.payment_succeeded missing subscription reference: eventId=${event.id}, invoiceId=${invoiceId}`
-            );
+            this.logger.warn(`invoice.payment_succeeded missing subscription reference: eventId=${event.id}, invoiceId=${invoiceId}`);
             return;
         }
 
@@ -197,7 +188,13 @@ export class BillingService {
                         previousStatus,
                         nextStatus: PaymentStatusEnum.ACTIVE,
                         changedAt: tenant.paymentStatusChangedAt.toISOString(),
-                        source: 'stripe'
+                        source: 'stripe',
+                        stripeEventId: event.id,
+                        stripeCustomerId: billing.stripeCustomerId ?? undefined,
+                        stripeSubscriptionId: billing.stripeSubscriptionId ?? undefined,
+                        stripeInvoiceId: invoiceId,
+                        stripePaymentIntentId: paymentIntentId ?? undefined,
+                        nextPaymentAttemptAt: null
                     });
                 }
             }
@@ -228,7 +225,8 @@ export class BillingService {
                     billingPlan: billing.plan,
                     subscriptionStatus: billing.status,
                     stripeCustomerId: billing.stripeCustomerId,
-                    stripeSubscriptionId: billing.stripeSubscriptionId
+                    stripeSubscriptionId: billing.stripeSubscriptionId,
+                    stripeEventId: event.id
                 });
 
                 await this.auditService.log({
@@ -341,8 +339,7 @@ export class BillingService {
                 stripeSubscriptionStatus = subscription.status;
 
                 const rawSubscription = subscription as any;
-                const currentPeriodEndRaw = (rawSubscription.current_period_end ??
-                    rawSubscription.items?.data?.[0]?.current_period_end) as unknown;
+                const currentPeriodEndRaw = (rawSubscription.current_period_end ?? rawSubscription.items?.data?.[0]?.current_period_end) as unknown;
                 let currentPeriodEndMs: number | null = null;
 
                 if (typeof currentPeriodEndRaw === 'number' && Number.isFinite(currentPeriodEndRaw)) {
@@ -911,7 +908,8 @@ export class BillingService {
                 subscriptionStatus: billing.status,
                 stripeCustomerId: billing.stripeCustomerId ?? undefined,
                 stripeSubscriptionId: billing.stripeSubscriptionId ?? undefined,
-                checkoutUserId: userId ?? null
+                checkoutUserId: userId ?? null,
+                stripeEventId: event.id
             };
 
             this.eventEmitter.emit('subscription.created', createdEvent);
@@ -922,7 +920,8 @@ export class BillingService {
             billingPlan: billing.plan,
             subscriptionStatus: billing.status,
             stripeCustomerId: billing.stripeCustomerId,
-            stripeSubscriptionId: billing.stripeSubscriptionId
+            stripeSubscriptionId: billing.stripeSubscriptionId,
+            stripeEventId: event.id
         });
 
         await this.auditService.log({
@@ -950,23 +949,14 @@ export class BillingService {
         const invoiceId = invoice.id;
 
         const rawInvoice = invoice as any;
-        const paymentIntentId =
-            typeof rawInvoice.payment_intent === 'string'
-                ? rawInvoice.payment_intent
-                : rawInvoice.payment_intent?.id;
+        const paymentIntentId = typeof rawInvoice.payment_intent === 'string' ? rawInvoice.payment_intent : rawInvoice.payment_intent?.id;
 
-        const subscriptionId =
-            typeof rawInvoice.subscription === 'string'
-                ? rawInvoice.subscription
-                : rawInvoice.subscription?.id;
+        const subscriptionId = typeof rawInvoice.subscription === 'string' ? rawInvoice.subscription : rawInvoice.subscription?.id;
 
-        const customerId =
-            typeof invoice.customer === 'string' ? invoice.customer : invoice.customer?.id;
+        const customerId = typeof invoice.customer === 'string' ? invoice.customer : invoice.customer?.id;
 
         if (!subscriptionId && !customerId) {
-            this.logger.warn(
-                `invoice.payment_failed missing subscription/customer reference: eventId=${event.id}, invoiceId=${invoiceId}`
-            );
+            this.logger.warn(`invoice.payment_failed missing subscription/customer reference: eventId=${event.id}, invoiceId=${invoiceId}`);
             return;
         }
 
@@ -993,9 +983,7 @@ export class BillingService {
             return;
         }
 
-        const nextAttempt = invoice.next_payment_attempt
-            ? new Date(invoice.next_payment_attempt * 1000)
-            : null;
+        const nextAttempt = invoice.next_payment_attempt ? new Date(invoice.next_payment_attempt * 1000) : null;
 
         try {
             const tenant = await this.billingRepository.manager.findOne(TenantEntity, {
@@ -1025,7 +1013,13 @@ export class BillingService {
                         previousStatus,
                         nextStatus: PaymentStatusEnum.PAST_DUE,
                         changedAt: changedAt.toISOString(),
-                        source: 'stripe'
+                        source: 'stripe',
+                        stripeEventId: event.id,
+                        stripeCustomerId: billing.stripeCustomerId ?? undefined,
+                        stripeSubscriptionId: billing.stripeSubscriptionId ?? undefined,
+                        stripeInvoiceId: invoiceId,
+                        stripePaymentIntentId: paymentIntentId ?? undefined,
+                        nextPaymentAttemptAt: nextAttempt?.toISOString() ?? null
                     });
                 }
             }
@@ -1041,15 +1035,6 @@ export class BillingService {
                 customerId ?? 'unknown'
             }, paymentIntentId=${paymentIntentId ?? 'unknown'}`
         );
-
-        const paymentFailedEvent: PaymentFailedEvent = {
-            tenantId: billing.tenantId,
-            stripeCustomerId: billing.stripeCustomerId ?? undefined,
-            stripeSubscriptionId: billing.stripeSubscriptionId ?? undefined,
-            stripeInvoiceId: invoiceId
-        };
-
-        this.eventEmitter.emit('billing.payment_failed', paymentFailedEvent);
     }
 
     private async endTenantTrialIfActive(tenantId: string): Promise<void> {

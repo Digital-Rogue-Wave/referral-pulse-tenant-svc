@@ -15,6 +15,7 @@ export class TenantSettingListener {
         // Task 91: Integrate with Integration Service
         const snsEventDto = await Utils.validateDtoOrFail(PublishSnsEventDto, {
             eventId: id,
+            tenantId,
             eventType: 'notification-preference.updated',
             data: {
                 userId,
