@@ -47,9 +47,7 @@ export class ReferralEventProcessor {
 
         if (typeof metric !== 'string' || !Number.isFinite(delta)) {
             this.logger.warn(
-                `Invalid referral usage payload for tenant ${tenantId} - eventType: ${eventType}, metric: ${String(
-                    metric
-                )}, delta: ${String(delta)}`
+                `Invalid referral usage payload for tenant ${tenantId} - eventType: ${eventType}, metric: ${String(metric)}, delta: ${String(delta)}`
             );
             return;
         }

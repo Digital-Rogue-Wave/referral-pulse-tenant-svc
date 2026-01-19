@@ -25,8 +25,7 @@ export class PlanStripeSyncService {
 
         for (const key of limitKeys) {
             const rawValue =
-                (price.metadata && price.metadata[key as string]) ??
-                (product && product.metadata ? product.metadata[key as string] : undefined);
+                (price.metadata && price.metadata[key as string]) ?? (product && product.metadata ? product.metadata[key as string] : undefined);
 
             if (rawValue == null) {
                 continue;
@@ -34,11 +33,7 @@ export class PlanStripeSyncService {
 
             const num = Number(rawValue);
             if (!Number.isFinite(num) || num < 0) {
-                this.logger.warn(
-                    `Ignoring invalid limit value for key "${String(
-                        key
-                    )}" on Stripe price ${price.id}: rawValue=${rawValue}`
-                );
+                this.logger.warn(`Ignoring invalid limit value for key "${String(key)}" on Stripe price ${price.id}: rawValue=${rawValue}`);
                 continue;
             }
 
@@ -63,8 +58,7 @@ export class PlanStripeSyncService {
             metadata.productMetadata = { ...product.metadata };
         }
 
-        return Object.keys(metadata.priceMetadata || {}).length > 0 ||
-            (metadata.productMetadata && Object.keys(metadata.productMetadata).length > 0)
+        return Object.keys(metadata.priceMetadata || {}).length > 0 || (metadata.productMetadata && Object.keys(metadata.productMetadata).length > 0)
             ? metadata
             : null;
     }
@@ -90,11 +84,7 @@ export class PlanStripeSyncService {
         try {
             prices = await this.stripeService.listActiveRecurringPricesWithProducts();
         } catch (error) {
-            this.logger.warn(
-                `Skipping Stripe Products/Prices sync because Stripe configuration or API is unavailable: ${
-                    (error as Error).message
-                }`
-            );
+            this.logger.warn(`Skipping Stripe Products/Prices sync because Stripe configuration or API is unavailable: ${(error as Error).message}`);
             return;
         }
 
@@ -123,9 +113,8 @@ export class PlanStripeSyncService {
                 const interval = price.recurring?.interval ?? null;
 
                 const name =
-                    (product && typeof product.name === 'string' && product.name.trim().length > 0
-                        ? product.name.trim()
-                        : undefined) ?? `Stripe price ${price.id}`;
+                    (product && typeof product.name === 'string' && product.name.trim().length > 0 ? product.name.trim() : undefined) ??
+                    `Stripe price ${price.id}`;
 
                 let plan = await this.planRepository.findOne({ where: { stripePriceId: price.id } });
 
@@ -154,10 +143,7 @@ export class PlanStripeSyncService {
 
                 seenStripePriceIds.add(price.id);
             } catch (error) {
-                this.logger.error(
-                    `Failed to sync Stripe price ${price.id}: ${(error as Error).message}`,
-                    (error as Error).stack
-                );
+                this.logger.error(`Failed to sync Stripe price ${price.id}: ${(error as Error).message}`, (error as Error).stack);
             }
         }
 

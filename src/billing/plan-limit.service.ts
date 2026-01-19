@@ -1,14 +1,15 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { HttpException, HttpStatus, Injectable, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, IsNull } from 'typeorm';
 import { PlanEntity } from './plan.entity';
 import { BillingEntity } from './billing.entity';
 import { RedisUsageService } from './redis-usage.service';
 import type { PlanLimits } from './plan-limits.type';
-import { BillingPlanEnum } from '@mod/common/enums/billing.enum';
+import { BillingPlanEnum, SubscriptionStatusEnum } from '@mod/common/enums/billing.enum';
 import { ConfigService } from '@nestjs/config';
 import type { AllConfigType } from '@mod/config/config.type';
 import { LimitExceededException } from './exceptions/limit-exceeded.exception';
+import { TenantEntity } from '@mod/tenant/tenant.entity';
 
 export interface PlanLimitCheckResult {
     metric: string;
@@ -33,9 +34,59 @@ export class PlanLimitService {
         private readonly planRepository: Repository<PlanEntity>,
         @InjectRepository(BillingEntity)
         private readonly billingRepository: Repository<BillingEntity>,
+        @InjectRepository(TenantEntity)
+        private readonly tenantRepository: Repository<TenantEntity>,
         private readonly redisUsageService: RedisUsageService,
         private readonly configService: ConfigService<AllConfigType>
     ) {}
+
+    private buildUpgradeUrl(): string | null {
+        const frontend = this.configService.get('appConfig.frontendDomain', { infer: true });
+        if (!frontend || typeof frontend !== 'string') {
+            return null;
+        }
+        return `${frontend.replace(/\/$/, '')}/billing`;
+    }
+
+    private async enforceTrialExpiryOrThrow(tenantId: string): Promise<void> {
+        const tenant = await this.tenantRepository.findOne({ where: { id: tenantId } });
+
+        if (!tenant?.trialEndsAt) {
+            return;
+        }
+
+        const now = new Date();
+        if (tenant.trialEndsAt > now) {
+            return;
+        }
+
+        const manualPlan = await this.planRepository.findOne({
+            where: {
+                tenantId,
+                isActive: true,
+                manualInvoicing: true
+            }
+        });
+
+        if (manualPlan) {
+            return;
+        }
+
+        const billing = await this.billingRepository.findOne({ where: { tenantId } });
+        if (billing?.status === SubscriptionStatusEnum.ACTIVE) {
+            return;
+        }
+
+        throw new HttpException(
+            {
+                message: 'Trial has expired. Please upgrade your subscription to continue.',
+                code: 'TRIAL_EXPIRED',
+                trialEndsAt: tenant.trialEndsAt.toISOString(),
+                upgradeUrl: this.buildUpgradeUrl()
+            },
+            HttpStatus.PAYMENT_REQUIRED
+        );
+    }
 
     private getStripePriceIdForPlan(plan: BillingPlanEnum): string | null {
         const cfg = this.configService.get('stripeConfig', { infer: true });
@@ -73,15 +124,11 @@ export class PlanLimitService {
         const billing = await this.billingRepository.findOne({ where: { tenantId } });
 
         if (!billing) {
-            this.logger.debug(
-                `No BillingEntity found for tenant ${tenantId} when resolving plan limits; defaulting to FREE plan`
-            );
+            this.logger.debug(`No BillingEntity found for tenant ${tenantId} when resolving plan limits; defaulting to FREE plan`);
 
             const freeStripePriceId = this.getStripePriceIdForPlan(BillingPlanEnum.FREE);
             if (!freeStripePriceId) {
-                this.logger.debug(
-                    `No Stripe price mapping found for plan ${BillingPlanEnum.FREE} when resolving plan limits for tenant ${tenantId}`
-                );
+                this.logger.debug(`No Stripe price mapping found for plan ${BillingPlanEnum.FREE} when resolving plan limits for tenant ${tenantId}`);
                 return null;
             }
 
@@ -104,9 +151,7 @@ export class PlanLimitService {
 
         const stripePriceId = this.getStripePriceIdForPlan(billing.plan);
         if (!stripePriceId) {
-            this.logger.debug(
-                `No Stripe price mapping found for plan ${billing.plan} when resolving plan limits for tenant ${tenantId}`
-            );
+            this.logger.debug(`No Stripe price mapping found for plan ${billing.plan} when resolving plan limits for tenant ${tenantId}`);
             return null;
         }
 
@@ -119,9 +164,7 @@ export class PlanLimitService {
         });
 
         if (!plan) {
-            this.logger.debug(
-                `No PlanEntity found for stripePriceId=${stripePriceId} when resolving plan limits for tenant ${tenantId}`
-            );
+            this.logger.debug(`No PlanEntity found for stripePriceId=${stripePriceId} when resolving plan limits for tenant ${tenantId}`);
         }
 
         return plan ?? null;
@@ -185,6 +228,8 @@ export class PlanLimitService {
             return;
         }
 
+        await this.enforceTrialExpiryOrThrow(tenantId);
+
         const limits = await this.getPlanLimits(tenantId);
         const rawLimit = limits ? (limits as Record<string, number | undefined>)[metric] : undefined;
 
@@ -206,8 +251,7 @@ export class PlanLimitService {
         const remaining = Math.max(0, effectiveLimit - currentUsage);
 
         if (nextValue > effectiveLimit) {
-            const upgradeSuggestions =
-                options?.upgradeSuggestions ?? [`Upgrade your subscription plan to increase the allowed ${metric} limit.`];
+            const upgradeSuggestions = options?.upgradeSuggestions ?? [`Upgrade your subscription plan to increase the allowed ${metric} limit.`];
 
             const upgradeUrl = options?.upgradeUrl ?? null;
 

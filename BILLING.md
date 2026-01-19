@@ -1,5 +1,38 @@
 # Billing Module Implementation - Complete Task List
 
+Architecture source of truth: `docs/specs/microservices-architecture.md`
+- Tenant Service owns billing state (plans/subscriptions/payment_status) and publishes events.
+- Integration Service owns emails/notifications and reacts to events.
+
+## Phase 0: Architecture Alignment Refactors (must match `docs/specs/microservices-architecture.md`)
+
+- [x] 0.1 Remove direct email sending from billing domain
+    - Tenant Service publishes events only; Integration Service sends emails/notifications.
+
+- [x] 0.2 Align Stripe webhook endpoint path with architecture
+    - Architecture specifies `POST /webhooks/stripe`.
+    - Current implementation supports `POST /webhooks/stripe` (see `src/webhook/webhooks.controller.ts`) while keeping `POST /api/v1/webhook/stripe` (see `src/webhook/webhook.controller.ts`) for backward compatibility.
+
+- [x] 0.3 Align event names with architecture
+    - Architecture lists `payment.failed`, `payment.restored`, plus `tenant.restricted`, `tenant.locked`, `tenant.restored`.
+    - Publish boss-contract events derived from internal `tenant.payment_status.changed` transitions.
+    - Add/rename emitted events so cross-service consumers can rely on the architecture event contracts.
+
+- [x] 0.4 Align SNS topic and event schema with architecture
+    - Architecture describes a single SNS topic `referral-platform-events` and an event envelope with top-level `tenantId`.
+    - Billing publishers use `referral-platform-events`, include top-level `tenantId`, and generate a unique `eventId` per event.
+    - Update publishing to match the architecture envelope (unique `eventId`, top-level `tenantId`, consistent topic name).
+
+- [x] 0.5 Ensure usage threshold + monthly summary become publishable events
+    - `DailyUsageCalculator` and `MonthlyUsageResetService` persist `BillingEventEntity` rows but do not emit publishable events.
+    - Add event emission (and SNS publishing) for:
+        - `usage.threshold_crossed`
+        - `usage.monthly_summary`
+    - Integration Service can then send notifications.
+
+- [x] 0.6 Ensure billing endpoints are protected per architecture
+    - Auth is enforced globally via `APP_GUARD` (`JwtAuthGuard` then `KetoGuard`).
+
 ## Phase 1: Database & Core Entities
 
 - [x] 1.1 Create Plan entity with TypeORM (REFER-312)
@@ -57,7 +90,7 @@
     - Implement query filtering in repository
     - Add tenant context to plan queries
 
-- [ ] 2.4 Sync plans with Stripe Products/Prices (REFER-315)
+- [x] 2.4 Sync plans with Stripe Products/Prices (REFER-315)
     - Implement Stripe products/prices sync logic in `PlanStripeSyncService`
     - Expose a safe way to trigger sync (e.g. admin/manual endpoint)
     - (Optional) Create a scheduled job to sync Stripe products to local database
@@ -96,14 +129,14 @@
     - Verify webhook signature
     - Extract metadata and update tenant billing_plan (REFER-267)
     - Publish `subscription.created` event (REFER-269)
-    - Send confirmation email
+    - Integration Service sends confirmation email/notifications (consuming billing events)
 
 - [x] 3.4 Implement upgrade flow
     - Create `POST /billings/subscription/upgrade` endpoint (REFER-272)
     - Implement upgrade preview endpoint with proration (REFER-271)
     - Integrate Stripe subscription update with proration (REFER-273)
     - Update tenant plan immediately (REFER-274)
-    - Send upgrade confirmation email (REFER-275)
+    - Integration Service sends upgrade confirmation email/notifications (consuming billing events)
     - Publish `subscription.upgraded` event (REFER-276)
 
 - [x] 3.5 Implement downgrade flow
@@ -111,7 +144,7 @@
     - Implement usage vs plan limit validation (REFER-278)
     - Schedule Stripe subscription change for period end (REFER-280)
     - Store pending downgrade in database (REFER-281)
-    - Send downgrade scheduled email (REFER-282)
+    - Integration Service sends downgrade scheduled email/notifications (consuming billing events)
     - Publish `subscription.downgrade_scheduled` event (REFER-283)
     - Implement cancel pending downgrade endpoint (REFER-281)
 
@@ -119,7 +152,7 @@
     - Create `POST /billings/subscription/cancel` endpoint (REFER-286)
     - Integrate Stripe cancel at period end (REFER-287)
     - Store cancellation reason (REFER-288)
-    - Send cancellation confirmation email (REFER-289)
+    - Integration Service sends cancellation confirmation email/notifications (consuming billing events)
     - Implement reactivation endpoint (REFER-290)
     - Handle subscription expiry via Stripe webhook (REFER-291)
     - Publish `subscription.cancelled` event (REFER-292)
@@ -147,7 +180,7 @@
 
 - [x] 4.3 Payment failure handling
     - Handle `invoice.payment_failed` webhook (REFER-305)
-    - Send failed payment notification (REFER-306)
+    - Integration Service sends failed payment email/notifications (consuming `payment.failed` / `tenant.payment_status.changed`)
     - Implement grace period logic (REFER-308)
     - Create payment required guard (REFER-309)
     - Handle `invoice.paid` webhook for restoration (REFER-310)
@@ -217,7 +250,7 @@
     - Scheduled job to reset usage counters at billing cycle start
     - Archive current month's usage to historical table
     - Reset counters for new billing period
-    - Send usage summary emails
+    - Integration Service sends usage summary notifications/emails (consuming usage summary events)
 
 - [x] 5.5 Create limit exceeded exception (REFER-322)
     - Custom exception for plan limit violations
@@ -255,7 +288,7 @@
         - Read Redis counters for all metrics
         - Save snapshot to `TenantUsageEntity`
         - Check thresholds (80%, 100%)
-        - Emit notifications if thresholds crossed
+        - Publish threshold-crossed events; Integration Service sends notifications
     - Archive or reset Redis keys as needed
 
 ## Phase 6: Limit Enforcement
@@ -286,12 +319,13 @@
     - Provide upgrade path in response
     - Allow configurable grace percentage (e.g., 10%)
 
-- [ ] 6.5 Add leaderboard limiting logic
+- **(External)** 6.5 Add leaderboard limiting logic
     - Modify leaderboard queries to accept limit parameter
     - Only return top N users where N = `leaderboard_entries` limit
     - Add note in response: "Showing top X of Y (plan limit)"
     - Create `LeaderboardService.withLimits()` wrapper
     - Note: current repo contains only a demo endpoint under `TestBillingController`; actual leaderboard queries must be limited at the real leaderboard read path.
+    > **Scope/Owner:** Out of scope for Tenant Service microservices update. Implement in the service that owns the real leaderboard read/query path; tenant-svc can only provide plan limits + billing status.
 
 - [x] 6.6 Create PlanLimitService utility
     - `getPlanLimits(tenantId)`: Returns current plan limits
@@ -307,22 +341,22 @@
     - Set `trial_started_at` to creation timestamp
     - Initialize with starter plan limits during trial
 
-- [ ] 7.2 Create trial expiry check middleware (REFER-337)
+- [x] 7.2 Create trial expiry check middleware (REFER-337)
     - Check trial status on each request
     - Block actions if trial expired and no subscription
     - Return appropriate error messages
     - Redirect to upgrade page
 
-- [ ] 7.3 Schedule trial reminder emails (Bull job) (REFER-338)
+- [x] 7.3 Schedule trial reminder emails (Bull job) (REFER-338)
     - Send reminder 3 days before trial ends
     - Send final reminder 1 day before trial ends
     - Send trial expired notification
-    - Include upgrade links in emails
+    - Integration Service owns reminder emails/notifications; Tenant Service should emit the relevant events for workflows
 
-- [ ] 7.4 Handle trial expiry (downgrade to free) (REFER-339)
+- [x] 7.4 Handle trial expiry (downgrade to free) (REFER-339)
     - Automatically downgrade to free plan after trial
     - Set reduced limits for free tier
-    - Send downgrade notification email
+    - Integration Service sends downgrade notification email/notifications (consuming events)
     - Update subscription status
 
 - [x] 7.5 Implement early upgrade during trial (REFER-340)
@@ -339,17 +373,19 @@
     - Set `suspended_at` timestamp
     - Publish `tenant.suspended` event (REFER-345)
 
-- [ ] 8.2 Handle campaign pausing in Campaign Service (REFER-346)
+- **(External)** 8.2 Handle campaign pausing in Campaign Service (REFER-346)
     - Listen for `tenant.suspended` event
     - Pause all active campaigns for suspended tenant
     - Stop email sends and referral tracking
     - Update campaign statuses
+    > **Scope/Owner:** Out of scope for Tenant Service microservices update. Owner is Campaign Service (consumer of `tenant.suspended` / billing status events).
 
-- [ ] 8.3 Send suspension notification (REFER-347)
-    - Email notification to tenant admin
+- **(External)** 8.3 Send suspension notification (REFER-347)
+    - Integration Service sends suspension email/notifications (consuming `tenant.suspended`)
     - Include suspension reason and duration
     - Provide contact information for support
     - Include restoration instructions
+    > **Scope/Owner:** Out of scope for Tenant Service microservices update. Owner is Integration Service (emails/notifications triggered by events).
 
 - [x] 8.4 Implement unsuspend endpoint (REFER-348)
     - Admin-only endpoint for restoring tenants
@@ -383,34 +419,38 @@
 
 ## Phase 9: Analytics & Monitoring
 
-- [ ] 9.1 Design ClickHouse schema for billing analytics
+- **(External)** 9.1 Design ClickHouse schema for billing analytics
     - Create `billing_events` table for raw events
     - Create `tenant_usage_daily` for aggregated usage
     - Create `subscription_changes` for audit trail
     - Set up appropriate indexes for query performance
     - Configure data retention policies (e.g., 1 year)
+    > **Scope/Owner:** Out of scope for Tenant Service microservices update. Owner is Analytics Service / analytics data store.
 
-- [ ] 9.2 Create ClickHouseService
+- **(External)** 9.2 Create ClickHouseService
     - Connection management with connection pooling
     - Batch insert operations for performance
     - Query methods for common analytics queries
     - Error handling and retry logic
     - Health check endpoint
+    > **Scope/Owner:** Out of scope for Tenant Service microservices update. Owner is Analytics Service.
 
-- [ ] 9.3 Integrate ClickHouse with event processors
+- **(External)** 9.3 Integrate ClickHouse with event processors
     - Log all billing events to ClickHouse
     - Log usage calculations and threshold crossings
     - Log subscription changes and payment events
     - Implement async batching for high-volume writes
+    > **Scope/Owner:** Out of scope for Tenant Service microservices update. Owner is Analytics Service (event ingestion pipeline).
 
-- [ ] 9.4 Create billing analytics endpoints
+- **(External)** 9.4 Create billing analytics endpoints
     - `GET /billing/analytics/usage-trends` - Usage trends over time
     - `GET /billing/analytics/revenue` - MRR and revenue analytics
     - `GET /billing/analytics/conversion` - Trial to paid conversion rates
     - `GET /billing/debug/events` - Raw events for debugging
     - Admin-only access for sensitive analytics
+    > **Scope/Owner:** Out of scope for Tenant Service microservices update. Owner is Analytics Service; tenant-svc should publish events + persist billing state only.
 
-- [ ] 9.5 Implement monitoring and alerts
+- **(External)** 9.5 Implement monitoring and alerts
     - Add metrics collection:
         - Counters: `billing_usage_total`, `billing_limit_exceeded_total`
         - Gauges: `billing_usage_percentage`, `active_trials_count`
@@ -421,13 +461,15 @@
         - Redis memory usage for counters
         - ClickHouse ingestion errors
     - Create Grafana dashboards for billing metrics
+    > **Scope/Owner:** Cross-service observability work. Tenant Service can expose metrics, but alerting/dashboards are owned by Platform/DevOps (and ClickHouse ingestion alerts by Analytics Service).
 
-- [ ] 9.6 Create billing report generation
+- **(External)** 9.6 Create billing report generation
     - Monthly usage reports for tenants
     - Revenue reports for admin
     - Trial conversion reports
     - Export to CSV/PDF formats
     - Scheduled email delivery of reports
+    > **Scope/Owner:** Cross-service feature. Analytics Service owns report generation; Integration Service owns scheduled delivery (emails/notifications).
 
 ## Phase 10: Testing
 
@@ -515,81 +557,92 @@
     - Auto-unlock scheduling
     - Status validation
 
-- [ ] 10.15 Write load tests for Redis counters
+- **(External)** 10.15 Write load tests for Redis counters
     - High-volume increment operations
     - Concurrent limit checks
     - Memory usage under load
     - Performance benchmarking
+    > **Scope/Owner:** Not required for Tenant Service microservices contract alignment. Typically owned by QA/Performance or a dedicated load-test harness repo; can be added later.
 
-- [ ] 10.16 Write integration tests for ClickHouse
+- **(External)** 10.16 Write integration tests for ClickHouse
     - Data ingestion performance
     - Query response times
     - Batch processing
     - Error recovery
+    > **Scope/Owner:** Out of scope for Tenant Service microservices update. Owner is Analytics Service test suite.
 
-- [ ] 10.17 Write E2E tests for billing scenarios
+- **(External)** 10.17 Write E2E tests for billing scenarios
     - Complete user journey: signup → trial → upgrade → usage → cancellation
     - Admin billing management flows
     - Error scenarios and recovery
     - Mobile/responsive testing
+    > **Scope/Owner:** Cross-service E2E. Typically owned by a dedicated E2E test harness spanning multiple services; not implemented solely inside tenant-svc.
 
 ## Phase 11: Deployment & Documentation
 
-- [ ] 11.1 Infrastructure setup
+- **(External)** 11.1 Infrastructure setup
     - Redis cluster configuration for production
     - ClickHouse cluster setup and tuning
     - SQS queues and SNS topics creation
     - Stripe webhook endpoint configuration
     - Load balancer setup for webhook endpoints
+    > **Scope/Owner:** Out of scope for Tenant Service code changes. Owner is Platform/DevOps/Infra.
 
-- [ ] 11.2 Environment configuration
+- **(External)** 11.2 Environment configuration
     - Stripe API keys (test/production separation)
     - Plan limit overrides per environment
     - Redis connection strings and pooling config
     - ClickHouse credentials and connection pooling
     - Feature flags for gradual rollout
+    > **Scope/Owner:** Out of scope for Tenant Service code changes. Owner is Platform/DevOps (config + secrets management).
 
-- [ ] 11.3 Database migrations for production
+- **(External)** 11.3 Database migrations for production
     - Production migration scripts with rollback procedures
     - Data backfill for existing tenants
     - Index optimization for query performance
     - Partitioning strategy for large tables
     - Backup and recovery procedures
+    > **Scope/Owner:** Cross-cutting release work. Migrations live here, but production rollout/rollback/backfill is owned by Platform/DevOps with DB ownership.
 
-- [ ] 11.4 API documentation
+- **(External)** 11.4 API documentation
     - Update OpenAPI/Swagger specifications
     - Document all billing endpoints
     - Include request/response examples
     - Add authentication requirements
     - Document error codes and responses
+    > **Scope/Owner:** Cross-service docs work. Owner is API/docs owner; tenant-svc can expose Swagger, but canonical docs often live in a shared docs repo.
 
-- [ ] 11.5 User documentation
+- **(External)** 11.5 User documentation
     - Plan comparison table with features and limits
     - Step-by-step guide for subscription management
     - Usage tracking explanation
     - Trial period FAQ
     - Troubleshooting common issues
+    > **Scope/Owner:** Out of scope for Tenant Service microservices update. Owner is Product/Docs (end-user facing documentation).
 
-- [ ] 11.6 Admin documentation
+- **(External)** 11.6 Admin documentation
     - Tenant management procedures
     - Billing exception handling
     - Report generation instructions
     - Monitoring and alert setup
     - Disaster recovery procedures
+    > **Scope/Owner:** Out of scope for Tenant Service microservices update. Owner is Ops/Docs/Platform.
 
-- [ ] 11.7 SDK documentation
+- **(External)** 11.7 SDK documentation
     - TypeScript SDK billing methods
     - Webhook setup instructions
     - Integration examples
     - Error handling best practices
     - Testing strategies
+    > **Scope/Owner:** Out of scope for Tenant Service microservices update. Owner is SDK repo/SDK maintainers; tenant-svc provides APIs/events.
 
-- [ ] 11.8 Deployment checklist
+- **(External)** 11.8 Deployment checklist
     - Database migrations applied
     - Environment variables configured
-    - Stripe webhook endpoints verified
+    - Stripe webhook endpoint verified
     - SQS queues created and subscribed
     - Redis and ClickHouse clusters healthy
     - Monitoring dashboards setup
     - Alerting configured and tested
     - Rollback procedures documented
+    > **Scope/Owner:** Out of scope for Tenant Service code changes. Owner is Platform/DevOps release process.

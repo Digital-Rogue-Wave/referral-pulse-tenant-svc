@@ -390,7 +390,7 @@ Triggered when a tenant subscribes to a plan or changes their existing subscript
 **Endpoints**:
 
 - `POST /billings/subscription/checkout` (Create Session; tenant resolved from `tenant-id` header)
-- `POST /webhook/stripe` (Handle Events)
+- `POST /webhooks/stripe` (Handle Events)
 
 **Implementation Steps**:
 

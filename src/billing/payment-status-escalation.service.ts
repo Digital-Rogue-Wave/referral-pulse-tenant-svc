@@ -5,6 +5,7 @@ import { In, Repository } from 'typeorm';
 import { TenantEntity } from '@mod/tenant/tenant.entity';
 import { PaymentStatusEnum } from '@mod/common/enums/billing.enum';
 import { TenantStatusEnum } from '@mod/common/enums/tenant.enum';
+import { TenantPaymentStatusChangedEvent } from '@mod/common/interfaces/billing-events.interface';
 
 @Injectable()
 export class PaymentStatusEscalationService {
@@ -66,16 +67,16 @@ export class PaymentStatusEscalationService {
         tenant.paymentStatusChangedAt = now;
         await this.tenantRepository.save(tenant);
 
-        this.logger.warn(
-            `Escalated tenant paymentStatus: tenantId=${tenant.id}, from=${previousStatus}, to=${nextStatus}`
-        );
+        this.logger.warn(`Escalated tenant paymentStatus: tenantId=${tenant.id}, from=${previousStatus}, to=${nextStatus}`);
 
-        this.eventEmitter.emit('tenant.payment_status.changed', {
+        const evt: TenantPaymentStatusChangedEvent = {
             tenantId: tenant.id,
             previousStatus,
             nextStatus,
             changedAt: now.toISOString(),
             source: 'escalation'
-        });
+        };
+
+        this.eventEmitter.emit('tenant.payment_status.changed', evt);
     }
 }

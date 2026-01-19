@@ -19,8 +19,7 @@ export class BillingGuard implements CanActivate {
     async canActivate(context: ExecutionContext): Promise<boolean> {
         const request = context.switchToHttp().getRequest<Request>();
 
-        const tenantId =
-            (request as any).tenantId || request.params.tenantId || request.params.id || this.cls.get('tenantId');
+        const tenantId = (request as any).tenantId || request.params.tenantId || request.params.id || this.cls.get('tenantId');
 
         if (!tenantId) {
             return true;

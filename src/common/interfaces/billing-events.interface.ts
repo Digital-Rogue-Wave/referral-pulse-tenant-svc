@@ -6,6 +6,7 @@ export interface SubscriptionChangedEvent {
     subscriptionStatus: SubscriptionStatusEnum;
     stripeCustomerId?: string;
     stripeSubscriptionId?: string;
+    stripeEventId?: string;
 }
 
 export interface SubscriptionCreatedEvent {
@@ -15,6 +16,7 @@ export interface SubscriptionCreatedEvent {
     stripeCustomerId?: string;
     stripeSubscriptionId?: string;
     checkoutUserId?: string | null;
+    stripeEventId?: string;
 }
 
 export interface SubscriptionUpgradedEvent {
@@ -25,6 +27,7 @@ export interface SubscriptionUpgradedEvent {
     stripeCustomerId?: string;
     stripeSubscriptionId?: string;
     upgradeUserId?: string | null;
+    stripeEventId?: string;
 }
 
 export interface SubscriptionDowngradeScheduledEvent {
@@ -36,6 +39,7 @@ export interface SubscriptionDowngradeScheduledEvent {
     stripeSubscriptionId?: string;
     downgradeUserId?: string | null;
     effectiveDate?: string | null;
+    stripeEventId?: string;
 }
 
 export interface SubscriptionCancelledEvent {
@@ -48,6 +52,21 @@ export interface SubscriptionCancelledEvent {
     cancelUserId?: string | null;
     cancellationReason?: string | null;
     cancellationEffectiveDate?: string | null;
+    stripeEventId?: string;
+}
+
+export interface TrialReminderEvent {
+    tenantId: string;
+    daysRemaining: number;
+    trialEndsAt: string;
+    triggeredAt: string;
+}
+
+export interface TrialExpiredEvent {
+    tenantId: string;
+    trialEndsAt: string;
+    downgradedTo: BillingPlanEnum;
+    triggeredAt: string;
 }
 
 export interface PaymentFailedEvent {
@@ -63,4 +82,12 @@ export interface TenantPaymentStatusChangedEvent {
     nextStatus: string;
     changedAt: string;
     source: 'stripe' | 'escalation';
+
+    stripeEventId?: string;
+
+    stripeCustomerId?: string;
+    stripeSubscriptionId?: string;
+    stripeInvoiceId?: string;
+    stripePaymentIntentId?: string;
+    nextPaymentAttemptAt?: string | null;
 }

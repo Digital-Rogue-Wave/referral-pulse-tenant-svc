@@ -26,7 +26,6 @@ export class EntityPatcher {
         const hasSuperClass = !UtilService.isEmptyObject(SuperClass);
 
         if (hasSuperClass) {
-            // eslint-disable-next-line @typescript-eslint/no-unsafe-argument
             fakeEntity = EntityPatcher.patch(SuperClass);
         }
 

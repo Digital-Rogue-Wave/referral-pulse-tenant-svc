@@ -1,5 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
+import { EventEmitter2 } from '@nestjs/event-emitter';
 import { Repository } from 'typeorm';
 import { TenantEntity } from '@mod/tenant/tenant.entity';
 import { TenantStatusEnum } from '@mod/common/enums/tenant.enum';
@@ -18,7 +19,8 @@ export class MonthlyUsageResetService {
         private readonly usageRepository: Repository<TenantUsageEntity>,
         @InjectRepository(BillingEventEntity)
         private readonly billingEventRepository: Repository<BillingEventEntity>,
-        private readonly redisUsageService: RedisUsageService
+        private readonly redisUsageService: RedisUsageService,
+        private readonly eventEmitter: EventEmitter2
     ) {}
 
     async runMonthlyReset(): Promise<void> {
@@ -70,6 +72,16 @@ export class MonthlyUsageResetService {
                 });
 
                 await this.billingEventRepository.save(summaryEvent);
+
+                this.eventEmitter.emit('usage.monthly_summary', {
+                    tenantId,
+                    metric,
+                    month: prevMonthLabel,
+                    usage,
+                    limit,
+                    periodDate: prevMonthEnd,
+                    triggeredAt: now.toISOString()
+                });
 
                 await this.redisUsageService.clearMonthlyUsage(tenantId, metric, prevMonthLabel);
                 await this.redisUsageService.clearThresholdFlags(tenantId, metric, [80, 100]);

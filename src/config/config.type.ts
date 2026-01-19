@@ -11,6 +11,7 @@ import { SqsConfig } from '@mod/config/sqs.config';
 import { SnsConfig } from '@mod/config/sns.config';
 import { TracingConfig } from '@mod/config/tracing.config';
 import { StripeConfig } from '@mod/config/stripe.config';
+import { BillingConfig } from '@mod/config/billing.config';
 
 export type AllConfigType = {
     appConfig: AppConfig;
@@ -26,4 +27,5 @@ export type AllConfigType = {
     sqsConfig: SqsConfig;
     snsConfig: SnsConfig;
     stripeConfig: StripeConfig;
+    billingConfig: BillingConfig;
 };
