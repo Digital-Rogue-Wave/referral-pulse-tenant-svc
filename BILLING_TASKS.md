@@ -34,7 +34,7 @@ Architecture ownership note (source of truth: `docs/specs/microservices-architec
 - [x] A3 Align billing event names with architecture
   - Architecture event contracts include: `payment.failed`, `payment.restored`, `tenant.restricted`, `tenant.locked`, `tenant.restored`.
   - Current implementation uses: `billing.payment_failed`, `tenant.payment_status.changed`.
-  - Add/rename events to match the boss contract (and keep internal ones only if necessary).
+  - Add/rename events to match the architecture contract (and keep internal ones only if necessary).
 
 - [x] A4 Align SNS topic + event envelope schema with architecture
   - Architecture describes SNS topic `referral-platform-events` and an envelope that includes top-level `tenantId`.

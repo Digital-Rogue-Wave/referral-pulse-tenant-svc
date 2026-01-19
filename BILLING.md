@@ -15,7 +15,7 @@ Architecture source of truth: `docs/specs/microservices-architecture.md`
 
 - [x] 0.3 Align event names with architecture
     - Architecture lists `payment.failed`, `payment.restored`, plus `tenant.restricted`, `tenant.locked`, `tenant.restored`.
-    - Publish boss-contract events derived from internal `tenant.payment_status.changed` transitions.
+    - Publish architecture-contract events derived from internal `tenant.payment_status.changed` transitions.
     - Add/rename emitted events so cross-service consumers can rely on the architecture event contracts.
 
 - [x] 0.4 Align SNS topic and event schema with architecture
