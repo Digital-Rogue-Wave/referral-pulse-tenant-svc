@@ -57,10 +57,12 @@ service:
     prometheus.io/port: "8080"
 
 ingress:
-  enabled: true
+  # Disabled - This service is accessed via Spring Cloud Gateway only
+  # ALB → Spring Gateway → referral-pulse-svc (ClusterIP)
+  enabled: false
   className: "alb"
   annotations:
-    alb.ingress.kubernetes.io/scheme: internet-facing        # or "internal"
+    alb.ingress.kubernetes.io/scheme: internet-facing
     alb.ingress.kubernetes.io/target-type: ip
     alb.ingress.kubernetes.io/healthcheck-path: /health
     alb.ingress.kubernetes.io/healthcheck-port: traffic-port
@@ -68,31 +70,29 @@ ingress:
     alb.ingress.kubernetes.io/ssl-redirect: "443"
     alb.ingress.kubernetes.io/backend-protocol: HTTP
     alb.ingress.kubernetes.io/success-codes: "200-399"
-    # Optional shared group
-    # alb.ingress.kubernetes.io/group.name: referral-shared
-    # ExternalDNS (optional)
-    # external-dns.alpha.kubernetes.io/hostname: api.example.com
   hosts:
     - host: api.example.com
       paths:
         - path: /
           pathType: Prefix
   tls:
-    - secretName: tls-acm-placeholder   # create empty secret if using ACM; ALB attaches cert by annotation
+    - secretName: tls-acm-placeholder
       hosts:
         - api.example.com
 
 # ---- NetworkPolicy tuning
 networkPolicy:
   enabled: true
-  # allow only the ALB/ingress-controller to reach the Service
+  # Allow only Spring Cloud Gateway to reach this service
+  # Update namespaceSelector/podSelector to match your Spring Gateway deployment
   allowFromIngressController:
     enabled: true
     namespaceSelector:
       matchLabels:
-        app.kubernetes.io/name: ingress-nginx  # change to your controller's ns labels
+        kubernetes.io/metadata.name: default  # Change to your Spring Gateway namespace
     podSelector:
-      matchLabels: {}                           # or target controller pods by label
+      matchLabels:
+        app: spring-cloud-gateway  # Change to match your Spring Gateway pod labels
 
   # allow Prometheus to scrape /metrics
   allowFromPrometheus:
@@ -128,6 +128,72 @@ resources:
     cpu: 200m
     memory: 256Mi
 
+# ---- Worker Configuration (BullMQ Job Processors) ----
+worker:
+  # Enable worker deployment
+  enabled: true
+
+  # Number of worker replicas (BullMQ handles distributed locking)
+  replicaCount: 2
+
+  # Worker-specific log level (can be different from web pods)
+  logLevel: "info"
+
+  # Worker resources (typically lower than web pods)
+  resources:
+    limits:
+      cpu: 300m
+      memory: 512Mi
+    requests:
+      cpu: 100m
+      memory: 256Mi
+
+  # Worker pod security context (same as web pods)
+  podSecurityContext:
+    runAsNonRoot: true
+    seccompProfile: { type: RuntimeDefault }
+
+  # Worker container security context (same as web pods)
+  securityContext:
+    allowPrivilegeEscalation: false
+    readOnlyRootFilesystem: true
+    capabilities:
+      drop: ["ALL"]
+
+  # Worker node selector (can schedule on different nodes if needed)
+  nodeSelector: {}
+
+  # Worker tolerations
+  tolerations: []
+
+  # Worker affinity (ensure worker doesn't run on same node as web pods)
+  affinity: {}
+
+  # Extra environment variables for worker
+  extraEnv: {}
+    # OUTBOX_BATCH_SIZE: "100"
+    # OUTBOX_CRON_INTERVAL: "*/5 * * * * *"
+
+livenessProbe:
+  httpGet:
+    path: /health
+    port: http
+  initialDelaySeconds: 30
+  periodSeconds: 10
+  timeoutSeconds: 5
+  failureThreshold: 3
+  successThreshold: 1
+
+readinessProbe:
+  httpGet:
+    path: /health
+    port: http
+  initialDelaySeconds: 10
+  periodSeconds: 5
+  timeoutSeconds: 3
+  failureThreshold: 3
+  successThreshold: 1
+
 autoscaling:
   enabled: true
   minReplicas: 3
@@ -138,6 +204,14 @@ autoscaling:
 pdb:
   enabled: true
   minAvailable: 1
+
+serviceMonitor:
+  enabled: true
+  interval: 15s
+  scrapeTimeout: 10s
+  labels: {}
+  metricRelabelings: []
+  relabelings: []
 
 nodeSelector: {}
 tolerations: []
@@ -162,6 +236,63 @@ envVars:
   APP_FALLBACK_LANGUAGE: "en"
   APP_HEADER_LANGUAGE: "x-custom-lang"
 
+  # Database
+  DATABASE_TYPE: "postgres"
+  DATABASE_HOST: "postgres.default.svc.cluster.local"
+  DATABASE_PORT: "5432"
+  DATABASE_NAME: "referral-db"
+  DATABASE_USERNAME: "root"
+  DATABASE_SYNCHRONIZE: "false"
+  DATABASE_MAX_CONNECTIONS: "100"
+  DATABASE_SSL_ENABLED: "false"
+  DATABASE_LOGGING: "false"
+
+  # Redis
+  REDIS_HOST: "redis.default.svc.cluster.local"
+  REDIS_PORT: "6379"
+  REDIS_DB: "0"
+  REDIS_TLS_ENABLED: "false"
+  REDIS_KEY_PREFIX: "rp:"
+
+  # AWS
+  AWS_REGION: "eu-central-1"
+  AWS_ENDPOINT: ""
+
+  # S3
+  AWS_S3_BUCKET: "referral-pulse-staging"
+  AWS_S3_REGION: "eu-central-1"
+  AWS_S3_ENDPOINT: ""
+
+  # SQS Queues (individual queue URLs)
+  SQS_QUEUE_CAMPAIGN_EVENTS: "https://sqs.eu-central-1.amazonaws.com/123456789012/campaign-events.fifo"
+  SQS_QUEUE_REFERRAL_EVENTS: "https://sqs.eu-central-1.amazonaws.com/123456789012/referral-events.fifo"
+  SQS_QUEUE_REWARD_EVENTS: "https://sqs.eu-central-1.amazonaws.com/123456789012/reward-events.fifo"
+  SQS_QUEUE_USER_EVENTS: "https://sqs.eu-central-1.amazonaws.com/123456789012/user-events.fifo"
+  SQS_QUEUE_NOTIFICATION_EVENTS: "https://sqs.eu-central-1.amazonaws.com/123456789012/notification-events.fifo"
+  SQS_QUEUE_ANALYTICS_EVENTS: "https://sqs.eu-central-1.amazonaws.com/123456789012/analytics-events.fifo"
+  SQS_QUEUE_WORKFLOW_EVENTS: "https://sqs.eu-central-1.amazonaws.com/123456789012/workflow-events.fifo"
+
+  # SQS Configuration
+  SQS_POLLING_ENABLED: "true"
+  SQS_POLLING_WAIT_TIME_SECONDS: "20"
+  SQS_POLLING_VISIBILITY_TIMEOUT: "60"
+  SQS_POLLING_MAX_MESSAGES: "10"
+  SQS_POLLING_TERMINATE_VISIBILITY_TIMEOUT: "0"
+
+  # SNS
+  SNS_TOPIC_ARN: "arn:aws:sns:eu-central-1:123456789012:campaign-notifications"
+
+  # JWT/Auth
+  AUTH_JWKS_URI: "https://auth.example.com/.well-known/jwks.json"
+  AUTH_ISSUER: "https://auth.example.com/"
+  AUTH_AUDIENCE: "referral-pulse-api"
+  AUTH_ALGORITHMS: "RS256"
+  AUTH_TENANT_CLAIM_PATH: "tenantId"
+  AUTH_CLOCK_TOLERANCE: "30"
+  AUTH_CACHE_ENABLED: "true"
+  AUTH_CACHE_TTL: "600"
+
+  # HTTP Client - Internal
   INTRA_HTTP_BASE_URL: "http://gateway.internal:3000"
   INTRA_HTTP_TIMEOUT_MS: "3000"
   INTRA_TENANT_HEADER: "x-tenant-id"
@@ -170,6 +301,7 @@ envVars:
   INTRA_HTTP_RETRY_BASE_DELAY_MS: "200"
   INTRA_HTTP_RETRY_STATUSES: "429,502,503,504"
 
+  # HTTP Client - Third Party
   TP_HTTP_BASE_URL: "https://thirdparty.example.com"
   TP_HTTP_TIMEOUT_MS: "5000"
   TP_HTTP_UA: "referral-pulse-svc/1.0"
@@ -177,69 +309,56 @@ envVars:
   TP_HTTP_RETRY_BASE_DELAY_MS: "400"
   TP_HTTP_RETRY_STATUSES: "429,500,502,503,504"
 
+  # Circuit Breaker - Internal
   INTRA_CB_TIMEOUT_MS: "2500"
   INTRA_CB_VOLUME_THRESHOLD: "20"
   INTRA_CB_ERR_PCT: "50"
   INTRA_CB_RESET_TIMEOUT_MS: "10000"
 
+  # Circuit Breaker - Third Party
   TP_CB_TIMEOUT_MS: "3500"
   TP_CB_VOLUME_THRESHOLD: "20"
   TP_CB_ERR_PCT: "50"
   TP_CB_RESET_TIMEOUT_MS: "15000"
 
+  # Metrics
   METRICS_ENABLED: "true"
   METRICS_ENDPOINT: "/metrics"
 
+  # OpenTelemetry
   OTEL_ENABLED: "true"
   OTEL_SERVICE_NAME: "referral-pulse-svc"
-  OTEL_ENVIRONMENT: "staging"
-  OTEL_EXPORTER_OTLP_TRACES_ENDPOINT: "http://otel-collector.otel.svc.cluster.local:4318/v1/traces"
-  OTEL_PROPAGATOR: "w3c"
-  OTEL_SAMPLER_RATIO: "1"
+  OTEL_SERVICE_VERSION: "1.0.0"
+  OTEL_EXPORTER_OTLP_ENDPOINT: "http://otel-collector.otel.svc.cluster.local:4318"
+  OTEL_EXPORTER_OTLP_PROTOCOL: "http/protobuf"
+  OTEL_EXPORTER_OTLP_HEADERS: ""
 
-  REDIS_MODE: "cluster"
-  REDIS_NODES: "mycluster.xxxx.cache.amazonaws.com:6379"
-  REDIS_DB: "0"
-  REDIS_TLS: "true"
-  REDIS_TLS_SERVERNAME: "mycluster.xxxx.cache.amazonaws.com"
-  REDIS_MAX_RETRIES_PER_REQUEST: "3"
-  REDIS_RECONNECT_BACKOFF_MS: "200"
-  REDIS_CONNECTION_TIMEOUT_MS: "5000"
-  REDIS_ENABLE_AUTOPIPELINING: "true"
-  REDIS_LAZY_CONNECT: "true"
-  REDIS_SUBSCRIBER_CREATE: "true"
-  REDIS_AUTH_MODE: "acl"
-  REDIS_KEY_PREFIX: "my-svc"
+  # Logging
+  LOGGING_LEVEL: "info"
+  LOGGING_PRETTY: "false"
 
-  S3_BUCKET: "referral-pulse"
-  S3_REGION: "us-east-1"
-  S3_FORCE_PATH_STYLE: "false"
-  S3_ACCELERATE: "false"
-  S3_KEY_PREFIX: "my-svc"
-  S3_SSE: "none"
-  S3_PRESIGN_EXPIRES_SEC: "900"
-  S3_ENDPOINT: ""
-
-  SQS_REGION: "us-east-1"
-  SQS_ENDPOINT: ""
-  SQS_CONSUMERS_JSON: '[{"name":"orders","queueUrl":"https://sqs.us-east-1.amazonaws.com/123456789012/orders.fifo","fifo":true,"waitTimeSeconds":20,"visibilityTimeout":60,"batchSize":10}]'
-  SQS_PRODUCERS_JSON: '[{"name":"orders","queueUrl":"https://sqs.us-east-1.amazonaws.com/123456789012/orders.fifo","fifo":true}]'
-  SQS_DEFAULT_WAIT: "20"
-  SQS_DEFAULT_VISIBILITY: "30"
-  SQS_DEFAULT_BATCH: "10"
-
+  # ClickHouse (Analytics)
   CH_URL: "http://clickhouse:8123"
   CH_USERNAME: "sa"
   CH_DATABASE: "analytics"
 
 # -------- Secret (sensitive env) --------
+# Note: AWS credentials (AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY) are NOT included
+# because IRSA (IAM Roles for Service Accounts) is enabled for this service.
+# The service account is annotated with eks.amazonaws.com/role-arn.
 secretVars:
+  # Database
+  DATABASE_PASSWORD: "your-db-password"
+
+  # Redis
+  REDIS_USERNAME: ""
+  REDIS_PASSWORD: ""
+
+  # ClickHouse
   CH_PASSWORD: "sa"
-  REDIS_USERNAME: "appuser"
-  REDIS_PASSWORD: "super-secret"
+
+  # Third Party API Keys (if needed)
   TP_API_KEY: ""
-  AWS_ACCESS_KEY_ID: ""         # leave empty if using IRSA
-  AWS_SECRET_ACCESS_KEY: ""     # leave empty if using IRSA
 
 # Extra manual envs (merged over envFrom)
 extraEnv: []

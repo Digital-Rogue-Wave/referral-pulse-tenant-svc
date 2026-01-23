@@ -1,12 +1,15 @@
-import { Injectable, ExecutionContext, HttpException, HttpStatus } from '@nestjs/common';
+import { Injectable, ExecutionContext, UnauthorizedException } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
 import { AuthGuard } from '@nestjs/passport';
-import { SetMetadata } from '@nestjs/common';
 import { Observable } from 'rxjs';
 
 export const IS_PUBLIC_KEY = 'isPublic';
-export const Public = () => SetMetadata(IS_PUBLIC_KEY, true);
 
+/**
+ * JWT Authentication Guard.
+ * Validates JWT tokens using the JwtStrategy.
+ * Routes can be marked as public using @Public() decorator.
+ */
 @Injectable()
 export class JwtAuthGuard extends AuthGuard('jwt') {
     constructor(private reflector: Reflector) {
@@ -14,23 +17,25 @@ export class JwtAuthGuard extends AuthGuard('jwt') {
     }
 
     canActivate(context: ExecutionContext): boolean | Promise<boolean> | Observable<boolean> {
-        const isPublic = this.reflector.getAllAndOverride<boolean>(IS_PUBLIC_KEY, [context.getHandler(), context.getClass()]);
+        // Check if route is marked as public
+        const isPublic = this.reflector.getAllAndOverride<boolean>(IS_PUBLIC_KEY, [
+            context.getHandler(),
+            context.getClass(),
+        ]);
+
         if (isPublic) {
             return true;
         }
+
+        // Call parent AuthGuard which uses JwtStrategy
         return super.canActivate(context);
     }
 
-    handleRequest(err: any, user: any, info: any, context: ExecutionContext) {
-        const isPublic = this.reflector.getAllAndOverride<boolean>(IS_PUBLIC_KEY, [context.getHandler(), context.getClass()]);
-
-        if (isPublic) {
-            return user || null;
-        }
-
-        // For protected routes, throw error if authentication fails
+    handleRequest<TUser = any>(err: any, user: any, info: any): TUser {
+        // Handle authentication errors
         if (err || !user) {
-            throw new HttpException({ message: 'Unauthorized', code: HttpStatus.UNAUTHORIZED }, HttpStatus.UNAUTHORIZED);
+            const message = info?.message || 'Unauthorized';
+            throw err || new UnauthorizedException(message);
         }
 
         return user;

@@ -1,0 +1,153 @@
+{{- if .Values.worker.enabled }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "service.fullname" . }}-worker
+  labels:
+    {{- include "service.labels" . | nindent 4 }}
+    app.kubernetes.io/component: worker
+spec:
+  # BullMQ handles distributed locking - safe to scale workers
+  replicas: {{ .Values.worker.replicaCount | default 2 }}
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 1
+      maxSurge: 1
+  selector:
+    matchLabels:
+      {{- include "service.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: worker
+  template:
+    metadata:
+      annotations:
+        checksum/config: {{ include (print $.Template.BasePath "/configmap.yaml") . | sha256sum }}
+        checksum/secret: {{ include (print $.Template.BasePath "/secret.yaml") . | sha256sum }}
+      labels:
+        {{- include "service.selectorLabels" . | nindent 8 }}
+        app.kubernetes.io/component: worker
+    spec:
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      serviceAccountName: {{ include "service.serviceAccountName" . }}
+      securityContext:
+        {{- toYaml .Values.worker.podSecurityContext | nindent 8 }}
+      containers:
+      - name: {{ .Chart.Name }}-worker
+        securityContext:
+          {{- toYaml .Values.worker.securityContext | nindent 12 }}
+        image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
+        imagePullPolicy: {{ .Values.image.pullPolicy }}
+        env:
+        # Worker mode configuration
+        - name: APP_MODE
+          value: "worker"
+        - name: NODE_ENV
+          value: {{ .Values.env | quote }}
+        - name: LOG_LEVEL
+          value: {{ .Values.worker.logLevel | default "info" | quote }}
+
+        # Database configuration
+        - name: DATABASE_HOST
+          valueFrom:
+            configMapKeyRef:
+              name: {{ include "service.fullname" . }}
+              key: database.host
+        - name: DATABASE_PORT
+          valueFrom:
+            configMapKeyRef:
+              name: {{ include "service.fullname" . }}
+              key: database.port
+        - name: DATABASE_NAME
+          valueFrom:
+            configMapKeyRef:
+              name: {{ include "service.fullname" . }}
+              key: database.name
+        - name: DATABASE_USERNAME
+          valueFrom:
+            secretKeyRef:
+              name: {{ include "service.fullname" . }}
+              key: database.username
+        - name: DATABASE_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: {{ include "service.fullname" . }}
+              key: database.password
+
+        # Redis configuration
+        - name: REDIS_HOST
+          valueFrom:
+            configMapKeyRef:
+              name: {{ include "service.fullname" . }}
+              key: redis.host
+        - name: REDIS_PORT
+          valueFrom:
+            configMapKeyRef:
+              name: {{ include "service.fullname" . }}
+              key: redis.port
+
+        # AWS configuration
+        - name: AWS_REGION
+          value: {{ .Values.aws.region | quote }}
+        {{- if .Values.aws.accessKeyId }}
+        - name: AWS_ACCESS_KEY_ID
+          valueFrom:
+            secretKeyRef:
+              name: {{ include "service.fullname" . }}
+              key: aws.accessKeyId
+        {{- end }}
+        {{- if .Values.aws.secretAccessKey }}
+        - name: AWS_SECRET_ACCESS_KEY
+          valueFrom:
+            secretKeyRef:
+              name: {{ include "service.fullname" . }}
+              key: aws.secretAccessKey
+        {{- end }}
+
+        # Additional environment variables from values
+        {{- range $key, $value := .Values.worker.extraEnv }}
+        - name: {{ $key }}
+          value: {{ $value | quote }}
+        {{- end }}
+
+        resources:
+          {{- toYaml .Values.worker.resources | nindent 12 }}
+
+        # Health checks for worker
+        livenessProbe:
+          exec:
+            command:
+            - /bin/sh
+            - -c
+            - "ps aux | grep node | grep -v grep"
+          initialDelaySeconds: 30
+          periodSeconds: 30
+          timeoutSeconds: 5
+          failureThreshold: 3
+
+        readinessProbe:
+          exec:
+            command:
+            - /bin/sh
+            - -c
+            - "ps aux | grep node | grep -v grep"
+          initialDelaySeconds: 10
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 3
+
+      {{- with .Values.worker.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.worker.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.worker.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+{{- end }}

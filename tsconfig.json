@@ -1,39 +1,32 @@
 {
-    "compilerOptions": {
-        "module": "ESNext",
-        "target": "ES2022",
-        "moduleResolution": "Node",
-        "outDir": "dist",
-        "incremental": true,
-        "strict": true,
-        "strictPropertyInitialization": false,
-        "noImplicitAny": true,
-        "strictNullChecks": true,
-        "skipLibCheck": true,
-        "emitDecoratorMetadata": true,
-        "experimentalDecorators": true,
-        "sourceMap": true,
-        "resolveJsonModule": true,
-        "esModuleInterop": true,
-        "lib": ["ES2022"],
-        "declaration": false,
-        "allowSyntheticDefaultImports": true,
-        "types": ["node", "jest"],
-        "removeComments": true,
-        "baseUrl": "./",
-        "strictBindCallApply": false,
-        "forceConsistentCasingInFileNames": false,
-        "noFallthroughCasesInSwitch": false,
-        "paths": {
-            "@mod/*": ["src/*"],
-            "@domains/*": ["src/domains/*"]
-        }
-    },
-    "typeRoots": ["src/types", "node_modules/@types"],
-    "include": ["src/**/*.ts", "src/**/*.d.ts", "src/types/**/*.ts", "test/**/*.ts"],
-    "ts-node": {
-        "compilerOptions": {
-            "module": "commonjs"
-        }
+  "compilerOptions": {
+    "module": "commonjs",
+    "declaration": true,
+    "removeComments": true,
+    "emitDecoratorMetadata": true,
+    "experimentalDecorators": true,
+    "allowSyntheticDefaultImports": true,
+    "target": "ES2022",
+    "sourceMap": true,
+    "outDir": "./dist",
+    "baseUrl": "./",
+    "incremental": true,
+    "skipLibCheck": true,
+    "strictNullChecks": true,
+    "noImplicitAny": true,
+    "strictBindCallApply": true,
+    "forceConsistentCasingInFileNames": true,
+    "noFallthroughCasesInSwitch": true,
+    "esModuleInterop": true,
+    "resolveJsonModule": true,
+    "moduleResolution": "node",
+    "paths": {
+      "@app/*": ["src/*"],
+      "@domains/*": ["src/domains/*"],
+      "@common/*": ["src/common/*"],
+      "@config/*": ["src/config/*"]
     }
+  },
+  "include": ["src/**/*"],
+  "exclude": ["node_modules", "dist", "test", "**/*.spec.ts"]
 }

@@ -49,20 +49,23 @@ services:
 
   # -----------------------------
   # LocalStack (S3, SQS, SNS)
+  # Web UI: https://app.localstack.cloud (free, connects to localhost:4566)
   # -----------------------------
   localstack:
     image: localstack/localstack:3
     container_name: rp-localstack
     environment:
       SERVICES: s3,sqs,sns
-      AWS_DEFAULT_REGION: us-east-1
+      AWS_DEFAULT_REGION: eu-central-1
       LS_LOG: warn
       DOCKER_HOST: unix:///var/run/docker.sock
+      # Optional: Enable LocalStack dashboard
+      LOCALSTACK_API_KEY: ${LOCALSTACK_API_KEY:-}
     ports:
       - "4566:4566"   # edge port
     volumes:
       - "/var/run/docker.sock:/var/run/docker.sock"
-      - ./docker/localstack-init:/etc/localstack/init/ready.d
+      - ./localstack-init:/etc/localstack/init/ready.d
     healthcheck:
       test: ["CMD-SHELL", "awslocal sqs list-queues >/dev/null 2>&1 || exit 1"]
       interval: 7s

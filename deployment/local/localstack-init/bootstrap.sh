@@ -1,24 +1,47 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+echo "[localstack-init] Starting bootstrap..."
+
 # S3 bucket
-awslocal s3 mb s3://referral-pulse || true
+echo "Creating S3 bucket..."
+awslocal s3 mb s3://campaign-assets-dev || true
 
-# SQS DLQ (FIFO)
-awslocal sqs create-queue \
-  --queue-name orders-dlq.fifo \
-  --attributes FifoQueue=true,ContentBasedDeduplication=true || true
+# FIFO Queues matching .env.development
+# All queues are FIFO with content-based deduplication
 
-DLQ_ARN=$(awslocal sqs get-queue-attributes \
-  --queue-url "http://localhost:4566/000000000000/orders-dlq.fifo" \
-  --attribute-names QueueArn --query 'Attributes.QueueArn' --output text)
+QUEUES=(
+  "campaign-events"
+  "referral-events"
+  "reward-events"
+  "user-events"
+  "notification-events"
+  "analytics-events"
+  "workflow-events"
+)
 
-# SQS main (FIFO) with redrive
-awslocal sqs create-queue \
-  --queue-name orders.fifo \
-  --attributes FifoQueue=true,ContentBasedDeduplication=true,"RedrivePolicy={\"deadLetterTargetArn\":\"${DLQ_ARN}\",\"maxReceiveCount\":\"5\"}" || true
+echo "Creating FIFO queues..."
+for queue in "${QUEUES[@]}"; do
+  echo "  - ${queue}.fifo"
+  awslocal sqs create-queue \
+    --queue-name "${queue}.fifo" \
+    --attributes FifoQueue=true,ContentBasedDeduplication=true \
+    --region eu-central-1 || true
+done
 
-# SNS topic (optional)
-awslocal sns create-topic --name catalog-events || true
+# SNS topics
+echo "Creating SNS topics..."
+awslocal sns create-topic \
+  --name campaign-notifications \
+  --region eu-central-1 || true
 
-echo "[localstack-init] bootstrap complete"
+echo "[localstack-init] Bootstrap complete!"
+echo ""
+echo "Resources created:"
+echo "  - S3 Bucket: s3://campaign-assets-dev"
+echo "  - SQS Queues: ${#QUEUES[@]} FIFO queues"
+echo "  - SNS Topics: campaign-notifications"
+echo ""
+echo "Access LocalStack Web UI: https://app.localstack.cloud"
+echo "  - Connect to: http://localhost:4566"
+echo ""

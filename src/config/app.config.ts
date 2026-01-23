@@ -1,81 +1,31 @@
 import { registerAs } from '@nestjs/config';
-import validateConfig from '@mod/common/validators/validate-config';
-import { MaybeType } from '@mod/types/maybe.type';
-import { IsEnum, IsNumberString, IsOptional, IsString, IsUrl } from 'class-validator';
+import { z } from 'zod';
+import { Environment } from '@app/types';
 
-export enum AppEnvironment {
-    Development = 'development',
-    Production = 'production',
-    Test = 'test',
-    Staging = 'staging'
-}
+const schema = z.object({
+    nodeEnv: z.nativeEnum(Environment).default(Environment.Development),
+    name: z.string().min(1).default('referral-campaign-service'),
+    port: z.coerce.number().int().positive().default(3000),
+    apiPrefix: z.string().min(1).default('api'),
+    allowedOrigins: z
+        .string()
+        .transform((val) => val.split(',').map((s) => s.trim()))
+        .optional(),
+});
 
-export type AppConfig = {
-    nodeEnv: MaybeType<string>;
-    name: MaybeType<string>;
-    workingDirectory: MaybeType<string>;
-    frontendDomain?: MaybeType<string>;
-    backendDomain: MaybeType<string>;
-    port: number;
-    apiPrefix: MaybeType<string>;
-    fallbackLanguage: MaybeType<string>;
-    headerLanguage: MaybeType<string>;
-    invitationExpiryDays: number;
-    trialDurationDays: number;
-};
+export type AppConfig = z.infer<typeof schema>;
 
-class EnvironmentVariablesValidator {
-    @IsEnum(AppEnvironment)
-    @IsOptional()
-    NODE_ENV: MaybeType<AppEnvironment>;
+export default registerAs('app', (): AppConfig => {
+    const result = schema.safeParse({
+        nodeEnv: process.env.NODE_ENV,
+        name: process.env.APP_NAME,
+        port: process.env.APP_PORT,
+        apiPrefix: process.env.APP_API_PREFIX,
+        allowedOrigins: process.env.ALLOWED_ORIGINS,
+    });
 
-    @IsNumberString()
-    @IsOptional()
-    APP_PORT: MaybeType<number>;
-
-    @IsUrl({ require_tld: false })
-    @IsOptional()
-    FRONTEND_DOMAIN: MaybeType<string>;
-
-    @IsUrl({ require_tld: false })
-    @IsOptional()
-    BACKEND_DOMAIN: MaybeType<string>;
-
-    @IsString()
-    @IsOptional()
-    API_PREFIX: MaybeType<string>;
-
-    @IsString()
-    @IsOptional()
-    APP_FALLBACK_LANGUAGE: MaybeType<string>;
-
-    @IsString()
-    @IsOptional()
-    APP_HEADER_LANGUAGE: MaybeType<string>;
-
-    @IsNumberString()
-    @IsOptional()
-    INVITATION_EXPIRY_DAYS: MaybeType<number>;
-
-    @IsNumberString()
-    @IsOptional()
-    TRIAL_DURATION_DAYS: MaybeType<number>;
-}
-
-export default registerAs<AppConfig>('appConfig', () => {
-    validateConfig(process.env, EnvironmentVariablesValidator);
-
-    return {
-        nodeEnv: process.env.NODE_ENV || AppEnvironment.Development,
-        name: process.env.APP_NAME || 'app',
-        workingDirectory: process.env.PWD || process.cwd(),
-        frontendDomain: process.env.FRONTEND_DOMAIN,
-        backendDomain: process.env.BACKEND_DOMAIN ?? 'http://localhost',
-        port: process.env.APP_PORT ? parseInt(process.env.APP_PORT, 10) : process.env.PORT ? parseInt(process.env.PORT, 10) : 3000,
-        apiPrefix: process.env.API_PREFIX || 'api',
-        fallbackLanguage: process.env.APP_FALLBACK_LANGUAGE || 'en',
-        headerLanguage: process.env.APP_HEADER_LANGUAGE || 'x-custom-lang',
-        invitationExpiryDays: process.env.INVITATION_EXPIRY_DAYS ? parseInt(process.env.INVITATION_EXPIRY_DAYS, 10) : 7,
-        trialDurationDays: process.env.TRIAL_DURATION_DAYS ? parseInt(process.env.TRIAL_DURATION_DAYS, 10) : 14
-    };
+    if (!result.success) {
+        throw new Error(`App config validation failed: ${result.error.message}`);
+    }
+    return result.data;
 });

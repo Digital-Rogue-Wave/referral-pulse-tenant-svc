@@ -1,0 +1,14 @@
+{
+    "permissions": {
+        "allow": [
+            "Bash(pnpm add:*)",
+            "Bash(cat:*)",
+            "Bash(ls:*)",
+            "Bash(find:*)",
+            "Bash(pnpm run test:*)",
+            "WebSearch"
+        ],
+        "deny": [],
+        "ask": []
+    }
+}

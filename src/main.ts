@@ -1,83 +1,90 @@
-import { ClassSerializerInterceptor, Logger, ValidationPipe, VersioningType } from '@nestjs/common';
+import { NestFactory } from '@nestjs/core';
+import { ValidationPipe, VersioningType } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { NestFactory, Reflector } from '@nestjs/core';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
-import { useContainer } from 'class-validator';
-import { AppModule } from './app.module';
-import { AllConfigType } from './config/config.type';
-import validationOptions from '@mod/common/validators/validation-options';
+import { Logger } from 'nestjs-pino';
 import helmet from 'helmet';
 import compression from 'compression';
-import hpp from 'hpp';
-import cors from 'cors';
-import { initializeTransactionalContext, StorageDriver } from 'typeorm-transactional';
+import { initializeTransactionalContext } from 'typeorm-transactional';
 
-async function bootstrap() {
-    initializeTransactionalContext({ storageDriver: StorageDriver.AUTO });
-    const app = await NestFactory.create(AppModule, {
-        cors: true,
-        abortOnError: true,
-        bufferLogs: true,
-        rawBody: true
-    });
+import { AppModule } from './app.module';
+import type { AllConfigType } from '@app/config/config.type';
+
+/**
+ * Application mode
+ * - web: HTTP server mode (default)
+ * - worker: Background worker mode (cron jobs only, no HTTP server)
+ */
+type AppMode = 'web' | 'worker';
+
+async function bootstrap(): Promise<void> {
+    initializeTransactionalContext();
+
+    // Determine app mode from environment variable
+    const appMode = (process.env.APP_MODE?.toLowerCase() || 'web') as AppMode;
+
+    const app = await NestFactory.create(AppModule, { bufferLogs: true });
     const configService = app.get(ConfigService<AllConfigType>);
-    useContainer(app.select(AppModule), {
-        fallbackOnErrors: true // fallbackOnErrors must be true
-    });
 
-    app.use(helmet({ crossOriginResourcePolicy: { policy: 'cross-origin' }, contentSecurityPolicy: false }));
-    app.use(cors({ origin: process.env.ALLOWED_ORIGINS?.split(',') ?? '*' }));
-    app.use(hpp());
-    app.use(compression());
+    const nodeEnv = configService.getOrThrow('app.nodeEnv', { infer: true });
+    const serviceName = configService.getOrThrow('app.name', { infer: true });
 
     app.useLogger(app.get(Logger));
-
     app.enableShutdownHooks();
-    app.setGlobalPrefix(configService.getOrThrow('appConfig.apiPrefix', { infer: true }), {
-        exclude: ['/', '/live', '/ready', '/startup', '/success', '/cancel', '/webhooks/stripe']
-    });
-    app.enableVersioning({
-        type: VersioningType.URI
-    });
-    app.useGlobalPipes(new ValidationPipe(validationOptions));
-    app.useGlobalInterceptors(new ClassSerializerInterceptor(app.get(Reflector)));
 
-    const options = new DocumentBuilder()
-        .setTitle('Referral Pulse Campaign API')
-        .setDescription('API List fro campaign microservice')
-        .setVersion('1.0')
-        .addBearerAuth()
-        .addGlobalParameters({
-            name: configService.getOrThrow('appConfig.headerLanguage', { infer: true }),
-            required: true,
-            in: 'header'
-        })
-        .build();
+    if (appMode === 'worker') {
+        // Worker mode: No HTTP server, just keep app running for cron jobs
+        await app.init();
 
-    const document = SwaggerModule.createDocument(app, options);
-    SwaggerModule.setup('tenant-docs', app, document);
-    /*app.use(
-        '/tenant-docs',
-        apiReference({
-            spec: {
-                content: document
-            },
-            favicon: 'https://cdn.prod.website-files.com/6600622e5ed775a33bff8280/6601af87c424b81fa4e5c8c1_DIGITAL%20ROGUE%20WAVE.svg'
-        })
-    );*/
+        console.log(`⚙️  ${serviceName} started in WORKER mode`);
+        console.log(`📚 Environment: ${nodeEnv}`);
+        console.log(`🔄 Background workers active (cron jobs, outbox processing, etc.)`);
+    } else {
+        // Web mode: Start HTTP server
+        const port = configService.getOrThrow('app.port', { infer: true });
+        const apiPrefix = configService.getOrThrow('app.apiPrefix', { infer: true });
+        const allowedOrigins = configService.get('app.allowedOrigins', { infer: true });
 
-    await app.listen(configService.getOrThrow('appConfig.port', { infer: true }), () => {
-        Logger.log(
-            `${configService.getOrThrow('appConfig.name', {
-                infer: true
-            })} Server is listening to port ${configService.getOrThrow('appConfig.port', {
-                infer: true
-            })}...`
+        app.use(helmet());
+        app.use(compression());
+
+        app.enableCors({
+            origin: allowedOrigins || '*',
+            methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+            allowedHeaders: ['Content-Type', 'Authorization', 'x-tenant-id', 'x-correlation-id', 'x-request-id', 'x-idempotency-key'],
+            credentials: true,
+        });
+
+        app.setGlobalPrefix(apiPrefix, { exclude: ['/health', '/health/ready', '/health/live', '/metrics'] });
+        app.enableVersioning({ type: VersioningType.URI, defaultVersion: '1' });
+
+        app.useGlobalPipes(
+            new ValidationPipe({
+                whitelist: true,
+                forbidNonWhitelisted: true,
+                transform: true,
+                transformOptions: { enableImplicitConversion: true },
+            }),
         );
-    });
+
+        if (nodeEnv !== 'production') {
+            const swaggerConfig = new DocumentBuilder()
+                .setTitle('Campaign Service API')
+                .setDescription('ReferralAI Campaign Management Microservice')
+                .setVersion('1.0')
+                .addBearerAuth()
+                .addApiKey({ type: 'apiKey', name: 'x-tenant-id', in: 'header' }, 'tenant-id')
+                .build();
+            const document = SwaggerModule.createDocument(app, swaggerConfig);
+            SwaggerModule.setup('docs', app, document);
+        }
+
+        await app.listen(port);
+
+        console.log(`🚀 ${serviceName} started in WEB mode on port ${port}`);
+        console.log(`📚 Environment: ${nodeEnv}`);
+        console.log(`📖 API docs: http://localhost:${port}/docs`);
+    }
 }
 
-void bootstrap().catch((e) => {
-    Logger.error(`❌  Error starting server, ${e}`, '', 'Bootstrap');
-    throw e;
-});
+bootstrap();

@@ -1,64 +1,40 @@
-/**
- * Centralized configuration exports
- * Import all configurations in one place for cleaner module imports
- */
-
 import appConfig from './app.config';
-import awsConfig from './aws.config';
-import cacheConfig from './cache.config';
 import databaseConfig from './database.config';
-import httpClientConfig from './http-client.config';
-import loggerConfig from './logger.config';
-import metricsConfig from './metrics.config';
-import oryConfig from './ory.config';
+import awsConfig from './aws.config';
 import redisConfig from './redis.config';
-import s3Config from './s3.config';
-import servicesConfig from './services.config';
-import snsConfig from './sns.config';
-import sqsConfig from './sqs.config';
-import stripeConfig from './stripe.config';
+import authConfig from './auth.config';
 import tracingConfig from './tracing.config';
-import billingConfig from './billing.config';
+import httpConfig from './http.config';
+import servicesConfig from './services.config';
 
-// Re-export individual configs
+export { AllConfigType } from './config.type';
+export { AppConfig } from './app.config';
+export { DatabaseConfig } from './database.config';
+export { AwsConfig } from './aws.config';
+export { RedisConfig } from './redis.config';
+export { AuthConfig } from './auth.config';
+export { TracingConfig } from './tracing.config';
+export { HttpConfig } from './http.config';
+export { ServicesConfig } from './services.config';
+
+export const configLoaders = [
+    appConfig,
+    databaseConfig,
+    awsConfig,
+    redisConfig,
+    authConfig,
+    tracingConfig,
+    httpConfig,
+    servicesConfig,
+];
+
 export {
     appConfig,
-    awsConfig,
-    cacheConfig,
     databaseConfig,
-    httpClientConfig,
-    loggerConfig,
-    metricsConfig,
-    oryConfig,
+    awsConfig,
     redisConfig,
-    s3Config,
-    servicesConfig,
-    snsConfig,
-    sqsConfig,
-    stripeConfig,
+    authConfig,
     tracingConfig,
-    billingConfig
+    httpConfig,
+    servicesConfig,
 };
-
-/**
- * Array of all configuration loaders for easy use in ConfigModule
- * Usage: ConfigModule.forRoot({ load: allConfigs })
- */
-export const allConfigs = [
-    appConfig,
-    awsConfig,
-    cacheConfig,
-    databaseConfig,
-    httpClientConfig,
-    loggerConfig,
-    metricsConfig,
-    oryConfig,
-    redisConfig,
-    s3Config,
-    servicesConfig,
-    snsConfig,
-    sqsConfig,
-    stripeConfig,
-    tracingConfig,
-    billingConfig
-];

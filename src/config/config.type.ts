@@ -1,31 +1,25 @@
-import { AppConfig } from '@mod/config/app.config';
-import { DatabaseConfig } from '@mod/config/database.config';
-import { OryConfig } from '@mod/config/ory.config';
-import { RedisConfig } from '@mod/config/redis.config';
-import { MetricsConfig } from '@mod/config/metrics.config';
-import { AwsConfig } from '@mod/config/aws.config';
-import { HttpClientConfig } from '@mod/config/http-client.config';
-import { LoggerConfig } from '@mod/config/logger.config';
-import { S3Config } from '@mod/config/s3.config';
-import { SqsConfig } from '@mod/config/sqs.config';
-import { SnsConfig } from '@mod/config/sns.config';
-import { TracingConfig } from '@mod/config/tracing.config';
-import { StripeConfig } from '@mod/config/stripe.config';
-import { BillingConfig } from '@mod/config/billing.config';
+import type { AppConfig } from './app.config';
+import type { DatabaseConfig } from './database.config';
+import type { AwsConfig } from './aws.config';
+import type { RedisConfig } from './redis.config';
+import type { AuthConfig } from './auth.config';
+import type { TracingConfig } from './tracing.config';
+import type { HttpConfig } from './http.config';
+import type { ServicesConfig } from './services.config';
 
-export type AllConfigType = {
-    appConfig: AppConfig;
-    databaseConfig: DatabaseConfig;
-    oryConfig: OryConfig;
-    redisConfig: RedisConfig;
-    loggerConfig: LoggerConfig;
-    metricsConfig: MetricsConfig;
-    tracingConfig: TracingConfig;
-    httpClientConfig: HttpClientConfig;
-    awsConfig: AwsConfig;
-    s3Config: S3Config;
-    sqsConfig: SqsConfig;
-    snsConfig: SnsConfig;
-    stripeConfig: StripeConfig;
-    billingConfig: BillingConfig;
-};
+/**
+ * Aggregated configuration type for type-safe config access.
+ *
+ * @example
+ * this.configService.getOrThrow('app.port', { infer: true })
+ */
+export interface AllConfigType {
+    app: AppConfig;
+    database: DatabaseConfig;
+    aws: AwsConfig;
+    redis: RedisConfig;
+    auth: AuthConfig;
+    tracing: TracingConfig;
+    http: HttpConfig;
+    services: ServicesConfig;
+}

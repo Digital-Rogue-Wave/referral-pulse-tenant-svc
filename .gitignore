@@ -38,8 +38,5 @@ lerna-debug.log*
 /files
 .env
 .env.*
+!.env.example
 /ormconfig.json
-
-# openspec
-# .windsurf
-# AGENTS.md

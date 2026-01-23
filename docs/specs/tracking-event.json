@@ -1,0 +1,106 @@
+{
+  "event": "referred_made_purchase",
+  "event_id": "b7f4b07d-1a6a-4f7e-8b6e-0b9c7d3e1f51",
+  "occurred_at": "2025-09-11T12:34:56.789Z",
+  "received_at": "2025-09-11T12:34:56.930Z",
+  "client_id": "acme",
+  "campaign_id": "camp_123",
+
+  "participant": {
+    "participant_id": "p_123",
+    "external_user_id_hash": "sha256:7c4a8d09ca3762af61e59520943dc26494f8941b",
+    "anonymous_id": "anon_abc",
+    "session_id": "s_456"
+  },
+
+  "referral": {
+    "referral_id": "ref_001",
+    "invite_id": "inv_321",
+    "visit_id": "v_654"
+  },
+
+  "sdk": { "name": "web", "version": "1.2.0" },
+  "app": { "platform": "web", "app_version": "3.4.1", "build": "9842" },
+  "device": {
+    "os": "macOS",
+    "os_version": "14.5",
+    "model": "Mac",
+    "browser": "Chrome",
+    "user_agent": "Mozilla/5.0 (...) Chrome/126.0.0.0 Safari/537.36",
+    "screen": "1440x900"
+  },
+  "locale": { "language": "en-US", "timezone": "Europe/Brussels" },
+
+  "page": {
+    "url": "https://client.app/checkout",
+    "referrer": "https://client.app/cart",
+    "title": "Checkout",
+    "path": "/checkout"
+  },
+
+  "geo": { "ip": "hash:abc123", "country": "BE", "region": "Brussels", "city": "Brussels" },
+
+  "marketing": {
+    "utm_source": "google",
+    "utm_medium": "cpc",
+    "utm_campaign": "q3_ref",
+    "utm_term": "referral",
+    "utm_content": "cta1",
+    "gclid": "Cj0KCQiA...",
+    "fbclid": "IwAR3R...",
+    "first_touch": {
+      "acquisition_channel": "paid_search",
+      "utm_source": "google",
+      "utm_medium": "cpc",
+      "utm_campaign": "q3_ref",
+      "first_referrer": "https://www.google.com/",
+      "first_landing_url": "https://client.app/landing",
+      "first_seen_at": "2025-09-01T09:00:00Z"
+    }
+  },
+
+  "experiments": [
+    { "experiment_id": "widget_layout_v2", "variant_id": "B" }
+  ],
+
+  "traits_inline_optional": {
+    "plan": "pro",
+    "country": "BE",
+    "language": "en",
+    "acquisition_channel": "paid_search",
+    "customer_tier": "gold",
+    "is_employee": false
+  },
+
+  "ctx_participant": {
+    "plan": "pro",
+    "country": "BE",
+    "language": "en",
+    "acquisition_channel": "paid_search",
+    "customer_tier": "gold",
+    "is_employee": false,
+    "plan_since": "2025-06-01",
+    "tier_since": "2025-07-10"
+  },
+
+  "properties": {
+    "referral_id": "ref_001",
+    "referred_participant_id": "p_999",
+    "external_user_id_hash": "sha256:user42@example.com",
+    "order_id": "ord_789",
+    "amount": 59.9,
+    "currency": "EUR",
+    "items_count": 2,
+    "subtotal": 70.0,
+    "tax": 5.0,
+    "shipping": 0.0,
+    "discount": 15.0,
+    "is_first_purchase": true,
+    "payment_method": "card",
+    "coupon_code": "FRIEND10",
+    "products": [
+      { "sku": "SKU-1", "qty": 1, "unit_price": 39.95, "name": "Pro Plan (1 mo)" },
+      { "sku": "SKU-2", "qty": 1, "unit_price": 19.95, "name": "Addon Seats" }
+    ]
+  }
+}

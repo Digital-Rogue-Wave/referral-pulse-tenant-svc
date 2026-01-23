@@ -1,53 +1,66 @@
 import { registerAs } from '@nestjs/config';
-import validateConfig from '@mod/common/validators/validate-config';
-import type { MaybeType } from '@mod/types/maybe.type';
-import { IsEnum, IsNumberString, IsOptional, IsString, IsUrl } from 'class-validator';
+import { z } from 'zod';
+import { Environment } from '@app/types';
 
-export enum OtelPropagator {
-    W3C = 'w3c',
-    B3 = 'b3'
-}
+const schema = z.object({
+    enabled: z.preprocess((val) => val === 'true', z.boolean()).default(true),
+    serviceName: z.string().min(1).default('referral-campaign-service'),
+    serviceVersion: z.string().default('1.0.0'),
+    environment: z.nativeEnum(Environment).default(Environment.Development),
+    namespace: z.string().optional(),
+    exporterEndpoint: z.string().url().optional(),
+    tracesEndpoint: z.string().url().optional(),
+    metricsEndpoint: z.string().url().optional(),
+    logLevel: z.enum(['trace', 'debug', 'info', 'warn', 'error']).default('info'),
+    samplingRatio: z.coerce.number().min(0).max(1).default(1),
+    propagateB3: z.preprocess((val) => val === 'true', z.boolean()).default(true),
+    propagateW3C: z.preprocess((val) => val === 'true', z.boolean()).default(true),
+    maxExportBatchSize: z.coerce.number().int().positive().default(512),
+    scheduledDelayMillis: z.coerce.number().int().positive().default(5000),
+    exportTimeoutMillis: z.coerce.number().int().positive().default(30000),
+    metricsExportInterval: z.coerce.number().int().positive().default(60000),
+    // Grafana Cloud authentication
+    grafanaUser: z.string().optional(),
+    grafanaApiKey: z.string().optional(),
+    // Loki configuration for log aggregation
+    lokiEnabled: z.preprocess((val) => val === 'true', z.boolean()).default(false),
+    lokiHost: z.string().optional(),
+    lokiBasicAuth: z.string().optional(),
+    lokiLabels: z.string().optional(),
+    lokiBatchInterval: z.coerce.number().int().positive().default(5000),
+});
 
-export type TracingConfig = {
-    enabled: boolean;
-    serviceName: string;
-    environment: string;
-    otlpEndpoint: string; // e.g. http://otel-collector:4318/v1/traces
-    otlpHeaders?: Record<string, string>;
-    samplerRatio: number; // 0..1
-    propagator: OtelPropagator; // w3c|b3
-};
+export type TracingConfig = z.infer<typeof schema>;
 
-class EnvValidator {
-    @IsString() @IsOptional() OTEL_ENABLED!: MaybeType<string>;
-    @IsString() @IsOptional() OTEL_SERVICE_NAME!: MaybeType<string>;
-    @IsString() @IsOptional() OTEL_ENVIRONMENT!: MaybeType<string>;
-    @IsUrl({ require_tld: false }) OTEL_EXPORTER_OTLP_TRACES_ENDPOINT!: string;
-    @IsString() @IsOptional() OTEL_EXPORTER_OTLP_HEADERS!: MaybeType<string>; // key1=val1,key2=val2
-    @IsNumberString() @IsOptional() OTEL_SAMPLER_RATIO!: MaybeType<number>;
-    @IsEnum(OtelPropagator) @IsOptional() OTEL_PROPAGATOR!: MaybeType<OtelPropagator>;
-}
+export default registerAs('tracing', (): TracingConfig => {
+    const result = schema.safeParse({
+        enabled: process.env.OTEL_ENABLED,
+        serviceName: process.env.OTEL_SERVICE_NAME,
+        serviceVersion: process.env.OTEL_SERVICE_VERSION,
+        environment: process.env.NODE_ENV,
+        namespace: process.env.OTEL_SERVICE_NAMESPACE,
+        exporterEndpoint: process.env.OTEL_EXPORTER_OTLP_ENDPOINT,
+        tracesEndpoint: process.env.OTEL_EXPORTER_OTLP_TRACES_ENDPOINT,
+        metricsEndpoint: process.env.OTEL_EXPORTER_OTLP_METRICS_ENDPOINT,
+        logLevel: process.env.OTEL_LOG_LEVEL,
+        samplingRatio: process.env.OTEL_SAMPLING_RATIO,
+        propagateB3: process.env.OTEL_PROPAGATE_B3,
+        propagateW3C: process.env.OTEL_PROPAGATE_W3C,
+        maxExportBatchSize: process.env.OTEL_MAX_EXPORT_BATCH_SIZE,
+        scheduledDelayMillis: process.env.OTEL_SCHEDULED_DELAY_MILLIS,
+        exportTimeoutMillis: process.env.OTEL_EXPORT_TIMEOUT_MILLIS,
+        metricsExportInterval: process.env.OTEL_METRICS_EXPORT_INTERVAL,
+        grafanaUser: process.env.GRAFANA_CLOUD_USER,
+        grafanaApiKey: process.env.GRAFANA_CLOUD_API_KEY,
+        lokiEnabled: process.env.LOKI_ENABLED,
+        lokiHost: process.env.LOKI_HOST,
+        lokiBasicAuth: process.env.LOKI_BASIC_AUTH,
+        lokiLabels: process.env.LOKI_LABELS,
+        lokiBatchInterval: process.env.LOKI_BATCH_INTERVAL,
+    });
 
-function parseHeaders(v?: string): Record<string, string> | undefined {
-    if (!v) return undefined;
-    const out: Record<string, string> = {};
-    for (const part of v.split(',')) {
-        const [k, ...rest] = part.split('=');
-        if (!k || rest.length === 0) continue;
-        out[k.trim()] = rest.join('=').trim();
+    if (!result.success) {
+        throw new Error(`Tracing config validation failed: ${result.error.message}`);
     }
-    return Object.keys(out).length ? out : undefined;
-}
-
-export default registerAs<TracingConfig>('tracingConfig', () => {
-    validateConfig(process.env, EnvValidator);
-    return {
-        enabled: (process.env.OTEL_ENABLED ?? 'true') === 'true',
-        serviceName: process.env.OTEL_SERVICE_NAME ?? process.env.APP_NAME ?? 'app',
-        environment: process.env.OTEL_ENVIRONMENT ?? process.env.NODE_ENV ?? 'development',
-        otlpEndpoint: process.env.OTEL_EXPORTER_OTLP_TRACES_ENDPOINT ?? 'http://otel-collector:4318/v1/traces',
-        otlpHeaders: parseHeaders(process.env.OTEL_EXPORTER_OTLP_HEADERS),
-        samplerRatio: process.env.OTEL_SAMPLER_RATIO ? Number(process.env.OTEL_SAMPLER_RATIO) : 1,
-        propagator: (process.env.OTEL_PROPAGATOR as OtelPropagator) ?? OtelPropagator.W3C
-    };
+    return result.data;
 });
