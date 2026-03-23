@@ -1,4 +1,4 @@
 export enum ApiKeyStatusEnum {
     ACTIVE = 'active',
-    STOPPED = 'stopped'
+    STOPPED = 'stopped',
 }

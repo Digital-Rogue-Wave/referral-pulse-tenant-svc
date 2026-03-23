@@ -1,0 +1,11 @@
+model ReservedSubdomain {
+  slug             String    @id @db.VarChar(255)
+  expiresAt        DateTime  @map("expires_at") @db.Timestamptz
+  originalTenantId String?   @map("original_tenant_id") @db.VarChar(26)
+
+  createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt DateTime  @updatedAt @map("updated_at") @db.Timestamptz
+  deletedAt DateTime? @map("deleted_at") @db.Timestamptz
+
+  @@map("reserved_subdomains")
+}

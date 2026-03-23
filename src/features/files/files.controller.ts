@@ -1,0 +1,136 @@
+import {
+    Controller,
+    Delete,
+    Get,
+    HttpCode,
+    HttpStatus,
+    Param,
+    Post,
+    Put,
+    UploadedFile,
+    UploadedFiles,
+    UseGuards,
+    UseInterceptors,
+} from '@nestjs/common';
+import { ApiBearerAuth, ApiBody, ApiConsumes, ApiOkResponse, ApiTags } from '@nestjs/swagger';
+import { AuthGuard } from '@nestjs/passport';
+import type { File } from '@prisma-gen/generated/client';
+import type { NullableType } from '@app/types';
+import { FileDto, PresignedUrlResponseDto } from '@domains/files';
+
+import { FilesService } from './files.service';
+import { FileInterceptor, FilesInterceptor } from '@nestjs/platform-express';
+
+@ApiTags('Files')
+@ApiBearerAuth()
+@Controller({
+    path: 'files',
+    version: '1',
+})
+export class FilesController {
+    constructor(private readonly filesService: FilesService) {}
+
+    @Post('upload')
+    @ApiBearerAuth()
+    @ApiConsumes('multipart/form-data')
+    @ApiBody({
+        schema: {
+            type: 'object',
+            properties: {
+                file: {
+                    type: 'string',
+                    format: 'binary',
+                },
+            },
+        },
+    })
+    @ApiOkResponse({ type: FileDto })
+    @UseInterceptors(FileInterceptor('file'))
+    @HttpCode(HttpStatus.CREATED)
+    async uploadFile(@UploadedFile() file: Express.Multer.File | Express.MulterS3.File): Promise<File> {
+        return this.filesService.uploadFile(file);
+    }
+
+    @Post('upload-multiple')
+    @ApiConsumes('multipart/form-data')
+    @ApiBody({
+        schema: {
+            type: 'object',
+            properties: {
+                files: {
+                    type: 'array',
+                    items: {
+                        type: 'string',
+                        format: 'binary',
+                    },
+                },
+            },
+        },
+    })
+    @ApiOkResponse({ type: FileDto, isArray: true })
+    @UseInterceptors(FilesInterceptor('files', 10))
+    @HttpCode(HttpStatus.CREATED)
+    async uploadMultipleFiles(
+        @UploadedFiles() files: Array<Express.Multer.File | Express.MulterS3.File>,
+    ): Promise<File[]> {
+        return this.filesService.uploadMultipleFiles(files);
+    }
+
+    @Get('presigned/:type')
+    @ApiBearerAuth()
+    @UseGuards(AuthGuard('jwt'))
+    @ApiOkResponse({ type: PresignedUrlResponseDto })
+    async getPresignedUrl(@Param('type') type: string): Promise<PresignedUrlResponseDto> {
+        return this.filesService.getPresignedUrl(type);
+    }
+
+    @Get(':id')
+    @ApiOkResponse({ type: FileDto })
+    @HttpCode(HttpStatus.OK)
+    async findOne(@Param('id') id: string): Promise<NullableType<File>> {
+        return this.filesService.findOne({ id });
+    }
+
+    /**
+     * Update a file in storage and database
+     * @returns {Promise<File>} updated file
+     * @param id
+     * @param file {Express.Multer.File | Express.MulterS3.File} file to update
+     */
+    @Put(':id')
+    @ApiConsumes('multipart/form-data')
+    @ApiBody({
+        schema: {
+            type: 'object',
+            properties: {
+                file: {
+                    type: 'string',
+                    format: 'binary',
+                },
+            },
+        },
+    })
+    @ApiOkResponse({ type: FileDto })
+    @UseGuards(AuthGuard('jwt'))
+    @UseInterceptors(FileInterceptor('file'))
+    @HttpCode(HttpStatus.OK)
+    async updateFile(
+        @Param('id') id: string,
+        @UploadedFile() file: Express.Multer.File | Express.MulterS3.File,
+    ): Promise<File> {
+        return this.filesService.updateFile(id, file);
+    }
+
+    /**
+     * Delete a file in storage and database
+     * @returns {Promise<File>} deleted file
+     * @param id file id
+     */
+    @Delete(':id')
+    @UseGuards(AuthGuard('jwt'))
+    @ApiOkResponse({ type: FileDto })
+    @HttpCode(HttpStatus.OK)
+    async deleteFile(@Param('id') id: string): Promise<File> {
+        return this.filesService.deleteFile(id);
+    }
+}

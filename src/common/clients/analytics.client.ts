@@ -1,23 +1,30 @@
 import { Injectable } from '@nestjs/common';
-import { ConfigService, ConfigType } from '@nestjs/config';
-import servicesConfig from '@mod/config/services.config';
-import { HttpClient } from '@mod/common/http/http.client';
+import { ConfigService } from '@nestjs/config';
+
+import { HttpClientService } from '@app/common/http/http-client.service';
+import type { AllConfigType } from '@app/config/config.type';
 
 @Injectable()
 export class AnalyticsClient {
     private readonly baseUrl: string;
 
     constructor(
-        private readonly http: HttpClient,
-        private readonly config: ConfigService
+        private readonly http: HttpClientService,
+        private readonly configService: ConfigService<AllConfigType>,
     ) {
-        const services = this.config.getOrThrow<ConfigType<typeof servicesConfig>>('servicesConfig', { infer: true });
-
-        this.baseUrl = services.analytics;
+        this.baseUrl = this.configService.getOrThrow('services.analytics.url', {
+            infer: true,
+        });
     }
 
-    async getCampaignAnalytics(req: { userId: string; campaignId: string }) {
-        const { data } = await this.http.post(`${this.baseUrl}/internal/analytics/{campaignId}/`, req);
+    async getCampaignAnalytics(campaignId: string) {
+        const { data } = await this.http.get(`${this.baseUrl}/internal/analytics/campaigns/${campaignId}`);
+
+        return data;
+    }
+
+    async getBulkCampaignAnalytics(campaignIds: string[]) {
+        const { data } = await this.http.post(`${this.baseUrl}/internal/analytics/campaigns/bulk`, { campaignIds });
 
         return data;
     }

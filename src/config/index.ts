@@ -1,64 +1,56 @@
-/**
- * Centralized configuration exports
- * Import all configurations in one place for cleaner module imports
- */
-
 import appConfig from './app.config';
+import authConfig from './auth.config';
 import awsConfig from './aws.config';
-import cacheConfig from './cache.config';
+import clickhouseConfig from './clickhouse.config';
 import databaseConfig from './database.config';
-import httpClientConfig from './http-client.config';
-import loggerConfig from './logger.config';
-import metricsConfig from './metrics.config';
+import httpConfig from './http.config';
 import oryConfig from './ory.config';
 import redisConfig from './redis.config';
-import s3Config from './s3.config';
+import resilienceConfig from './resilience.config';
 import servicesConfig from './services.config';
-import snsConfig from './sns.config';
-import sqsConfig from './sqs.config';
-import stripeConfig from './stripe.config';
+import temporalConfig from './temporal.config';
 import tracingConfig from './tracing.config';
-import billingConfig from './billing.config';
 
-// Re-export individual configs
+export type { AllConfigType } from './config.type';
+export type { AppConfig } from './app.config';
+export type { DatabaseConfig } from './database.config';
+export type { AwsConfig } from './aws.config';
+export type { RedisConfig } from './redis.config';
+export type { AuthConfig } from './auth.config';
+export type { TracingConfig } from './tracing.config';
+export type { HttpConfig } from './http.config';
+export type { ResilienceConfig } from './resilience.config';
+export type { ServicesConfig } from './services.config';
+export type { OryConfig } from './ory.config';
+export type { ClickHouseConfig } from './clickhouse.config';
+export type { TemporalConfig } from './temporal.config';
+
+export const configLoaders = [
+    appConfig,
+    databaseConfig,
+    awsConfig,
+    redisConfig,
+    authConfig,
+    tracingConfig,
+    httpConfig,
+    resilienceConfig,
+    servicesConfig,
+    oryConfig,
+    clickhouseConfig,
+    temporalConfig,
+];
+
 export {
     appConfig,
-    awsConfig,
-    cacheConfig,
     databaseConfig,
-    httpClientConfig,
-    loggerConfig,
-    metricsConfig,
-    oryConfig,
+    awsConfig,
     redisConfig,
-    s3Config,
-    servicesConfig,
-    snsConfig,
-    sqsConfig,
-    stripeConfig,
+    authConfig,
     tracingConfig,
-    billingConfig
+    httpConfig,
+    resilienceConfig,
+    servicesConfig,
+    oryConfig,
+    clickhouseConfig,
+    temporalConfig,
 };
-
-/**
- * Array of all configuration loaders for easy use in ConfigModule
- * Usage: ConfigModule.forRoot({ load: allConfigs })
- */
-export const allConfigs = [
-    appConfig,
-    awsConfig,
-    cacheConfig,
-    databaseConfig,
-    httpClientConfig,
-    loggerConfig,
-    metricsConfig,
-    oryConfig,
-    redisConfig,
-    s3Config,
-    servicesConfig,
-    snsConfig,
-    sqsConfig,
-    stripeConfig,
-    tracingConfig,
-    billingConfig
-];
