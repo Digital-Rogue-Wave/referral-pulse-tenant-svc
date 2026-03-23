@@ -1,12 +1,12 @@
-{{- define "referral-svc.name" -}}
+{{- define "service.name" -}}
 {{- default .Chart.Name .Values.nameOverride | trunc 63 | trimSuffix "-" -}}
 {{- end -}}
 
-{{- define "referral-svc.fullname" -}}
+{{- define "service.fullname" -}}
 {{- if .Values.fullnameOverride -}}
 {{- .Values.fullnameOverride | trunc 63 | trimSuffix "-" -}}
 {{- else -}}
-{{- $name := include "referral-svc.name" . -}}
+{{- $name := include "service.name" . -}}
 {{- if contains $name .Release.Name -}}
 {{- .Release.Name | trunc 63 | trimSuffix "-" -}}
 {{- else -}}
@@ -15,15 +15,15 @@
 {{- end -}}
 {{- end -}}
 
-{{- define "referral-svc.labels" -}}
+{{- define "service.labels" -}}
 helm.sh/chart: {{ .Chart.Name }}-{{ .Chart.Version | replace "+" "_" }}
-app.kubernetes.io/name: {{ include "referral-svc.name" . }}
+app.kubernetes.io/name: {{ include "service.name" . }}
 app.kubernetes.io/instance: {{ .Release.Name }}
 app.kubernetes.io/version: {{ .Chart.AppVersion }}
 app.kubernetes.io/managed-by: Helm
 {{- end -}}
 
-{{- define "referral-svc.selectorLabels" -}}
-app.kubernetes.io/name: {{ include "referral-svc.name" . }}
+{{- define "service.selectorLabels" -}}
+app.kubernetes.io/name: {{ include "service.name" . }}
 app.kubernetes.io/instance: {{ .Release.Name }}
 {{- end -}}

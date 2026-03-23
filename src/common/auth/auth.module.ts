@@ -1,39 +1,32 @@
-import { Module, Global } from '@nestjs/common';
-import { PassportModule } from '@nestjs/passport';
+import { Global, Module } from '@nestjs/common';
 import { APP_GUARD } from '@nestjs/core';
-import { ConfigModule } from '@nestjs/config';
-import { JwtStrategy } from './jwt.strategy';
-import { JwtAuthGuard } from './jwt-auth.guard';
-import { KetoService } from './keto.service';
-import { KetoGuard } from './keto.guard';
-import { HttpClientsModule } from '@mod/common/http/http-clients.module';
-import oryConfig from '@mod/config/ory.config';
-import { KratosService } from './kratos.service';
-import { JwtModule } from '@nestjs/jwt';
+import { PassportModule } from '@nestjs/passport';
 
+import { JwtAuthGuard } from './jwt-auth.guard';
+import { JwtStrategy } from './jwt.strategy';
+import { PermissionGuard } from './permission.guard';
+import { KetoService } from './keto.service';
+import { KratosService } from './kratos.service';
+import { AlsAuthInterceptor } from '../interceptor';
+
+/**
+ * Authentication module for JWT/OpenID Connect validation.
+ *
+ * Guards registered globally via APP_GUARD:
+ * - JwtAuthGuard: validates JWT on all routes (skip with @Public())
+ * - PermissionGuard: checks Keto permissions (skip by omitting @RequirePermission())
+ */
 @Global()
 @Module({
-    imports: [
-        PassportModule.register({ defaultStrategy: 'jwt' }),
-        JwtModule.register({}),
-        ConfigModule.forFeature(oryConfig),
-        HttpClientsModule.register()
-    ],
+    imports: [PassportModule.register({ defaultStrategy: 'jwt' })],
     providers: [
         JwtStrategy,
+        { provide: APP_GUARD, useClass: JwtAuthGuard },
+        { provide: APP_GUARD, useClass: PermissionGuard },
+        AlsAuthInterceptor,
         KetoService,
         KratosService,
-        KetoGuard,
-        // Guards (order matters: JWT first, then Keto)
-        {
-            provide: APP_GUARD,
-            useClass: JwtAuthGuard
-        },
-        {
-            provide: APP_GUARD,
-            useExisting: KetoGuard
-        }
     ],
-    exports: [PassportModule, KetoService, KratosService]
+    exports: [AlsAuthInterceptor, KetoService, KratosService, PassportModule],
 })
 export class AuthModule {}

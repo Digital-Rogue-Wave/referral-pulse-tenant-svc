@@ -1,26 +1,26 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: {{ include "referral-svc.fullname" . }}
+  name: {{ include "service.fullname" . }}
   labels:
-    {{- include "referral-svc.labels" . | nindent 4 }}
+    {{- include "service.labels" . | nindent 4 }}
 spec:
   replicas: {{ .Values.replicaCount }}
   revisionHistoryLimit: 5
   selector:
     matchLabels:
-      {{- include "referral-svc.selectorLabels" . | nindent 6 }}
+      {{- include "service.selectorLabels" . | nindent 6 }}
   template:
     metadata:
       labels:
-        {{- include "referral-svc.selectorLabels" . | nindent 8 }}
+        {{- include "service.selectorLabels" . | nindent 8 }}
         {{- with .Values.podLabels }}{{ toYaml . | nindent 8 }}{{- end }}
       {{- with .Values.podAnnotations }}
       annotations:
         {{- toYaml . | nindent 8 }}
       {{- end }}
     spec:
-      serviceAccountName: {{ default (include "referral-svc.fullname" .) .Values.serviceAccount.name }}
+      serviceAccountName: {{ default (include "service.fullname" .) .Values.serviceAccount.name }}
       {{- if .Values.imagePullSecrets }}
       imagePullSecrets:
         {{- toYaml .Values.imagePullSecrets | nindent 8 }}
@@ -37,9 +37,9 @@ spec:
               protocol: TCP
           envFrom:
             - configMapRef:
-                name: {{ include "referral-svc.fullname" . }}-config
+                name: {{ include "service.fullname" . }}-config
             - secretRef:
-                name: {{ include "referral-svc.fullname" . }}-secret
+                name: {{ include "service.fullname" . }}-secret
           env:
             {{- with .Values.extraEnv }}
             {{- toYaml . | nindent 12 }}

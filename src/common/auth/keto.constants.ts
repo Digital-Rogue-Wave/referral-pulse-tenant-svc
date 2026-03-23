@@ -1,27 +1,35 @@
+export const KETO_PERMISSION_KEY = 'keto_permission';
+
+// ─── Shared across all microservices (common/auth) ───────────────────────────
+
 export enum KetoNamespace {
     ROLE = 'role',
     TENANT = 'tenants',
-    EVENT = 'event'
 }
 
+/**
+ * Universal CRUD actions on resources.
+ *
+ *   CREATE = write = invite = ingest
+ *   READ   = list = view
+ */
 export enum KetoRelation {
-    MEMBER = 'member',
-    WRITE = 'write',
-    READ = 'read',
-    CREATE_API_KEY = 'create_api_key',
-    UPDATE_API_KEY = 'update_api_key',
-    DELETE_API_KEY = 'delete_api_key',
-    LIST_API_KEY = 'list_api_key',
-    MANAGE_BILLING = 'manage_billing',
-    MANAGE_PLANS = 'manage_plans'
-}
-
-export enum KetoPermission {
     CREATE = 'create',
     READ = 'read',
     UPDATE = 'update',
     DELETE = 'delete',
-    INGEST = 'ingest',
-    VIEW = 'view',
-    INVITE = 'invite'
+}
+
+/** Role namespace relation: role:admin#assigned@user:123 */
+export const ROLE_ASSIGNMENT = 'assigned' as const;
+
+// ─── tenant-svc resources (each microservice defines its own) ────────────────
+
+export enum KetoResource {
+    MEMBER = 'member',
+    INVITATION = 'invitation',
+    API_KEY = 'api_key',
+    BILLING = 'billing',
+    PLANS = 'plans',
+    SETTINGS = 'settings',
 }

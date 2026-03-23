@@ -1,7 +1,7 @@
 import { registerAs } from '@nestjs/config';
 import { IsBooleanString, IsOptional, IsString } from 'class-validator';
-import validateConfig from '@mod/common/validators/validate-config';
-import { MaybeType } from '@mod/types/maybe.type';
+import validateConfig from '@common/validators/validate-config';
+import { MaybeType } from '@app/types';
 
 export type BillingConfig = {
     planStripeSyncEnabled: boolean;
@@ -23,6 +23,6 @@ export default registerAs<BillingConfig>('billingConfig', () => {
 
     return {
         planStripeSyncEnabled: (process.env.BILLING_PLAN_STRIPE_SYNC_ENABLED ?? 'false') === 'true',
-        planStripeSyncCron: process.env.BILLING_PLAN_STRIPE_SYNC_CRON ?? '0 * * * *'
+        planStripeSyncCron: process.env.BILLING_PLAN_STRIPE_SYNC_CRON ?? '0 * * * *',
     };
 });

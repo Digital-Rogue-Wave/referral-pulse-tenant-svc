@@ -1,70 +1,51 @@
 import { registerAs } from '@nestjs/config';
-import validateConfig from '@mod/common/validators/validate-config';
-import { IsUrl, IsString, IsOptional } from 'class-validator';
-import type { MaybeType } from '@mod/types/maybe.type';
 
-export type OryConfig = {
-    hydra: {
-        publicUrl: string;
-        jwksUrl: string;
-        issuer: string;
-    };
-    keto: {
-        readUrl: string;
-        writeUrl: string;
-    };
-    kratos?: {
-        adminUrl: string;
-        publicUrl: string;
-    };
-    audience: string;
-};
+import { z } from 'zod';
 
-class OryEnvValidator {
-    @IsUrl({ require_tld: false })
-    ORY_HYDRA_PUBLIC_URL!: string;
+const schema = z.object({
+    hydra: z.object({
+        publicUrl: z.string(),
+        jwksUrl: z.string().optional(),
+        issuer: z.string(),
+    }),
+    keto: z.object({
+        readUrl: z.string().url(),
+        writeUrl: z.string().url(),
+    }),
+    kratos: z
+        .object({
+            adminUrl: z.string().optional(),
+            publicUrl: z.string().optional(),
+        })
+        .optional(),
+    audience: z.string(),
+});
 
-    @IsUrl({ require_tld: false })
-    @IsOptional()
-    ORY_HYDRA_JWKS_URL?: MaybeType<string>;
+export type OryConfig = z.infer<typeof schema>;
 
-    @IsString()
-    ORY_HYDRA_ISSUER!: string;
-
-    @IsUrl({ require_tld: false })
-    ORY_KETO_READ_URL!: string;
-
-    @IsUrl({ require_tld: false })
-    ORY_KETO_WRITE_URL!: string;
-
-    @IsString()
-    JWT_AUDIENCE!: string;
-
-    @IsUrl({ require_tld: false })
-    @IsOptional()
-    ORY_KRATOS_ADMIN_URL?: MaybeType<string>;
-
-    @IsUrl({ require_tld: false })
-    @IsOptional()
-    ORY_KRATOS_PUBLIC_URL?: MaybeType<string>;
-}
-
-export default registerAs<OryConfig>('oryConfig', () => {
-    validateConfig(process.env, OryEnvValidator);
-
+export default registerAs('oryConfig', (): OryConfig => {
     const hydraPublicUrl = process.env.ORY_HYDRA_PUBLIC_URL as string;
     const jwksUrl = process.env.ORY_HYDRA_JWKS_URL || `${hydraPublicUrl}/.well-known/jwks.json`;
 
-    return {
+    const result = schema.safeParse({
         hydra: {
             publicUrl: hydraPublicUrl,
             jwksUrl,
-            issuer: process.env.ORY_HYDRA_ISSUER as string
+            issuer: process.env.ORY_HYDRA_ISSUER,
         },
         keto: {
-            readUrl: process.env.ORY_KETO_READ_URL as string,
-            writeUrl: process.env.ORY_KETO_WRITE_URL as string
+            readUrl: process.env.ORY_KETO_READ_URL,
+            writeUrl: process.env.ORY_KETO_WRITE_URL,
         },
-        audience: process.env.JWT_AUDIENCE as string
-    };
+        kratos: {
+            adminUrl: process.env.ORY_KRATOS_ADMIN_URL,
+            publicUrl: process.env.ORY_KRATOS_PUBLIC_URL,
+        },
+        audience: process.env.JWT_AUDIENCE,
+    });
+
+    if (!result.success) {
+        throw new Error(`Ory config validation failed: ${result.error.message}`);
+    }
+    return result.data;
 });

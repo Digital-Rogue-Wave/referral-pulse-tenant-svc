@@ -1,18 +1,37 @@
 import { Module, Global } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
-import servicesConfig from '@mod/config/services.config';
-import { HttpClientsModule } from '@mod/common/http/http-clients.module';
-import { WorkflowOrchestrationClient } from './workflow-orchestration.client';
+
+import { HttpModule } from '@app/common/http/http.module';
+import servicesConfig from '@app/config/services.config';
+
+import { AnalyticsClient } from './analytics.client';
+import { CampaignsClient } from './campaigns.client';
+import { ClientIdentityClient } from './client-identity.client';
 import { ContentAiClient } from './content-ai.client';
 import { RewardsClient } from './rewards.client';
-import { CampaignsClient } from '@mod/common/clients/campaigns.client';
-import { SdkConfigClient } from '@mod/common/clients/sdk-config.client';
-import { AnalyticsClient } from '@mod/common/clients/analytics.client';
+import { SdkConfigClient } from './sdk-config.client';
+import { WorkflowOrchestrationClient } from './workflow-orchestration.client';
 
 @Global()
 @Module({
-    imports: [ConfigModule.forFeature(servicesConfig), HttpClientsModule.register()],
-    providers: [WorkflowOrchestrationClient, ContentAiClient, RewardsClient, CampaignsClient, SdkConfigClient, AnalyticsClient],
-    exports: [WorkflowOrchestrationClient, ContentAiClient, RewardsClient, CampaignsClient, SdkConfigClient, AnalyticsClient]
+    imports: [ConfigModule.forFeature(servicesConfig), HttpModule],
+    providers: [
+        WorkflowOrchestrationClient,
+        ContentAiClient,
+        RewardsClient,
+        CampaignsClient,
+        SdkConfigClient,
+        AnalyticsClient,
+        ClientIdentityClient,
+    ],
+    exports: [
+        WorkflowOrchestrationClient,
+        ContentAiClient,
+        RewardsClient,
+        CampaignsClient,
+        SdkConfigClient,
+        AnalyticsClient,
+        ClientIdentityClient,
+    ],
 })
 export class ClientsModule {}

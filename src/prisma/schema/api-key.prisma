@@ -1,0 +1,23 @@
+model ApiKey {
+  id         String    @id @default(cuid())
+  tenantId   String    @map("tenant_id") @db.VarChar(26)
+  name       String    @db.VarChar(255)
+  keyHash    String    @map("key_hash") @db.VarChar(255)
+  keyPrefix  String    @map("key_prefix") @db.VarChar(20)
+  status     String    @default("active") @db.VarChar(50)
+  scopes     Json      @default("[]")
+  createdBy  String    @map("created_by") @db.VarChar(26)
+  lastUsedAt DateTime? @map("last_used_at") @db.Timestamptz
+  expiresAt  DateTime  @map("expires_at") @db.Timestamptz
+
+  createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt DateTime  @updatedAt @map("updated_at") @db.Timestamptz
+  deletedAt DateTime? @map("deleted_at") @db.Timestamptz
+
+  // Relations
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, status])
+  @@index([keyPrefix])
+  @@map("api_keys")
+}

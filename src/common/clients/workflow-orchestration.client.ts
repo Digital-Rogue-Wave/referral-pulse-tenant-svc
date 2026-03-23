@@ -1,23 +1,22 @@
 import { Injectable } from '@nestjs/common';
-import { ConfigService, ConfigType } from '@nestjs/config';
-import servicesConfig from '@mod/config/services.config';
-import { HttpClient } from '@mod/common/http/http.client';
+import { ConfigService } from '@nestjs/config';
+
+import { HttpClientService } from '@app/common/http/http-client.service';
+import type { AllConfigType } from '@app/config/config.type';
 
 @Injectable()
 export class WorkflowOrchestrationClient {
     private readonly baseUrl: string;
 
     constructor(
-        private readonly http: HttpClient,
-        private readonly config: ConfigService
+        private readonly http: HttpClientService,
+        private readonly configService: ConfigService<AllConfigType>,
     ) {
-        const services = this.config.getOrThrow<ConfigType<typeof servicesConfig>>('servicesConfig', { infer: true });
-
-        this.baseUrl = services.workflowOrchestration;
+        this.baseUrl = this.configService.getOrThrow('services.workflowOrchestration.url', { infer: true });
     }
 
     async startWorkflow(req: { workflowType: string; input: Record<string, unknown> }) {
-        // OAuth2 JWT added automatically by HttpClient
+        // OAuth2 JWT added automatically by HttpClientService
         const { data } = await this.http.post(`${this.baseUrl}/internal/workflows/start`, req);
 
         return data;

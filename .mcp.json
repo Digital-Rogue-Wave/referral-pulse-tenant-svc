@@ -1,0 +1,36 @@
+{
+  "mcpServers": {
+    "context7": {
+      "type": "stdio",
+      "command": "npx",
+      "args": ["-y", "@upstash/context7-mcp"],
+      "description": "Live, version-specific docs for NestJS, Prisma, Ory, and all dependencies"
+    },
+    "memory-keeper": {
+      "type": "stdio",
+      "command": "npx",
+      "args": ["-y", "mcp-memory-keeper"],
+      "description": "Persistent memory across sessions — architecture decisions, patterns, progress"
+    },
+    "github": {
+      "type": "stdio",
+      "command": "npx",
+      "args": ["-y", "@modelcontextprotocol/server-github"],
+      "env": {
+        "GITHUB_PERSONAL_ACCESS_TOKEN": "${GITHUB_TOKEN}"
+      },
+      "description": "GitHub for PRs, issues, code search"
+    },
+    "context-mode": {
+      "type": "stdio",
+      "command": "npx",
+      "args": ["-y", "context-mode"],
+      "description": "Reduces tool output in context by 98% — extends sessions from 30 min to 3 hours"
+    },
+    "code-graph-rag": {
+      "type": "stdio",
+      "command": "code-graph-rag-mcp",
+      "description": "Codebase knowledge graph with semantic search — query code structure without reading every file"
+    }
+  }
+}

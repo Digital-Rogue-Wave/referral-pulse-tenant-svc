@@ -1,24 +1,30 @@
 import { Injectable } from '@nestjs/common';
-import { ConfigService, ConfigType } from '@nestjs/config';
-import oryConfig from '@mod/config/ory.config';
-import { KratosIdentity } from '@mod/types/app.interface';
-import { HttpClient } from '@mod/common/http/http.client';
+import { ConfigService } from '@nestjs/config';
+
+import { HttpClientService } from '@common/http/http-client.service';
+
+import type { OryConfig } from '@config/ory.config';
+
+import type { KratosIdentity } from '@app/types';
 
 @Injectable()
 export class KratosService {
     private readonly adminUrl: string;
 
     constructor(
-        private readonly http: HttpClient,
-        private readonly config: ConfigService
+        private readonly http: HttpClientService,
+        private readonly config: ConfigService,
     ) {
-        const oryCfg = this.config.getOrThrow<ConfigType<typeof oryConfig>>('oryConfig', { infer: true });
+        const oryCfg = this.config.getOrThrow<OryConfig>('oryConfig');
         this.adminUrl = oryCfg.kratos?.adminUrl || 'http://kratos:4434';
     }
 
     async getIdentity(identityId: string): Promise<KratosIdentity> {
-        const { data } = await this.http.get<KratosIdentity>(`${this.adminUrl}/admin/identities/${identityId}`);
-        return data;
+        const response = await this.http.get<KratosIdentity>(`${this.adminUrl}/admin/identities/${identityId}`);
+        if (!response.data) {
+            throw new Error(`Identity not found: ${identityId}`);
+        }
+        return response.data;
     }
 
     async listIdentities(tenantId?: string): Promise<KratosIdentity[]> {
@@ -29,9 +35,9 @@ export class KratosService {
             params['metadata_public.tenant_id'] = tenantId;
         }
 
-        const { data } = await this.http.get<KratosIdentity[]>(`${this.adminUrl}/admin/identities`, { params });
+        const response = await this.http.get<KratosIdentity[]>(`${this.adminUrl}/admin/identities`, { params });
 
-        return data;
+        return response.data ?? [];
     }
 
     /**
@@ -52,11 +58,14 @@ export class KratosService {
 
             // Use Kratos native API to verify credentials
             // This endpoint validates password without creating a session
-            const { data } = await this.http.post<{ valid: boolean }>(`${this.adminUrl}/admin/identities/${identityId}/credentials/password/verify`, {
-                password
-            });
+            const response = await this.http.post<{ valid: boolean }>(
+                `${this.adminUrl}/admin/identities/${identityId}/credentials/password/verify`,
+                {
+                    password,
+                },
+            );
 
-            return data?.valid === true;
+            return response.data?.valid === true;
         } catch (error) {
             // If verification fails or endpoint returns error, password is invalid
             console.error(error);
@@ -64,10 +73,23 @@ export class KratosService {
         }
     }
 
-    async updateIdentityMetadata(identityId: string, metadata: { public?: any; admin?: any }): Promise<void> {
-        const payload: any = {};
-        if (metadata.public) payload.metadata_public = metadata.public;
-        if (metadata.admin) payload.metadata_admin = metadata.admin;
+    async updateIdentityMetadata(
+        identityId: string,
+        metadata: {
+            public?: Record<string, unknown>;
+            admin?: Record<string, unknown>;
+        },
+    ): Promise<void> {
+        const payload: {
+            metadata_public?: Record<string, unknown>;
+            metadata_admin?: Record<string, unknown>;
+        } = {};
+        if (metadata.public) {
+            payload.metadata_public = metadata.public;
+        }
+        if (metadata.admin) {
+            payload.metadata_admin = metadata.admin;
+        }
 
         await this.http.patch(`${this.adminUrl}/admin/identities/${identityId}`, payload);
     }

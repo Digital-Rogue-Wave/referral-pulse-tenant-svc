@@ -1,36 +1,49 @@
-import { registerDecorator, ValidationOptions, ValidatorConstraint, ValidatorConstraintInterface, ValidationArguments } from 'class-validator';
-import dayjs from 'dayjs';
+import {
+    registerDecorator,
+    ValidationOptions,
+    ValidatorConstraint,
+    ValidatorConstraintInterface,
+    ValidationArguments,
+} from 'class-validator';
+import moment, { MomentInput } from 'moment';
 
 export enum DateComparisonMethod {
     GREATER = 'greater',
     LESS = 'less',
-    EQUAL = 'equal'
+    EQUAL = 'equal',
 }
 
 @ValidatorConstraint({ async: false })
 export class CompareDateConstraint implements ValidatorConstraintInterface {
-    validate(value: any, args: ValidationArguments): boolean {
+    validate(value: unknown, args: ValidationArguments): boolean {
         const [relatedPropertyOrDate, method] = args.constraints as [string | Date, DateComparisonMethod];
 
         // Get the related value or use the provided Date
-        const relatedValue = relatedPropertyOrDate instanceof Date ? relatedPropertyOrDate : (args.object as any)[relatedPropertyOrDate];
+        const relatedValue =
+            relatedPropertyOrDate instanceof Date
+                ? relatedPropertyOrDate
+                : (args.object as Record<string, unknown>)[relatedPropertyOrDate];
 
-        if (!relatedValue || !dayjs(relatedValue).isValid()) return false;
+        if (!relatedValue || !moment(relatedValue).isValid()) {
+            return false;
+        }
 
         // Handle arrays
         if (Array.isArray(value)) {
-            return value.every((item) => this.compareDates(item, relatedValue, method));
+            return value.every((item) => this.compareDates(item as MomentInput, relatedValue as MomentInput, method));
         }
 
         // Handle single values
-        return this.compareDates(value, relatedValue, method);
+        return this.compareDates(value as MomentInput, relatedValue as MomentInput, method);
     }
 
-    private compareDates(value: any, relatedValue: any, method: DateComparisonMethod): boolean {
-        if (!value || !dayjs(value).isValid()) return false;
+    private compareDates(value: MomentInput, relatedValue: MomentInput, method: DateComparisonMethod): boolean {
+        if (!value || !moment(value).isValid()) {
+            return false;
+        }
 
-        const currentDate = dayjs(value);
-        const compareDate = dayjs(relatedValue);
+        const currentDate = moment(value);
+        const compareDate = moment(relatedValue);
 
         switch (method) {
             case DateComparisonMethod.GREATER:
@@ -53,14 +66,18 @@ export class CompareDateConstraint implements ValidatorConstraintInterface {
     }
 }
 
-export function CompareDate(relatedPropertyOrDate: string | Date, method: DateComparisonMethod, validationOptions?: ValidationOptions) {
+export function CompareDate(
+    relatedPropertyOrDate: string | Date,
+    method: DateComparisonMethod,
+    validationOptions?: ValidationOptions,
+) {
     return function (object: NonNullable<unknown>, propertyName: string) {
         registerDecorator({
             target: object.constructor,
             propertyName: propertyName,
             options: validationOptions,
             constraints: [relatedPropertyOrDate, method],
-            validator: CompareDateConstraint
+            validator: CompareDateConstraint,
         });
     };
 }

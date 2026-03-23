@@ -1,0 +1,39 @@
+model Tenant {
+  id                       String    @id @default(cuid())
+  name                     String    @db.VarChar(255)
+  slug                     String    @unique @db.VarChar(255)
+  imageId                  String?   @map("image_id")
+  status                   String    @default("active") @db.VarChar(50)
+  paymentStatus            String    @default("active") @map("payment_status") @db.VarChar(50)
+  paymentStatusChangedAt   DateTime? @map("payment_status_changed_at") @db.Timestamptz
+  trialStartedAt           DateTime? @map("trial_started_at") @db.Timestamptz
+  trialEndsAt              DateTime? @map("trial_ends_at") @db.Timestamptz
+  suspendedAt              DateTime? @map("suspended_at") @db.Timestamptz
+  lockedAt                 DateTime? @map("locked_at") @db.Timestamptz
+  lockUntil                DateTime? @map("lock_until") @db.Timestamptz
+  lockReason               String?   @map("lock_reason") @db.Text
+  deletionScheduledAt      DateTime? @map("deletion_scheduled_at") @db.Timestamptz
+  deletionReason           String?   @map("deletion_reason") @db.Text
+  customDomain             String?   @unique @map("custom_domain") @db.VarChar(255)
+  domainVerificationStatus String    @default("unverified") @map("domain_verification_status") @db.VarChar(50)
+  domainVerificationToken  String?   @map("domain_verification_token") @db.VarChar(255)
+
+  createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt DateTime  @updatedAt @map("updated_at") @db.Timestamptz
+  deletedAt DateTime? @map("deleted_at") @db.Timestamptz
+
+  // Relations
+  image                       File?                        @relation(fields: [imageId], references: [id])
+  setting                     TenantSetting?
+  invitations                 Invitation[]
+  members                     TeamMember[]
+  billing                     Billing?
+  billingEvents               BillingEvent[]
+  tenantUsages                TenantUsage[]
+  apiKeys                     ApiKey[]
+  userNotificationPreferences UserNotificationPreference[]
+
+  @@index([status])
+  @@index([slug])
+  @@map("tenants")
+}

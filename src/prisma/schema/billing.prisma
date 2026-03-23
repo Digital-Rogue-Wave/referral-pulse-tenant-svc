@@ -1,0 +1,81 @@
+model Plan {
+  id              String  @id @default(cuid())
+  name            String  @db.VarChar(255)
+  stripePriceId   String? @map("stripe_price_id") @db.VarChar(255)
+  stripeProductId String? @map("stripe_product_id") @db.VarChar(255)
+  interval        String? @db.VarChar(50)
+  limits          Json?
+  tenantId        String? @map("tenant_id") @db.VarChar(26)
+  isActive        Boolean @default(true) @map("is_active")
+  manualInvoicing Boolean @default(false) @map("manual_invoicing")
+  metadata        Json?
+
+  createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt DateTime  @updatedAt @map("updated_at") @db.Timestamptz
+  deletedAt DateTime? @map("deleted_at") @db.Timestamptz
+
+  @@map("plans")
+}
+
+model Billing {
+  id                      String    @id @default(cuid())
+  tenantId                String    @unique @map("tenant_id") @db.VarChar(26)
+  plan                    String    @default("Free") @db.VarChar(50)
+  status                  String    @default("none") @db.VarChar(50)
+  stripeCustomerId        String?   @map("stripe_customer_id") @db.VarChar(255)
+  stripeSubscriptionId    String?   @map("stripe_subscription_id") @db.VarChar(255)
+  stripeTransactionId     String?   @map("stripe_transaction_id") @db.VarChar(255)
+  pendingDowngradePlan    String?   @map("pending_downgrade_plan") @db.VarChar(50)
+  downgradeScheduledAt    DateTime? @map("downgrade_scheduled_at") @db.Timestamptz
+  cancellationReason      String?   @map("cancellation_reason") @db.Text
+  cancellationRequestedAt DateTime? @map("cancellation_requested_at") @db.Timestamptz
+  cancellationEffectiveAt DateTime? @map("cancellation_effective_at") @db.Timestamptz
+
+  createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt DateTime  @updatedAt @map("updated_at") @db.Timestamptz
+  deletedAt DateTime? @map("deleted_at") @db.Timestamptz
+
+  // Relations
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@map("billings")
+}
+
+model BillingEvent {
+  id         String    @id @default(cuid())
+  tenantId   String    @map("tenant_id") @db.VarChar(26)
+  eventType  String    @map("event_type") @db.VarChar(100)
+  metricName String?   @map("metric_name") @db.VarChar(100)
+  increment  Int?
+  timestamp  DateTime  @db.Timestamptz
+  metadata   Json?
+
+  createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt DateTime  @updatedAt @map("updated_at") @db.Timestamptz
+  deletedAt DateTime? @map("deleted_at") @db.Timestamptz
+
+  // Relations
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, timestamp])
+  @@map("billing_events")
+}
+
+model TenantUsage {
+  id           String  @id @default(cuid())
+  tenantId     String  @map("tenant_id") @db.VarChar(26)
+  metricName   String  @map("metric_name") @db.VarChar(100)
+  periodDate   String  @map("period_date") @db.VarChar(10)
+  currentUsage Int     @default(0) @map("current_usage")
+  limitValue   Int?    @map("limit_value")
+
+  createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt DateTime  @updatedAt @map("updated_at") @db.Timestamptz
+  deletedAt DateTime? @map("deleted_at") @db.Timestamptz
+
+  // Relations
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, metricName, periodDate])
+  @@map("tenant_usages")
+}

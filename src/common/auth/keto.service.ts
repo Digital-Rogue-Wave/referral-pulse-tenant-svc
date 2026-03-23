@@ -1,7 +1,9 @@
 import { Injectable } from '@nestjs/common';
-import { ConfigService, ConfigType } from '@nestjs/config';
-import { HttpClient } from '@mod/common/http/http.client';
-import oryConfig from '@mod/config/ory.config';
+import { ConfigService } from '@nestjs/config';
+
+import { HttpClientService } from '@common/http/http-client.service';
+
+import type { OryConfig } from '@config/ory.config';
 
 export interface KetoRelationTuple {
     namespace: string;
@@ -32,10 +34,10 @@ export class KetoService {
     private readonly writeUrl: string;
 
     constructor(
-        private readonly http: HttpClient,
-        private readonly config: ConfigService
+        private readonly http: HttpClientService,
+        private readonly config: ConfigService,
     ) {
-        const oryCfg = this.config.getOrThrow<ConfigType<typeof oryConfig>>('oryConfig', { infer: true });
+        const oryCfg = this.config.getOrThrow<OryConfig>('oryConfig');
         this.readUrl = oryCfg.keto.readUrl;
         this.writeUrl = oryCfg.keto.writeUrl;
     }
@@ -46,17 +48,17 @@ export class KetoService {
      */
     async check(namespace: string, object: string, relation: string, subjectId: string): Promise<boolean> {
         try {
-            const { data } = await this.http.post<KetoCheckResponse>(`${this.readUrl}/relation-tuples/check`, {
+            const response = await this.http.post<KetoCheckResponse>(`${this.readUrl}/relation-tuples/check`, {
                 namespace,
                 object,
                 relation,
-                subject_id: subjectId
+                subject_id: subjectId,
             } as KetoCheckRequest);
 
-            return data.allowed;
+            return response.data.allowed;
         } catch (error) {
             // Keto returns 403 if not allowed, treat as false
-            if ((error as any)?.response?.status === 403) {
+            if ((error as { status?: number })?.status === 403) {
                 return false;
             }
             throw error;
@@ -66,12 +68,15 @@ export class KetoService {
     /**
      * Batch check multiple permissions
      */
-    async checkBatch(checks: Array<{ namespace: string; object: string; relation: string }>, subjectId: string): Promise<Record<string, boolean>> {
+    async checkBatch(
+        checks: Array<{ namespace: string; object: string; relation: string }>,
+        subjectId: string,
+    ): Promise<Record<string, boolean>> {
         const results = await Promise.all(
             checks.map(async ({ namespace, object, relation }) => {
                 const allowed = await this.check(namespace, object, relation, subjectId);
                 return { key: `${namespace}:${object}#${relation}`, allowed };
-            })
+            }),
         );
 
         return Object.fromEntries(results.map((r) => [r.key, r.allowed]));
@@ -93,8 +98,8 @@ export class KetoService {
                 namespace: tuple.namespace,
                 object: tuple.object,
                 relation: tuple.relation,
-                subject_id: tuple.subject_id
-            }
+                subject_id: tuple.subject_id as string,
+            },
         });
     }
 }
