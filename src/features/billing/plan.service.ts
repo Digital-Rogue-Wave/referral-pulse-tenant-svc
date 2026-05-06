@@ -11,14 +11,14 @@ import { RedisService } from '@common/redis/redis.service';
 import { RedisKeyBuilder } from '@common/redis/redis-key.builder';
 import { prismaPaginate } from '@common/nestjs-prisma-pagination';
 
-import { CreatePlanDto, UpdatePlanDto } from '@domains/billing';
+import { CreatePlanDto, UpdatePlanDto, PlanDto, planResponseMapper } from '@domains/billing';
 import { assertValidPlanLimits } from './plan-limits.type';
 import type { PlanLimits } from './plan-limits.type';
 import { PLAN_PAGINATE_CONFIG } from './plan.pagination';
 
 @Injectable()
 export class PlanService {
-    private readonly publicPlansCacheTtlSec = 3600; // ~1 hour
+    private readonly publicPlansCacheTtlSec = 3600;
 
     constructor(
         private readonly prisma: DatabaseService,
@@ -51,7 +51,7 @@ export class PlanService {
         }
     }
 
-    async create(dto: CreatePlanDto): Promise<Plan> {
+    async create(dto: CreatePlanDto): Promise<PlanDto> {
         if (dto.manualInvoicing && !dto.tenantId) {
             throw new BadRequestException('manualInvoicing plans must be associated with a tenantId');
         }
@@ -73,10 +73,10 @@ export class PlanService {
         });
 
         await this.invalidateCaches();
-        return plan;
+        return planResponseMapper.toResponse(plan);
     }
 
-    async findAllPaginated(query: PaginateQuery<Plan>, includeInactive = false): Promise<Paginated<Plan>> {
+    async findAllPaginated(query: PaginateQuery<PlanDto>, includeInactive = false): Promise<Paginated<PlanDto>> {
         const baseWhere: Prisma.PlanWhereInput = {
             deletedAt: null,
         };
@@ -85,13 +85,18 @@ export class PlanService {
             baseWhere.isActive = true;
         }
 
-        return prismaPaginate(query, this.prisma.plan, PLAN_PAGINATE_CONFIG, baseWhere);
+        const result = await prismaPaginate(query as PaginateQuery<Plan>, this.prisma.plan, PLAN_PAGINATE_CONFIG, baseWhere);
+        return {
+            ...result,
+            data: planResponseMapper.toResponseArray(result.data),
+        };
     }
 
-    async findOne(where: Prisma.PlanWhereInput): Promise<NullableType<Plan>> {
-        return this.prisma.plan.findFirst({
+    async findOne(where: Prisma.PlanWhereInput): Promise<NullableType<PlanDto>> {
+        const plan = await this.prisma.plan.findFirst({
             where: { ...where, deletedAt: null },
         });
+        return plan ? planResponseMapper.toResponse(plan) : null;
     }
 
     async findOneOrFail(where: Prisma.PlanWhereInput): Promise<Plan> {
@@ -106,7 +111,7 @@ export class PlanService {
         return plan;
     }
 
-    async update(id: string, dto: UpdatePlanDto): Promise<Plan> {
+    async update(id: string, dto: UpdatePlanDto): Promise<PlanDto> {
         const existingPlan = await this.findOneOrFail({ id });
 
         const updateData: Prisma.PlanUpdateInput = {};
@@ -144,7 +149,6 @@ export class PlanService {
             updateData.manualInvoicing = dto.manualInvoicing;
         }
 
-        // Check manualInvoicing constraint with merged values
         const finalManualInvoicing =
             dto.manualInvoicing !== undefined ? dto.manualInvoicing : existingPlan.manualInvoicing;
         const finalTenantId = dto.tenantId !== undefined ? dto.tenantId : existingPlan.tenantId;
@@ -163,7 +167,7 @@ export class PlanService {
         });
 
         await this.invalidateCaches();
-        return updated;
+        return planResponseMapper.toResponse(updated);
     }
 
     async softDelete(id: string): Promise<void> {
@@ -177,10 +181,10 @@ export class PlanService {
         await this.invalidateCaches();
     }
 
-    async getPublicPlansCached(): Promise<Plan[]> {
+    async getPublicPlansCached(): Promise<PlanDto[]> {
         const cacheKey = this.buildPublicPlansCacheKey();
 
-        const cached = await this.redisService.get<Plan[]>(cacheKey, {
+        const cached = await this.redisService.get<PlanDto[]>(cacheKey, {
             tenantScoped: false,
         });
         if (cached) {
@@ -198,10 +202,12 @@ export class PlanService {
             },
         });
 
-        await this.redisService.set(cacheKey, plans, {
+        const mapped = planResponseMapper.toResponseArray(plans);
+
+        await this.redisService.set(cacheKey, mapped, {
             ttl: this.publicPlansCacheTtlSec,
             tenantScoped: false,
         });
-        return plans;
+        return mapped;
     }
 }
