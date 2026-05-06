@@ -63,6 +63,26 @@ In Swagger, add:
 - **Authorize** with your Bearer token
 - Add `tenant-id` header for each request (or set it globally in Swagger if you use a plugin)
 
+## Idempotency (required for mutation endpoints)
+
+All mutation endpoints (`POST /subscription/checkout`, `POST /subscription/upgrade`, `POST /subscription/cancel`, etc.) require an idempotency key header to prevent duplicate processing:
+
+```
+x-idempotency-key: <unique-uuid-per-request>
+```
+
+Generate a unique key for each new request. Retrying the **same** operation (e.g. after a network timeout) should reuse the same key — the server will return the cached response. Sending a different key will be treated as a new request.
+
+Example:
+
+```powershell
+$headers = @{
+    "Authorization" = "Bearer $token"
+    "tenant-id"     = "$tenantId"
+    "x-idempotency-key" = [System.Guid]::NewGuid().ToString()
+}
+```
+
 ## 3) Path Scenario A — New paid subscription via Stripe Checkout (4242…)
 
 ### Step A1 — Create a real Checkout Session URL

@@ -52,6 +52,16 @@ Architecture ownership note (source of truth: `docs/specs/microservices-architec
 - [x] A6 Confirm billing route auth matches architecture
   - Auth is enforced globally via `APP_GUARD` (`JwtAuthGuard` then `KetoGuard`).
 
+- [x] A7 Align billing feature with toto-example template patterns
+  - Events now use `TransactionEventEmitterService` (not raw `EventEmitter2`) across all services:
+    `billing.service.ts`, `payment-status-escalation.service.ts`, `trial-lifecycle.service.ts`, `daily-usage-calculator.service.ts`.
+  - All event emissions use typed domain event classes (`SubscriptionCreatedEvent`, `SubscriptionChangedEvent`, etc.) instead of plain object literals.
+  - All mutation endpoints decorated with `@Idempotent()` (scope: Tenant); clients must send `x-idempotency-key` header.
+  - `AppLoggerService` injected and context set in both `BillingController` and `PlanAdminController`.
+  - SQS consumer refactored: `ReferralEventProcessor` (manual parsing, manual tenant context) replaced by `BillingConsumer` using `MessageProcessorService.process()` for automatic idempotency + tenant context.
+  - `Plan` admin endpoints now return `PlanDto` (via `planResponseMapper`) instead of raw Prisma `Plan` model.
+  - `EventsModule` imported in `BillingModule` to provide `TransactionEventEmitterService`.
+
 ---
 
 ## 0. OpenSpec Change – `add-subscription-checkout`

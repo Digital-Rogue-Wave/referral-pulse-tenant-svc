@@ -33,6 +33,16 @@ Architecture source of truth: `docs/specs/microservices-architecture.md`
 - [x] 0.6 Ensure billing endpoints are protected per architecture
     - Auth is enforced globally via `APP_GUARD` (`JwtAuthGuard` then `KetoGuard`).
 
+- [x] 0.7 Align billing feature with toto-example NestJS template patterns
+    - All event emission uses `TransactionEventEmitterService.emitAfterCommit()` with typed domain event classes.
+      Affected services: `billing.service.ts`, `payment-status-escalation.service.ts`, `trial-lifecycle.service.ts`, `daily-usage-calculator.service.ts`.
+    - All mutation HTTP endpoints decorated with `@Idempotent({ scope: IdempotencyScope.Tenant })`.
+      Clients must send `x-idempotency-key` header on every mutation request.
+    - `AppLoggerService` injected with `setContext()` in all controllers.
+    - SQS consumer refactored to `BillingConsumer` using `MessageProcessorService.process()` (automatic idempotency + tenant context).
+    - Plan responses use `PlanResponseMapper` extending `BaseResponseMapper` — admin and public plan endpoints return `PlanDto` instead of raw Prisma model.
+    - `EventsModule` added to `BillingModule` imports.
+
 ## Phase 1: Database & Core Entities
 
 - [x] 1.1 Create Plan entity with TypeORM (REFER-312)
