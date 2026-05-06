@@ -5,7 +5,6 @@ import { Public } from '@common/auth/public.decorator';
 import { PlanDto } from '@domains/billing';
 
 import { PlanService } from './plan.service';
-import type { Plan } from '@prisma-gen/generated/client';
 
 @ApiTags('Billing Plans')
 @Controller({ path: 'billings/plans', version: '1' })
@@ -20,7 +19,7 @@ export class PlanPublicController {
     })
     @HttpCode(HttpStatus.OK)
     @Get()
-    async listPublicPlans(): Promise<Plan[]> {
+    async listPublicPlans(): Promise<PlanDto[]> {
         return this.planService.getPublicPlansCached();
     }
 }

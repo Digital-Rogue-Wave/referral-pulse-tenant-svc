@@ -2,6 +2,8 @@ import { Body, Controller, Delete, Get, HttpCode, HttpStatus, Param, Post, Put }
 import { ApiBearerAuth, ApiBody, ApiCreatedResponse, ApiHeader, ApiOkResponse, ApiTags } from '@nestjs/swagger';
 import { RequirePermission } from '@common/auth/require-permission.decorator';
 import { KetoNamespace, KetoRelation, KetoResource } from '@common/auth/keto.constants';
+import { Idempotent, IdempotencyScope } from '@common/idempotency';
+import { AppLoggerService } from '@common/logging/app-logger.service';
 import {
     Paginate,
     PaginateQuery,
@@ -13,7 +15,6 @@ import {
 import { CreatePlanDto, UpdatePlanDto, PlanDto } from '@domains/billing';
 
 import { PlanService } from './plan.service';
-import type { Plan } from '@prisma-gen/generated/client';
 import { NullableType } from '@app/types';
 
 @ApiTags('Billing Plans (Admin)')
@@ -26,7 +27,12 @@ import { NullableType } from '@app/types';
 })
 @Controller({ path: 'billings/admin/plans', version: '1' })
 export class PlanAdminController {
-    constructor(private readonly planService: PlanService) {}
+    constructor(
+        private readonly planService: PlanService,
+        private readonly logger: AppLoggerService,
+    ) {
+        this.logger.setContext(PlanAdminController.name);
+    }
 
     @ApiBody({ type: CreatePlanDto })
     @ApiCreatedResponse({
@@ -34,9 +40,10 @@ export class PlanAdminController {
         type: PlanDto,
     })
     @RequirePermission({ namespace: KetoNamespace.TENANT, object: KetoResource.PLANS, relation: KetoRelation.CREATE })
+    @Idempotent({ scope: IdempotencyScope.Tenant, ttl: 3600 })
     @HttpCode(HttpStatus.CREATED)
     @Post()
-    async create(@Body() dto: CreatePlanDto): Promise<Plan> {
+    async create(@Body() dto: CreatePlanDto): Promise<PlanDto> {
         return this.planService.create(dto);
     }
 
@@ -54,7 +61,7 @@ export class PlanAdminController {
     @RequirePermission({ namespace: KetoNamespace.TENANT, object: KetoResource.PLANS, relation: KetoRelation.READ })
     @HttpCode(HttpStatus.OK)
     @Get()
-    async listPlans(@Paginate() query: PaginateQuery<Plan>): Promise<Paginated<Plan>> {
+    async listPlans(@Paginate() query: PaginateQuery<PlanDto>): Promise<Paginated<PlanDto>> {
         return this.planService.findAllPaginated(query);
     }
 
@@ -62,16 +69,17 @@ export class PlanAdminController {
     @RequirePermission({ namespace: KetoNamespace.TENANT, object: KetoResource.PLANS, relation: KetoRelation.READ })
     @HttpCode(HttpStatus.OK)
     @Get(':id')
-    async findOne(@Param('id') id: string): Promise<NullableType<Plan>> {
+    async findOne(@Param('id') id: string): Promise<NullableType<PlanDto>> {
         return this.planService.findOne({ id });
     }
 
     @ApiBody({ type: UpdatePlanDto })
     @ApiOkResponse({ description: 'Plan updated successfully', type: PlanDto })
     @RequirePermission({ namespace: KetoNamespace.TENANT, object: KetoResource.PLANS, relation: KetoRelation.UPDATE })
+    @Idempotent({ scope: IdempotencyScope.Tenant, ttl: 1800 })
     @HttpCode(HttpStatus.OK)
     @Put(':id')
-    async update(@Param('id') id: string, @Body() dto: UpdatePlanDto): Promise<Plan> {
+    async update(@Param('id') id: string, @Body() dto: UpdatePlanDto): Promise<PlanDto> {
         return this.planService.update(id, dto);
     }
 
