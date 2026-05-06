@@ -1,5 +1,4 @@
 import { Injectable } from '@nestjs/common';
-import { EventEmitter2 } from '@nestjs/event-emitter';
 
 import { TenantStatusEnum } from '@common/enums/tenant.enum';
 
@@ -7,6 +6,9 @@ import { DatabaseService } from '@app/database/database.service';
 import { TenantContextService } from '@common/tenant-aware/tenant-context.service';
 import { AppLoggerService } from '@common/logging/app-logger.service';
 import { RedisService } from '@common/redis/redis.service';
+import { TransactionEventEmitterService } from '@common/events/transaction-event-emitter.service';
+
+import { BillingEvents, UsageMonthlySummaryEvent } from '@domains/billing';
 
 @Injectable()
 export class MonthlyUsageResetService {
@@ -15,7 +17,7 @@ export class MonthlyUsageResetService {
         private readonly tenantContext: TenantContextService,
         private readonly logger: AppLoggerService,
         private readonly redis: RedisService,
-        private readonly eventEmitter: EventEmitter2,
+        private readonly txEventEmitter: TransactionEventEmitterService,
     ) {
         this.logger.setContext(MonthlyUsageResetService.name);
     }
@@ -78,15 +80,10 @@ export class MonthlyUsageResetService {
                         },
                     });
 
-                    this.eventEmitter.emit('usage.monthly_summary', {
-                        tenantId,
-                        metric,
-                        month: prevMonthLabel,
-                        usage,
-                        limit,
-                        periodDate: prevMonthEnd,
-                        triggeredAt: now.toISOString(),
-                    });
+                    this.txEventEmitter.emitAfterCommit(
+                        BillingEvents.USAGE_MONTHLY_SUMMARY,
+                        new UsageMonthlySummaryEvent(tenantId, tenantId, metric, prevMonthLabel, usage, limit, prevMonthEnd, now.toISOString()),
+                    );
 
                     await this.redis.clearMonthlyUsage(metric, prevMonthLabel);
                     await this.redis.clearThresholdFlags(metric, [80, 100]);

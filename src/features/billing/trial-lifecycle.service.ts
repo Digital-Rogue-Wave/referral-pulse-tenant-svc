@@ -1,5 +1,4 @@
 import { Injectable } from '@nestjs/common';
-import { EventEmitter2 } from '@nestjs/event-emitter';
 
 import type { Tenant, Billing } from '@prisma-gen/generated/client';
 import { TenantStatusEnum } from '@common/enums/tenant.enum';
@@ -9,6 +8,14 @@ import { DatabaseService } from '@app/database/database.service';
 import { AppLoggerService } from '@common/logging/app-logger.service';
 import { RedisService } from '@common/redis/redis.service';
 import { RedisKeyBuilder } from '@common/redis/redis-key.builder';
+import { TransactionEventEmitterService } from '@common/events/transaction-event-emitter.service';
+
+import {
+    BillingEvents,
+    TrialReminderEvent,
+    TrialExpiredEvent,
+    SubscriptionChangedEvent,
+} from '@domains/billing';
 
 @Injectable()
 export class TrialLifecycleService {
@@ -20,7 +27,7 @@ export class TrialLifecycleService {
         private readonly logger: AppLoggerService,
         private readonly redis: RedisService,
         private readonly keyBuilder: RedisKeyBuilder,
-        private readonly eventEmitter: EventEmitter2,
+        private readonly txEventEmitter: TransactionEventEmitterService,
     ) {
         this.logger.setContext(TrialLifecycleService.name);
     }
@@ -70,12 +77,10 @@ export class TrialLifecycleService {
             return;
         }
 
-        this.eventEmitter.emit('trial.reminder', {
-            tenantId,
-            daysRemaining,
-            trialEndsAt: trialEndsAt.toISOString(),
-            triggeredAt: now.toISOString(),
-        });
+        this.txEventEmitter.emitAfterCommit(
+            BillingEvents.TRIAL_REMINDER,
+            new TrialReminderEvent(tenantId, tenantId, trialEndsAt.toISOString(), daysRemaining, now.toISOString()),
+        );
     }
 
     private async handleTrialExpired(tenant: Tenant, now: Date): Promise<void> {
@@ -115,13 +120,17 @@ export class TrialLifecycleService {
                 },
             });
 
-            this.eventEmitter.emit('subscription.changed', {
-                tenantId: billing.tenantId,
-                billingPlan: BillingPlanEnum.FREE,
-                subscriptionStatus: SubscriptionStatusEnum.NONE,
-                stripeCustomerId: billing.stripeCustomerId ?? undefined,
-                stripeSubscriptionId: undefined,
-            });
+            this.txEventEmitter.emitAfterCommit(
+                BillingEvents.SUBSCRIPTION_CHANGED,
+                new SubscriptionChangedEvent(
+                    billing.id,
+                    billing.tenantId,
+                    BillingPlanEnum.FREE,
+                    SubscriptionStatusEnum.NONE,
+                    undefined,
+                    billing.stripeCustomerId ?? undefined,
+                ),
+            );
         }
 
         const oldTrialEndsAt = tenant.trialEndsAt;
@@ -141,12 +150,10 @@ export class TrialLifecycleService {
             return;
         }
 
-        this.eventEmitter.emit('trial.expired', {
-            tenantId,
-            trialEndsAt: (oldTrialEndsAt ?? now).toISOString(),
-            downgradedTo: BillingPlanEnum.FREE,
-            triggeredAt: now.toISOString(),
-        });
+        this.txEventEmitter.emitAfterCommit(
+            BillingEvents.TRIAL_EXPIRED,
+            new TrialExpiredEvent(tenantId, tenantId, (oldTrialEndsAt ?? now).toISOString(), now.toISOString()),
+        );
     }
 
     private async ensureBillingForTenant(tenantId: string): Promise<Billing> {

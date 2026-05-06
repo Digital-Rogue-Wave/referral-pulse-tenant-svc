@@ -1,5 +1,4 @@
 import { Injectable } from '@nestjs/common';
-import { EventEmitter2 } from '@nestjs/event-emitter';
 
 import { TenantStatusEnum } from '@common/enums/tenant.enum';
 
@@ -7,6 +6,9 @@ import { DatabaseService } from '@app/database/database.service';
 import { TenantContextService } from '@common/tenant-aware/tenant-context.service';
 import { AppLoggerService } from '@common/logging/app-logger.service';
 import { RedisService } from '@common/redis/redis.service';
+import { TransactionEventEmitterService } from '@common/events/transaction-event-emitter.service';
+
+import { BillingEvents, UsageThresholdCrossedEvent } from '@domains/billing';
 
 @Injectable()
 export class DailyUsageCalculator {
@@ -15,7 +17,7 @@ export class DailyUsageCalculator {
         private readonly tenantContext: TenantContextService,
         private readonly logger: AppLoggerService,
         private readonly redis: RedisService,
-        private readonly eventEmitter: EventEmitter2,
+        private readonly txEventEmitter: TransactionEventEmitterService,
     ) {
         this.logger.setContext(DailyUsageCalculator.name);
     }
@@ -127,17 +129,10 @@ export class DailyUsageCalculator {
                 `Usage threshold ${threshold}% crossed for tenant ${tenantId}, metric ${metric} (usage=${usage}, limit=${limit})`,
             );
 
-            this.eventEmitter.emit('usage.threshold_crossed', {
-                tenantId,
-                metric,
-                threshold,
-                usage,
-                limit,
-                percentage,
-                periodDate,
-                month,
-                triggeredAt: now.toISOString(),
-            });
+            this.txEventEmitter.emitAfterCommit(
+                BillingEvents.USAGE_THRESHOLD_CROSSED,
+                new UsageThresholdCrossedEvent(tenantId, tenantId, metric, threshold, usage, limit, percentage, periodDate, now.toISOString()),
+            );
         }
     }
 }

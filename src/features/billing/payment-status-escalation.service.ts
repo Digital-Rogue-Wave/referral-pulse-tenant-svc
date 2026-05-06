@@ -1,5 +1,4 @@
 import { Injectable } from '@nestjs/common';
-import { EventEmitter2 } from '@nestjs/event-emitter';
 
 import type { Tenant } from '@prisma-gen/generated/client';
 import { PaymentStatusEnum } from '@common/enums/billing.enum';
@@ -7,14 +6,9 @@ import { TenantStatusEnum } from '@common/enums/tenant.enum';
 
 import { DatabaseService } from '@app/database/database.service';
 import { AppLoggerService } from '@common/logging/app-logger.service';
+import { TransactionEventEmitterService } from '@common/events/transaction-event-emitter.service';
 
-interface TenantPaymentStatusChangedEvent {
-    tenantId: string;
-    previousStatus: string | null;
-    nextStatus: string;
-    changedAt: string;
-    source: string;
-}
+import { BillingEvents, TenantPaymentStatusChangedEvent } from '@domains/billing';
 
 @Injectable()
 export class PaymentStatusEscalationService {
@@ -24,7 +18,7 @@ export class PaymentStatusEscalationService {
     constructor(
         private readonly prisma: DatabaseService,
         private readonly logger: AppLoggerService,
-        private readonly eventEmitter: EventEmitter2,
+        private readonly txEventEmitter: TransactionEventEmitterService,
     ) {
         this.logger.setContext(PaymentStatusEscalationService.name);
     }
@@ -89,14 +83,9 @@ export class PaymentStatusEscalationService {
             `Escalated tenant paymentStatus: tenantId=${tenant.id}, from=${previousStatus}, to=${nextStatus}`,
         );
 
-        const evt: TenantPaymentStatusChangedEvent = {
-            tenantId: tenant.id,
-            previousStatus,
-            nextStatus,
-            changedAt: now.toISOString(),
-            source: 'escalation',
-        };
-
-        this.eventEmitter.emit('tenant.payment_status.changed', evt);
+        this.txEventEmitter.emitAfterCommit(
+            BillingEvents.TENANT_PAYMENT_STATUS_CHANGED,
+            new TenantPaymentStatusChangedEvent(tenant.id, tenant.id, previousStatus ?? '', nextStatus, now.toISOString()),
+        );
     }
 }

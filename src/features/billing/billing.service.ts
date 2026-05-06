@@ -1,5 +1,4 @@
 import { HttpException, HttpStatus, Injectable } from '@nestjs/common';
-import { EventEmitter2 } from '@nestjs/event-emitter';
 import Stripe from 'stripe';
 
 import { NO_STRIPE_CUSTOMER_ERROR } from '@app/types';
@@ -32,6 +31,7 @@ import { AppLoggerService } from '@common/logging/app-logger.service';
 import { TenantContextService } from '@common/tenant-aware/tenant-context.service';
 import { MetricsService } from '@common/monitoring/metrics.service';
 import { IdempotencyService } from '@common/idempotency/idempotency.service';
+import { TransactionEventEmitterService } from '@common/events/transaction-event-emitter.service';
 
 import { TenantService } from '@app/features/tenant/tenant.service';
 import { TenantStatsService } from '@app/features/tenant/aware/tenant-stats.service';
@@ -48,6 +48,13 @@ import {
     UsageSummaryDto,
     UsageMetricSummaryDto,
     UsageMetricHistoryPointDto,
+    SubscriptionCreatedEvent,
+    SubscriptionChangedEvent,
+    SubscriptionUpgradedEvent,
+    SubscriptionDowngradeScheduledEvent,
+    SubscriptionCancelledEvent,
+    TenantPaymentStatusChangedEvent,
+    BillingEvents,
 } from '@domains/billing';
 
 import { StripeService } from './stripe.service';
@@ -59,7 +66,7 @@ export class BillingService {
         private readonly prisma: DatabaseService,
         private readonly logger: AppLoggerService,
         private readonly tenantContext: TenantContextService,
-        private readonly eventEmitter: EventEmitter2,
+        private readonly txEventEmitter: TransactionEventEmitterService,
         private readonly stripeService: StripeService,
         private readonly idempotencyService: IdempotencyService,
         private readonly metricsService: MetricsService,
@@ -257,19 +264,23 @@ export class BillingService {
                 },
             });
 
-            this.eventEmitter.emit('tenant.payment_status.changed', {
-                tenantId: tenant.id,
-                previousStatus,
-                nextStatus: PaymentStatusEnum.ACTIVE,
-                changedAt: changedAt.toISOString(),
-                source: 'stripe',
-                stripeEventId: event.id,
-                stripeCustomerId: billing.stripeCustomerId ?? undefined,
-                stripeSubscriptionId: billing.stripeSubscriptionId ?? undefined,
-                stripeInvoiceId: invoiceId,
-                stripePaymentIntentId: paymentIntentId ?? undefined,
-                nextPaymentAttemptAt: null,
-            });
+            this.txEventEmitter.emitAfterCommit(
+                BillingEvents.TENANT_PAYMENT_STATUS_CHANGED,
+                new TenantPaymentStatusChangedEvent(
+                    tenant.id,
+                    tenant.id,
+                    previousStatus,
+                    PaymentStatusEnum.ACTIVE,
+                    changedAt.toISOString(),
+                    undefined,
+                    undefined,
+                    billing.stripeCustomerId ?? undefined,
+                    billing.stripeSubscriptionId ?? undefined,
+                    invoiceId,
+                    paymentIntentId ?? undefined,
+                    null,
+                ),
+            );
         } catch (err) {
             this.logger.error(
                 `Failed to update tenant paymentStatus for invoice.payment_succeeded: tenantId=${billing.tenantId}, eventId=${event.id}, invoiceId=${invoiceId}`,
@@ -305,14 +316,20 @@ export class BillingService {
                 data: updateData,
             });
 
-            this.eventEmitter.emit('subscription.changed', {
-                tenantId: billing.tenantId,
-                billingPlan: resolvedPlan,
-                subscriptionStatus: billing.status,
-                stripeCustomerId: billing.stripeCustomerId,
-                stripeSubscriptionId: billing.stripeSubscriptionId,
-                stripeEventId: event.id,
-            });
+            this.txEventEmitter.emitAfterCommit(
+                BillingEvents.SUBSCRIPTION_CHANGED,
+                new SubscriptionChangedEvent(
+                    billing.id,
+                    billing.tenantId,
+                    resolvedPlan,
+                    billing.status,
+                    billing.stripeSubscriptionId ?? undefined,
+                    billing.stripeCustomerId ?? undefined,
+                    undefined,
+                    undefined,
+                    event.id,
+                ),
+            );
 
             this.logger.log(`Subscription plan updated from ${previousPlan} to ${resolvedPlan}`, {
                 tenantId: billing.tenantId,
@@ -497,15 +514,17 @@ export class BillingService {
             },
         });
 
-        this.eventEmitter.emit('subscription.upgraded', {
-            tenantId: billing.tenantId,
-            previousPlan,
-            billingPlan: targetPlan,
-            subscriptionStatus: SubscriptionStatusEnum.ACTIVE,
-            stripeCustomerId: billing.stripeCustomerId ?? undefined,
-            stripeSubscriptionId: billing.stripeSubscriptionId ?? undefined,
-            upgradeUserId: userId ?? null,
-        });
+        this.txEventEmitter.emitAfterCommit(
+            BillingEvents.SUBSCRIPTION_UPGRADED,
+            new SubscriptionUpgradedEvent(
+                billing.id,
+                billing.tenantId,
+                previousPlan,
+                targetPlan,
+                new Date().toISOString(),
+                userId ?? undefined,
+            ),
+        );
 
         this.logger.log(`Subscription upgraded from ${previousPlan} to ${targetPlan}`, {
             tenantId: billing.tenantId,
@@ -626,17 +645,19 @@ export class BillingService {
             },
         });
 
-        this.eventEmitter.emit('subscription.cancelled', {
-            tenantId: billing.tenantId,
-            previousPlan: billing.plan,
-            billingPlan: billing.plan,
-            subscriptionStatus: billing.status,
-            stripeCustomerId: billing.stripeCustomerId ?? undefined,
-            stripeSubscriptionId: billing.stripeSubscriptionId ?? undefined,
-            cancelUserId: userId ?? null,
-            cancellationReason: dto.reason ?? null,
-            cancellationEffectiveDate: schedule.effectiveDate?.toISOString() ?? null,
-        });
+        this.txEventEmitter.emitAfterCommit(
+            BillingEvents.SUBSCRIPTION_CANCELLED,
+            new SubscriptionCancelledEvent(
+                billing.id,
+                billing.tenantId,
+                now.toISOString(),
+                schedule.effectiveDate?.toISOString() ?? now.toISOString(),
+                billing.stripeSubscriptionId ?? undefined,
+                billing.plan,
+                dto.reason ?? undefined,
+                userId ?? undefined,
+            ),
+        );
 
         this.logger.log(`Subscription cancellation scheduled`, {
             tenantId: billing.tenantId,
@@ -760,16 +781,17 @@ export class BillingService {
             },
         });
 
-        this.eventEmitter.emit('subscription.downgrade_scheduled', {
-            tenantId: billing.tenantId,
-            previousPlan,
-            billingPlan: targetPlan,
-            subscriptionStatus: billing.status,
-            stripeCustomerId: billing.stripeCustomerId ?? undefined,
-            stripeSubscriptionId: billing.stripeSubscriptionId ?? undefined,
-            downgradeUserId: userId ?? null,
-            effectiveDate: schedule.effectiveDate?.toISOString() ?? null,
-        });
+        this.txEventEmitter.emitAfterCommit(
+            BillingEvents.SUBSCRIPTION_DOWNGRADE_SCHEDULED,
+            new SubscriptionDowngradeScheduledEvent(
+                billing.id,
+                billing.tenantId,
+                previousPlan,
+                targetPlan,
+                schedule.effectiveDate?.toISOString() ?? new Date().toISOString(),
+                userId ?? undefined,
+            ),
+        );
 
         this.logger.log(`Subscription downgrade scheduled from ${previousPlan} to ${targetPlan}`, {
             tenantId: billing.tenantId,
@@ -965,25 +987,37 @@ export class BillingService {
             (previousStatus !== SubscriptionStatusEnum.ACTIVE || !previousStripeSubscriptionId);
 
         if (isNewPaidSubscription) {
-            this.eventEmitter.emit('subscription.created', {
-                tenantId,
-                billingPlan: planId,
-                subscriptionStatus: SubscriptionStatusEnum.ACTIVE,
-                stripeCustomerId: updateData.stripeCustomerId ?? undefined,
-                stripeSubscriptionId: updateData.stripeSubscriptionId ?? undefined,
-                checkoutUserId: userId ?? null,
-                stripeEventId: event.id,
-            });
+            this.txEventEmitter.emitAfterCommit(
+                BillingEvents.SUBSCRIPTION_CREATED,
+                new SubscriptionCreatedEvent(
+                    billing.id,
+                    tenantId,
+                    planId,
+                    SubscriptionStatusEnum.ACTIVE,
+                    typeof updateData.stripeSubscriptionId === 'string' ? updateData.stripeSubscriptionId : undefined,
+                    typeof updateData.stripeCustomerId === 'string' ? updateData.stripeCustomerId : undefined,
+                    undefined,
+                    undefined,
+                    event.id,
+                    userId ?? undefined,
+                ),
+            );
         }
 
-        this.eventEmitter.emit('subscription.changed', {
-            tenantId,
-            billingPlan: planId,
-            subscriptionStatus: updateData.status,
-            stripeCustomerId: updateData.stripeCustomerId,
-            stripeSubscriptionId: updateData.stripeSubscriptionId,
-            stripeEventId: event.id,
-        });
+        this.txEventEmitter.emitAfterCommit(
+            BillingEvents.SUBSCRIPTION_CHANGED,
+            new SubscriptionChangedEvent(
+                billing.id,
+                tenantId,
+                planId,
+                typeof updateData.status === 'string' ? updateData.status : billing.status,
+                typeof updateData.stripeSubscriptionId === 'string' ? updateData.stripeSubscriptionId : undefined,
+                typeof updateData.stripeCustomerId === 'string' ? updateData.stripeCustomerId : undefined,
+                undefined,
+                undefined,
+                event.id,
+            ),
+        );
 
         this.logger.log(`Subscription updated via Stripe checkout`, {
             tenantId,
@@ -1088,19 +1122,23 @@ export class BillingService {
                 },
             });
 
-            this.eventEmitter.emit('tenant.payment_status.changed', {
-                tenantId: tenant.id,
-                previousStatus,
-                nextStatus: PaymentStatusEnum.PAST_DUE,
-                changedAt: changedAt.toISOString(),
-                source: 'stripe',
-                stripeEventId: event.id,
-                stripeCustomerId: billing.stripeCustomerId ?? undefined,
-                stripeSubscriptionId: billing.stripeSubscriptionId ?? undefined,
-                stripeInvoiceId: invoiceId,
-                stripePaymentIntentId: context.paymentIntentId ?? undefined,
-                nextPaymentAttemptAt: context.nextAttempt?.toISOString() ?? null,
-            });
+            this.txEventEmitter.emitAfterCommit(
+                BillingEvents.TENANT_PAYMENT_STATUS_CHANGED,
+                new TenantPaymentStatusChangedEvent(
+                    tenant.id,
+                    tenant.id,
+                    previousStatus,
+                    PaymentStatusEnum.PAST_DUE,
+                    changedAt.toISOString(),
+                    undefined,
+                    undefined,
+                    billing.stripeCustomerId ?? undefined,
+                    billing.stripeSubscriptionId ?? undefined,
+                    invoiceId,
+                    context.paymentIntentId ?? undefined,
+                    context.nextAttempt?.toISOString() ?? null,
+                ),
+            );
         } catch (err) {
             this.logger.error(
                 `Failed to update tenant paymentStatus for invoice.payment_failed: tenantId=${billing.tenantId}, eventId=${event.id}, invoiceId=${invoiceId}`,
