@@ -29,3 +29,4 @@ export * from './responses/billing.responses';
 
 // Mappers
 export * from './mappers/billing-response.mapper';
+export * from './mappers/plan-response.mapper';

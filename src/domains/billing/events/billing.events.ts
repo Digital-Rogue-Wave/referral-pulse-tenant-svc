@@ -1,20 +1,17 @@
 import { BaseDomainEvent } from '@domains/common/events';
 
-/**
- * Domain event emitted when a subscription changes
- */
 export class SubscriptionChangedEvent extends BaseDomainEvent {
     readonly eventType = 'subscription.changed' as const;
 
     constructor(
         public readonly aggregateId: string,
         public readonly tenantId: string,
-        public readonly stripeSubscriptionId: string,
-        public readonly stripeCustomerId: string,
         public readonly billingPlan: string,
         public readonly subscriptionStatus: string,
-        public readonly currentPeriodStart: Date,
-        public readonly currentPeriodEnd: Date,
+        public readonly stripeSubscriptionId?: string,
+        public readonly stripeCustomerId?: string,
+        public readonly currentPeriodStart?: Date,
+        public readonly currentPeriodEnd?: Date,
         public readonly stripeEventId?: string,
         public readonly userId?: string,
     ) {
@@ -22,21 +19,18 @@ export class SubscriptionChangedEvent extends BaseDomainEvent {
     }
 }
 
-/**
- * Domain event emitted when a subscription is created
- */
 export class SubscriptionCreatedEvent extends BaseDomainEvent {
     readonly eventType = 'subscription.created' as const;
 
     constructor(
         public readonly aggregateId: string,
         public readonly tenantId: string,
-        public readonly stripeSubscriptionId: string,
-        public readonly stripeCustomerId: string,
         public readonly billingPlan: string,
         public readonly subscriptionStatus: string,
-        public readonly currentPeriodStart: Date,
-        public readonly currentPeriodEnd: Date,
+        public readonly stripeSubscriptionId?: string,
+        public readonly stripeCustomerId?: string,
+        public readonly currentPeriodStart?: Date,
+        public readonly currentPeriodEnd?: Date,
         public readonly stripeEventId?: string,
         public readonly userId?: string,
     ) {
@@ -44,18 +38,16 @@ export class SubscriptionCreatedEvent extends BaseDomainEvent {
     }
 }
 
-/**
- * Domain event emitted when a subscription is cancelled
- */
 export class SubscriptionCancelledEvent extends BaseDomainEvent {
     readonly eventType = 'subscription.cancelled' as const;
 
     constructor(
         public readonly aggregateId: string,
         public readonly tenantId: string,
-        public readonly stripeSubscriptionId: string,
         public readonly cancelledAt: string,
-        public readonly endsAt: string,
+        public readonly cancellationEffectiveAt: string,
+        public readonly stripeSubscriptionId?: string,
+        public readonly billingPlan?: string,
         public readonly reason?: string,
         public readonly userId?: string,
     ) {
@@ -63,9 +55,6 @@ export class SubscriptionCancelledEvent extends BaseDomainEvent {
     }
 }
 
-/**
- * Domain event emitted when a subscription downgrade is scheduled
- */
 export class SubscriptionDowngradeScheduledEvent extends BaseDomainEvent {
     readonly eventType = 'subscription.downgrade-scheduled' as const;
 
@@ -81,9 +70,6 @@ export class SubscriptionDowngradeScheduledEvent extends BaseDomainEvent {
     }
 }
 
-/**
- * Domain event emitted when a subscription is upgraded
- */
 export class SubscriptionUpgradedEvent extends BaseDomainEvent {
     readonly eventType = 'subscription.upgraded' as const;
 
@@ -91,7 +77,7 @@ export class SubscriptionUpgradedEvent extends BaseDomainEvent {
         public readonly aggregateId: string,
         public readonly tenantId: string,
         public readonly previousPlan: string,
-        public readonly newPlan: string,
+        public readonly billingPlan: string,
         public readonly effectiveDate: string,
         public readonly userId?: string,
     ) {
@@ -99,9 +85,6 @@ export class SubscriptionUpgradedEvent extends BaseDomainEvent {
     }
 }
 
-/**
- * Domain event emitted when tenant payment status changes
- */
 export class TenantPaymentStatusChangedEvent extends BaseDomainEvent {
     readonly eventType = 'tenant.payment-status-changed' as const;
 
@@ -113,14 +96,16 @@ export class TenantPaymentStatusChangedEvent extends BaseDomainEvent {
         public readonly changedAt: string,
         public readonly reason?: string,
         public readonly userId?: string,
+        public readonly stripeCustomerId?: string,
+        public readonly stripeSubscriptionId?: string,
+        public readonly stripeInvoiceId?: string,
+        public readonly stripePaymentIntentId?: string,
+        public readonly nextPaymentAttemptAt?: string | null,
     ) {
         super();
     }
 }
 
-/**
- * Domain event emitted as a trial reminder
- */
 export class TrialReminderEvent extends BaseDomainEvent {
     readonly eventType = 'trial.reminder' as const;
 
@@ -136,9 +121,6 @@ export class TrialReminderEvent extends BaseDomainEvent {
     }
 }
 
-/**
- * Domain event emitted when a trial expires
- */
 export class TrialExpiredEvent extends BaseDomainEvent {
     readonly eventType = 'trial.expired' as const;
 
@@ -153,9 +135,6 @@ export class TrialExpiredEvent extends BaseDomainEvent {
     }
 }
 
-/**
- * Domain event emitted when a payment fails
- */
 export class PaymentFailedEvent extends BaseDomainEvent {
     readonly eventType = 'payment.failed' as const;
 
@@ -172,9 +151,6 @@ export class PaymentFailedEvent extends BaseDomainEvent {
     }
 }
 
-/**
- * Domain event emitted when a payment is restored
- */
 export class PaymentRestoredEvent extends BaseDomainEvent {
     readonly eventType = 'payment.restored' as const;
 
@@ -191,9 +167,6 @@ export class PaymentRestoredEvent extends BaseDomainEvent {
     }
 }
 
-/**
- * Domain event emitted when a tenant is restricted due to billing
- */
 export class TenantRestrictedEvent extends BaseDomainEvent {
     readonly eventType = 'tenant.restricted' as const;
 
@@ -210,9 +183,6 @@ export class TenantRestrictedEvent extends BaseDomainEvent {
     }
 }
 
-/**
- * Domain event emitted when a tenant is restored from billing restriction
- */
 export class TenantRestoredEvent extends BaseDomainEvent {
     readonly eventType = 'tenant.restored' as const;
 
@@ -229,9 +199,41 @@ export class TenantRestoredEvent extends BaseDomainEvent {
     }
 }
 
-/**
- * Event type constants for convenience
- */
+export class UsageMonthlySummaryEvent extends BaseDomainEvent {
+    readonly eventType = 'usage.monthly_summary' as const;
+
+    constructor(
+        public readonly aggregateId: string,
+        public readonly tenantId: string,
+        public readonly metric: string,
+        public readonly month: string,
+        public readonly usage: number,
+        public readonly limit: number | null,
+        public readonly periodDate: string,
+        public readonly triggeredAt: string,
+    ) {
+        super();
+    }
+}
+
+export class UsageThresholdCrossedEvent extends BaseDomainEvent {
+    readonly eventType = 'usage.threshold_crossed' as const;
+
+    constructor(
+        public readonly aggregateId: string,
+        public readonly tenantId: string,
+        public readonly metric: string,
+        public readonly threshold: number,
+        public readonly usage: number,
+        public readonly limit: number,
+        public readonly percentage: number,
+        public readonly periodDate: string,
+        public readonly triggeredAt: string,
+    ) {
+        super();
+    }
+}
+
 export const BillingEvents = {
     SUBSCRIPTION_CHANGED: 'subscription.changed',
     SUBSCRIPTION_CREATED: 'subscription.created',
