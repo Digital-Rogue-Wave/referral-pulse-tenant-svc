@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 
 import { TenantModule } from '@app/features/tenant/tenant.module';
+import { EventsModule } from '@common/events/events.module';
 
 // Controllers
 import { BillingController } from './billing.controller';
@@ -31,10 +32,10 @@ import { BillingGuard } from './guards/billing.guard';
 
 // Processors
 import { BillingUsageProcessor } from './processors/billing-usage.processor';
-import { ReferralEventProcessor } from './listeners/referral-events.consumer';
+import { BillingConsumer } from './billing.consumer';
 
 @Module({
-    imports: [TenantModule],
+    imports: [TenantModule, EventsModule],
     controllers: [
         BillingController,
         PlanAdminController,
@@ -57,7 +58,7 @@ import { ReferralEventProcessor } from './listeners/referral-events.consumer';
         BillingUsageQueueService,
         BillingUsageProcessor,
         DailyUsageCalculator,
-        ReferralEventProcessor,
+        BillingConsumer,
         MonthlyUsageResetService,
         PaymentStatusEscalationService,
         TrialLifecycleService,
@@ -71,7 +72,7 @@ import { ReferralEventProcessor } from './listeners/referral-events.consumer';
         PlanLimitService,
         BillingGuard,
         DailyUsageCalculator,
-        ReferralEventProcessor,
+        BillingConsumer,
         MonthlyUsageResetService,
         PaymentStatusEscalationService,
         TrialLifecycleService,
