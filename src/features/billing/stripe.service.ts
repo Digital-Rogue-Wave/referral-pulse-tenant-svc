@@ -1,14 +1,20 @@
-import { HttpException, HttpStatus, Injectable, Logger } from '@nestjs/common';
+import { HttpException, HttpStatus, Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import Stripe from 'stripe';
 import { AllConfigType } from '@config/config.type';
 import { BillingPlanEnum } from '@common/enums/billing.enum';
+import { AppLoggerService } from '@common/logging/app-logger.service';
+import { DateService } from '@common/helper/date.service';
 
 @Injectable()
 export class StripeService {
-    private readonly logger = new Logger(StripeService.name);
-
-    constructor(private readonly configService: ConfigService<AllConfigType>) {}
+    constructor(
+        private readonly configService: ConfigService<AllConfigType>,
+        private readonly logger: AppLoggerService,
+        private readonly dateService: DateService,
+    ) {
+        this.logger.setContext(StripeService.name);
+    }
 
     private stripeClient(): Stripe {
         const secretKey = this.configService.get('stripeConfig.secretKey', {
@@ -272,7 +278,9 @@ export class StripeService {
 
         const amountDueNow = (upcoming.amount_due ?? 0) / 100;
         const currency = upcoming.currency ?? 'usd';
-        const nextInvoiceDate = upcoming.next_payment_attempt ? new Date(upcoming.next_payment_attempt * 1000) : null;
+        const nextInvoiceDate = upcoming.next_payment_attempt
+            ? this.dateService.fromUnix(upcoming.next_payment_attempt).toDate()
+            : null;
 
         this.logger.log(
             `Calculated Stripe subscription upgrade preview for subscription ${params.stripeSubscriptionId} to plan ${params.targetPlan}: amountDueNow=${amountDueNow} ${currency}`,
@@ -321,7 +329,7 @@ export class StripeService {
         const subscription = await stripe.subscriptions.retrieve(params.stripeSubscriptionId);
         const periodEndRaw = subscription.items?.data?.[0]?.current_period_end;
         const periodEndTs = typeof periodEndRaw === 'number' && Number.isFinite(periodEndRaw) ? periodEndRaw : null;
-        const effectiveDate = periodEndTs ? new Date(periodEndTs * 1000) : null;
+        const effectiveDate = periodEndTs ? this.dateService.fromUnix(periodEndTs).toDate() : null;
 
         if (!periodEndTs) {
             this.logger.warn(
@@ -372,7 +380,7 @@ export class StripeService {
 
         this.logger.log(
             `Scheduled Stripe subscription ${params.stripeSubscriptionId} to downgrade to plan ${params.targetPlan} at ${
-                effectiveDate ? effectiveDate.toISOString() : 'unknown'
+                effectiveDate ? this.dateService.toISO(effectiveDate) : 'unknown'
             } using schedule ${schedule.id}`,
         );
 
@@ -414,11 +422,11 @@ export class StripeService {
 
         const periodEndRaw = subscription.items?.data?.[0]?.current_period_end;
         const periodEndTs = typeof periodEndRaw === 'number' && Number.isFinite(periodEndRaw) ? periodEndRaw : null;
-        const periodEnd = periodEndTs ? new Date(periodEndTs * 1000) : null;
+        const periodEnd = periodEndTs ? this.dateService.fromUnix(periodEndTs).toDate() : null;
 
         this.logger.log(
             `Scheduled subscription cancellation at period end for Stripe subscription ${stripeSubscriptionId} with effective date ${
-                periodEnd ? periodEnd.toISOString() : 'unknown'
+                periodEnd ? this.dateService.toISO(periodEnd) : 'unknown'
             }`,
         );
 
@@ -577,9 +585,9 @@ export class StripeService {
                 currency: invoice.currency ?? 'usd',
                 amountDue: (invoice.amount_due ?? 0) / 100,
                 amountPaid: (invoice.amount_paid ?? 0) / 100,
-                createdAt: new Date(createdTs * 1000),
-                periodStart: periodStartTs ? new Date(periodStartTs * 1000) : null,
-                periodEnd: periodEndTs ? new Date(periodEndTs * 1000) : null,
+                createdAt: this.dateService.fromUnix(createdTs).toDate(),
+                periodStart: periodStartTs ? this.dateService.fromUnix(periodStartTs).toDate() : null,
+                periodEnd: periodEndTs ? this.dateService.fromUnix(periodEndTs).toDate() : null,
                 hostedInvoiceUrl: invoice.hosted_invoice_url ?? null,
                 invoicePdfUrl: invoice.invoice_pdf ?? null,
             };
@@ -608,14 +616,14 @@ export class StripeService {
         const currency = upcoming.currency ?? 'usd';
 
         const nextPaymentAttempt = upcoming.next_payment_attempt
-            ? new Date(upcoming.next_payment_attempt * 1000)
+            ? this.dateService.fromUnix(upcoming.next_payment_attempt).toDate()
             : null;
 
         const periodStartTs = upcoming.period_start as number | undefined;
         const periodEndTs = upcoming.period_end as number | undefined;
 
-        const periodStart = periodStartTs ? new Date(periodStartTs * 1000) : null;
-        const periodEnd = periodEndTs ? new Date(periodEndTs * 1000) : null;
+        const periodStart = periodStartTs ? this.dateService.fromUnix(periodStartTs).toDate() : null;
+        const periodEnd = periodEndTs ? this.dateService.fromUnix(periodEndTs).toDate() : null;
 
         this.logger.log(
             `Retrieved upcoming Stripe invoice preview for customer ${params.customerId} (subscription=${
