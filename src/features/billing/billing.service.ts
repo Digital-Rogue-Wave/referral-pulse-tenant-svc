@@ -33,6 +33,8 @@ import { MetricsService } from '@common/monitoring/metrics.service';
 import { IdempotencyService } from '@common/idempotency/idempotency.service';
 import { TransactionEventEmitterService } from '@common/events/transaction-event-emitter.service';
 
+import { DateService } from '@common/helper/date.service';
+
 import { TenantService } from '@app/features/tenant/tenant.service';
 import { TenantStatsService } from '@app/features/tenant/aware/tenant-stats.service';
 
@@ -73,6 +75,7 @@ export class BillingService {
         private readonly tenantService: TenantService,
         private readonly tenantStatsService: TenantStatsService,
         private readonly planLimitService: PlanLimitService,
+        private readonly dateService: DateService,
     ) {
         this.logger.setContext(BillingService.name);
     }
@@ -102,14 +105,13 @@ export class BillingService {
 
         const limits = await this.planLimitService.getPlanLimits(tenantId);
 
-        const today = new Date();
-        const todayStr = today.toISOString().slice(0, 10);
+        const today = this.dateService.nowMoment();
+        const todayStr = this.dateService.format(today, 'YYYY-MM-DD');
 
         const periodDates: string[] = [];
         for (let i = 0; i < 7; i++) {
-            const d = new Date(today);
-            d.setDate(d.getDate() - i);
-            periodDates.push(d.toISOString().slice(0, 10));
+            const d = this.dateService.subtract(today, i, 'day');
+            periodDates.push(this.dateService.format(d, 'YYYY-MM-DD'));
         }
 
         const rows = await this.prisma.tenantUsage.findMany({
@@ -271,7 +273,7 @@ export class BillingService {
                     tenant.id,
                     previousStatus,
                     PaymentStatusEnum.ACTIVE,
-                    changedAt.toISOString(),
+                    this.dateService.toISO(changedAt),
                     undefined,
                     undefined,
                     billing.stripeCustomerId ?? undefined,
@@ -389,8 +391,7 @@ export class BillingService {
                 const now = new Date();
                 if (tenant.trialEndsAt > now) {
                     trialActive = true;
-                    const diffMs = tenant.trialEndsAt.getTime() - now.getTime();
-                    trialDaysRemaining = Math.ceil(diffMs / (1000 * 60 * 60 * 24));
+                    trialDaysRemaining = Math.ceil(this.dateService.diff(tenant.trialEndsAt, now, 'days'));
                 } else {
                     trialActive = false;
                 }
@@ -432,10 +433,9 @@ export class BillingService {
                 const currentPeriodEndSeconds = getSubscriptionPeriodEnd(subscription);
 
                 if (currentPeriodEndSeconds !== null) {
-                    const endDate = new Date(currentPeriodEndSeconds * 1000);
-                    stripeCurrentPeriodEnd = endDate.toISOString();
-                    const diffMs = endDate.getTime() - Date.now();
-                    stripePeriodDaysRemaining = Math.max(0, Math.ceil(diffMs / (1000 * 60 * 60 * 24)));
+                    const endDate = this.dateService.fromUnix(currentPeriodEndSeconds).toDate();
+                    stripeCurrentPeriodEnd = this.dateService.toISO(endDate);
+                    stripePeriodDaysRemaining = Math.max(0, Math.ceil(this.dateService.diff(endDate, new Date(), 'days')));
                 }
 
                 stripeCancelAtPeriodEnd = subscription.cancel_at_period_end;
@@ -521,7 +521,7 @@ export class BillingService {
                 billing.tenantId,
                 previousPlan,
                 targetPlan,
-                new Date().toISOString(),
+                this.dateService.nowISO(),
                 userId ?? undefined,
             ),
         );
@@ -650,8 +650,8 @@ export class BillingService {
             new SubscriptionCancelledEvent(
                 billing.id,
                 billing.tenantId,
-                now.toISOString(),
-                schedule.effectiveDate?.toISOString() ?? now.toISOString(),
+                this.dateService.toISO(now),
+                schedule.effectiveDate ? this.dateService.toISO(schedule.effectiveDate) : this.dateService.toISO(now),
                 billing.stripeSubscriptionId ?? undefined,
                 billing.plan,
                 dto.reason ?? undefined,
@@ -788,7 +788,7 @@ export class BillingService {
                 billing.tenantId,
                 previousPlan,
                 targetPlan,
-                schedule.effectiveDate?.toISOString() ?? new Date().toISOString(),
+                schedule.effectiveDate ? this.dateService.toISO(schedule.effectiveDate) : this.dateService.nowISO(),
                 userId ?? undefined,
             ),
         );
@@ -1051,7 +1051,9 @@ export class BillingService {
             return;
         }
 
-        const nextAttempt = invoice.next_payment_attempt ? new Date(invoice.next_payment_attempt * 1000) : null;
+        const nextAttempt = invoice.next_payment_attempt
+            ? this.dateService.fromUnix(invoice.next_payment_attempt).toDate()
+            : null;
 
         await this.markTenantPaymentAsPastDue(billing, event, invoiceId, {
             paymentIntentId,
@@ -1111,7 +1113,7 @@ export class BillingService {
             const changedAt = new Date();
 
             this.logger.warn(
-                `Set tenant ${tenant.id} paymentStatus=PAST_DUE due to invoice.payment_failed (next_attempt=${context.nextAttempt?.toISOString() ?? 'none'})`,
+                `Set tenant ${tenant.id} paymentStatus=PAST_DUE due to invoice.payment_failed (next_attempt=${context.nextAttempt ? this.dateService.toISO(context.nextAttempt) : 'none'})`,
             );
 
             await this.prisma.tenant.update({
@@ -1129,14 +1131,14 @@ export class BillingService {
                     tenant.id,
                     previousStatus,
                     PaymentStatusEnum.PAST_DUE,
-                    changedAt.toISOString(),
+                    this.dateService.toISO(changedAt),
                     undefined,
                     undefined,
                     billing.stripeCustomerId ?? undefined,
                     billing.stripeSubscriptionId ?? undefined,
                     invoiceId,
                     context.paymentIntentId ?? undefined,
-                    context.nextAttempt?.toISOString() ?? null,
+                    context.nextAttempt ? this.dateService.toISO(context.nextAttempt) : null,
                 ),
             );
         } catch (err) {
@@ -1166,7 +1168,7 @@ export class BillingService {
                 });
 
                 this.logger.log(
-                    `Ended trial early for tenant ${tenantId} at ${now.toISOString()} due to paid subscription checkout`,
+                    `Ended trial early for tenant ${tenantId} at ${this.dateService.toISO(now)} due to paid subscription checkout`,
                 );
             }
         } catch (err) {
@@ -1195,7 +1197,9 @@ export class BillingService {
         const previousPlan = billing.plan;
         const previousStatus = billing.status;
 
-        const effectiveDate = subscription.ended_at ? new Date(subscription.ended_at * 1000) : new Date();
+        const effectiveDate = subscription.ended_at
+            ? this.dateService.fromUnix(subscription.ended_at).toDate()
+            : new Date();
 
         await this.prisma.billing.update({
             where: { id: billing.id },
