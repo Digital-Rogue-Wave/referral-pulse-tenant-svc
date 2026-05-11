@@ -7,6 +7,7 @@ import { TenantContextService } from '@common/tenant-aware/tenant-context.servic
 import { AppLoggerService } from '@common/logging/app-logger.service';
 import { RedisService } from '@common/redis/redis.service';
 import { TransactionEventEmitterService } from '@common/events/transaction-event-emitter.service';
+import { DateService } from '@common/helper/date.service';
 
 import { BillingEvents, UsageMonthlySummaryEvent } from '@domains/billing';
 
@@ -18,13 +19,14 @@ export class MonthlyUsageResetService {
         private readonly logger: AppLoggerService,
         private readonly redis: RedisService,
         private readonly txEventEmitter: TransactionEventEmitterService,
+        private readonly dateService: DateService,
     ) {
         this.logger.setContext(MonthlyUsageResetService.name);
     }
 
     async runMonthlyReset(): Promise<void> {
-        const now = new Date();
-        const { prevMonthLabel, prevMonthEnd } = this.getPreviousCalendarMonth(now);
+        const now = this.dateService.nowMoment();
+        const { prevMonthLabel, prevMonthEnd } = this.getPreviousCalendarMonth(now.toDate());
 
         this.logger.log(`Running monthly usage reset for month ${prevMonthLabel}`);
 
@@ -82,7 +84,7 @@ export class MonthlyUsageResetService {
 
                     this.txEventEmitter.emitAfterCommit(
                         BillingEvents.USAGE_MONTHLY_SUMMARY,
-                        new UsageMonthlySummaryEvent(tenantId, tenantId, metric, prevMonthLabel, usage, limit, prevMonthEnd, now.toISOString()),
+                        new UsageMonthlySummaryEvent(tenantId, tenantId, metric, prevMonthLabel, usage, limit, prevMonthEnd, this.dateService.toISO(now)),
                     );
 
                     await this.redis.clearMonthlyUsage(metric, prevMonthLabel);
@@ -96,17 +98,10 @@ export class MonthlyUsageResetService {
         prevMonthLabel: string;
         prevMonthEnd: string;
     } {
-        const year = ref.getUTCFullYear();
-        const monthIndex = ref.getUTCMonth(); // 0-11
-
-        const prevYear = monthIndex === 0 ? year - 1 : year;
-        const prevMonthIndex = monthIndex === 0 ? 11 : monthIndex - 1;
-        const prevMonth = prevMonthIndex + 1; // 1-12
-
-        const end = new Date(Date.UTC(prevYear, prevMonthIndex + 1, 0));
-        const prevMonthLabel = `${prevYear}-${String(prevMonth).padStart(2, '0')}`;
-        const prevMonthEnd = end.toISOString().slice(0, 10);
-
-        return { prevMonthLabel, prevMonthEnd };
+        const prev = this.dateService.subtract(ref, 1, 'month');
+        return {
+            prevMonthLabel: this.dateService.format(prev, 'YYYY-MM'),
+            prevMonthEnd: this.dateService.format(this.dateService.endOf(prev, 'month'), 'YYYY-MM-DD'),
+        };
     }
 }

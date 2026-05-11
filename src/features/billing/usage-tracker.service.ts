@@ -6,6 +6,7 @@ import { DatabaseService } from '@app/database/database.service';
 import { TenantContextService } from '@common/tenant-aware/tenant-context.service';
 import { AppLoggerService } from '@common/logging/app-logger.service';
 import { RedisService } from '@common/redis/redis.service';
+import { DateService } from '@common/helper/date.service';
 
 @Injectable()
 export class UsageTrackerService {
@@ -14,13 +15,13 @@ export class UsageTrackerService {
         private readonly tenantContext: TenantContextService,
         private readonly logger: AppLoggerService,
         private readonly redis: RedisService,
+        private readonly dateService: DateService,
     ) {
         this.logger.setContext(UsageTrackerService.name);
     }
 
     private getTodayDate(): string {
-        const now = new Date();
-        return now.toISOString().slice(0, 10);
+        return this.dateService.format(this.dateService.nowMoment(), 'YYYY-MM-DD');
     }
 
     private async getOrCreateUsageRow(tenantId: string, metricName: string, periodDate: string): Promise<TenantUsage> {

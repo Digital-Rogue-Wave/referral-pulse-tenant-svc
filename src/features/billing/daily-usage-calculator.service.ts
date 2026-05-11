@@ -7,6 +7,7 @@ import { TenantContextService } from '@common/tenant-aware/tenant-context.servic
 import { AppLoggerService } from '@common/logging/app-logger.service';
 import { RedisService } from '@common/redis/redis.service';
 import { TransactionEventEmitterService } from '@common/events/transaction-event-emitter.service';
+import { DateService } from '@common/helper/date.service';
 
 import { BillingEvents, UsageThresholdCrossedEvent } from '@domains/billing';
 
@@ -18,14 +19,15 @@ export class DailyUsageCalculator {
         private readonly logger: AppLoggerService,
         private readonly redis: RedisService,
         private readonly txEventEmitter: TransactionEventEmitterService,
+        private readonly dateService: DateService,
     ) {
         this.logger.setContext(DailyUsageCalculator.name);
     }
 
     async runDailySnapshot(): Promise<void> {
-        const now = new Date();
-        const periodDate = now.toISOString().slice(0, 10);
-        const month = now.toISOString().slice(0, 7);
+        const now = this.dateService.nowMoment();
+        const periodDate = this.dateService.format(now, 'YYYY-MM-DD');
+        const month = this.dateService.format(now, 'YYYY-MM');
 
         this.logger.log(`Running daily usage snapshot for date ${periodDate}`);
 
@@ -35,7 +37,7 @@ export class DailyUsageCalculator {
 
         for (const tenant of tenants) {
             await this.tenantContext.runWithContext({ tenantId: tenant.id }, () =>
-                this.snapshotTenant(tenant.id, periodDate, month, now),
+                this.snapshotTenant(tenant.id, periodDate, month, now.toDate()),
             );
         }
     }
@@ -131,7 +133,7 @@ export class DailyUsageCalculator {
 
             this.txEventEmitter.emitAfterCommit(
                 BillingEvents.USAGE_THRESHOLD_CROSSED,
-                new UsageThresholdCrossedEvent(tenantId, tenantId, metric, threshold, usage, limit, percentage, periodDate, now.toISOString()),
+                new UsageThresholdCrossedEvent(tenantId, tenantId, metric, threshold, usage, limit, percentage, periodDate, this.dateService.toISO(now)),
             );
         }
     }
