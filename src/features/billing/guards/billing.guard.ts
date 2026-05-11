@@ -1,7 +1,9 @@
-import { CanActivate, ExecutionContext, HttpException, HttpStatus, Injectable } from '@nestjs/common';
+import { CanActivate, ExecutionContext, HttpStatus, Injectable } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
 import { TenantContextService } from '@common/tenant-aware/tenant-context.service';
 import { TenantService } from '@app/features/tenant/tenant.service';
+import { BaseException } from '@common/exceptions/base.exceptions';
+import { ErrorCode } from '@app/types/app.type';
 import { BillingGuardOptions, BILLING_GUARD_KEY } from '../decorators/billing-guard.decorator';
 import { PlanLimitService } from '../plan-limit.service';
 
@@ -24,7 +26,7 @@ export class BillingGuard implements CanActivate {
         const tenant = await this.tenantService.findOneById(tenantId);
 
         if (!tenant) {
-            throw new HttpException({ message: 'Tenant not found' }, HttpStatus.NOT_FOUND);
+            throw new BaseException('TENANT_NOT_FOUND' as ErrorCode, 'Tenant not found', HttpStatus.NOT_FOUND);
         }
 
         const options = this.reflector.getAllAndOverride<BillingGuardOptions | undefined>(BILLING_GUARD_KEY, [

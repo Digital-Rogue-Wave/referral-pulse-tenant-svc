@@ -1,6 +1,8 @@
-import { CanActivate, ExecutionContext, HttpException, HttpStatus, Injectable } from '@nestjs/common';
+import { CanActivate, ExecutionContext, HttpStatus, Injectable } from '@nestjs/common';
 import { TenantContextService } from '@common/tenant-aware/tenant-context.service';
 import { TenantService } from '@app/features/tenant/tenant.service';
+import { BaseException } from '@common/exceptions/base.exceptions';
+import { ErrorCode } from '@app/types/app.type';
 import { PaymentStatusEnum } from '@common/enums/billing.enum';
 
 @Injectable()
@@ -20,15 +22,13 @@ export class PaymentRequiredGuard implements CanActivate {
         const tenant = await this.tenantService.findOneById(tenantId);
 
         if (!tenant) {
-            throw new HttpException({ message: 'Tenant not found' }, HttpStatus.NOT_FOUND);
+            throw new BaseException('TENANT_NOT_FOUND' as ErrorCode, 'Tenant not found', HttpStatus.NOT_FOUND);
         }
 
         if (tenant.paymentStatus === PaymentStatusEnum.LOCKED) {
-            throw new HttpException(
-                {
-                    message: 'Payment is required to access this resource.',
-                    code: 'PAYMENT_REQUIRED',
-                },
+            throw new BaseException(
+                'PAYMENT_REQUIRED' as ErrorCode,
+                'Payment is required to access this resource.',
                 HttpStatus.PAYMENT_REQUIRED,
             );
         }

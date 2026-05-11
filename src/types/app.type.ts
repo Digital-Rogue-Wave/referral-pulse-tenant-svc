@@ -237,7 +237,10 @@ export type ErrorCode =
     | 'CIRCUIT_BREAKER_OPEN'
     | 'DUPLICATE_RESOURCE'
     | 'FOREIGN_KEY_VIOLATION'
-    | 'IDEMPOTENCY_CONFLICT';
+    | 'IDEMPOTENCY_CONFLICT'
+    | 'PLAN_LIMIT_EXCEEDED'
+    | 'TENANT_NOT_FOUND'
+    | 'PAYMENT_REQUIRED';
 
 // ============================================================================
 // EVENT TYPES - EVENTEMITTER2 (In-Process Events)

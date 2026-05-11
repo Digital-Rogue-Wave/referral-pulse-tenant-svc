@@ -1,4 +1,7 @@
-import { HttpException, HttpStatus } from '@nestjs/common';
+import { HttpStatus } from '@nestjs/common';
+
+import { BaseException } from '@common/exceptions/base.exceptions';
+import { ErrorCode } from '@app/types/app.type';
 
 export interface LimitExceededDetails {
     metric: string;
@@ -11,15 +14,14 @@ export interface LimitExceededDetails {
     upgradeUrl?: string | null;
 }
 
-export class LimitExceededException extends HttpException {
+export class LimitExceededException extends BaseException {
     constructor(details: LimitExceededDetails) {
         super(
-            {
-                message: 'Plan limit exceeded for this resource.',
-                code: 'PLAN_LIMIT_EXCEEDED',
-                details,
-            },
+            'PLAN_LIMIT_EXCEEDED' as ErrorCode,
+            'Plan limit exceeded for this resource.',
             HttpStatus.PAYMENT_REQUIRED,
+            undefined,
+            details as unknown as Record<string, unknown>,
         );
     }
 }
