@@ -3,6 +3,7 @@ import { TenantService } from '../tenant/tenant.service';
 import { ConfigService } from '@nestjs/config';
 import { Public } from '@common/auth/public.decorator';
 import { BillingService } from '../billing/billing.service';
+import { Idempotent, IdempotencyScope } from '@common/idempotency';
 import { Request } from 'express';
 import { ApiTags } from '@nestjs/swagger';
 
@@ -17,6 +18,7 @@ export class WebhookController {
     ) {}
 
     @Post('ory/signup')
+    @Idempotent({ scope: IdempotencyScope.Global, ttl: 3600 })
     async handleOrySignup(@Headers('x-ory-api-key') apiKey: string, @Body() body: Record<string, unknown>) {
         const configuredApiKey = this.configService.getOrThrow<string>('ORY_WEBHOOK_API_KEY', { infer: true });
         if (configuredApiKey && apiKey !== configuredApiKey) {
