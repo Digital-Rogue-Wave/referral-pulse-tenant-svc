@@ -1,6 +1,8 @@
-import { Injectable, CanActivate, ExecutionContext, HttpException, HttpStatus } from '@nestjs/common';
+import { Injectable, CanActivate, ExecutionContext, HttpStatus } from '@nestjs/common';
+import type { ErrorCode } from '@app/types/app.type';
 
 import { TenantContextService } from '@common/tenant-aware/tenant-context.service';
+import { BaseException } from '@common/exceptions/base.exceptions';
 import { TenantStatus } from '@domains/tenant/tenant.types';
 
 import { TenantService } from '../tenant.service';
@@ -23,28 +25,21 @@ export class TenantStatusGuard implements CanActivate {
         const tenant = await this.tenantService.findOneById(tenantId);
 
         if (!tenant) {
-            throw new HttpException(
-                { message: 'Tenant not found', errorCode: 'TENANT_NOT_FOUND' },
-                HttpStatus.NOT_FOUND,
-            );
+            throw new BaseException('TENANT_NOT_FOUND' as ErrorCode, 'Tenant not found', HttpStatus.NOT_FOUND);
         }
 
         if (tenant.status === TenantStatus.SUSPENDED) {
-            throw new HttpException(
-                {
-                    message: 'This account has been suspended. Please contact support.',
-                    errorCode: 'TENANT_SUSPENDED',
-                },
+            throw new BaseException(
+                'TENANT_SUSPENDED' as ErrorCode,
+                'This account has been suspended. Please contact support.',
                 HttpStatus.FORBIDDEN,
             );
         }
 
         if (tenant.status === TenantStatus.LOCKED) {
-            throw new HttpException(
-                {
-                    message: 'This account has been locked due to security concerns.',
-                    errorCode: 'TENANT_LOCKED',
-                },
+            throw new BaseException(
+                'TENANT_LOCKED' as ErrorCode,
+                'This account has been locked due to security concerns.',
                 HttpStatus.FORBIDDEN,
             );
         }

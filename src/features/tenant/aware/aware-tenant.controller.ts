@@ -27,6 +27,7 @@ import { KetoNamespace, KetoRelation } from '@common/auth/keto.constants';
 import { CurrentUser } from '@common/auth/current-user.decorator';
 import type { IAuthenticatedUser } from '@app/types';
 import { ParseFormdataPipe } from '@common/pipes/parse-formdata.pipe';
+import { Idempotent, IdempotencyScope } from '@common/idempotency';
 
 import {
     TenantResponse,
@@ -102,6 +103,7 @@ export class AwareTenantController {
     }
 
     @Put()
+    @Idempotent({ scope: IdempotencyScope.Tenant, ttl: 1800 })
     @ApiConsumes('multipart/form-data')
     @ApiExtraModels(UpdateTenantDto)
     @ApiBody({
@@ -131,6 +133,7 @@ export class AwareTenantController {
     }
 
     @Put('custom-domain/verify')
+    @Idempotent({ scope: IdempotencyScope.Tenant, ttl: 1800 })
     @ApiOkResponse({
         description: 'Domain verified successfully',
         type: TenantResponse,
@@ -142,6 +145,7 @@ export class AwareTenantController {
     }
 
     @Put('transfer-ownership')
+    @Idempotent({ scope: IdempotencyScope.Tenant, ttl: 1800 })
     @ApiBody({ type: TransferOwnershipDto })
     @ApiOkResponse({ description: 'Ownership transferred successfully' })
     @RequirePermission({ namespace: KetoNamespace.TENANT, relation: KetoRelation.UPDATE })
@@ -151,6 +155,7 @@ export class AwareTenantController {
     }
 
     @Put('schedule-deletion')
+    @Idempotent({ scope: IdempotencyScope.Tenant, ttl: 1800 })
     @ApiBody({ type: ScheduleDeletionDto })
     @ApiOkResponse({
         description: 'Deletion scheduled successfully',
@@ -166,6 +171,7 @@ export class AwareTenantController {
     }
 
     @Put('cancel-deletion')
+    @Idempotent({ scope: IdempotencyScope.Tenant, ttl: 1800 })
     @ApiBody({ type: CancelDeletionDto })
     @ApiOkResponse({ description: 'Deletion cancelled successfully' })
     @RequirePermission({ namespace: KetoNamespace.TENANT, relation: KetoRelation.UPDATE })
@@ -175,6 +181,7 @@ export class AwareTenantController {
     }
 
     @Put('lock')
+    @Idempotent({ scope: IdempotencyScope.Tenant, ttl: 1800 })
     @ApiBody({ type: LockTenantDto })
     @ApiOkResponse({ type: TenantResponse })
     @RequirePermission({ namespace: KetoNamespace.TENANT, relation: KetoRelation.UPDATE })
@@ -184,6 +191,7 @@ export class AwareTenantController {
     }
 
     @Put('unlock')
+    @Idempotent({ scope: IdempotencyScope.Tenant, ttl: 1800 })
     @ApiBody({ type: UnlockTenantDto })
     @ApiOkResponse({ type: TenantResponse })
     @RequirePermission({ namespace: KetoNamespace.TENANT, relation: KetoRelation.UPDATE })

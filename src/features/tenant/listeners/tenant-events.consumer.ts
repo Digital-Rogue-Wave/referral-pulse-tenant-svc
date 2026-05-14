@@ -5,7 +5,7 @@ import type { Message } from '@aws-sdk/client-sqs';
 import { type IMessageEnvelope, CAMPAIGN_SVC_FIFO } from '@app/types';
 
 import { AppLoggerService } from '@common/logging/app-logger.service';
-import { JsonService } from '@common/helper/json.service';
+import { MessageProcessorService } from '@common/messaging/message-processor.service';
 import { SqsConsumer } from '@common/messaging/sqs-consumer.decorator';
 
 import {
@@ -19,41 +19,41 @@ import {
 @Injectable()
 export class CampaignEventsConsumer {
     constructor(
+        private readonly messageProcessor: MessageProcessorService,
         private readonly logger: AppLoggerService,
-        private readonly jsonService: JsonService,
     ) {
         this.logger.setContext(CampaignEventsConsumer.name);
     }
 
     @SqsConsumer({ queueName: CAMPAIGN_SVC_FIFO })
     @SqsMessageHandler(CAMPAIGN_SVC_FIFO, false)
-    handleEvent(message: Message): void {
-        if (!message.Body) {
-            this.logger.warn('Received SQS message with empty body, skipping');
-            return;
-        }
+    async handleEvent(message: Message): Promise<void> {
+        await this.messageProcessor.process<IMessageEnvelope>(
+            message,
+            async (envelope) => {
+                const { eventType, payload, messageId } = envelope;
 
-        const envelope: IMessageEnvelope = this.jsonService.parse(message.Body);
-        const { eventType, payload, messageId } = envelope;
+                this.logger.log(`Processing campaign event - eventType: ${eventType}, messageId: ${messageId}`);
 
-        this.logger.log(`Processing campaign event - eventType: ${eventType}, messageId: ${messageId}`);
-
-        switch (eventType) {
-            case CampaignEvents.CREATED:
-                this.handleCreated(payload as CampaignCreatedEvent);
-                break;
-            case CampaignEvents.UPDATED:
-                this.handleUpdated(payload as CampaignUpdatedEvent);
-                break;
-            case CampaignEvents.INVITATION_SENT:
-                this.handleInvitationSent(payload as CampaignInvitationSentEvent);
-                break;
-            case CampaignEvents.ACTIVATED:
-                this.handleActivated(payload as CampaignActivatedEvent);
-                break;
-            default:
-                this.logger.warn(`Unknown campaign event type: ${eventType}`);
-        }
+                switch (eventType) {
+                    case CampaignEvents.CREATED:
+                        this.handleCreated(payload as CampaignCreatedEvent);
+                        break;
+                    case CampaignEvents.UPDATED:
+                        this.handleUpdated(payload as CampaignUpdatedEvent);
+                        break;
+                    case CampaignEvents.INVITATION_SENT:
+                        this.handleInvitationSent(payload as CampaignInvitationSentEvent);
+                        break;
+                    case CampaignEvents.ACTIVATED:
+                        this.handleActivated(payload as CampaignActivatedEvent);
+                        break;
+                    default:
+                        this.logger.warn(`Unknown campaign event type: ${eventType}`);
+                }
+            },
+            { queueName: CAMPAIGN_SVC_FIFO },
+        );
     }
 
     private handleCreated(payload: CampaignCreatedEvent): void {

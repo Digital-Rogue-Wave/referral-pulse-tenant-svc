@@ -2,6 +2,7 @@ import { Controller, Post, Body, Param, HttpCode, HttpStatus } from '@nestjs/com
 import { ApiBearerAuth, ApiOkResponse, ApiOperation, ApiTags } from '@nestjs/swagger';
 
 import { TenantResponse, SuspendTenantDto } from '@domains/tenant';
+import { Idempotent, IdempotencyScope } from '@common/idempotency';
 
 import { TenantService } from '../tenant.service';
 
@@ -13,6 +14,7 @@ export class AdminTenantController {
     constructor(private readonly tenantService: TenantService) {}
 
     @Post(':id/suspend')
+    @Idempotent({ scope: IdempotencyScope.Tenant, ttl: 1800 })
     @HttpCode(HttpStatus.OK)
     @ApiOperation({ summary: 'Suspend a tenant' })
     @ApiOkResponse({ type: TenantResponse })
@@ -21,6 +23,7 @@ export class AdminTenantController {
     }
 
     @Post(':id/unsuspend')
+    @Idempotent({ scope: IdempotencyScope.Tenant, ttl: 1800 })
     @HttpCode(HttpStatus.OK)
     @ApiOperation({ summary: 'Unsuspend a tenant' })
     @ApiOkResponse({ type: TenantResponse })

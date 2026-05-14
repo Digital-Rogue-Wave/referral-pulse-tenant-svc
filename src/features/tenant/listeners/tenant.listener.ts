@@ -7,6 +7,7 @@ import { HttpClientService } from '@common/http/http-client.service';
 import { KetoService } from '@common/auth/keto.service';
 import { KetoNamespace } from '@common/auth/keto.constants';
 import { AppLoggerService } from '@common/logging/app-logger.service';
+import { DateService } from '@common/helper/date.service';
 import { BullJobsService } from '@common/bulljobs';
 import oryConfig from '@config/ory.config';
 import { TENANT_DELETION_QUEUE, TenantDeletionJobData } from '@app/types';
@@ -41,6 +42,7 @@ export class TenantListener {
         private readonly configService: ConfigService,
         private readonly domainProvisioningService: DomainProvisioningService,
         private readonly logger: AppLoggerService,
+        private readonly dateService: DateService,
     ) {
         this.logger.setContext(TenantListener.name);
 
@@ -66,10 +68,10 @@ export class TenantListener {
                     name: event.name,
                     slug: event.slug,
                     ownerId: event.ownerId,
-                    trialStartedAt: event.trialStartedAt.toISOString(),
-                    trialEndsAt: event.trialEndsAt.toISOString(),
+                    trialStartedAt: this.dateService.toISO(event.trialStartedAt),
+                    trialEndsAt: this.dateService.toISO(event.trialEndsAt),
                 },
-                timestamp: event.occurredAt.toISOString(),
+                timestamp: this.dateService.toISO(event.occurredAt),
             },
             {
                 messageGroupId: event.tenantId,
@@ -95,7 +97,7 @@ export class TenantListener {
                     tenantId: event.tenantId,
                     changes: event.changes,
                 },
-                timestamp: event.occurredAt.toISOString(),
+                timestamp: this.dateService.toISO(event.occurredAt),
             },
             {
                 messageGroupId: event.tenantId,
@@ -120,9 +122,9 @@ export class TenantListener {
                 data: {
                     tenantId: event.tenantId,
                     reason: event.reason,
-                    suspendedAt: event.suspendedAt.toISOString(),
+                    suspendedAt: this.dateService.toISO(event.suspendedAt),
                 },
-                timestamp: event.occurredAt.toISOString(),
+                timestamp: this.dateService.toISO(event.occurredAt),
             },
             {
                 messageGroupId: event.tenantId,
@@ -145,9 +147,9 @@ export class TenantListener {
                 eventId: event.eventId,
                 data: {
                     tenantId: event.tenantId,
-                    unsuspendedAt: event.unsuspendedAt.toISOString(),
+                    unsuspendedAt: this.dateService.toISO(event.unsuspendedAt),
                 },
-                timestamp: event.occurredAt.toISOString(),
+                timestamp: this.dateService.toISO(event.occurredAt),
             },
             {
                 messageGroupId: event.tenantId,
@@ -172,10 +174,10 @@ export class TenantListener {
                 data: {
                     tenantId: event.tenantId,
                     reason: event.reason,
-                    lockUntil: event.lockUntil?.toISOString(),
-                    lockedAt: event.lockedAt.toISOString(),
+                    lockUntil: event.lockUntil ? this.dateService.toISO(event.lockUntil) : undefined,
+                    lockedAt: this.dateService.toISO(event.lockedAt),
                 },
-                timestamp: event.occurredAt.toISOString(),
+                timestamp: this.dateService.toISO(event.occurredAt),
             },
             {
                 messageGroupId: event.tenantId,
@@ -200,9 +202,9 @@ export class TenantListener {
                 data: {
                     tenantId: event.tenantId,
                     unlockedBy: event.unlockedBy,
-                    unlockedAt: event.unlockedAt.toISOString(),
+                    unlockedAt: this.dateService.toISO(event.unlockedAt),
                 },
-                timestamp: event.occurredAt.toISOString(),
+                timestamp: this.dateService.toISO(event.occurredAt),
             },
             {
                 messageGroupId: event.tenantId,
@@ -227,11 +229,11 @@ export class TenantListener {
                 eventId: event.eventId,
                 data: {
                     tenantId: event.tenantId,
-                    scheduledAt: event.scheduledAt.toISOString(),
-                    executionDate: event.executionDate.toISOString(),
+                    scheduledAt: this.dateService.toISO(event.scheduledAt),
+                    executionDate: this.dateService.toISO(event.executionDate),
                     reason: event.reason,
                 },
-                timestamp: event.occurredAt.toISOString(),
+                timestamp: this.dateService.toISO(event.occurredAt),
             },
             {
                 messageGroupId: event.tenantId,
@@ -240,7 +242,7 @@ export class TenantListener {
         );
 
         // Schedule deletion job
-        const delay = event.executionDate.getTime() - Date.now();
+        const delay = this.dateService.diff(event.executionDate, new Date(), 'milliseconds');
         await this.bullJobsService.addDelayedJob<TenantDeletionJobData>(
             TENANT_DELETION_QUEUE,
             'execute-deletion',
@@ -270,9 +272,9 @@ export class TenantListener {
                 eventId: event.eventId,
                 data: {
                     tenantId: event.tenantId,
-                    cancelledAt: event.cancelledAt.toISOString(),
+                    cancelledAt: this.dateService.toISO(event.cancelledAt),
                 },
-                timestamp: event.occurredAt.toISOString(),
+                timestamp: this.dateService.toISO(event.occurredAt),
             },
             {
                 messageGroupId: event.tenantId,
@@ -305,7 +307,7 @@ export class TenantListener {
                     name: event.name,
                     slug: event.slug,
                 },
-                timestamp: event.occurredAt.toISOString(),
+                timestamp: this.dateService.toISO(event.occurredAt),
             },
             {
                 messageGroupId: event.tenantId,
@@ -341,9 +343,9 @@ export class TenantListener {
                     tenantId: event.tenantId,
                     oldOwnerId: event.oldOwnerId,
                     newOwnerId: event.newOwnerId,
-                    transferredAt: event.transferredAt.toISOString(),
+                    transferredAt: this.dateService.toISO(event.transferredAt),
                 },
-                timestamp: event.occurredAt.toISOString(),
+                timestamp: this.dateService.toISO(event.occurredAt),
             },
             {
                 messageGroupId: event.tenantId,
@@ -371,9 +373,9 @@ export class TenantListener {
                 data: {
                     tenantId: event.tenantId,
                     domain: event.domain,
-                    verifiedAt: event.verifiedAt.toISOString(),
+                    verifiedAt: this.dateService.toISO(event.verifiedAt),
                 },
-                timestamp: event.occurredAt.toISOString(),
+                timestamp: this.dateService.toISO(event.occurredAt),
             },
             {
                 messageGroupId: event.tenantId,

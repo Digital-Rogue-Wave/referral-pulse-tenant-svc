@@ -1,14 +1,18 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import Stripe from 'stripe';
 import { AllConfigType } from '@config/config.type';
 import { BillingPlanEnum } from '@common/enums/billing.enum';
+import { AppLoggerService } from '@common/logging/app-logger.service';
 
 @Injectable()
 export class StripeService {
-    private readonly logger = new Logger(StripeService.name);
-
-    constructor(private readonly configService: ConfigService<AllConfigType>) {}
+    constructor(
+        private readonly configService: ConfigService<AllConfigType>,
+        private readonly logger: AppLoggerService,
+    ) {
+        this.logger.setContext(StripeService.name);
+    }
 
     private stripeClient(): Stripe {
         const secretKey = this.configService.get('stripeConfig.secretKey', {

@@ -13,6 +13,7 @@ import { FileInterceptor } from '@nestjs/platform-express';
 import { ParseFormdataPipe } from '@common/pipes/parse-formdata.pipe';
 import { CurrentUser } from '@common/auth/current-user.decorator';
 import type { IAuthenticatedUser } from '@app/types';
+import { Idempotent, IdempotencyScope } from '@common/idempotency';
 
 import { TenantResponse, CreateTenantDto } from '@domains/tenant';
 
@@ -25,6 +26,7 @@ export class AgnosticTenantController {
     constructor(private readonly tenantService: TenantService) {}
 
     @Post()
+    @Idempotent({ scope: IdempotencyScope.Tenant, ttl: 3600 })
     @ApiConsumes('multipart/form-data')
     @ApiExtraModels(CreateTenantDto)
     @ApiBody({
