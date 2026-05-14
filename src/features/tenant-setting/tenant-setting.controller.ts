@@ -4,6 +4,7 @@ import { ApiTags, ApiBearerAuth, ApiCreatedResponse, ApiOkResponse, ApiHeader, A
 import { RequirePermission } from '@common/auth/require-permission.decorator';
 import { KetoNamespace, KetoRelation, KetoResource } from '@common/auth/keto.constants';
 import { Paginate, PaginateQuery, Paginated, ApiPaginationQuery } from '@common/nestjs-prisma-pagination';
+import { Idempotent, IdempotencyScope } from '@common/idempotency';
 
 import { CreateTenantSettingDto, UpdateTenantSettingDto, TenantSettingResponse } from '@domains/tenant-setting';
 
@@ -34,6 +35,7 @@ export class TenantSettingController {
     })
     @HttpCode(HttpStatus.CREATED)
     @Post()
+    @Idempotent({ scope: IdempotencyScope.Tenant, ttl: 3600 })
     async create(@Body() dto: CreateTenantSettingDto): Promise<TenantSettingResponse> {
         return this.tenantSettingService.create(dto);
     }
@@ -85,6 +87,7 @@ export class TenantSettingController {
     })
     @HttpCode(HttpStatus.OK)
     @Put(':id')
+    @Idempotent({ scope: IdempotencyScope.Tenant, ttl: 1800 })
     async update(@Param('id') id: string, @Body() dto: UpdateTenantSettingDto): Promise<TenantSettingResponse> {
         return this.tenantSettingService.update(id, dto);
     }
@@ -97,6 +100,7 @@ export class TenantSettingController {
     })
     @HttpCode(HttpStatus.NO_CONTENT)
     @Delete(':id')
+    @Idempotent({ scope: IdempotencyScope.Tenant, ttl: 1800 })
     async delete(@Param('id') id: string): Promise<void> {
         await this.tenantSettingService.delete(id);
     }

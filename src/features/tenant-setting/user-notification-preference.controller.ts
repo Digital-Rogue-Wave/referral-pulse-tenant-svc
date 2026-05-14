@@ -1,6 +1,7 @@
 import { Controller, Get, Put, Delete, Body, HttpCode, HttpStatus } from '@nestjs/common';
 import { ApiTags, ApiBearerAuth, ApiOkResponse, ApiHeader, ApiBody } from '@nestjs/swagger';
 
+import { Idempotent, IdempotencyScope } from '@common/idempotency';
 import { UpdateUserNotificationPreferenceDto, UserNotificationPreferenceResponse } from '@domains/tenant-setting';
 
 import { UserNotificationPreferenceService } from './user-notification-preference.service';
@@ -34,6 +35,7 @@ export class UserNotificationPreferenceController {
     })
     @HttpCode(HttpStatus.OK)
     @Put()
+    @Idempotent({ scope: IdempotencyScope.Tenant, ttl: 1800 })
     async updateMyPreferences(
         @Body() dto: UpdateUserNotificationPreferenceDto,
     ): Promise<UserNotificationPreferenceResponse> {
@@ -45,6 +47,7 @@ export class UserNotificationPreferenceController {
     })
     @HttpCode(HttpStatus.NO_CONTENT)
     @Delete()
+    @Idempotent({ scope: IdempotencyScope.Tenant, ttl: 1800 })
     async deleteMyPreferences(): Promise<void> {
         await this.userNotificationPreferenceService.deleteMyPreferences();
     }
