@@ -1,13 +1,8 @@
-import {
-    CanActivate,
-    ExecutionContext,
-    HttpException,
-    HttpStatus,
-    Injectable,
-    UnauthorizedException,
-} from '@nestjs/common';
+import { CanActivate, ExecutionContext, HttpStatus, Injectable, UnauthorizedException } from '@nestjs/common';
 
 import { TenantContextService } from '@common/tenant-aware/tenant-context.service';
+import { BaseException } from '@common/exceptions/base.exceptions';
+import { ErrorCode } from '@app/types/app.type';
 import { ApiKeyService } from '../api-key.service';
 
 @Injectable()
@@ -28,7 +23,7 @@ export class ApiKeyGuard implements CanActivate {
         const apiKey = await this.apiKeyService.validateKey(apiKeyHeader as string);
 
         if (!apiKey) {
-            throw new HttpException({ message: 'Invalid or expired API Key' }, HttpStatus.EXPECTATION_FAILED);
+            throw new BaseException('INVALID_API_KEY' as ErrorCode, 'Invalid or expired API Key', HttpStatus.EXPECTATION_FAILED);
         }
 
         // Set context
