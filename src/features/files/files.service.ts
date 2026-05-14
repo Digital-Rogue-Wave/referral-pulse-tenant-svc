@@ -1,13 +1,16 @@
-import { HttpException, HttpStatus, Injectable } from '@nestjs/common';
+import { HttpStatus, Injectable } from '@nestjs/common';
 import { randomUUID } from 'node:crypto';
 import { ConfigService } from '@nestjs/config';
 import type { File, Prisma } from '@prisma-gen/generated/client';
 import type { AllConfigType } from '@config/config.type';
 import type { NullableType } from '@app/types';
+import type { ErrorCode } from '@app/types/app.type';
 
 import { DatabaseService } from '@app/database/database.service';
 import { I18nContext, I18nService } from 'nestjs-i18n';
 import { S3Service } from '@common/storage/s3.service';
+import { AppLoggerService } from '@common/logging/app-logger.service';
+import { BaseException } from '@common/exceptions/base.exceptions';
 import { PresignedUrlResponseDto, FileDto } from '@domains/files';
 
 @Injectable()
@@ -17,7 +20,10 @@ export class FilesService {
         private readonly prisma: DatabaseService,
         private readonly awsS3Service: S3Service,
         private readonly i18n: I18nService,
-    ) {}
+        private readonly logger: AppLoggerService,
+    ) {
+        this.logger.setContext(FilesService.name);
+    }
 
     async findOne(where: Prisma.FileWhereInput): Promise<NullableType<File>> {
         return this.prisma.file.findFirst({
@@ -30,28 +36,16 @@ export class FilesService {
             where: { ...where, deletedAt: null },
         });
         if (!file) {
-            throw new HttpException(
-                {
-                    status: HttpStatus.NOT_FOUND,
-                    message: 'File not found',
-                },
-                HttpStatus.NOT_FOUND,
-            );
+            throw new BaseException('FILE_NOT_FOUND' as ErrorCode, 'File not found', HttpStatus.NOT_FOUND);
         }
         return file;
     }
 
     async uploadFile(file: Express.Multer.File | Express.MulterS3.File): Promise<File> {
         if (!file) {
-            throw new HttpException(
-                {
-                    status: HttpStatus.PRECONDITION_FAILED,
-                    errors: {
-                        file: this.i18n.t('file.failedUpload', {
-                            lang: I18nContext.current()?.lang,
-                        }),
-                    },
-                },
+            throw new BaseException(
+                'FILE_UPLOAD_FAILED' as ErrorCode,
+                this.i18n.t('file.failedUpload', { lang: I18nContext.current()?.lang }),
                 HttpStatus.PRECONDITION_FAILED,
             );
         }
@@ -65,15 +59,9 @@ export class FilesService {
 
     async uploadMultipleFiles(files: Array<Express.Multer.File | Express.MulterS3.File>): Promise<File[]> {
         if (!files) {
-            throw new HttpException(
-                {
-                    status: HttpStatus.PRECONDITION_FAILED,
-                    errors: {
-                        file: this.i18n.t('file.failedUpload', {
-                            lang: I18nContext.current()?.lang,
-                        }),
-                    },
-                },
+            throw new BaseException(
+                'FILE_UPLOAD_FAILED' as ErrorCode,
+                this.i18n.t('file.failedUpload', { lang: I18nContext.current()?.lang }),
                 HttpStatus.PRECONDITION_FAILED,
             );
         }
@@ -88,15 +76,9 @@ export class FilesService {
      */
     async updateFile(id: string, file: Express.Multer.File | Express.MulterS3.File): Promise<File> {
         if (!file) {
-            throw new HttpException(
-                {
-                    status: HttpStatus.PRECONDITION_FAILED,
-                    errors: {
-                        file: this.i18n.t('file.failedUpload', {
-                            lang: I18nContext.current()?.lang,
-                        }),
-                    },
-                },
+            throw new BaseException(
+                'FILE_UPLOAD_FAILED' as ErrorCode,
+                this.i18n.t('file.failedUpload', { lang: I18nContext.current()?.lang }),
                 HttpStatus.PRECONDITION_FAILED,
             );
         }
@@ -148,10 +130,7 @@ export class FilesService {
         const urlParts = url.split('/');
         const key = urlParts[urlParts.length - 1];
         if (!key) {
-            throw new HttpException(
-                { status: HttpStatus.BAD_REQUEST, message: 'Invalid file URL' },
-                HttpStatus.BAD_REQUEST,
-            );
+            throw new BaseException('INVALID_FILE_URL' as ErrorCode, 'Invalid file URL', HttpStatus.BAD_REQUEST);
         }
         return key;
     }
@@ -159,15 +138,9 @@ export class FilesService {
     async createFileFromUrl(url: string): Promise<File> {
         const existingFile = await this.findOne({ path: url });
         if (existingFile) {
-            throw new HttpException(
-                {
-                    status: HttpStatus.PRECONDITION_FAILED,
-                    errors: {
-                        file: this.i18n.t('file.fileExists', {
-                            lang: I18nContext.current()?.lang,
-                        }),
-                    },
-                },
+            throw new BaseException(
+                'CONFLICT' as ErrorCode,
+                this.i18n.t('file.fileExists', { lang: I18nContext.current()?.lang }),
                 HttpStatus.PRECONDITION_FAILED,
             );
         }

@@ -13,6 +13,7 @@ import {
     UseInterceptors,
 } from '@nestjs/common';
 import { ApiBearerAuth, ApiBody, ApiConsumes, ApiOkResponse, ApiTags } from '@nestjs/swagger';
+import { Idempotent, IdempotencyScope } from '@common/idempotency';
 import { AuthGuard } from '@nestjs/passport';
 import type { File } from '@prisma-gen/generated/client';
 import type { NullableType } from '@app/types';
@@ -31,6 +32,7 @@ export class FilesController {
     constructor(private readonly filesService: FilesService) {}
 
     @Post('upload')
+    @Idempotent({ scope: IdempotencyScope.Tenant, ttl: 3600 })
     @ApiBearerAuth()
     @ApiConsumes('multipart/form-data')
     @ApiBody({
@@ -52,6 +54,7 @@ export class FilesController {
     }
 
     @Post('upload-multiple')
+    @Idempotent({ scope: IdempotencyScope.Tenant, ttl: 3600 })
     @ApiConsumes('multipart/form-data')
     @ApiBody({
         schema: {
@@ -98,6 +101,7 @@ export class FilesController {
      * @param file {Express.Multer.File | Express.MulterS3.File} file to update
      */
     @Put(':id')
+    @Idempotent({ scope: IdempotencyScope.Tenant, ttl: 1800 })
     @ApiConsumes('multipart/form-data')
     @ApiBody({
         schema: {
@@ -127,6 +131,7 @@ export class FilesController {
      * @param id file id
      */
     @Delete(':id')
+    @Idempotent({ scope: IdempotencyScope.Tenant, ttl: 1800 })
     @UseGuards(AuthGuard('jwt'))
     @ApiOkResponse({ type: FileDto })
     @HttpCode(HttpStatus.OK)
