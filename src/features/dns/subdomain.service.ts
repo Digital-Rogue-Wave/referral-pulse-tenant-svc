@@ -3,6 +3,7 @@ import { Injectable, BadRequestException } from '@nestjs/common';
 import { DatabaseService } from '@app/database/database.service';
 import { TransactionEventEmitterService } from '@common/events/transaction-event-emitter.service';
 import { AppLoggerService } from '@common/logging/app-logger.service';
+import { DateService } from '@common/helper/date.service';
 
 import {
     ReservedSubdomainProps,
@@ -23,6 +24,7 @@ export class SubdomainService {
         private readonly prisma: DatabaseService,
         private readonly txEventEmitter: TransactionEventEmitterService,
         private readonly logger: AppLoggerService,
+        private readonly dateService: DateService,
     ) {
         this.logger.setContext(SubdomainService.name);
     }
@@ -128,8 +130,7 @@ export class SubdomainService {
             throw new BadRequestException(`Subdomain "${slug}" is not available`);
         }
 
-        const expiresAt = new Date();
-        expiresAt.setDate(expiresAt.getDate() + days);
+        const expiresAt = this.dateService.nowMoment().add(days, 'day').toDate();
 
         const saved = (await this.prisma.reservedSubdomain.create({
             data: {
