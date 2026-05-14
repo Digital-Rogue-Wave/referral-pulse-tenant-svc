@@ -86,6 +86,7 @@ export class TeamMemberController {
     @RequirePermission({ namespace: KetoNamespace.TENANT, object: KetoResource.MEMBER, relation: KetoRelation.DELETE })
     @HttpCode(HttpStatus.NO_CONTENT)
     @Delete(':id')
+    @Idempotent({ scope: IdempotencyScope.Tenant, ttl: 1800 })
     async remove(@Param('id') id: string, @CurrentUser() user: IAuthenticatedUser): Promise<void> {
         await this.teamMemberService.remove(id, user.userId);
     }
