@@ -240,7 +240,13 @@ export type ErrorCode =
     | 'IDEMPOTENCY_CONFLICT'
     | 'PLAN_LIMIT_EXCEEDED'
     | 'TENANT_NOT_FOUND'
-    | 'PAYMENT_REQUIRED';
+    | 'PAYMENT_REQUIRED'
+    | 'TENANT_LOCKED'
+    | 'TENANT_SUSPENDED'
+    | 'INVALID_API_KEY'
+    | 'FILE_NOT_FOUND'
+    | 'FILE_UPLOAD_FAILED'
+    | 'INVALID_FILE_URL';
 
 // ============================================================================
 // EVENT TYPES - EVENTEMITTER2 (In-Process Events)
