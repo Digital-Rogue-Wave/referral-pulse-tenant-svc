@@ -1,9 +1,7 @@
-import { Injectable, OnModuleInit } from '@nestjs/common';
+import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 
 import { metrics, Meter, Counter, Histogram, ObservableGauge, ValueType } from '@opentelemetry/api';
-
-import { AppLoggerService } from '@common/logging/app-logger.service';
 
 import type { AllConfigType } from '@config/config.type';
 
@@ -44,11 +42,9 @@ export class MetricsService implements OnModuleInit {
     private activeHttpRequests = 0;
     private activeQueueJobs: Map<string, number> = new Map();
 
-    constructor(
-        private readonly configService: ConfigService<AllConfigType>,
-        private readonly logger: AppLoggerService,
-    ) {
-        this.logger.setContext(MetricsService.name);
+    private readonly logger = new Logger(MetricsService.name);
+
+    constructor(private readonly configService: ConfigService<AllConfigType>) {
         this.serviceName = this.configService.getOrThrow('app.name', {
             infer: true,
         });
