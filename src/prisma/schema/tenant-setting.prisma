@@ -1,0 +1,35 @@
+model TenantSetting {
+  id            String  @id @default(cuid())
+  tenantId      String  @unique @map("tenant_id") @db.VarChar(26)
+  branding      Json
+  notifications Json
+  general       Json
+  currencyCode  String? @map("currency_code") @db.VarChar(3)
+
+  createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt DateTime  @updatedAt @map("updated_at") @db.Timestamptz
+  deletedAt DateTime? @map("deleted_at") @db.Timestamptz
+
+  // Relations
+  tenant   Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  currency Currency? @relation(fields: [currencyCode], references: [code])
+
+  @@map("tenant_settings")
+}
+
+model UserNotificationPreference {
+  id        String @id @default(cuid())
+  userId    String @map("user_id") @db.VarChar(26)
+  tenantId  String @map("tenant_id") @db.VarChar(26)
+  overrides Json   @default("{}")
+
+  createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt DateTime  @updatedAt @map("updated_at") @db.Timestamptz
+  deletedAt DateTime? @map("deleted_at") @db.Timestamptz
+
+  // Relations
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, tenantId])
+  @@map("user_notification_preferences")
+}

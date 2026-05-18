@@ -2,9 +2,9 @@
 apiVersion: batch/v1
 kind: Job
 metadata:
-  name: {{ include "referral-svc.fullname" . }}-migrate
+  name: {{ include "service.fullname" . }}-migrate
   labels:
-    {{- include "referral-svc.labels" . | nindent 4 }}
+    {{- include "service.labels" . | nindent 4 }}
   annotations:
     "helm.sh/hook": pre-install,pre-upgrade
     "helm.sh/hook-delete-policy": before-hook-creation,hook-succeeded
@@ -14,9 +14,9 @@ spec:
   template:
     metadata:
       labels:
-        {{- include "referral-svc.selectorLabels" . | nindent 8 }}
+        {{- include "service.selectorLabels" . | nindent 8 }}
     spec:
-      serviceAccountName: {{ default (include "referral-svc.fullname" .) .Values.serviceAccount.name }}
+      serviceAccountName: {{ default (include "service.fullname" .) .Values.serviceAccount.name }}
       restartPolicy: OnFailure
       containers:
         - name: migrate
@@ -24,16 +24,19 @@ spec:
           imagePullPolicy: {{ .Values.image.pullPolicy }}
           envFrom:
             - configMapRef:
-                name: {{ include "referral-svc.fullname" . }}-config
+                name: {{ include "service.fullname" . }}-config
             - secretRef:
-                name: {{ include "referral-svc.fullname" . }}-secret
+                name: {{ include "service.fullname" . }}-secret
           env:
             {{- with .Values.migrations.extraEnv }}
             {{- toYaml . | nindent 12 }}
             {{- end }}
-          command: ["node"]
+          command: ["pnpm"]
           args:
-            - "dist/database/run-migrations.js"
+            - "dlx"
+            - "prisma"
+            - "migrate"
+            - "deploy"
           {{- if .Values.migrations.waitForDb }}
           # optional tiny wait loop if your DB needs a few seconds
           lifecycle:

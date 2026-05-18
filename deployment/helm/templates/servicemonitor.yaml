@@ -2,14 +2,14 @@
 apiVersion: monitoring.coreos.com/v1
 kind: ServiceMonitor
 metadata:
-  name: {{ include "referral-svc.fullname" . }}
+  name: {{ include "service.fullname" . }}
   labels:
-    {{- include "referral-svc.labels" . | nindent 4 }}
+    {{- include "service.labels" . | nindent 4 }}
     {{- with .Values.serviceMonitor.labels }}{{ toYaml . | nindent 4 }}{{- end }}
 spec:
   selector:
     matchLabels:
-      {{- include "referral-svc.selectorLabels" . | nindent 6 }}
+      {{- include "service.selectorLabels" . | nindent 6 }}
   namespaceSelector:
     matchNames: [ {{ .Release.Namespace | quote }} ]
   endpoints:

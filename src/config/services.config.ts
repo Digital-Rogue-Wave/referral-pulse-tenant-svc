@@ -1,49 +1,75 @@
 import { registerAs } from '@nestjs/config';
-import { IsUrl } from 'class-validator';
-import validateConfig from '@mod/common/validators/validate-config';
 
-export type ServicesConfig = {
-    clientIdentity: string;
-    rewards: string;
-    contentAi: string;
-    analytics: string;
-    sdkConfig: string;
-    workflowOrchestration: string;
-};
+import { z } from 'zod';
 
-class ServicesEnvValidator {
-    @IsUrl({ require_tld: false })
-    SERVICE_CLIENT_IDENTITY_URL!: string;
+const serviceSchema = z.object({
+    url: z.string().url(),
+    timeout: z.coerce.number().int().positive().default(5000),
+});
 
-    @IsUrl({ require_tld: false })
-    SERVICE_REWARDS_URL!: string;
+const schema = z.object({
+    tenants: serviceSchema,
+    campaigns: serviceSchema,
+    rewards: serviceSchema,
+    analytics: serviceSchema,
+    tracking: serviceSchema,
+    referrals: serviceSchema,
+    sdkConfig: serviceSchema,
+    contentAi: serviceSchema,
+    clientIdentity: serviceSchema,
+    workflowOrchestration: serviceSchema,
+});
 
-    @IsUrl({ require_tld: false })
-    SERVICE_CONTENT_AI_URL!: string;
+export type ServicesConfig = z.infer<typeof schema>;
 
-    @IsUrl({ require_tld: false })
-    SERVICE_ANALYTICS_URL!: string;
+export default registerAs('services', (): ServicesConfig => {
+    const defaultTimeout = process.env.INTRA_HTTP_TIMEOUT_MS ? parseInt(process.env.INTRA_HTTP_TIMEOUT_MS, 10) : 5000;
 
-    @IsUrl({ require_tld: false })
-    SERVICE_SDK_CONFIG_URL!: string;
+    const result = schema.safeParse({
+        tenants: {
+            url: process.env.SERVICE_TENANTS_URL || 'http://localhost:5001',
+            timeout: defaultTimeout,
+        },
+        campaigns: {
+            url: process.env.SERVICE_CAMPAIGNS_URL || 'http://localhost:5002',
+            timeout: defaultTimeout,
+        },
+        rewards: {
+            url: process.env.SERVICE_REWARDS_URL || 'http://localhost:5003',
+            timeout: defaultTimeout,
+        },
+        analytics: {
+            url: process.env.SERVICE_ANALYTICS_URL || 'http://localhost:5004',
+            timeout: defaultTimeout,
+        },
+        tracking: {
+            url: process.env.SERVICE_TRACKING_URL || 'http://localhost:5005',
+            timeout: defaultTimeout,
+        },
+        referrals: {
+            url: process.env.SERVICE_REFERRALS_URL || 'http://localhost:5006',
+            timeout: defaultTimeout,
+        },
+        sdkConfig: {
+            url: process.env.SERVICE_SDK_CONFIG_URL || 'http://localhost:5007',
+            timeout: defaultTimeout,
+        },
+        contentAi: {
+            url: process.env.SERVICE_CONTENT_AI_URL || 'http://localhost:5008',
+            timeout: defaultTimeout,
+        },
+        clientIdentity: {
+            url: process.env.SERVICE_CLIENT_IDENTITY_URL || 'http://localhost:5009',
+            timeout: defaultTimeout,
+        },
+        workflowOrchestration: {
+            url: process.env.SERVICE_WORKFLOW_ORCHESTRATION_URL || 'http://localhost:5010',
+            timeout: defaultTimeout,
+        },
+    });
 
-    @IsUrl({ require_tld: false })
-    SERVICE_CAMPAIGNS_URL!: string;
-
-    @IsUrl({ require_tld: false })
-    SERVICE_WORKFLOW_ORCHESTRATION_URL!: string;
-}
-
-export default registerAs<ServicesConfig>('servicesConfig', () => {
-    validateConfig(process.env, ServicesEnvValidator);
-
-    return {
-        clientIdentity: process.env.SERVICE_CLIENT_IDENTITY_URL as string,
-        rewards: process.env.SERVICE_REWARDS_URL as string,
-        contentAi: process.env.SERVICE_CONTENT_AI_URL as string,
-        analytics: process.env.SERVICE_ANALYTICS_URL as string,
-        sdkConfig: process.env.SERVICE_SDK_CONFIG_URL as string,
-        campaigns: process.env.SERVICE_CAMPAIGNS_URL as string,
-        workflowOrchestration: process.env.SERVICE_WORKFLOW_ORCHESTRATION_URL as string
-    };
+    if (!result.success) {
+        throw new Error(`Services config validation failed: ${result.error.message}`);
+    }
+    return result.data;
 });

@@ -1,7 +1,7 @@
 import { registerAs } from '@nestjs/config';
 import { IsOptional, IsString, IsUrl } from 'class-validator';
-import validateConfig from '@mod/common/validators/validate-config';
-import { MaybeType } from '@mod/types/maybe.type';
+import validateConfig from '@common/validators/validate-config';
+import { MaybeType } from '@app/types';
 
 export type StripeConfig = {
     secretKey?: MaybeType<string>;
@@ -59,6 +59,6 @@ export default registerAs<StripeConfig>('stripeConfig', () => {
         starterPriceId: process.env.STRIPE_STARTER_PRICE_ID,
         growthPriceId: process.env.STRIPE_GROWTH_PRICE_ID,
         enterprisePriceId: process.env.STRIPE_ENTERPRISE_PRICE_ID,
-        webhookSecret: process.env.STRIPE_WEBHOOK_SECRET
+        webhookSecret: process.env.STRIPE_WEBHOOK_SECRET,
     };
 });

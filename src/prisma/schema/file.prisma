@@ -1,0 +1,14 @@
+model File {
+  id       String @id @default(cuid())
+  path     String @db.VarChar(500)
+  mimeType String @map("mime_type") @db.VarChar(100)
+
+  createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt DateTime  @updatedAt @map("updated_at") @db.Timestamptz
+  deletedAt DateTime? @map("deleted_at") @db.Timestamptz
+
+  // Relations
+  tenants Tenant[]
+
+  @@map("files")
+}

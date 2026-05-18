@@ -1,0 +1,15 @@
+model Currency {
+  code     String @id @db.VarChar(3)
+  name     String @db.VarChar(100)
+  symbol   String @db.VarChar(10)
+  decimals Int    @default(2)
+
+  createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt DateTime  @updatedAt @map("updated_at") @db.Timestamptz
+  deletedAt DateTime? @map("deleted_at") @db.Timestamptz
+
+  // Relations
+  tenantSettings TenantSetting[]
+
+  @@map("currencies")
+}

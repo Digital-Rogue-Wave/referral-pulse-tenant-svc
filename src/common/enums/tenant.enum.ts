@@ -3,12 +3,12 @@ export enum TenantStatusEnum {
     SUSPENDED = 'suspended',
     LOCKED = 'locked',
     PENDING = 'pending',
-    DELETION_SCHEDULED = 'deletion_scheduled'
+    DELETION_SCHEDULED = 'deletion_scheduled',
 }
 
 export enum DomainVerificationStatusEnum {
     UNVERIFIED = 'unverified',
     PENDING = 'pending',
     VERIFIED = 'verified',
-    FAILED = 'failed'
+    FAILED = 'failed',
 }

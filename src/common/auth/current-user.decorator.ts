@@ -1,25 +1,23 @@
 import { createParamDecorator, ExecutionContext } from '@nestjs/common';
-import { JwtPayload } from '@mod/types/app.interface';
 
-export type CurrentUserType = {
-    id: string;
-    email: string;
-    identityId: string;
-    sub: string;
-};
+import type { IAuthenticatedUser } from '@app/types';
 
-export function getCurrentUser(request: { user: JwtPayload }): CurrentUserType {
-    const user = request.user;
+/**
+ * Extract the authenticated user populated by JwtStrategy.validate().
+ *
+ * Usage:
+ *   @Get() handle(@CurrentUser() user: IAuthenticatedUser) { ... }
+ *   @Get() handle(@CurrentUser('tenantId') tenantId: string) { ... }
+ */
+export const CurrentUser = createParamDecorator(
+    (data: keyof IAuthenticatedUser | undefined, ctx: ExecutionContext): IAuthenticatedUser | unknown => {
+        const request = ctx.switchToHttp().getRequest<{ user?: IAuthenticatedUser }>();
+        const user = request.user;
 
-    return {
-        id: user.sub,
-        email: user.email,
-        identityId: user.sub,
-        sub: user.sub
-    };
-}
+        if (!user) {
+            return undefined;
+        }
 
-export const CurrentUser = createParamDecorator((data: unknown, ctx: ExecutionContext) => {
-    const request = ctx.switchToHttp().getRequest();
-    return getCurrentUser(request);
-});
+        return data ? user[data] : user;
+    },
+);
