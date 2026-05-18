@@ -64,11 +64,11 @@ export class PlanService {
                 stripePriceId: dto.stripePriceId ?? null,
                 stripeProductId: dto.stripeProductId ?? null,
                 interval: dto.interval ?? null,
-                limits: dto.limits ?? Prisma.JsonNull,
+                limits: (dto.limits as Prisma.InputJsonValue) ?? Prisma.JsonNull,
                 tenantId: dto.tenantId ?? null,
                 isActive: dto.isActive ?? true,
                 manualInvoicing: dto.manualInvoicing ?? false,
-                metadata: dto.metadata ?? Prisma.JsonNull,
+                metadata: (dto.metadata as Prisma.InputJsonValue) ?? Prisma.JsonNull,
             },
         });
 
@@ -134,7 +134,7 @@ export class PlanService {
 
         if (dto.limits !== undefined) {
             this.validateLimitsOrThrow(dto.limits ?? null);
-            updateData.limits = dto.limits ?? Prisma.JsonNull;
+            updateData.limits = (dto.limits as Prisma.InputJsonValue) ?? Prisma.JsonNull;
         }
 
         if (dto.tenantId !== undefined) {
@@ -158,7 +158,7 @@ export class PlanService {
         }
 
         if (dto.metadata !== undefined) {
-            updateData.metadata = dto.metadata ?? Prisma.JsonNull;
+            updateData.metadata = (dto.metadata as Prisma.InputJsonValue) ?? Prisma.JsonNull;
         }
 
         const updated = await this.prisma.plan.update({

@@ -130,7 +130,7 @@ export class BroadcastEventListener {
         await this.broadcast('billing', event.eventType, event.tenantId, event.eventId, BILLING_EVENTS_TOPIC, {
             stripeSubscriptionId: event.stripeSubscriptionId,
             cancelledAt: event.cancelledAt,
-            endsAt: event.endsAt,
+            endsAt: event.cancellationEffectiveAt,
             reason: event.reason,
             tenantId: event.tenantId,
             userId: event.userId,
@@ -152,7 +152,7 @@ export class BroadcastEventListener {
     async handleSubscriptionUpgraded(event: SubscriptionUpgradedEvent): Promise<void> {
         await this.broadcast('billing', event.eventType, event.tenantId, event.eventId, BILLING_EVENTS_TOPIC, {
             previousPlan: event.previousPlan,
-            newPlan: event.newPlan,
+            newPlan: event.billingPlan,
             effectiveDate: event.effectiveDate,
             tenantId: event.tenantId,
             userId: event.userId,

@@ -87,7 +87,9 @@ export type EventAction =
     | 'payment-status-changed'
     | 'reminder'
     | 'restricted'
-    | 'restored';
+    | 'restored'
+    | 'monthly_summary'
+    | 'threshold_crossed';
 
 /**
  * Valid base event type combining category and action
