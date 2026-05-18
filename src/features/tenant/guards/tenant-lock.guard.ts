@@ -33,7 +33,6 @@ export class TenantLockGuard implements CanActivate {
                 'TENANT_LOCKED' as ErrorCode,
                 'This account has been locked. Please unlock it using your password.',
                 HttpStatus.FORBIDDEN,
-                undefined,
                 { lockedAt: tenant.lockedAt, lockUntil: tenant.lockUntil, reason: tenant.lockReason },
             );
         }
