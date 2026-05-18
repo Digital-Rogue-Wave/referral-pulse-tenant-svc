@@ -37,16 +37,16 @@ export class CampaignEventsConsumer {
 
                 switch (eventType) {
                     case CampaignEvents.CREATED:
-                        this.handleCreated(payload as CampaignCreatedEvent);
+                        this.handleCreated(payload as unknown as CampaignCreatedEvent);
                         break;
                     case CampaignEvents.UPDATED:
-                        this.handleUpdated(payload as CampaignUpdatedEvent);
+                        this.handleUpdated(payload as unknown as CampaignUpdatedEvent);
                         break;
                     case CampaignEvents.INVITATION_SENT:
-                        this.handleInvitationSent(payload as CampaignInvitationSentEvent);
+                        this.handleInvitationSent(payload as unknown as CampaignInvitationSentEvent);
                         break;
                     case CampaignEvents.ACTIVATED:
-                        this.handleActivated(payload as CampaignActivatedEvent);
+                        this.handleActivated(payload as unknown as CampaignActivatedEvent);
                         break;
                     default:
                         this.logger.warn(`Unknown campaign event type: ${eventType}`);

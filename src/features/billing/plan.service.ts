@@ -89,7 +89,7 @@ export class PlanService {
         return {
             ...result,
             data: planResponseMapper.toResponseArray(result.data),
-        };
+        } as unknown as Paginated<PlanDto>;
     }
 
     async findOne(where: Prisma.PlanWhereInput): Promise<NullableType<PlanDto>> {

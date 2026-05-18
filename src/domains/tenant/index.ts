@@ -7,7 +7,8 @@ import { BaseResponseMapper } from '@common/helper';
 // Enums (canonical definition lives in tenant.types.ts)
 // ============================================================
 
-export { TenantStatus } from './tenant.types';
+import { TenantStatus } from './tenant.types';
+export { TenantStatus };
 
 // ============================================================
 // Props (shape of the Prisma model)

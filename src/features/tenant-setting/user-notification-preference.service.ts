@@ -1,5 +1,6 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 
+import { Prisma } from '@prisma-gen/generated/client';
 import { DatabaseService } from '@app/database/database.service';
 import { TenantAwareService } from '@common/tenant-aware/tenant-aware.service';
 import { TenantContextService } from '@common/tenant-aware/tenant-context.service';
@@ -83,10 +84,10 @@ export class UserNotificationPreferenceService {
             create: {
                 userId,
                 tenantId,
-                overrides,
+                overrides: overrides as Prisma.InputJsonValue,
             },
             update: {
-                overrides,
+                overrides: overrides as Prisma.InputJsonValue,
             },
         })) as UserNotificationPreferenceProps;
 
