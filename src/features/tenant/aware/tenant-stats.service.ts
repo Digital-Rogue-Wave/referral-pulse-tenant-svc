@@ -26,12 +26,12 @@ export class TenantStatsService {
     ) {
         this.logger.setContext(TenantStatsService.name);
 
-        const srvCfg = this.configService.getOrThrow<ConfigType<typeof servicesConfig>>('servicesConfig', {
+        const srvCfg = this.configService.getOrThrow<ConfigType<typeof servicesConfig>>('services', {
             infer: true,
         });
-        this.campaignServiceUrl = srvCfg.campaigns;
-        this.rewardsServiceUrl = srvCfg.rewards;
-        this.analyticsServiceUrl = srvCfg.analytics;
+        this.campaignServiceUrl = srvCfg.campaigns.url;
+        this.rewardsServiceUrl = srvCfg.rewards.url;
+        this.analyticsServiceUrl = srvCfg.analytics.url;
     }
 
     async getStats(): Promise<TenantStatsDto> {

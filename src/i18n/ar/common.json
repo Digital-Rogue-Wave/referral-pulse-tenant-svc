@@ -1,0 +1,8 @@
+{
+  "notFound": "المورد غير موجود",
+  "unauthorized": "غير مصرح",
+  "forbidden": "الوصول مرفوض",
+  "internalError": "حدث خطأ غير متوقع",
+  "validationFailed": "فشل التحقق من الصحة",
+  "conflict": "المورد موجود بالفعل"
+}

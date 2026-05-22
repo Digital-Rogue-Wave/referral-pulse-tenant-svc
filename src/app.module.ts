@@ -1,7 +1,10 @@
+import * as path from 'path';
+
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { APP_FILTER, APP_GUARD, APP_INTERCEPTOR } from '@nestjs/core';
 import { TerminusModule } from '@nestjs/terminus';
+import { AcceptLanguageResolver, HeaderResolver, I18nModule, QueryResolver } from 'nestjs-i18n';
 
 import { configLoaders } from './config';
 
@@ -33,6 +36,18 @@ import { GlobalExceptionsFilter } from '@common/exceptions/global-exceptions.fil
             cache: true,
             expandVariables: true,
             envFilePath: `.env.${process.env.NODE_ENV || 'development'}`,
+        }),
+        I18nModule.forRoot({
+            fallbackLanguage: 'en',
+            loaderOptions: {
+                path: path.join(__dirname, 'i18n'),
+                watch: process.env.NODE_ENV !== 'production',
+            },
+            resolvers: [
+                { use: QueryResolver, options: ['lang'] },
+                AcceptLanguageResolver,
+                new HeaderResolver(['x-lang']),
+            ],
         }),
         TerminusModule,
         CommonModule,

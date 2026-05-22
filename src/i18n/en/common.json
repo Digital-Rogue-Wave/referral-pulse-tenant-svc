@@ -1,0 +1,8 @@
+{
+  "notFound": "Resource not found",
+  "unauthorized": "Unauthorized",
+  "forbidden": "Access denied",
+  "internalError": "An unexpected error occurred",
+  "validationFailed": "Validation failed",
+  "conflict": "Resource already exists"
+}

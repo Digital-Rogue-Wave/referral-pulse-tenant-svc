@@ -1,13 +1,11 @@
 import { HttpStatus, Injectable } from '@nestjs/common';
 import { randomUUID } from 'node:crypto';
-import { ConfigService } from '@nestjs/config';
 import type { File, Prisma } from '@prisma-gen/generated/client';
-import type { AllConfigType } from '@config/config.type';
+import { I18nContext, I18nService } from 'nestjs-i18n';
 import type { NullableType } from '@app/types';
 import type { ErrorCode } from '@app/types/app.type';
 
 import { DatabaseService } from '@app/database/database.service';
-import { I18nContext, I18nService } from 'nestjs-i18n';
 import { S3Service } from '@common/storage/s3.service';
 import { AppLoggerService } from '@common/logging/app-logger.service';
 import { BaseException } from '@common/exceptions/base.exceptions';
@@ -16,7 +14,6 @@ import { PresignedUrlResponseDto, FileDto } from '@domains/files';
 @Injectable()
 export class FilesService {
     constructor(
-        private readonly configService: ConfigService<AllConfigType>,
         private readonly prisma: DatabaseService,
         private readonly awsS3Service: S3Service,
         private readonly i18n: I18nService,

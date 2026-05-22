@@ -1,0 +1,8 @@
+{
+  "notFound": "Ressource introuvable",
+  "unauthorized": "Non autorisé",
+  "forbidden": "Accès refusé",
+  "internalError": "Une erreur inattendue s'est produite",
+  "validationFailed": "Échec de la validation",
+  "conflict": "La ressource existe déjà"
+}
