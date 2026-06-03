@@ -1,0 +1,80 @@
+/**
+ * Cucumber Lifecycle Hooks
+ *
+ * BeforeAll  — boots NestJS test app once, registers nock interceptors
+ * AfterAll   — closes the app, cleans up nock and Prisma connections
+ *
+ * Tagged Before/After — create / destroy fixture tenants per scenario
+ */
+
+import { BeforeAll, AfterAll, Before, After, setDefaultTimeout } from '@cucumber/cucumber';
+import { bootstrapTestApp, teardownTestApp } from './app.bootstrap';
+import { setupNock, teardownNock } from './nock.setup';
+import {
+    createSuspendedTenant,
+    createLockedTenant,
+    createActiveTenant,
+    cleanupTenant,
+    disconnectFixturesPrisma,
+    FIXTURE_IDS,
+} from './db.fixtures';
+import type { BddWorldInterface } from './world';
+
+// Give each scenario up to 30 s (NestJS boot + DB round-trips)
+setDefaultTimeout(30_000);
+
+// ─── Suite lifecycle ──────────────────────────────────────────────────────────
+
+BeforeAll(async function () {
+    // nock MUST be set up before the app boots so the JWKS intercept is in place
+    setupNock();
+    await bootstrapTestApp();
+});
+
+AfterAll(async function () {
+    await teardownTestApp();
+    teardownNock();
+    await disconnectFixturesPrisma();
+});
+
+// ─── Fixture: suspended tenant ────────────────────────────────────────────────
+
+Before({ tags: '@needs-suspended-tenant' }, async function (this: BddWorldInterface) {
+    await createSuspendedTenant(FIXTURE_IDS.suspended);
+    this.currentTenantId = FIXTURE_IDS.suspended;
+});
+
+After({ tags: '@needs-suspended-tenant' }, async function (this: BddWorldInterface) {
+    if (this.currentTenantId) {
+        await cleanupTenant(this.currentTenantId);
+        this.currentTenantId = null;
+    }
+});
+
+// ─── Fixture: locked tenant ───────────────────────────────────────────────────
+
+Before({ tags: '@needs-locked-tenant' }, async function (this: BddWorldInterface) {
+    await createLockedTenant(FIXTURE_IDS.locked);
+    this.currentTenantId = FIXTURE_IDS.locked;
+});
+
+After({ tags: '@needs-locked-tenant' }, async function (this: BddWorldInterface) {
+    if (this.currentTenantId) {
+        await cleanupTenant(this.currentTenantId);
+        this.currentTenantId = null;
+    }
+});
+
+// ─── Fixture: active tenant ───────────────────────────────────────────────────
+
+Before({ tags: '@needs-active-tenant' }, async function (this: BddWorldInterface) {
+    await createActiveTenant(FIXTURE_IDS.active);
+    this.currentTenantId = FIXTURE_IDS.active;
+});
+
+After({ tags: '@needs-active-tenant' }, async function (this: BddWorldInterface) {
+    if (this.currentTenantId) {
+        await cleanupTenant(this.currentTenantId);
+        this.currentTenantId = null;
+    }
+});
