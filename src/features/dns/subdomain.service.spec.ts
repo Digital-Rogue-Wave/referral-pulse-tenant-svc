@@ -6,25 +6,28 @@ import { SubdomainService } from './subdomain.service';
 import { DatabaseService } from '@app/database/database.service';
 import { TransactionEventEmitterService } from '@common/events/transaction-event-emitter.service';
 import { AppLoggerService } from '@common/logging/app-logger.service';
+import { DateService } from '@common/helper/date.service';
 
 describe('SubdomainService', () => {
     let service: SubdomainService;
     let prisma: MockProxy<DatabaseService>;
     let txEventEmitter: MockProxy<TransactionEventEmitterService>;
     let logger: MockProxy<AppLoggerService>;
+    let dateService: MockProxy<DateService>;
 
     beforeEach(async () => {
         prisma = mock<DatabaseService>();
         txEventEmitter = mock<TransactionEventEmitterService>();
         logger = mock<AppLoggerService>();
+        dateService = mock<DateService>();
 
         // Mock prisma methods
         prisma.tenant = {
-            count: jest.fn(),
+            count: jest.fn()
         } as any;
         prisma.reservedSubdomain = {
             count: jest.fn(),
-            create: jest.fn(),
+            create: jest.fn()
         } as any;
 
         const module: TestingModule = await Test.createTestingModule({
@@ -33,7 +36,8 @@ describe('SubdomainService', () => {
                 { provide: DatabaseService, useValue: prisma },
                 { provide: TransactionEventEmitterService, useValue: txEventEmitter },
                 { provide: AppLoggerService, useValue: logger },
-            ],
+                { provide: DateService, useValue: dateService }
+            ]
         }).compile();
 
         service = module.get<SubdomainService>(SubdomainService);
@@ -103,10 +107,17 @@ describe('SubdomainService', () => {
 
     describe('reserveSubdomain', () => {
         it('should create a reservation', async () => {
+            (prisma.tenant.count as jest.Mock).mockResolvedValue(0);
+            (prisma.reservedSubdomain.count as jest.Mock).mockResolvedValue(0);
+            const momentChain = {
+                add: jest.fn().mockReturnThis(),
+                toDate: jest.fn().mockReturnValue(new Date())
+            };
+            dateService.nowMoment.mockReturnValue(momentChain as unknown as ReturnType<DateService['nowMoment']>);
             (prisma.reservedSubdomain.create as jest.Mock).mockResolvedValue({
                 slug: 'old-slug',
                 originalTenantId: 'tenant-id',
-                expiresAt: expect.any(Date),
+                expiresAt: expect.any(Date)
             });
 
             await service.reserveSubdomain('old-slug', 'tenant-id', 7);
@@ -115,8 +126,8 @@ describe('SubdomainService', () => {
                 data: expect.objectContaining({
                     slug: 'old-slug',
                     originalTenantId: 'tenant-id',
-                    expiresAt: expect.any(Date),
-                }),
+                    expiresAt: expect.any(Date)
+                })
             });
         });
     });

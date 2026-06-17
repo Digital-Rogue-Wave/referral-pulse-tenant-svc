@@ -16,9 +16,9 @@ describe('TenantStatusGuard', () => {
         return {
             switchToHttp: () => ({
                 getRequest: () => ({
-                    params,
-                }),
-            }),
+                    params
+                })
+            })
         } as ExecutionContext;
     };
 
@@ -30,8 +30,8 @@ describe('TenantStatusGuard', () => {
             providers: [
                 TenantStatusGuard,
                 { provide: TenantService, useValue: tenantService },
-                { provide: TenantContextService, useValue: tenantContext },
-            ],
+                { provide: TenantContextService, useValue: tenantContext }
+            ]
         }).compile();
 
         guard = module.get<TenantStatusGuard>(TenantStatusGuard);
@@ -54,7 +54,7 @@ describe('TenantStatusGuard', () => {
         tenantContext.getTenantId.mockReturnValue('tenant-123');
         tenantService.findOneById.mockResolvedValue({
             id: 'tenant-123',
-            status: TenantStatus.ACTIVE,
+            status: TenantStatus.ACTIVE
         } as any);
 
         const context = createMockExecutionContext();
@@ -63,24 +63,24 @@ describe('TenantStatusGuard', () => {
         expect(result).toBe(true);
     });
 
-    it('should get tenantId from params first', async () => {
+    it('should resolve tenantId from the tenant context (ignoring route params)', async () => {
         tenantContext.getTenantId.mockReturnValue('context-tenant');
         tenantService.findOneById.mockResolvedValue({
-            id: 'param-tenant',
-            status: TenantStatus.ACTIVE,
+            id: 'context-tenant',
+            status: TenantStatus.ACTIVE
         } as any);
 
         const context = createMockExecutionContext({ id: 'param-tenant' });
         await guard.canActivate(context);
 
-        expect(tenantService.findOneById).toHaveBeenCalledWith('param-tenant');
+        expect(tenantService.findOneById).toHaveBeenCalledWith('context-tenant');
     });
 
     it('should throw FORBIDDEN if tenant is SUSPENDED', async () => {
         tenantContext.getTenantId.mockReturnValue('tenant-123');
         tenantService.findOneById.mockResolvedValue({
             id: 'tenant-123',
-            status: TenantStatus.SUSPENDED,
+            status: TenantStatus.SUSPENDED
         } as any);
 
         const context = createMockExecutionContext();
@@ -99,7 +99,7 @@ describe('TenantStatusGuard', () => {
         tenantContext.getTenantId.mockReturnValue('tenant-123');
         tenantService.findOneById.mockResolvedValue({
             id: 'tenant-123',
-            status: TenantStatus.LOCKED,
+            status: TenantStatus.LOCKED
         } as any);
 
         const context = createMockExecutionContext();

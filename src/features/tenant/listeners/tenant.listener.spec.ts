@@ -7,14 +7,11 @@ import { KetoService } from '@common/auth/keto.service';
 import { HttpClientService } from '@common/http/http-client.service';
 import { AppLoggerService } from '@common/logging/app-logger.service';
 import { BullJobsService } from '@common/bulljobs';
+import { DateService } from '@common/helper/date.service';
 import { DomainProvisioningService } from '../../dns/domain-provisioning.service';
 
 import { TenantListener } from './tenant.listener';
-import {
-    TenantCreatedEvent,
-    TenantDeletionScheduledEvent,
-    TenantDeletionCancelledEvent,
-} from '@domains/tenant/events/tenant.events';
+import { TenantCreatedEvent, TenantDeletionScheduledEvent, TenantDeletionCancelledEvent } from '@domains/tenant/events/tenant.events';
 
 describe('TenantListener', () => {
     let listener: TenantListener;
@@ -25,6 +22,7 @@ describe('TenantListener', () => {
     let configService: MockProxy<ConfigService>;
     let domainProvisioningService: MockProxy<DomainProvisioningService>;
     let logger: MockProxy<AppLoggerService>;
+    let dateService: MockProxy<DateService>;
 
     const tenantId = 'tenant-123';
 
@@ -36,12 +34,13 @@ describe('TenantListener', () => {
         configService = mock<ConfigService>();
         domainProvisioningService = mock<DomainProvisioningService>();
         logger = mock<AppLoggerService>();
+        dateService = mock<DateService>();
 
         configService.getOrThrow.mockReturnValue({
             keto: {
                 writeUrl: 'http://keto-write',
-                readUrl: 'http://keto-read',
-            },
+                readUrl: 'http://keto-read'
+            }
         });
 
         const module: TestingModule = await Test.createTestingModule({
@@ -54,10 +53,11 @@ describe('TenantListener', () => {
                 { provide: ConfigService, useValue: configService },
                 {
                     provide: DomainProvisioningService,
-                    useValue: domainProvisioningService,
+                    useValue: domainProvisioningService
                 },
                 { provide: AppLoggerService, useValue: logger },
-            ],
+                { provide: DateService, useValue: dateService }
+            ]
         }).compile();
 
         listener = module.get<TenantListener>(TenantListener);
@@ -69,32 +69,23 @@ describe('TenantListener', () => {
 
     describe('handleTenantCreatedEvent', () => {
         it('should publish SNS event on tenant creation', async () => {
-            const event = new TenantCreatedEvent(
-                tenantId,
-                tenantId,
-                'Test Tenant',
-                'test-tenant',
-                'owner-123',
-                new Date(),
-                new Date(),
-                'user-123',
-            );
+            const event = new TenantCreatedEvent(tenantId, tenantId, 'Test Tenant', 'test-tenant', 'owner-123', new Date(), new Date(), 'user-123');
 
             await listener.handleTenantCreatedEvent(event);
 
             expect(snsPublisher.publish).toHaveBeenCalledWith(
+                'tenant-events',
+                'tenant.created',
                 expect.objectContaining({
-                    eventType: 'tenant.created',
                     data: expect.objectContaining({
                         tenantId,
                         name: 'Test Tenant',
-                        slug: 'test-tenant',
-                    }),
+                        slug: 'test-tenant'
+                    })
                 }),
                 expect.objectContaining({
-                    topic: 'tenant-events',
-                    groupId: tenantId,
-                }),
+                    messageGroupId: tenantId
+                })
             );
         });
     });
@@ -103,14 +94,7 @@ describe('TenantListener', () => {
         it('should schedule a deletion job', async () => {
             const scheduledAt = new Date();
             const executionDate = new Date(Date.now() + 1000 * 60 * 60 * 24 * 30);
-            const event = new TenantDeletionScheduledEvent(
-                tenantId,
-                tenantId,
-                scheduledAt,
-                executionDate,
-                'Test reason',
-                'user-123',
-            );
+            const event = new TenantDeletionScheduledEvent(tenantId, tenantId, scheduledAt, executionDate, 'Test reason', 'user-123');
 
             await listener.handleTenantDeletionScheduledEvent(event);
 
@@ -120,12 +104,12 @@ describe('TenantListener', () => {
                 'execute-deletion',
                 expect.objectContaining({
                     tenantId,
-                    reason: 'Test reason',
+                    reason: 'Test reason'
                 }),
                 expect.any(Number),
                 expect.objectContaining({
-                    jobId: `deletion-${tenantId}`,
-                }),
+                    jobId: `deletion-${tenantId}`
+                })
             );
         });
     });
