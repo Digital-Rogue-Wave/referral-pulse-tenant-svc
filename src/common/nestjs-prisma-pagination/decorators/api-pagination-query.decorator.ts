@@ -26,9 +26,7 @@ interface FilterParam {
  * findAll(@Paginate() query: PaginateQuery) { ... }
  */
 export function ApiPaginationQuery<T>(config: PaginateConfig<T>): ReturnType<typeof applyDecorators> {
-    const decorators: Array<ClassDecorator | MethodDecorator | PropertyDecorator> = [
-        SetMetadata(PAGINATION_CONFIG_KEY, config),
-    ];
+    const decorators: Array<ClassDecorator | MethodDecorator | PropertyDecorator> = [SetMetadata(PAGINATION_CONFIG_KEY, config)];
 
     // Page parameter (required for pagination)
     decorators.push(
@@ -39,10 +37,10 @@ export function ApiPaginationQuery<T>(config: PaginateConfig<T>): ReturnType<typ
             schema: {
                 type: 'integer',
                 minimum: 1,
-                default: 1,
+                default: 1
             },
-            example: 1,
-        }),
+            example: 1
+        })
     );
 
     // Limit parameter
@@ -58,10 +56,10 @@ export function ApiPaginationQuery<T>(config: PaginateConfig<T>): ReturnType<typ
                 type: 'integer',
                 minimum: 1,
                 maximum: maxLimit,
-                default: defaultLimit,
+                default: defaultLimit
             },
-            example: defaultLimit,
-        }),
+            example: defaultLimit
+        })
     );
 
     // SortBy parameter - only if sortable columns are defined
@@ -80,13 +78,13 @@ export function ApiPaginationQuery<T>(config: PaginateConfig<T>): ReturnType<typ
                     type: 'array',
                     items: {
                         type: 'string',
-                        pattern: '^[a-zA-Z_]+:(ASC|DESC)$',
+                        pattern: '^[a-zA-Z_]+:(ASC|DESC)$'
                     },
-                    default: [defaultSort],
+                    default: [defaultSort]
                 },
                 example: [defaultSort],
-                explode: false,
-            }),
+                explode: false
+            })
         );
     }
 
@@ -97,10 +95,10 @@ export function ApiPaginationQuery<T>(config: PaginateConfig<T>): ReturnType<typ
             description: 'Full-text search query',
             required: false,
             schema: {
-                type: 'string',
+                type: 'string'
             },
-            example: 'search term',
-        }),
+            example: 'search term'
+        })
     );
 
     decorators.push(
@@ -111,12 +109,12 @@ export function ApiPaginationQuery<T>(config: PaginateConfig<T>): ReturnType<typ
             schema: {
                 type: 'array',
                 items: {
-                    type: 'string',
-                },
+                    type: 'string'
+                }
             },
             example: config.searchableColumns ? config.searchableColumns.map(String) : ['name', 'code'],
-            explode: false,
-        }),
+            explode: false
+        })
     );
 
     // Filter parameter - only if filterable columns are defined
@@ -144,7 +142,7 @@ export function ApiPaginationQuery<T>(config: PaginateConfig<T>): ReturnType<typ
             $not_sw: 'Uni',
             $ends: 'ted',
             $not_ends: 'ted',
-            $ilike: 'unit',
+            $ilike: 'unit'
         };
 
         // Generate example filter keys based on actual filterable columns
@@ -169,7 +167,7 @@ export function ApiPaginationQuery<T>(config: PaginateConfig<T>): ReturnType<typ
                 schemaProperties[`${column}[${operator}]`] = {
                     type: 'array',
                     items: { type: 'string' },
-                    example: exampleValue,
+                    example: exampleValue
                 };
             }
         }
@@ -181,11 +179,11 @@ export function ApiPaginationQuery<T>(config: PaginateConfig<T>): ReturnType<typ
                 required: false,
                 schema: {
                     type: 'object',
-                    properties: schemaProperties,
+                    properties: schemaProperties
                 },
                 style: 'deepObject',
-                explode: true,
-            }),
+                explode: true
+            })
         );
     }
 
@@ -196,6 +194,6 @@ export function ApiPaginationQuery<T>(config: PaginateConfig<T>): ReturnType<typ
  * Helper function to get the pagination config from the decorator
  * Can be used in guards or interceptors to access the config
  */
-export function getPaginationConfig<T>(target: object | Function): PaginateConfig<T> | undefined {
+export function getPaginationConfig<T>(target: object): PaginateConfig<T> | undefined {
     return Reflect.getMetadata(PAGINATION_CONFIG_KEY, target);
 }

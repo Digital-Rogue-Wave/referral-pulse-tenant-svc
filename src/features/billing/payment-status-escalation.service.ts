@@ -18,7 +18,7 @@ export class PaymentStatusEscalationService {
     constructor(
         private readonly prisma: DatabaseService,
         private readonly logger: AppLoggerService,
-        private readonly txEventEmitter: TransactionEventEmitterService,
+        private readonly txEventEmitter: TransactionEventEmitterService
     ) {
         this.logger.setContext(PaymentStatusEscalationService.name);
     }
@@ -30,10 +30,10 @@ export class PaymentStatusEscalationService {
             where: {
                 status: TenantStatusEnum.ACTIVE,
                 paymentStatus: {
-                    in: [PaymentStatusEnum.PAST_DUE, PaymentStatusEnum.RESTRICTED],
+                    in: [PaymentStatusEnum.PAST_DUE, PaymentStatusEnum.RESTRICTED]
                 },
-                deletedAt: null,
-            },
+                deletedAt: null
+            }
         });
 
         for (const tenant of tenants) {
@@ -42,7 +42,7 @@ export class PaymentStatusEscalationService {
             if (!changedAt) {
                 await this.prisma.tenant.update({
                     where: { id: tenant.id },
-                    data: { paymentStatusChangedAt: now },
+                    data: { paymentStatusChangedAt: now }
                 });
                 continue;
             }
@@ -56,10 +56,8 @@ export class PaymentStatusEscalationService {
                 continue;
             }
 
-            if (tenant.paymentStatus === PaymentStatusEnum.RESTRICTED) {
-                if (elapsedMs >= PaymentStatusEscalationService.RESTRICTED_TO_LOCKED_MS) {
-                    await this.transition(tenant, PaymentStatusEnum.LOCKED, now);
-                }
+            if (tenant.paymentStatus === PaymentStatusEnum.RESTRICTED && elapsedMs >= PaymentStatusEscalationService.RESTRICTED_TO_LOCKED_MS) {
+                await this.transition(tenant, PaymentStatusEnum.LOCKED, now);
             }
         }
     }
@@ -75,17 +73,15 @@ export class PaymentStatusEscalationService {
             where: { id: tenant.id },
             data: {
                 paymentStatus: nextStatus,
-                paymentStatusChangedAt: now,
-            },
+                paymentStatusChangedAt: now
+            }
         });
 
-        this.logger.warn(
-            `Escalated tenant paymentStatus: tenantId=${tenant.id}, from=${previousStatus}, to=${nextStatus}`,
-        );
+        this.logger.warn(`Escalated tenant paymentStatus: tenantId=${tenant.id}, from=${previousStatus}, to=${nextStatus}`);
 
         this.txEventEmitter.emitAfterCommit(
             BillingEvents.TENANT_PAYMENT_STATUS_CHANGED,
-            new TenantPaymentStatusChangedEvent(tenant.id, tenant.id, previousStatus ?? '', nextStatus, now.toISOString()),
+            new TenantPaymentStatusChangedEvent(tenant.id, tenant.id, previousStatus ?? '', nextStatus, now.toISOString())
         );
     }
 }

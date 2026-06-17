@@ -18,9 +18,7 @@ export const CURSOR_PAGINATION_CONFIG_KEY = 'cursorPaginationConfig';
  * findAllCursor(@CursorPaginate() query: CursorPaginateQuery) { ... }
  */
 export function ApiCursorPaginationQuery<T>(config: PaginateConfig<T>): ReturnType<typeof applyDecorators> {
-    const decorators: Array<ClassDecorator | MethodDecorator | PropertyDecorator> = [
-        SetMetadata(CURSOR_PAGINATION_CONFIG_KEY, config),
-    ];
+    const decorators: Array<ClassDecorator | MethodDecorator | PropertyDecorator> = [SetMetadata(CURSOR_PAGINATION_CONFIG_KEY, config)];
 
     // After cursor (forward pagination)
     decorators.push(
@@ -29,8 +27,8 @@ export function ApiCursorPaginationQuery<T>(config: PaginateConfig<T>): ReturnTy
             description: 'Cursor for forward pagination. Returns items after this cursor.',
             required: false,
             schema: { type: 'string' },
-            example: 'eyJzdiI6W3siYyI6Im5hbWUiLCJ2IjoiVVNEIn1dLCJ1aWQiOnsiYyI6ImNvZGUiLCJ2IjoiVVNEIn0sImQiOiJmIn0',
-        }),
+            example: 'eyJzdiI6W3siYyI6Im5hbWUiLCJ2IjoiVVNEIn1dLCJ1aWQiOnsiYyI6ImNvZGUiLCJ2IjoiVVNEIn0sImQiOiJmIn0'
+        })
     );
 
     // Before cursor (backward pagination)
@@ -39,8 +37,8 @@ export function ApiCursorPaginationQuery<T>(config: PaginateConfig<T>): ReturnTy
             name: 'before',
             description: 'Cursor for backward pagination. Returns items before this cursor.',
             required: false,
-            schema: { type: 'string' },
-        }),
+            schema: { type: 'string' }
+        })
     );
 
     // First (forward limit)
@@ -56,10 +54,10 @@ export function ApiCursorPaginationQuery<T>(config: PaginateConfig<T>): ReturnTy
                 type: 'integer',
                 minimum: 1,
                 maximum: maxLimit,
-                default: defaultLimit,
+                default: defaultLimit
             },
-            example: defaultLimit,
-        }),
+            example: defaultLimit
+        })
     );
 
     // Last (backward limit)
@@ -71,9 +69,9 @@ export function ApiCursorPaginationQuery<T>(config: PaginateConfig<T>): ReturnTy
             schema: {
                 type: 'integer',
                 minimum: 1,
-                maximum: maxLimit,
-            },
-        }),
+                maximum: maxLimit
+            }
+        })
     );
 
     // SortBy parameter - only if sortable columns are defined
@@ -92,13 +90,13 @@ export function ApiCursorPaginationQuery<T>(config: PaginateConfig<T>): ReturnTy
                     type: 'array',
                     items: {
                         type: 'string',
-                        pattern: '^[a-zA-Z_]+:(ASC|DESC)$',
+                        pattern: '^[a-zA-Z_]+:(ASC|DESC)$'
                     },
-                    default: [defaultSort],
+                    default: [defaultSort]
                 },
                 example: [defaultSort],
-                explode: false,
-            }),
+                explode: false
+            })
         );
     }
 
@@ -108,8 +106,8 @@ export function ApiCursorPaginationQuery<T>(config: PaginateConfig<T>): ReturnTy
             name: 'search',
             description: 'Full-text search query',
             required: false,
-            schema: { type: 'string' },
-        }),
+            schema: { type: 'string' }
+        })
     );
 
     decorators.push(
@@ -119,11 +117,11 @@ export function ApiCursorPaginationQuery<T>(config: PaginateConfig<T>): ReturnTy
             required: false,
             schema: {
                 type: 'array',
-                items: { type: 'string' },
+                items: { type: 'string' }
             },
             example: config.searchableColumns ? config.searchableColumns.map(String) : ['name', 'code'],
-            explode: false,
-        }),
+            explode: false
+        })
     );
 
     // Filter parameter - only if filterable columns are defined
@@ -149,7 +147,7 @@ export function ApiCursorPaginationQuery<T>(config: PaginateConfig<T>): ReturnTy
             $not_sw: 'Uni',
             $ends: 'ted',
             $not_ends: 'ted',
-            $ilike: 'unit',
+            $ilike: 'unit'
         };
 
         const allOperators = Object.keys(operatorExamples).join(', ');
@@ -162,7 +160,7 @@ export function ApiCursorPaginationQuery<T>(config: PaginateConfig<T>): ReturnTy
                 schemaProperties[`${column}[${operator}]`] = {
                     type: 'array',
                     items: { type: 'string' },
-                    example: exampleValue,
+                    example: exampleValue
                 };
             }
         }
@@ -174,11 +172,11 @@ export function ApiCursorPaginationQuery<T>(config: PaginateConfig<T>): ReturnTy
                 required: false,
                 schema: {
                     type: 'object',
-                    properties: schemaProperties,
+                    properties: schemaProperties
                 },
                 style: 'deepObject',
-                explode: true,
-            }),
+                explode: true
+            })
         );
     }
 
@@ -189,6 +187,6 @@ export function ApiCursorPaginationQuery<T>(config: PaginateConfig<T>): ReturnTy
  * Helper function to get the cursor pagination config from the decorator
  * Can be used in guards or interceptors to access the config
  */
-export function getCursorPaginationConfig<T>(target: object | Function): PaginateConfig<T> | undefined {
+export function getCursorPaginationConfig<T>(target: object): PaginateConfig<T> | undefined {
     return Reflect.getMetadata(CURSOR_PAGINATION_CONFIG_KEY, target);
 }

@@ -30,17 +30,17 @@ export class RedisService implements OnModuleInit, OnModuleDestroy {
         private readonly logger: AppLoggerService,
         private readonly dateService: DateService,
         private readonly jsonService: JsonService,
-        private readonly iamAuthProvider: ElastiCacheIamAuthProvider,
+        private readonly iamAuthProvider: ElastiCacheIamAuthProvider
     ) {
         this.logger.setContext(RedisService.name);
         this.keyPrefix = this.configService.getOrThrow('redis.keyPrefix', {
-            infer: true,
+            infer: true
         });
         this.defaultTtl = this.configService.getOrThrow('redis.defaultTtl', {
-            infer: true,
+            infer: true
         });
         this.lockTtl = this.configService.getOrThrow('redis.lockTtl', {
-            infer: true,
+            infer: true
         });
     }
 
@@ -59,7 +59,7 @@ export class RedisService implements OnModuleInit, OnModuleDestroy {
         if (this.iamAuthProvider.isEnabled()) {
             const host = this.configService.getOrThrow('redis.host', { infer: true });
             const username = this.configService.getOrThrow('redis.iamAuthUsername', {
-                infer: true,
+                infer: true
             });
             await this.iamAuthProvider.startTokenRefresh(username, host);
             this.logger.log('Redis service initialized with IAM authentication');
@@ -82,7 +82,7 @@ export class RedisService implements OnModuleInit, OnModuleDestroy {
         let password: string | undefined;
         if (iamAuthEnabled) {
             const username = this.configService.getOrThrow('redis.iamAuthUsername', {
-                infer: true,
+                infer: true
             });
             password = await this.iamAuthProvider.getAuthToken(username, host);
             this.logger.debug('Using IAM auth token for Redis connection');
@@ -97,18 +97,18 @@ export class RedisService implements OnModuleInit, OnModuleDestroy {
             db: this.configService.getOrThrow('redis.db', { infer: true }),
             maxRetriesPerRequest: this.configService.getOrThrow('redis.maxRetriesPerRequest', { infer: true }),
             connectTimeout: this.configService.getOrThrow('redis.connectTimeout', {
-                infer: true,
+                infer: true
             }),
             commandTimeout: this.configService.getOrThrow('redis.commandTimeout', {
-                infer: true,
+                infer: true
             }),
             retryStrategy: (times) => {
                 const delay = this.configService.getOrThrow('redis.retryDelayMs', {
-                    infer: true,
+                    infer: true
                 });
                 const maxDelay = this.configService.getOrThrow('redis.maxRetryDelayMs', { infer: true });
                 return Math.min(times * delay, maxDelay);
-            },
+            }
         };
 
         // IAM auth requires TLS
@@ -143,7 +143,7 @@ export class RedisService implements OnModuleInit, OnModuleDestroy {
         if (iamAuthEnabled) {
             const host = this.configService.getOrThrow('redis.host', { infer: true });
             const username = this.configService.getOrThrow('redis.iamAuthUsername', {
-                infer: true,
+                infer: true
             });
             password = await this.iamAuthProvider.getAuthToken(username, host);
             this.logger.debug('Using IAM auth token for Redis cluster connection');
@@ -155,19 +155,19 @@ export class RedisService implements OnModuleInit, OnModuleDestroy {
             redisOptions: {
                 password,
                 connectTimeout: this.configService.getOrThrow('redis.connectTimeout', {
-                    infer: true,
+                    infer: true
                 }),
                 commandTimeout: this.configService.getOrThrow('redis.commandTimeout', {
-                    infer: true,
-                }),
+                    infer: true
+                })
             },
             clusterRetryStrategy: (times) => {
                 const delay = this.configService.getOrThrow('redis.retryDelayMs', {
-                    infer: true,
+                    infer: true
                 });
                 const maxDelay = this.configService.getOrThrow('redis.maxRetryDelayMs', { infer: true });
                 return Math.min(times * delay, maxDelay);
-            },
+            }
         };
 
         // IAM auth requires TLS
@@ -394,7 +394,7 @@ export class RedisService implements OnModuleInit, OnModuleDestroy {
                             if (currentValue === lockId) {
                                 await this.client.del(lockKey);
                             }
-                        },
+                        }
                     };
                 }
                 if (attempt < retryCount) {
@@ -460,7 +460,7 @@ export class RedisService implements OnModuleInit, OnModuleDestroy {
             channel,
             data,
             timestamp: this.dateService.nowISO(),
-            tenantId: this.tenantContext.getTenantId(),
+            tenantId: this.tenantContext.getTenantId()
         });
         return this.client.publish(channel, message);
     }
@@ -527,15 +527,13 @@ export class RedisService implements OnModuleInit, OnModuleDestroy {
         if (delta === 0) {
             return this.getUsage(metric);
         }
-        return delta > 0
-            ? this.incrementUsage(metric, delta)
-            : this.decrementUsage(metric, Math.abs(delta));
+        return delta > 0 ? this.incrementUsage(metric, delta) : this.decrementUsage(metric, Math.abs(delta));
     }
 
     async getUsage(metric: string, month?: string): Promise<number> {
         const period = month ?? this.getCurrentMonth();
         const raw = await this.get<string>(`usage:${metric}:${period}`, { serialize: false });
-        if (raw == null) {
+        if (raw === undefined) {
             return 0;
         }
         const parsed = Number(raw);
@@ -548,7 +546,7 @@ export class RedisService implements OnModuleInit, OnModuleDestroy {
 
     async setLimit(metric: string, limit: number | null): Promise<void> {
         const key = `limits:${metric}`;
-        if (limit == null) {
+        if (limit === null) {
             await this.del(key);
             return;
         }
@@ -557,7 +555,7 @@ export class RedisService implements OnModuleInit, OnModuleDestroy {
 
     async getLimit(metric: string): Promise<number | null> {
         const raw = await this.get<string>(`limits:${metric}`, { serialize: false });
-        if (raw == null) {
+        if (raw === undefined) {
             return null;
         }
         const parsed = Number(raw);
