@@ -1,0 +1,213 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: postgres
+    restart: always
+    environment:
+      POSTGRES_DB: ory
+      POSTGRES_USER: ory
+      POSTGRES_PASSWORD: orysecret
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./db/init:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "ory"]
+      interval: 60s
+      timeout: 15s
+      retries: 5
+    networks:
+      - ory-net
+
+  adminer:
+    image: adminer:latest
+    restart: always
+    ports:
+      - "8080:8080"
+    networks:
+      - ory-net
+
+  redis:
+    image: redis:7-alpine
+    container_name: redis
+    restart: always
+    ports:
+      - "6379:6379"
+    volumes:
+      - redisdata:/data
+    command: redis-server --appendonly yes
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - ory-net
+
+  localstack:
+    image: localstack/localstack:latest
+    container_name: localstack
+    ports:
+      - "4566:4566"
+    environment:
+      - SERVICES=sqs,sns,s3
+      - DEFAULT_REGION=eu-central-1
+      - DOCKER_HOST=unix:///var/run/docker.sock
+      - DEBUG=1
+    volumes:
+      - localstackdata:/var/lib/localstack
+      - /var/run/docker.sock:/var/run/docker.sock
+      - ./localstack/init-aws.sh:/etc/localstack/init/ready.d/init-aws.sh:ro
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:4566/_localstack/health || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    networks:
+      - ory-net
+
+  hydra-migrate:
+    image: oryd/hydra:latest
+    command: migrate sql up -e --yes
+    environment:
+      - DSN=postgres://ory:orysecret@postgres:5432/oryhydra?sslmode=disable
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - ory-net
+
+  hydra:
+    image: oryd/hydra:latest
+    command: serve all --config /etc/config/hydra.yml --dev
+    ports:
+      - "4444:4444"  # public
+      - "4445:4445"  # admin
+    volumes:
+      - ./hydra/config/hydra.yml:/etc/config/hydra.yml:ro
+    depends_on:
+      - hydra-migrate
+    networks:
+      - ory-net
+
+  kratos-migrate:
+    image: oryd/kratos:latest
+    command: >
+      migrate sql
+      "postgres://ory:orysecret@postgres:5432/orykratos?sslmode=disable"
+      --config /etc/config/kratos.yml
+      --yes
+    environment:
+      - DSN=postgres://ory:orysecret@postgres:5432/orykratos?sslmode=disable
+    volumes:
+      - ./kratos/config/kratos.yml:/etc/config/kratos.yml:ro
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - ory-net
+
+  kratos:
+    image: oryd/kratos:latest
+    command: serve --config /etc/config/kratos.yml
+    ports:
+      - "4433:4433"  # public API
+      - "4434:4434"  # admin API
+    volumes:
+      - ./kratos/config/kratos.yml:/etc/config/kratos.yml:ro
+      - ./kratos/config/identity.schema.json:/etc/config/identity.schema.json:ro
+      - ./kratos/config/oidc.hydra.mapper.json:/etc/config/oidc.hydra.mapper.json:ro
+    depends_on:
+      - kratos-migrate
+      - hydra
+    networks:
+      - ory-net
+
+  keto-migrate:
+    image: oryd/keto:latest
+    environment:
+      - DSN=postgres://ory:orysecret@postgres:5432/oryketo?sslmode=disable
+    command: migrate up -c /etc/config/keto.yml -y
+    volumes:
+      - ./keto/config/keto.yml:/etc/config/keto.yml:ro
+      - ./keto/config/keto_namespaces:/etc/config/keto_namespaces:ro
+    depends_on:
+      - postgres
+      - hydra
+      - kratos
+    networks:
+      - ory-net
+
+  keto:
+    image: oryd/keto:latest
+    container_name: keto
+    command: serve --config /etc/config/keto.yml
+    ports:
+      - "4466:4466"  # read API
+      - "4467:4467"  # write API
+    volumes:
+      - ./keto/config/keto.yml:/etc/config/keto.yml:ro
+      - ./keto/config/keto_namespaces:/etc/config/keto_namespaces:ro
+    healthcheck:
+      test: [ "CMD-SHELL", "wget --spider -q http://localhost:4467/health/alive" ]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+    depends_on:
+      - postgres
+      - keto-migrate
+    networks:
+      - ory-net
+
+  keto-bootstrap:
+    image: node:22-alpine
+    working_dir: /keto-bootstrap
+    volumes:
+      - ./keto-bootstrap:/keto-bootstrap:rw
+      - ./wait-for-it.sh:/wait-for-it.sh:ro
+    command: >
+      sh -c "./wait-for-it.sh keto:4467 -- \
+            npm install --legacy-peer-deps && \
+            npm run keto:bootstrap"
+    depends_on:
+      keto:
+        condition: service_healthy
+    restart: "no"
+    networks:
+      - ory-net
+
+  temporal:
+    image: temporalio/auto-setup:1.25.0
+    depends_on:
+      - postgres
+    environment:
+      - DB=postgresql
+      - DB_PORT=5432
+      - POSTGRES_USER=temporal
+      - POSTGRES_PWD=temporal
+      - POSTGRES_SEEDS=postgres
+      - DYNAMIC_CONFIG_FILE_PATH=config/dynamicconfig/development.yaml
+    ports:
+      - "7233:7233"
+    volumes:
+      - ./temporal/dynamicconfig:/etc/temporal/config/dynamicconfig
+
+  temporal-ui:
+    image: temporalio/ui:2.20.0
+    depends_on:
+      - temporal
+    environment:
+      - TEMPORAL_ADDRESS=temporal:7233
+      - TEMPORAL_UI_PORT=4040
+    ports:
+      - "4040:4040"
+
+volumes:
+  pgdata:
+  redisdata:
+  localstackdata:
+
+networks:
+  ory-net:
+    driver: bridge
