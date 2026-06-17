@@ -11,14 +11,14 @@ export class StripeService {
     constructor(
         private readonly configService: ConfigService<AllConfigType>,
         private readonly logger: AppLoggerService,
-        private readonly dateService: DateService,
+        private readonly dateService: DateService
     ) {
         this.logger.setContext(StripeService.name);
     }
 
     private stripeClient(): Stripe {
         const secretKey = this.configService.get('stripeConfig.secretKey', {
-            infer: true,
+            infer: true
         });
         if (!secretKey) {
             throw new Error('Stripe secret key is not configured');
@@ -52,10 +52,7 @@ export class StripeService {
         return null;
     }
 
-    async applyScheduledDowngrade(params: {
-        stripeSubscriptionId: string;
-        targetPlan: BillingPlanEnum;
-    }): Promise<void> {
+    async applyScheduledDowngrade(params: { stripeSubscriptionId: string; targetPlan: BillingPlanEnum }): Promise<void> {
         const stripe = this.stripeClient();
 
         const subscription = await stripe.subscriptions.retrieve(params.stripeSubscriptionId);
@@ -73,15 +70,15 @@ export class StripeService {
             items: [
                 {
                     id: firstItem.id,
-                    price: newPriceId,
-                },
+                    price: newPriceId
+                }
             ],
             proration_behavior: 'none',
-            cancel_at_period_end: false,
+            cancel_at_period_end: false
         });
 
         this.logger.log(
-            `Applied scheduled downgrade for Stripe subscription ${params.stripeSubscriptionId} to plan ${params.targetPlan} (no proration)`,
+            `Applied scheduled downgrade for Stripe subscription ${params.stripeSubscriptionId} to plan ${params.targetPlan} (no proration)`
         );
     }
 
@@ -104,7 +101,7 @@ export class StripeService {
                 active: true,
                 limit: 100,
                 expand: ['data.product'],
-                ...(startingAfter ? { starting_after: startingAfter } : {}),
+                ...(startingAfter ? { starting_after: startingAfter } : {})
             });
 
             prices.push(...page.data);
@@ -163,10 +160,10 @@ export class StripeService {
         const stripe = this.stripeClient();
 
         const successUrl = this.configService.get('stripeConfig.successUrl', {
-            infer: true,
+            infer: true
         });
         const cancelUrl = this.configService.get('stripeConfig.cancelUrl', {
-            infer: true,
+            infer: true
         });
 
         if (!successUrl || !cancelUrl) {
@@ -181,7 +178,7 @@ export class StripeService {
             const promoList = await stripe.promotionCodes.list({
                 code: params.couponCode,
                 active: true,
-                limit: 1,
+                limit: 1
             });
 
             promotionCode = promoList.data[0] ?? null;
@@ -193,7 +190,7 @@ export class StripeService {
 
         const metadata: Record<string, string> = {
             tenantId: params.tenantId,
-            planId: params.plan,
+            planId: params.plan
         };
 
         if (params.userId) {
@@ -214,16 +211,14 @@ export class StripeService {
                 ? {
                       discounts: [
                           {
-                              promotion_code: promotionCode.id,
-                          },
-                      ],
+                              promotion_code: promotionCode.id
+                          }
+                      ]
                   }
-                : {}),
+                : {})
         });
 
-        this.logger.log(
-            `Created Stripe Checkout Session ${session.id} for tenant ${params.tenantId}, plan ${params.plan}`,
-        );
+        this.logger.log(`Created Stripe Checkout Session ${session.id} for tenant ${params.tenantId}, plan ${params.plan}`);
 
         return { id: session.id, url: session.url };
     }
@@ -244,14 +239,10 @@ export class StripeService {
 
         const subscription = await stripe.subscriptions.retrieve(params.stripeSubscriptionId);
 
-        const customerId =
-            typeof subscription.customer === 'string' ? subscription.customer : subscription.customer?.id;
+        const customerId = typeof subscription.customer === 'string' ? subscription.customer : subscription.customer?.id;
 
         if (!customerId) {
-            throw new HttpException(
-                'Stripe subscription is missing customer for upgrade preview',
-                HttpStatus.BAD_REQUEST,
-            );
+            throw new HttpException('Stripe subscription is missing customer for upgrade preview', HttpStatus.BAD_REQUEST);
         }
 
         const items = subscription.items?.data ?? [];
@@ -270,20 +261,18 @@ export class StripeService {
                 items: [
                     {
                         id: firstItem.id,
-                        price: newPriceId,
-                    },
-                ],
-            },
+                        price: newPriceId
+                    }
+                ]
+            }
         });
 
         const amountDueNow = (upcoming.amount_due ?? 0) / 100;
         const currency = upcoming.currency ?? 'usd';
-        const nextInvoiceDate = upcoming.next_payment_attempt
-            ? this.dateService.fromUnix(upcoming.next_payment_attempt).toDate()
-            : null;
+        const nextInvoiceDate = upcoming.next_payment_attempt ? this.dateService.fromUnix(upcoming.next_payment_attempt).toDate() : null;
 
         this.logger.log(
-            `Calculated Stripe subscription upgrade preview for subscription ${params.stripeSubscriptionId} to plan ${params.targetPlan}: amountDueNow=${amountDueNow} ${currency}`,
+            `Calculated Stripe subscription upgrade preview for subscription ${params.stripeSubscriptionId} to plan ${params.targetPlan}: amountDueNow=${amountDueNow} ${currency}`
         );
 
         return { amountDueNow, currency, nextInvoiceDate };
@@ -307,17 +296,15 @@ export class StripeService {
             items: [
                 {
                     id: firstItem.id,
-                    price: newPriceId,
-                },
+                    price: newPriceId
+                }
             ],
             proration_behavior: 'always_invoice',
             payment_behavior: 'error_if_incomplete',
-            cancel_at_period_end: false,
+            cancel_at_period_end: false
         });
 
-        this.logger.log(
-            `Upgraded Stripe subscription ${params.stripeSubscriptionId} to plan ${params.targetPlan} with proration`,
-        );
+        this.logger.log(`Upgraded Stripe subscription ${params.stripeSubscriptionId} to plan ${params.targetPlan} with proration`);
     }
 
     async scheduleSubscriptionDowngrade(params: {
@@ -333,7 +320,7 @@ export class StripeService {
 
         if (!periodEndTs) {
             this.logger.warn(
-                `Unable to schedule downgrade in Stripe because current_period_end is missing for subscription ${params.stripeSubscriptionId}`,
+                `Unable to schedule downgrade in Stripe because current_period_end is missing for subscription ${params.stripeSubscriptionId}`
             );
             return { effectiveDate: null };
         }
@@ -342,23 +329,19 @@ export class StripeService {
         const firstItem = items[0];
 
         if (!firstItem?.price?.id) {
-            throw new HttpException(
-                'Stripe subscription has no price information to schedule downgrade',
-                HttpStatus.BAD_REQUEST,
-            );
+            throw new HttpException('Stripe subscription has no price information to schedule downgrade', HttpStatus.BAD_REQUEST);
         }
 
         const currentPriceId = firstItem.price.id;
         const currentQuantity = firstItem.quantity ?? 1;
         const newPriceId = this.priceIdForPlan(params.targetPlan);
 
-        const scheduleId =
-            typeof subscription.schedule === 'string' ? subscription.schedule : subscription.schedule?.id;
+        const scheduleId = typeof subscription.schedule === 'string' ? subscription.schedule : subscription.schedule?.id;
 
         const schedule = scheduleId
             ? await stripe.subscriptionSchedules.retrieve(scheduleId)
             : await stripe.subscriptionSchedules.create({
-                  from_subscription: params.stripeSubscriptionId,
+                  from_subscription: params.stripeSubscriptionId
               });
 
         const startDate = schedule.phases?.[0]?.start_date ?? subscription.created;
@@ -369,19 +352,19 @@ export class StripeService {
                 {
                     start_date: startDate,
                     end_date: periodEndTs,
-                    items: [{ price: currentPriceId, quantity: currentQuantity }],
+                    items: [{ price: currentPriceId, quantity: currentQuantity }]
                 },
                 {
                     start_date: periodEndTs,
-                    items: [{ price: newPriceId, quantity: currentQuantity }],
-                },
-            ],
+                    items: [{ price: newPriceId, quantity: currentQuantity }]
+                }
+            ]
         });
 
         this.logger.log(
             `Scheduled Stripe subscription ${params.stripeSubscriptionId} to downgrade to plan ${params.targetPlan} at ${
                 effectiveDate ? this.dateService.toISO(effectiveDate) : 'unknown'
-            } using schedule ${schedule.id}`,
+            } using schedule ${schedule.id}`
         );
 
         return { effectiveDate };
@@ -391,8 +374,7 @@ export class StripeService {
         const stripe = this.stripeClient();
 
         const subscription = await stripe.subscriptions.retrieve(stripeSubscriptionId);
-        const scheduleId =
-            typeof subscription.schedule === 'string' ? subscription.schedule : subscription.schedule?.id;
+        const scheduleId = typeof subscription.schedule === 'string' ? subscription.schedule : subscription.schedule?.id;
 
         if (!scheduleId) {
             this.logger.log(`No Stripe schedule found to cancel downgrade for subscription ${stripeSubscriptionId}`);
@@ -412,12 +394,12 @@ export class StripeService {
         if (existingScheduleId) {
             await stripe.subscriptionSchedules.release(existingScheduleId);
             this.logger.log(
-                `Released Stripe subscription schedule ${existingScheduleId} before scheduling cancellation for subscription ${stripeSubscriptionId}`,
+                `Released Stripe subscription schedule ${existingScheduleId} before scheduling cancellation for subscription ${stripeSubscriptionId}`
             );
         }
 
         const subscription = await stripe.subscriptions.update(stripeSubscriptionId, {
-            cancel_at_period_end: true,
+            cancel_at_period_end: true
         });
 
         const periodEndRaw = subscription.items?.data?.[0]?.current_period_end;
@@ -427,7 +409,7 @@ export class StripeService {
         this.logger.log(
             `Scheduled subscription cancellation at period end for Stripe subscription ${stripeSubscriptionId} with effective date ${
                 periodEnd ? this.dateService.toISO(periodEnd) : 'unknown'
-            }`,
+            }`
         );
 
         return { effectiveDate: periodEnd };
@@ -437,7 +419,7 @@ export class StripeService {
         const stripe = this.stripeClient();
 
         await stripe.subscriptions.update(stripeSubscriptionId, {
-            cancel_at_period_end: false,
+            cancel_at_period_end: false
         });
 
         this.logger.log(`Reactivated Stripe subscription ${stripeSubscriptionId} by clearing cancel_at_period_end`);
@@ -466,7 +448,7 @@ export class StripeService {
         const setupIntent = await stripe.setupIntents.create({
             customer: customerId,
             usage: 'off_session',
-            payment_method_types: ['card'],
+            payment_method_types: ['card']
         });
 
         this.logger.log(`Created Stripe SetupIntent ${setupIntent.id} for customer ${customerId}`);
@@ -493,12 +475,10 @@ export class StripeService {
         const list = await stripe.paymentMethods.list({
             customer: customerId,
             type: 'card',
-            limit: 100,
+            limit: 100
         });
 
-        this.logger.log(
-            `Listed ${list.data.length} Stripe payment methods for customer ${customerId}, default=${defaultPaymentMethodId ?? 'none'}`,
-        );
+        this.logger.log(`Listed ${list.data.length} Stripe payment methods for customer ${customerId}, default=${defaultPaymentMethodId ?? 'none'}`);
 
         return list.data.map((pm) => {
             const card = pm.card;
@@ -508,7 +488,7 @@ export class StripeService {
                 last4: card?.last4 ?? null,
                 expMonth: card?.exp_month ?? null,
                 expYear: card?.exp_year ?? null,
-                isDefault: pm.id === defaultPaymentMethodId,
+                isDefault: pm.id === defaultPaymentMethodId
             };
         });
     }
@@ -542,8 +522,8 @@ export class StripeService {
 
         await stripe.customers.update(customerId, {
             invoice_settings: {
-                default_payment_method: paymentMethodId,
-            },
+                default_payment_method: paymentMethodId
+            }
         });
 
         this.logger.log(`Set default payment method ${paymentMethodId} for customer ${customerId}`);
@@ -568,7 +548,7 @@ export class StripeService {
 
         const list = await stripe.invoices.list({
             customer: customerId,
-            limit: 100,
+            limit: 100
         });
 
         this.logger.log(`Listed ${list.data.length} Stripe invoices for customer ${customerId}`);
@@ -589,7 +569,7 @@ export class StripeService {
                 periodStart: periodStartTs ? this.dateService.fromUnix(periodStartTs).toDate() : null,
                 periodEnd: periodEndTs ? this.dateService.fromUnix(periodEndTs).toDate() : null,
                 hostedInvoiceUrl: invoice.hosted_invoice_url ?? null,
-                invoicePdfUrl: invoice.invoice_pdf ?? null,
+                invoicePdfUrl: invoice.invoice_pdf ?? null
             };
         });
     }
@@ -607,17 +587,15 @@ export class StripeService {
             customer: params.customerId,
             ...(params.subscriptionId
                 ? {
-                      subscription: params.subscriptionId,
+                      subscription: params.subscriptionId
                   }
-                : {}),
+                : {})
         });
 
         const amountDue = (upcoming.amount_due ?? 0) / 100;
         const currency = upcoming.currency ?? 'usd';
 
-        const nextPaymentAttempt = upcoming.next_payment_attempt
-            ? this.dateService.fromUnix(upcoming.next_payment_attempt).toDate()
-            : null;
+        const nextPaymentAttempt = upcoming.next_payment_attempt ? this.dateService.fromUnix(upcoming.next_payment_attempt).toDate() : null;
 
         const periodStartTs = upcoming.period_start as number | undefined;
         const periodEndTs = upcoming.period_end as number | undefined;
@@ -628,7 +606,7 @@ export class StripeService {
         this.logger.log(
             `Retrieved upcoming Stripe invoice preview for customer ${params.customerId} (subscription=${
                 params.subscriptionId ?? 'none'
-            }): amountDue=${amountDue} ${currency}`,
+            }): amountDue=${amountDue} ${currency}`
         );
 
         return {
@@ -636,7 +614,7 @@ export class StripeService {
             currency,
             nextPaymentAttempt,
             periodStart,
-            periodEnd,
+            periodEnd
         };
     }
 }

@@ -27,7 +27,7 @@ export class CampaignServiceListener {
     constructor(
         private readonly sideEffectService: SideEffectService,
         private readonly logger: AppLoggerService,
-        private readonly redisKeyBuilder: RedisKeyBuilder,
+        private readonly redisKeyBuilder: RedisKeyBuilder
     ) {
         this.logger.setContext(CampaignServiceListener.name);
     }
@@ -50,28 +50,22 @@ export class CampaignServiceListener {
                     status: event.status,
                     tenantId: event.tenantId,
                     userId: event.userId,
-                    createdAt: event.occurredAt,
+                    createdAt: event.occurredAt
                 },
                 {
                     critical: false,
-                    idempotencyKey: this.redisKeyBuilder.buildIdempotencyKey(
-                        `campaign-toto-created-${event.aggregateId}`,
-                    ),
-                },
+                    idempotencyKey: this.redisKeyBuilder.buildIdempotencyKey(`campaign-toto-created-${event.aggregateId}`)
+                }
             );
 
             this.logger.debug(`Sent toto.created to campaign service`, {
                 eventId: event.eventId,
-                totoId: event.aggregateId,
+                totoId: event.aggregateId
             });
         } catch (error) {
-            this.logger.error(
-                `Failed to send toto.created to campaign service (check DLQ)`,
-                error instanceof Error ? error.stack : undefined,
-                {
-                    eventId: event.eventId,
-                },
-            );
+            this.logger.error(`Failed to send toto.created to campaign service (check DLQ)`, error instanceof Error ? error.stack : undefined, {
+                eventId: event.eventId
+            });
         }
     }
 
@@ -92,25 +86,23 @@ export class CampaignServiceListener {
                     changes: event.changes,
                     tenantId: event.tenantId,
                     userId: event.userId,
-                    updatedAt: event.occurredAt,
+                    updatedAt: event.occurredAt
                 },
                 {
                     critical: false,
-                    idempotencyKey: this.redisKeyBuilder.buildIdempotencyKey(
-                        `campaign-toto-updated-${event.aggregateId}-${event.eventId}`,
-                    ),
-                },
+                    idempotencyKey: this.redisKeyBuilder.buildIdempotencyKey(`campaign-toto-updated-${event.aggregateId}-${event.eventId}`)
+                }
             );
 
             this.logger.debug(`Sent toto.updated to campaign service`, {
                 eventId: event.eventId,
-                totoId: event.aggregateId,
+                totoId: event.aggregateId
             });
         } catch (error) {
             this.logger.warn(`Failed to send toto.updated to campaign service (check DLQ)`, {
                 eventId: event.eventId,
                 totoId: event.aggregateId,
-                error: error instanceof Error ? error.message : 'Unknown error',
+                error: error instanceof Error ? error.message : 'Unknown error'
             });
         }
     }

@@ -19,7 +19,7 @@ export class MonthlyUsageResetService {
         private readonly logger: AppLoggerService,
         private readonly redis: RedisService,
         private readonly txEventEmitter: TransactionEventEmitterService,
-        private readonly dateService: DateService,
+        private readonly dateService: DateService
     ) {
         this.logger.setContext(MonthlyUsageResetService.name);
     }
@@ -33,8 +33,8 @@ export class MonthlyUsageResetService {
         const tenants = await this.prisma.tenant.findMany({
             where: {
                 status: TenantStatusEnum.ACTIVE,
-                deletedAt: null,
-            },
+                deletedAt: null
+            }
         });
 
         for (const tenant of tenants) {
@@ -55,8 +55,8 @@ export class MonthlyUsageResetService {
                             tenantId,
                             metricName: metric,
                             periodDate: prevMonthEnd,
-                            deletedAt: null,
-                        },
+                            deletedAt: null
+                        }
                     });
 
                     if (snapshot) {
@@ -77,14 +77,23 @@ export class MonthlyUsageResetService {
                             metadata: {
                                 month: prevMonthLabel,
                                 usage,
-                                limit,
-                            },
-                        },
+                                limit
+                            }
+                        }
                     });
 
                     this.txEventEmitter.emitAfterCommit(
                         BillingEvents.USAGE_MONTHLY_SUMMARY,
-                        new UsageMonthlySummaryEvent(tenantId, tenantId, metric, prevMonthLabel, usage, limit, prevMonthEnd, this.dateService.toISO(now)),
+                        new UsageMonthlySummaryEvent(
+                            tenantId,
+                            tenantId,
+                            metric,
+                            prevMonthLabel,
+                            usage,
+                            limit,
+                            prevMonthEnd,
+                            this.dateService.toISO(now)
+                        )
                     );
 
                     await this.redis.clearMonthlyUsage(metric, prevMonthLabel);
@@ -101,7 +110,7 @@ export class MonthlyUsageResetService {
         const prev = this.dateService.subtract(ref, 1, 'month');
         return {
             prevMonthLabel: this.dateService.format(prev, 'YYYY-MM'),
-            prevMonthEnd: this.dateService.format(this.dateService.endOf(prev, 'month'), 'YYYY-MM-DD'),
+            prevMonthEnd: this.dateService.format(this.dateService.endOf(prev, 'month'), 'YYYY-MM-DD')
         };
     }
 }

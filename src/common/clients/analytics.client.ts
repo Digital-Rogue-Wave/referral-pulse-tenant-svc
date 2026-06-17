@@ -10,10 +10,10 @@ export class AnalyticsClient {
 
     constructor(
         private readonly http: HttpClientService,
-        private readonly configService: ConfigService<AllConfigType>,
+        private readonly configService: ConfigService<AllConfigType>
     ) {
         this.baseUrl = this.configService.getOrThrow('services.analytics.url', {
-            infer: true,
+            infer: true
         });
     }
 

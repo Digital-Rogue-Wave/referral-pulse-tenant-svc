@@ -19,7 +19,7 @@ describe('IsRuleConditionsConstraint', () => {
         const validCondition = {
             fact: 'conversionValue',
             operator: 'greaterThan',
-            value: 100,
+            value: 100
         };
         expect(constraint.validate(validCondition, args)).toBe(true);
     });
@@ -30,14 +30,14 @@ describe('IsRuleConditionsConstraint', () => {
                 {
                     fact: 'conversionValue',
                     operator: 'greaterThan',
-                    value: 100,
+                    value: 100
                 },
                 {
                     fact: 'isFirstPurchase',
                     operator: 'equal',
-                    value: true,
-                },
-            ],
+                    value: true
+                }
+            ]
         };
         expect(constraint.validate(validAllCondition, args)).toBe(true);
     });
@@ -48,9 +48,9 @@ describe('IsRuleConditionsConstraint', () => {
                 {
                     fact: 'conversionValue',
                     operator: 'greaterThan',
-                    value: 100,
-                },
-            ],
+                    value: 100
+                }
+            ]
         };
         expect(constraint.validate(validAnyCondition, args)).toBe(true);
     });
@@ -59,14 +59,14 @@ describe('IsRuleConditionsConstraint', () => {
         const invalidCondition = {
             fact: 'conversionValue',
             // operator missing
-            value: 100,
+            value: 100
         };
         expect(constraint.validate(invalidCondition, args)).toBe(false);
     });
 
     it('should return false for "all" condition with non-array value', () => {
         const invalidAll = {
-            all: { fact: 'foo', operator: 'eq', value: 'bar' },
+            all: { fact: 'foo', operator: 'eq', value: 'bar' }
         };
         expect(constraint.validate(invalidAll, args)).toBe(false);
     });
@@ -82,15 +82,15 @@ describe('IsRuleConditionsConstraint', () => {
                 {
                     fact: 'age',
                     operator: 'greaterThan',
-                    value: 18,
+                    value: 18
                 },
                 {
                     any: [
                         { fact: 'country', operator: 'equal', value: 'US' },
-                        { fact: 'country', operator: 'equal', value: 'CA' },
-                    ],
-                },
-            ],
+                        { fact: 'country', operator: 'equal', value: 'CA' }
+                    ]
+                }
+            ]
         };
         expect(constraint.validate(nestedCondition, args)).toBe(true);
     });

@@ -10,14 +10,7 @@
 import { BeforeAll, AfterAll, Before, After, setDefaultTimeout } from '@cucumber/cucumber';
 import { bootstrapTestApp, teardownTestApp } from './app.bootstrap';
 import { setupNock, teardownNock } from './nock.setup';
-import {
-    createSuspendedTenant,
-    createLockedTenant,
-    createActiveTenant,
-    cleanupTenant,
-    disconnectFixturesPrisma,
-    FIXTURE_IDS,
-} from './db.fixtures';
+import { createSuspendedTenant, createLockedTenant, createActiveTenant, cleanupTenant, disconnectFixturesPrisma, FIXTURE_IDS } from './db.fixtures';
 import type { BddWorldInterface } from './world';
 
 // Give each scenario up to 30 s (NestJS boot + DB round-trips)

@@ -5,6 +5,6 @@ import { GlobalExceptionsFilter } from './global-exceptions.filter';
 @Global()
 @Module({
     providers: [GlobalExceptionsFilter],
-    exports: [GlobalExceptionsFilter],
+    exports: [GlobalExceptionsFilter]
 })
 export class ExceptionsModule {}

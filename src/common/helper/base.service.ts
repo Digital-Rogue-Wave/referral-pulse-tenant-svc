@@ -7,7 +7,7 @@ export interface BaseService<
     CreateDto = Partial<T>,
     UpdateDto = Partial<T>,
     WhereUniqueDto extends object = Record<string, unknown>,
-    FindManyArgsDto extends object = Record<string, unknown>,
+    FindManyArgsDto extends object = Record<string, unknown>
 > {
     list(query: PaginateQuery<T>): Promise<Paginated<T>>;
     listUnpaginated(options?: FindManyArgsDto): Promise<T[]>;

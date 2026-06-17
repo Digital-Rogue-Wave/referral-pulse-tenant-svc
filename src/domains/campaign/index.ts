@@ -14,7 +14,7 @@ export const CampaignEvents = {
     CREATED: 'campaign.created',
     UPDATED: 'campaign.updated',
     INVITATION_SENT: 'campaign.invitation_sent',
-    ACTIVATED: 'campaign.activated',
+    ACTIVATED: 'campaign.activated'
 } as const;
 
 export type CampaignEventType = (typeof CampaignEvents)[keyof typeof CampaignEvents];

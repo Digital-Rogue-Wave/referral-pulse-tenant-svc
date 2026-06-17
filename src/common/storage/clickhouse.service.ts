@@ -13,7 +13,7 @@ export class ClickHouseService implements OnModuleInit, OnModuleDestroy {
 
     constructor(
         private readonly configService: ConfigService<AllConfigType>,
-        private readonly logger: AppLoggerService,
+        private readonly logger: AppLoggerService
     ) {
         this.logger.setContext(ClickHouseService.name);
     }
@@ -25,7 +25,7 @@ export class ClickHouseService implements OnModuleInit, OnModuleDestroy {
             host: `${config.protocol}://${config.host}:${config.port}`,
             username: config.user,
             password: config.pass,
-            database: config.db,
+            database: config.db
         });
 
         this.logger.log(`ClickHouse client initialized for ${config.host}:${config.port}`);
@@ -44,7 +44,7 @@ export class ClickHouseService implements OnModuleInit, OnModuleDestroy {
         try {
             const resultSet = await this.client.query({
                 query,
-                format: 'JSONEachRow',
+                format: 'JSONEachRow'
             });
             return resultSet.json<T>();
         } catch (error) {
@@ -61,7 +61,7 @@ export class ClickHouseService implements OnModuleInit, OnModuleDestroy {
             await this.client.insert({
                 table,
                 values,
-                format: 'JSONEachRow',
+                format: 'JSONEachRow'
             });
             this.logger.debug(`Inserted ${values.length} rows into ClickHouse table: ${table}`);
         } catch (error) {

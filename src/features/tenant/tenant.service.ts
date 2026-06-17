@@ -28,7 +28,7 @@ import {
     SubdomainAvailabilityResponse,
     DeletionScheduledResponse,
     tenantResponseMapper,
-    TenantStatus,
+    TenantStatus
 } from '@domains/tenant';
 
 import {
@@ -43,7 +43,7 @@ import {
     TenantDeletionCancelledEvent,
     TenantOwnershipTransferredEvent,
     TenantDomainVerifiedEvent,
-    TenantEvents,
+    TenantEvents
 } from '@domains/tenant/events/tenant.events';
 
 /** Default trial period in days */
@@ -62,7 +62,7 @@ export class TenantService {
         private readonly dateService: DateService,
         private readonly subdomainService: SubdomainService,
         private readonly dnsVerificationService: DnsVerificationService,
-        private readonly filesService: FilesService,
+        private readonly filesService: FilesService
     ) {
         this.logger.setContext(TenantService.name);
     }
@@ -77,7 +77,7 @@ export class TenantService {
      */
     async findOneById(id: string): Promise<Tenant | null> {
         return this.prisma.tenant.findUnique({
-            where: { id, deletedAt: null },
+            where: { id, deletedAt: null }
         });
     }
 
@@ -111,7 +111,7 @@ export class TenantService {
         return {
             customDomain: tenant.customDomain ?? null,
             domainVerificationStatus: tenant.domainVerificationStatus ?? null,
-            domainVerificationToken: tenant.domainVerificationToken ?? undefined,
+            domainVerificationToken: tenant.domainVerificationToken ?? undefined
         };
     }
 
@@ -124,7 +124,7 @@ export class TenantService {
         return {
             subdomain,
             available: result.available ?? false,
-            message: result.message,
+            message: result.message
         };
     }
 
@@ -138,12 +138,10 @@ export class TenantService {
      */
     async create(
         data: CreateTenantDto | { name: string; ownerId: string; slug?: string },
-        file?: Express.Multer.File | Express.MulterS3.File,
+        file?: Express.Multer.File | Express.MulterS3.File
     ): Promise<TenantResponse> {
         const id = ulid();
-        const slug = (data as CreateTenantDto).slug
-            ? (data as CreateTenantDto).slug!
-            : this.generateSlug((data as { name: string }).name, id);
+        const slug = (data as CreateTenantDto).slug ? (data as CreateTenantDto).slug! : this.generateSlug((data as { name: string }).name, id);
         const ownerId = (data as { ownerId?: string }).ownerId ?? 'system';
 
         // Validate slug uniqueness
@@ -163,7 +161,7 @@ export class TenantService {
                 imageId = uploaded.id;
             } catch (err) {
                 this.logger.warn('Failed to upload tenant logo, continuing without image', {
-                    error: err instanceof Error ? err.message : String(err),
+                    error: err instanceof Error ? err.message : String(err)
                 });
             }
         }
@@ -177,13 +175,13 @@ export class TenantService {
                 status: TenantStatus.ACTIVE,
                 paymentStatus: 'active',
                 trialStartedAt,
-                trialEndsAt,
-            },
+                trialEndsAt
+            }
         });
 
         this.txEventEmitter.emitAfterCommit(
             TenantEvents.CREATED,
-            new TenantCreatedEvent(tenant.id, tenant.id, tenant.name, tenant.slug, ownerId, trialStartedAt, trialEndsAt),
+            new TenantCreatedEvent(tenant.id, tenant.id, tenant.name, tenant.slug, ownerId, trialStartedAt, trialEndsAt)
         );
 
         this.logger.log(`Tenant created: ${tenant.id}`, { tenantId: tenant.id, slug: tenant.slug });
@@ -198,11 +196,7 @@ export class TenantService {
     /**
      * Update current tenant's settings (aware context).
      */
-    async update(
-        dto: UpdateTenantDto,
-        user: IAuthenticatedUser,
-        file?: Express.Multer.File | Express.MulterS3.File,
-    ): Promise<TenantResponse> {
+    async update(dto: UpdateTenantDto, user: IAuthenticatedUser, file?: Express.Multer.File | Express.MulterS3.File): Promise<TenantResponse> {
         const tenantId = this.tenantContext.getTenantId()!;
         const tenant = await this.findOneOrFail(tenantId);
 
@@ -228,7 +222,7 @@ export class TenantService {
                 changes.imageId = { from: tenant.imageId, to: uploaded.id };
             } catch (err) {
                 this.logger.warn('Failed to upload tenant logo, continuing without image update', {
-                    error: err instanceof Error ? err.message : String(err),
+                    error: err instanceof Error ? err.message : String(err)
                 });
             }
         }
@@ -239,13 +233,10 @@ export class TenantService {
 
         const updated = await this.prisma.tenant.update({
             where: { id: tenantId },
-            data: updateData,
+            data: updateData
         });
 
-        this.txEventEmitter.emitAfterCommit(
-            TenantEvents.UPDATED,
-            new TenantUpdatedEvent(updated.id, updated.id, changes, user.userId),
-        );
+        this.txEventEmitter.emitAfterCommit(TenantEvents.UPDATED, new TenantUpdatedEvent(updated.id, updated.id, changes, user.userId));
 
         this.logger.log(`Tenant updated: ${tenantId}`, { tenantId, changes: Object.keys(changes) });
 
@@ -267,27 +258,19 @@ export class TenantService {
             throw new BadRequestException('No verification token found; please re-add the domain to regenerate it');
         }
 
-        const result = await this.dnsVerificationService.verifyTxtRecord(
-            tenant.customDomain,
-            tenant.domainVerificationToken,
-        );
+        const result = await this.dnsVerificationService.verifyTxtRecord(tenant.customDomain, tenant.domainVerificationToken);
 
         const newStatus = result.verified ? 'verified' : 'failed';
 
         const updated = await this.prisma.tenant.update({
             where: { id: tenantId },
-            data: { domainVerificationStatus: newStatus },
+            data: { domainVerificationStatus: newStatus }
         });
 
         if (result.verified) {
             this.txEventEmitter.emitAfterCommit(
                 TenantEvents.DOMAIN_VERIFIED,
-                new TenantDomainVerifiedEvent(
-                    updated.id,
-                    updated.id,
-                    tenant.customDomain,
-                    this.dateService.nowMoment().toDate(),
-                ),
+                new TenantDomainVerifiedEvent(updated.id, updated.id, tenant.customDomain, this.dateService.nowMoment().toDate())
             );
         }
 
@@ -304,20 +287,13 @@ export class TenantService {
         // NOTE: actual Keto permission re-assignment happens in TenantListener
         this.txEventEmitter.emitAfterCommit(
             TenantEvents.OWNERSHIP_TRANSFERRED,
-            new TenantOwnershipTransferredEvent(
-                tenantId,
-                tenantId,
-                user.userId,
-                dto.newOwnerId,
-                this.dateService.nowMoment().toDate(),
-                user.userId,
-            ),
+            new TenantOwnershipTransferredEvent(tenantId, tenantId, user.userId, dto.newOwnerId, this.dateService.nowMoment().toDate(), user.userId)
         );
 
         this.logger.log(`Tenant ownership transferred: ${tenantId}`, {
             tenantId,
             from: user.userId,
-            to: dto.newOwnerId,
+            to: dto.newOwnerId
         });
     }
 
@@ -341,13 +317,13 @@ export class TenantService {
             where: { id: tenantId },
             data: {
                 deletionScheduledAt,
-                deletionReason: reason,
-            },
+                deletionReason: reason
+            }
         });
 
         this.txEventEmitter.emitAfterCommit(
             TenantEvents.DELETION_SCHEDULED,
-            new TenantDeletionScheduledEvent(tenantId, tenantId, deletionScheduledAt, executionDate, reason, user.userId),
+            new TenantDeletionScheduledEvent(tenantId, tenantId, deletionScheduledAt, executionDate, reason, user.userId)
         );
 
         this.logger.log(`Tenant deletion scheduled: ${tenantId}`, { tenantId, executionDate });
@@ -355,7 +331,7 @@ export class TenantService {
         return {
             tenantId,
             deletionScheduledAt: updated.deletionScheduledAt!,
-            deletionReason: updated.deletionReason,
+            deletionReason: updated.deletionReason
         };
     }
 
@@ -370,13 +346,13 @@ export class TenantService {
             where: { id: tenantId },
             data: {
                 deletionScheduledAt: null,
-                deletionReason: null,
-            },
+                deletionReason: null
+            }
         });
 
         this.txEventEmitter.emitAfterCommit(
             TenantEvents.DELETION_CANCELLED,
-            new TenantDeletionCancelledEvent(tenantId, tenantId, this.dateService.nowMoment().toDate(), user.userId),
+            new TenantDeletionCancelledEvent(tenantId, tenantId, this.dateService.nowMoment().toDate(), user.userId)
         );
 
         this.logger.log(`Tenant deletion cancelled: ${tenantId}`, { tenantId });
@@ -392,14 +368,11 @@ export class TenantService {
             where: { id: tenantId },
             data: {
                 status: TenantStatus.DELETED,
-                deletedAt: new Date(),
-            },
+                deletedAt: new Date()
+            }
         });
 
-        this.txEventEmitter.emitAfterCommit(
-            TenantEvents.DELETED,
-            new TenantDeletedEvent(tenantId, tenantId, tenant.name, tenant.slug),
-        );
+        this.txEventEmitter.emitAfterCommit(TenantEvents.DELETED, new TenantDeletedEvent(tenantId, tenantId, tenant.name, tenant.slug));
 
         this.logger.log(`Tenant deleted: ${tenantId}`, { tenantId });
     }
@@ -422,15 +395,15 @@ export class TenantService {
                 status: TenantStatus.LOCKED,
                 lockedAt: new Date(),
                 lockUntil,
-                lockReason: dto.reason,
-            },
+                lockReason: dto.reason
+            }
         });
 
         const lockedAt = updated.lockedAt!;
 
         this.txEventEmitter.emitAfterCommit(
             TenantEvents.LOCKED,
-            new TenantLockedEvent(tenantId, tenantId, dto.reason, lockedAt, lockUntil ?? undefined, user.userId),
+            new TenantLockedEvent(tenantId, tenantId, dto.reason, lockedAt, lockUntil ?? undefined, user.userId)
         );
 
         this.logger.log(`Tenant locked: ${tenantId}`, { tenantId, reason: dto.reason });
@@ -471,14 +444,11 @@ export class TenantService {
             where: { id },
             data: {
                 status: TenantStatus.SUSPENDED,
-                suspendedAt: new Date(),
-            },
+                suspendedAt: new Date()
+            }
         });
 
-        this.txEventEmitter.emitAfterCommit(
-            TenantEvents.SUSPENDED,
-            new TenantSuspendedEvent(id, id, reason, updated.suspendedAt!),
-        );
+        this.txEventEmitter.emitAfterCommit(TenantEvents.SUSPENDED, new TenantSuspendedEvent(id, id, reason, updated.suspendedAt!));
 
         this.logger.log(`Tenant suspended: ${id}`, { tenantId: id, reason });
 
@@ -499,14 +469,11 @@ export class TenantService {
             where: { id },
             data: {
                 status: TenantStatus.ACTIVE,
-                suspendedAt: null,
-            },
+                suspendedAt: null
+            }
         });
 
-        this.txEventEmitter.emitAfterCommit(
-            TenantEvents.UNSUSPENDED,
-            new TenantUnsuspendedEvent(id, id, this.dateService.nowMoment().toDate()),
-        );
+        this.txEventEmitter.emitAfterCommit(TenantEvents.UNSUSPENDED, new TenantUnsuspendedEvent(id, id, this.dateService.nowMoment().toDate()));
 
         this.logger.log(`Tenant unsuspended: ${id}`, { tenantId: id });
 
@@ -524,13 +491,13 @@ export class TenantService {
                 status: TenantStatus.ACTIVE,
                 lockedAt: null,
                 lockUntil: null,
-                lockReason: null,
-            },
+                lockReason: null
+            }
         });
 
         this.txEventEmitter.emitAfterCommit(
             TenantEvents.UNLOCKED,
-            new TenantUnlockedEvent(tenantId, tenantId, userId ?? 'system', this.dateService.nowMoment().toDate(), userId),
+            new TenantUnlockedEvent(tenantId, tenantId, userId ?? 'system', this.dateService.nowMoment().toDate(), userId)
         );
 
         this.logger.log(`Tenant unlocked: ${tenantId}`, { tenantId, unlockedBy: userId ?? 'system' });

@@ -10,7 +10,7 @@ export class WorkflowOrchestrationClient {
 
     constructor(
         private readonly http: HttpClientService,
-        private readonly configService: ConfigService<AllConfigType>,
+        private readonly configService: ConfigService<AllConfigType>
     ) {
         this.baseUrl = this.configService.getOrThrow('services.workflowOrchestration.url', { infer: true });
     }

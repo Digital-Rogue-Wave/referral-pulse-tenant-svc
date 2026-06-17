@@ -23,7 +23,7 @@ export class InvitationCreatedEvent extends BaseDomainEvent {
             token: string;
             expiresAt: Date;
         },
-        public readonly userId?: string,
+        public readonly userId?: string
     ) {
         super();
     }
@@ -47,7 +47,7 @@ export class InvitationResentEvent extends BaseDomainEvent {
             newExpiresAt: Date;
             resentAt: Date;
         },
-        public readonly userId?: string,
+        public readonly userId?: string
     ) {
         super();
     }
@@ -55,5 +55,5 @@ export class InvitationResentEvent extends BaseDomainEvent {
 
 export const InvitationEvents = {
     CREATED: 'invitation.created',
-    RESENT: 'invitation.resent',
+    RESENT: 'invitation.resent'
 } as const;

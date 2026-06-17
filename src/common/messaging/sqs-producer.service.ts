@@ -29,16 +29,16 @@ export class SqsProducerService {
         private readonly envelopeService: MessageEnvelopeService,
         private readonly tracingService: TracingService,
         private readonly messagingMetrics: MessagingMetricsService,
-        private readonly logger: AppLoggerService,
+        private readonly logger: AppLoggerService
     ) {
         this.logger.setContext(SqsProducerService.name);
         const queues = this.configService.getOrThrow('aws.sqs.queues', {
-            infer: true,
+            infer: true
         });
 
         this.queueMap = new LRUCache<string, string>({
             max: 100,
-            ttl: 1000 * 60 * 60 * 24, // 24 hours
+            ttl: 1000 * 60 * 60 * 24 // 24 hours
         });
 
         queues.forEach((q) => this.queueMap.set(q.name, q.url));
@@ -56,7 +56,7 @@ export class SqsProducerService {
 
             this.tracingService.addSpanAttributes({
                 'sqs.queue': queueName,
-                'sqs.eventType': eventType,
+                'sqs.eventType': eventType
             });
 
             const envelope = this.envelopeService.createEnvelope(eventType, payload, options?.idempotencyKey);
@@ -69,7 +69,7 @@ export class SqsProducerService {
                 messageId: envelope.messageId,
                 tenantId: envelope.tenantId,
                 idempotencyKey: envelope.idempotencyKey,
-                deduplicationId,
+                deduplicationId
             });
 
             let success = true;
@@ -85,9 +85,9 @@ export class SqsProducerService {
                         tenantId: { DataType: 'String', StringValue: envelope.tenantId },
                         correlationId: {
                             DataType: 'String',
-                            StringValue: envelope.correlationId,
-                        },
-                    },
+                            StringValue: envelope.correlationId
+                        }
+                    }
                 });
 
                 this.logger.log(`Message sent to queue ${queueName}: ${envelope.messageId}`);
@@ -107,7 +107,7 @@ export class SqsProducerService {
             eventType: string;
             payload: T;
             options?: IPublishOptions;
-        }>,
+        }>
     ): Promise<{ successful: string[]; failed: string[] }> {
         return this.tracingService.withSpan('sqs.sendBatch', async () => {
             if (!this.queueMap.has(queueName)) {

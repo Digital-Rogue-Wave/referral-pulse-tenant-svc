@@ -10,6 +10,6 @@ import { RedisService } from './redis.service';
 @Module({
     imports: [TerminusModule],
     providers: [RedisService, ElastiCacheIamAuthProvider, RedisKeyBuilder, RedisHealthIndicator],
-    exports: [RedisService, RedisKeyBuilder, RedisHealthIndicator],
+    exports: [RedisService, RedisKeyBuilder, RedisHealthIndicator]
 })
 export class RedisModule {}

@@ -32,16 +32,16 @@ export class SnsPublisherService implements OnModuleInit {
         private readonly tracingService: TracingService,
         private readonly messagingMetrics: MessagingMetricsService,
         private readonly logger: AppLoggerService,
-        private readonly jsonService: JsonService,
+        private readonly jsonService: JsonService
     ) {
         this.logger.setContext(SnsPublisherService.name);
         const topics = this.configService.getOrThrow('aws.sns.topics', {
-            infer: true,
+            infer: true
         });
 
         this.topicMap = new LRUCache<string, string>({
             max: 100,
-            ttl: 1000 * 60 * 60 * 24, // 24 hours
+            ttl: 1000 * 60 * 60 * 24 // 24 hours
         });
 
         topics.forEach((t) => this.topicMap.set(t.name, t.arn));
@@ -78,7 +78,7 @@ export class SnsPublisherService implements OnModuleInit {
                 messageId: envelope.messageId,
                 tenantId: envelope.tenantId,
                 idempotencyKey: envelope.idempotencyKey,
-                deduplicationId,
+                deduplicationId
             });
 
             let success = true;
@@ -91,9 +91,9 @@ export class SnsPublisherService implements OnModuleInit {
                         MessageDeduplicationId: deduplicationId,
                         MessageAttributes: {
                             eventType: { DataType: 'String', StringValue: eventType },
-                            tenantId: { DataType: 'String', StringValue: envelope.tenantId },
-                        },
-                    }),
+                            tenantId: { DataType: 'String', StringValue: envelope.tenantId }
+                        }
+                    })
                 );
 
                 this.logger.log(`Message published to topic ${topicName}: ${result.MessageId}`);
@@ -127,13 +127,7 @@ export class SnsPublisherService implements OnModuleInit {
             const topicArn = this.topicMap.get(topicName);
             if (!topicArn) {
                 this.logger.error(`Topic not configured: ${topicName}`);
-                this.messagingMetrics.recordOutboundMessage(
-                    topicName,
-                    eventType,
-                    false,
-                    Date.now() - startTime,
-                    tenantId,
-                );
+                this.messagingMetrics.recordOutboundMessage(topicName, eventType, false, Date.now() - startTime, tenantId);
                 throw new Error(`Topic not configured: ${topicName}`);
             }
 
@@ -142,7 +136,7 @@ export class SnsPublisherService implements OnModuleInit {
             this.logger.debug(`Publishing system message to topic ${topicName}`, {
                 eventType,
                 messageId: envelope.messageId,
-                tenantId: envelope.tenantId,
+                tenantId: envelope.tenantId
             });
 
             let success = true;
@@ -154,9 +148,9 @@ export class SnsPublisherService implements OnModuleInit {
                         MessageAttributes: {
                             eventType: { DataType: 'String', StringValue: eventType },
                             tenantId: { DataType: 'String', StringValue: envelope.tenantId },
-                            isSystem: { DataType: 'String', StringValue: 'true' },
-                        },
-                    }),
+                            isSystem: { DataType: 'String', StringValue: 'true' }
+                        }
+                    })
                 );
 
                 this.logger.log(`System message published to topic ${topicName}: ${result.MessageId}`);
@@ -165,13 +159,7 @@ export class SnsPublisherService implements OnModuleInit {
                 success = false;
                 throw error;
             } finally {
-                this.messagingMetrics.recordOutboundMessage(
-                    topicName,
-                    eventType,
-                    success,
-                    Date.now() - startTime,
-                    tenantId,
-                );
+                this.messagingMetrics.recordOutboundMessage(topicName, eventType, success, Date.now() - startTime, tenantId);
             }
         });
     }
@@ -182,7 +170,7 @@ export class SnsPublisherService implements OnModuleInit {
             eventType: string;
             payload: T;
             options?: IPublishOptions;
-        }>,
+        }>
     ): Promise<{ successful: string[]; failed: string[] }> {
         return this.tracingService.withSpan('sns.publishBatch', async () => {
             const topicArn = this.topicMap.get(topicName);
@@ -198,20 +186,20 @@ export class SnsPublisherService implements OnModuleInit {
                 return {
                     Id: `${i}`,
                     Message: this.jsonService.stringify(envelope),
-                    MessageGroupId: msg.options?.messageGroupId,
+                    MessageGroupId: msg.options?.messageGroupId
                 };
             });
 
             const result = await this.client.send(
                 new PublishBatchCommand({
                     TopicArn: topicArn,
-                    PublishBatchRequestEntries: entries,
-                }),
+                    PublishBatchRequestEntries: entries
+                })
             );
 
             return {
                 successful: (result.Successful || []).map((s) => s.MessageId!),
-                failed: (result.Failed || []).map((f) => f.Id!),
+                failed: (result.Failed || []).map((f) => f.Id!)
             };
         });
     }

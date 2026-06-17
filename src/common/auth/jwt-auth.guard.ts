@@ -19,10 +19,7 @@ export class JwtAuthGuard extends AuthGuard('jwt') {
 
     canActivate(context: ExecutionContext): boolean | Promise<boolean> | Observable<boolean> {
         // Check if route is marked as public
-        const isPublic = this.reflector.getAllAndOverride<boolean>(IS_PUBLIC_KEY, [
-            context.getHandler(),
-            context.getClass(),
-        ]);
+        const isPublic = this.reflector.getAllAndOverride<boolean>(IS_PUBLIC_KEY, [context.getHandler(), context.getClass()]);
 
         if (isPublic) {
             return true;
@@ -32,11 +29,7 @@ export class JwtAuthGuard extends AuthGuard('jwt') {
         return super.canActivate(context);
     }
 
-    handleRequest<TUser = unknown>(
-        err: Error | undefined,
-        user: TUser | undefined,
-        info: { message?: string } | undefined,
-    ): TUser {
+    handleRequest<TUser = unknown>(err: Error | undefined, user: TUser | undefined, info: { message?: string } | undefined): TUser {
         // Handle authentication errors
         if (err || !user) {
             const message = info?.message ?? 'Unauthorized';

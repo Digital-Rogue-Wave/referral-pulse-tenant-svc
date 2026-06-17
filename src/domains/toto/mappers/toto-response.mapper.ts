@@ -63,10 +63,7 @@ export class TotoResponseMapper extends BaseResponseMapper<TotoProps, TotoRespon
      * Predefined public response for Toto entities
      * Excludes internal/sensitive fields by default
      */
-    toPublicResponse<K extends keyof TotoResponse = 'tenantId' | 'externalData'>(
-        entity: TotoProps,
-        excludeFields?: K[],
-    ): Omit<TotoResponse, K> {
+    toPublicResponse<K extends keyof TotoResponse = 'tenantId' | 'externalData'>(entity: TotoProps, excludeFields?: K[]): Omit<TotoResponse, K> {
         const defaultExclude = ['tenantId', 'externalData'] as K[];
         return super.toPublicResponse(entity, excludeFields || defaultExclude);
     }

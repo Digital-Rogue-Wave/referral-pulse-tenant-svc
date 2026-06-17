@@ -80,23 +80,15 @@ export function mockPrismaDelegate<T>(defaultData: T[]): {
         findMany: jest.fn().mockResolvedValue(defaultData),
         findUnique: jest.fn().mockResolvedValue(defaultData[0] || null),
         findFirst: jest.fn().mockResolvedValue(defaultData[0] || null),
-        create: jest
-            .fn()
-            .mockImplementation((args: { data: Partial<T> }) => Promise.resolve({ ...defaultData[0], ...args.data })),
+        create: jest.fn().mockImplementation((args: { data: Partial<T> }) => Promise.resolve({ ...defaultData[0], ...args.data })),
         createMany: jest.fn().mockResolvedValue({ count: defaultData.length }),
-        update: jest
-            .fn()
-            .mockImplementation((args: { data: Partial<T> }) => Promise.resolve({ ...defaultData[0], ...args.data })),
+        update: jest.fn().mockImplementation((args: { data: Partial<T> }) => Promise.resolve({ ...defaultData[0], ...args.data })),
         updateMany: jest.fn().mockResolvedValue({ count: defaultData.length }),
-        upsert: jest
-            .fn()
-            .mockImplementation((args: { create: Partial<T> }) =>
-                Promise.resolve({ ...defaultData[0], ...args.create }),
-            ),
+        upsert: jest.fn().mockImplementation((args: { create: Partial<T> }) => Promise.resolve({ ...defaultData[0], ...args.create })),
         delete: jest.fn().mockResolvedValue(defaultData[0] || null),
         deleteMany: jest.fn().mockResolvedValue({ count: defaultData.length }),
         count: jest.fn().mockResolvedValue(defaultData.length),
         aggregate: jest.fn().mockResolvedValue({}),
-        groupBy: jest.fn().mockResolvedValue([]),
+        groupBy: jest.fn().mockResolvedValue([])
     };
 }

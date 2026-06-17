@@ -21,18 +21,18 @@ export class InternalTenantStatusController {
     @Get(':id/status')
     async getTenantStatus(@Param('id') tenantId: string): Promise<InternalTenantBillingStatusDto> {
         const tenant = await this.prisma.tenant.findUnique({
-            where: { id: tenantId },
+            where: { id: tenantId }
         });
 
         if (!tenant) {
             throw new NotFoundException({
                 message: `Tenant not found: ${tenantId}`,
-                code: HttpStatus.NOT_FOUND,
+                code: HttpStatus.NOT_FOUND
             });
         }
 
         const billing = await this.prisma.billing.findUnique({
-            where: { tenantId },
+            where: { tenantId }
         });
 
         return {
@@ -44,7 +44,7 @@ export class InternalTenantStatusController {
             plan: (billing?.plan as BillingPlanEnum) ?? BillingPlanEnum.FREE,
             subscriptionStatus: (billing?.status as SubscriptionStatusEnum) ?? SubscriptionStatusEnum.NONE,
             stripeCustomerId: billing?.stripeCustomerId ?? null,
-            stripeSubscriptionId: billing?.stripeSubscriptionId ?? null,
+            stripeSubscriptionId: billing?.stripeSubscriptionId ?? null
         };
     }
 }

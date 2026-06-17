@@ -11,7 +11,7 @@ const schema = z.object({
     retryExponential: z.preprocess((val) => val === 'true', z.boolean()).default(true),
     internalServiceDomains: z
         .preprocess((val) => (typeof val === 'string' ? val.split(',').map((s) => s.trim()) : []), z.array(z.string()))
-        .default([]),
+        .default([])
 });
 
 export type HttpConfig = z.infer<typeof schema>;
@@ -24,7 +24,7 @@ export default registerAs('http', (): HttpConfig => {
         retryDelay: process.env.HTTP_CLIENT_RETRY_DELAY,
         retryMaxDelay: process.env.HTTP_CLIENT_RETRY_MAX_DELAY,
         retryExponential: process.env.HTTP_CLIENT_RETRY_EXPONENTIAL,
-        internalServiceDomains: process.env.HTTP_INTERNAL_SERVICE_DOMAINS,
+        internalServiceDomains: process.env.HTTP_INTERNAL_SERVICE_DOMAINS
     });
 
     if (!result.success) {

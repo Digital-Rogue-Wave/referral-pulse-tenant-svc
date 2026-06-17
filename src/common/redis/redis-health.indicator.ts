@@ -10,7 +10,7 @@ export class RedisHealthIndicator {
     constructor(
         private readonly healthIndicatorService: HealthIndicatorService,
         private readonly redisService: RedisService,
-        private readonly dateService: DateService,
+        private readonly dateService: DateService
     ) {}
 
     async isHealthy(key: string): Promise<HealthIndicatorResult> {
@@ -24,7 +24,7 @@ export class RedisHealthIndicator {
             if (result === 'PONG') {
                 return indicator.up({
                     latency,
-                    connected: this.redisService.isConnected(),
+                    connected: this.redisService.isConnected()
                 });
             }
             return indicator.down({ response: result });
@@ -32,7 +32,7 @@ export class RedisHealthIndicator {
             const latency = this.dateService.now() - startTime;
             return indicator.down({
                 latency,
-                error: error instanceof Error ? error.message : 'Unknown error',
+                error: error instanceof Error ? error.message : 'Unknown error'
             });
         }
     }

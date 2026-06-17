@@ -9,7 +9,7 @@ import { ApiKeyService } from '../api-key.service';
 export class ApiKeyGuard implements CanActivate {
     constructor(
         private readonly apiKeyService: ApiKeyService,
-        private readonly tenantContext: TenantContextService,
+        private readonly tenantContext: TenantContextService
     ) {}
 
     async canActivate(context: ExecutionContext): Promise<boolean> {
@@ -37,7 +37,7 @@ export class ApiKeyGuard implements CanActivate {
         request.user = {
             id: apiKey.createdBy,
             tenantId: apiKey.tenantId,
-            viaApiKey: true,
+            viaApiKey: true
         };
 
         return true;

@@ -62,7 +62,7 @@ interface MapperOptions<T = Record<string, unknown>> {
 export function toDto<TSource extends object, TTarget extends object>(
     TargetClass: Class<TTarget>,
     source: TSource,
-    options?: MapperOptions<TTarget>,
+    options?: MapperOptions<TTarget>
 ): TTarget {
     const target = new TargetClass();
     return mapProperties(source, target, options);
@@ -77,13 +77,13 @@ export function toDto<TSource extends object, TTarget extends object>(
 export function toEntity<TSource extends object, TTarget extends object>(
     EntityClass: Class<TTarget>,
     source: TSource,
-    options?: MapperOptions<TTarget>,
+    options?: MapperOptions<TTarget>
 ): TTarget {
     const entity = new EntityClass();
     // By default, exclude protected fields when mapping to entity
     const opts: MapperOptions<TTarget> = {
         ...options,
-        exclude: [...(options?.exclude || []), ...Array.from(DEFAULT_PROTECTED_FIELDS)] as (keyof TTarget)[],
+        exclude: [...(options?.exclude || []), ...Array.from(DEFAULT_PROTECTED_FIELDS)] as (keyof TTarget)[]
     };
     return mapProperties(source, entity, opts);
 }
@@ -102,12 +102,12 @@ export function toEntity<TSource extends object, TTarget extends object>(
 export function patchEntity<TSource extends object, TTarget extends object>(
     target: TTarget,
     source: Partial<TSource>,
-    options?: MapperOptions<TTarget>,
+    options?: MapperOptions<TTarget>
 ): TTarget {
     const opts: MapperOptions<TTarget> = {
         skipUndefined: true,
         ...options,
-        exclude: [...(options?.exclude || []), ...Array.from(DEFAULT_PROTECTED_FIELDS)] as (keyof TTarget)[],
+        exclude: [...(options?.exclude || []), ...Array.from(DEFAULT_PROTECTED_FIELDS)] as (keyof TTarget)[]
     };
     return mapProperties(source, target, opts);
 }
@@ -121,7 +121,7 @@ export function patchEntity<TSource extends object, TTarget extends object>(
 export function toDtoArray<TSource extends object, TTarget extends object>(
     TargetClass: Class<TTarget>,
     sources: TSource[],
-    options?: MapperOptions<TTarget>,
+    options?: MapperOptions<TTarget>
 ): TTarget[] {
     return sources.map((source) => toDto(TargetClass, source, options));
 }
@@ -135,7 +135,7 @@ export function toDtoArray<TSource extends object, TTarget extends object>(
 export function toEntityArray<TSource extends object, TTarget extends object>(
     EntityClass: Class<TTarget>,
     sources: TSource[],
-    options?: MapperOptions<TTarget>,
+    options?: MapperOptions<TTarget>
 ): TTarget[] {
     return sources.map((source) => toEntity(EntityClass, source, options));
 }
@@ -156,19 +156,8 @@ export function toPlainObject<T extends object>(source: T, options?: MapperOptio
  * Core mapping implementation
  * Handles the actual property copying with all options
  */
-function mapProperties<TSource extends object, TTarget extends object>(
-    source: TSource,
-    target: TTarget,
-    options?: MapperOptions<TTarget>,
-): TTarget {
-    const {
-        exclude = [],
-        include,
-        transform = {},
-        skipUndefined = false,
-        skipNull = false,
-        deepClone = false,
-    } = options || {};
+function mapProperties<TSource extends object, TTarget extends object>(source: TSource, target: TTarget, options?: MapperOptions<TTarget>): TTarget {
+    const { exclude = [], include, transform = {}, skipUndefined = false, skipNull = false, deepClone = false } = options || {};
 
     const excludeSet = new Set(exclude.map(String));
     const includeSet = include ? new Set(include.map(String)) : null;

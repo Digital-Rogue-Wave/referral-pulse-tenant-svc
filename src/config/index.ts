@@ -43,7 +43,7 @@ export const configLoaders = [
     clickhouseConfig,
     temporalConfig,
     billingConfig,
-    stripeConfig,
+    stripeConfig
 ];
 
 export {
@@ -60,5 +60,5 @@ export {
     clickhouseConfig,
     temporalConfig,
     billingConfig,
-    stripeConfig,
+    stripeConfig
 };

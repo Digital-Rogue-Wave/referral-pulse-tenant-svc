@@ -11,7 +11,7 @@ import { UserNotificationPreferenceService } from './user-notification-preferenc
     name: 'x-tenant-id',
     required: true,
     description: 'Tenant ID header',
-    schema: { type: 'string' },
+    schema: { type: 'string' }
 })
 @Controller({ path: 'me/notification-preferences', version: '1' })
 @ApiBearerAuth()
@@ -20,7 +20,7 @@ export class UserNotificationPreferenceController {
 
     @ApiOkResponse({
         description: 'Current user notification preferences',
-        type: UserNotificationPreferenceResponse,
+        type: UserNotificationPreferenceResponse
     })
     @HttpCode(HttpStatus.OK)
     @Get()
@@ -31,19 +31,17 @@ export class UserNotificationPreferenceController {
     @ApiBody({ type: UpdateUserNotificationPreferenceDto })
     @ApiOkResponse({
         description: 'Notification preferences updated successfully',
-        type: UserNotificationPreferenceResponse,
+        type: UserNotificationPreferenceResponse
     })
     @HttpCode(HttpStatus.OK)
     @Put()
     @Idempotent({ scope: IdempotencyScope.Tenant, ttl: 1800 })
-    async updateMyPreferences(
-        @Body() dto: UpdateUserNotificationPreferenceDto,
-    ): Promise<UserNotificationPreferenceResponse> {
+    async updateMyPreferences(@Body() dto: UpdateUserNotificationPreferenceDto): Promise<UserNotificationPreferenceResponse> {
         return this.userNotificationPreferenceService.updateMyPreferences(dto);
     }
 
     @ApiOkResponse({
-        description: 'Notification preferences deleted successfully',
+        description: 'Notification preferences deleted successfully'
     })
     @HttpCode(HttpStatus.NO_CONTENT)
     @Delete()

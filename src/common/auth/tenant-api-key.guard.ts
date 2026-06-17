@@ -24,16 +24,13 @@ export class TenantApiKeyGuard implements CanActivate {
         private readonly redisKeyBuilder: RedisKeyBuilder,
         private readonly tenantContext: TenantContextService,
         private readonly httpClient: HttpClientService,
-        private readonly configService: ConfigService<AllConfigType>,
+        private readonly configService: ConfigService<AllConfigType>
     ) {
         this.tenantServiceUrl = this.configService.getOrThrow('services.tenants.url', { infer: true });
     }
 
     async canActivate(context: ExecutionContext): Promise<boolean> {
-        const isProtected = this.reflector.getAllAndOverride<boolean>(IS_TENANT_API_KEY_PROTECTED_KEY, [
-            context.getHandler(),
-            context.getClass(),
-        ]);
+        const isProtected = this.reflector.getAllAndOverride<boolean>(IS_TENANT_API_KEY_PROTECTED_KEY, [context.getHandler(), context.getClass()]);
 
         if (!isProtected) {
             return true;
@@ -67,7 +64,7 @@ export class TenantApiKeyGuard implements CanActivate {
 
         // 1. Check Redis cache
         const cachedTenantId = await this.redisService.get(cacheKey, {
-            tenantScoped: false,
+            tenantScoped: false
         });
         if (cachedTenantId) {
             return cachedTenantId as string;
@@ -75,26 +72,21 @@ export class TenantApiKeyGuard implements CanActivate {
 
         // 2. Call Tenant Service
         try {
-            const response = await this.httpClient.get<{ tenantId: string }>(
-                `${this.tenantServiceUrl}/internal/v1/api-keys/validate`,
-                {
-                    params: { apiKey },
-                },
-            );
+            const response = await this.httpClient.get<{ tenantId: string }>(`${this.tenantServiceUrl}/internal/v1/api-keys/validate`, {
+                params: { apiKey }
+            });
 
             const tenantId = response.data.tenantId;
 
             // 3. Cache result in Redis (5 minutes)
             await this.redisService.set(cacheKey, tenantId, {
                 ttl: 300,
-                tenantScoped: false,
+                tenantScoped: false
             });
 
             return tenantId;
         } catch (error) {
-            this.logger.error(
-                `Failed to validate API key with Tenant Service: ${error instanceof Error ? error.message : String(error)}`,
-            );
+            this.logger.error(`Failed to validate API key with Tenant Service: ${error instanceof Error ? error.message : String(error)}`);
             return undefined;
         }
     }

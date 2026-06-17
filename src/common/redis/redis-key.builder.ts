@@ -28,7 +28,7 @@ export class RedisKeyBuilder {
 
     constructor(
         private readonly configService: ConfigService,
-        private readonly tenantContext: TenantContextService,
+        private readonly tenantContext: TenantContextService
     ) {
         this.keyPrefix = this.configService.getOrThrow<string>('redis.keyPrefix');
     }

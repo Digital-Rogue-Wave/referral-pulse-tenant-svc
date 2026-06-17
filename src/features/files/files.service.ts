@@ -17,20 +17,20 @@ export class FilesService {
         private readonly prisma: DatabaseService,
         private readonly awsS3Service: S3Service,
         private readonly i18n: I18nService,
-        private readonly logger: AppLoggerService,
+        private readonly logger: AppLoggerService
     ) {
         this.logger.setContext(FilesService.name);
     }
 
     async findOne(where: Prisma.FileWhereInput): Promise<NullableType<File>> {
         return this.prisma.file.findFirst({
-            where: { ...where, deletedAt: null },
+            where: { ...where, deletedAt: null }
         });
     }
 
     async findOneOrFail(where: Prisma.FileWhereInput): Promise<File> {
         const file = await this.prisma.file.findFirst({
-            where: { ...where, deletedAt: null },
+            where: { ...where, deletedAt: null }
         });
         if (!file) {
             throw new BaseException('FILE_NOT_FOUND' as ErrorCode, 'File not found', HttpStatus.NOT_FOUND);
@@ -43,14 +43,14 @@ export class FilesService {
             throw new BaseException(
                 'FILE_UPLOAD_FAILED' as ErrorCode,
                 this.i18n.t('file.failedUpload', { lang: I18nContext.current()?.lang }),
-                HttpStatus.PRECONDITION_FAILED,
+                HttpStatus.PRECONDITION_FAILED
             );
         }
         return this.prisma.file.create({
             data: {
                 mimeType: file.mimetype,
-                path: (file as Express.MulterS3.File).location,
-            },
+                path: (file as Express.MulterS3.File).location
+            }
         });
     }
 
@@ -59,7 +59,7 @@ export class FilesService {
             throw new BaseException(
                 'FILE_UPLOAD_FAILED' as ErrorCode,
                 this.i18n.t('file.failedUpload', { lang: I18nContext.current()?.lang }),
-                HttpStatus.PRECONDITION_FAILED,
+                HttpStatus.PRECONDITION_FAILED
             );
         }
         return this.handleMultipleFilesUpload(files);
@@ -76,7 +76,7 @@ export class FilesService {
             throw new BaseException(
                 'FILE_UPLOAD_FAILED' as ErrorCode,
                 this.i18n.t('file.failedUpload', { lang: I18nContext.current()?.lang }),
-                HttpStatus.PRECONDITION_FAILED,
+                HttpStatus.PRECONDITION_FAILED
             );
         }
         // Delete old file from S3
@@ -88,8 +88,8 @@ export class FilesService {
             where: { id },
             data: {
                 mimeType: file.mimetype,
-                path: (file as Express.MulterS3.File).location,
-            },
+                path: (file as Express.MulterS3.File).location
+            }
         });
     }
 
@@ -114,7 +114,7 @@ export class FilesService {
         // Soft delete from database
         return this.prisma.file.update({
             where: { id: fileToDelete.id },
-            data: { deletedAt: new Date() },
+            data: { deletedAt: new Date() }
         });
     }
 
@@ -138,35 +138,33 @@ export class FilesService {
             throw new BaseException(
                 'CONFLICT' as ErrorCode,
                 this.i18n.t('file.fileExists', { lang: I18nContext.current()?.lang }),
-                HttpStatus.PRECONDITION_FAILED,
+                HttpStatus.PRECONDITION_FAILED
             );
         }
         return this.prisma.file.create({
-            data: { path: url, mimeType: 'application/octet-stream' },
+            data: { path: url, mimeType: 'application/octet-stream' }
         });
     }
 
     async getPresignedUrl(type: string): Promise<PresignedUrlResponseDto> {
         const fileName = `${randomUUID()}.${type}`;
         const presignedUrl = await this.awsS3Service.getPresignedUploadUrl(fileName, {
-            contentType: 'application/octet-stream',
+            contentType: 'application/octet-stream'
         });
         return new PresignedUrlResponseDto({ presignedUrl, fileName });
     }
 
-    private async handleMultipleFilesUpload(
-        files: Array<Express.Multer.File | Express.MulterS3.File>,
-    ): Promise<File[]> {
+    private async handleMultipleFilesUpload(files: Array<Express.Multer.File | Express.MulterS3.File>): Promise<File[]> {
         return this.prisma.$transaction(async (tx) => {
             return Promise.all(
                 files.map(async (file) => {
                     return tx.file.create({
                         data: {
                             mimeType: file.mimetype,
-                            path: (file as Express.MulterS3.File).location,
-                        },
+                            path: (file as Express.MulterS3.File).location
+                        }
                     });
-                }),
+                })
             );
         });
     }

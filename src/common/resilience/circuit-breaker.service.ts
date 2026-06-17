@@ -32,30 +32,27 @@ export class CircuitBreakerService implements OnModuleInit, OnModuleDestroy {
 
     constructor(
         private readonly configService: ConfigService<AllConfigType>,
-        private readonly logger: AppLoggerService,
+        private readonly logger: AppLoggerService
     ) {
         this.logger.setContext(CircuitBreakerService.name);
 
         this.enabled = this.configService.getOrThrow('resilience.circuitBreaker.enabled', { infer: true });
         this.config = {
             failureThreshold: this.configService.getOrThrow('resilience.circuitBreaker.failureThreshold', {
-                infer: true,
+                infer: true
             }),
             halfOpenMaxCalls: this.configService.getOrThrow('resilience.circuitBreaker.halfOpenMaxCalls', {
-                infer: true,
+                infer: true
             }),
             monitoringPeriod: this.configService.getOrThrow('resilience.circuitBreaker.monitoringPeriod', {
-                infer: true,
+                infer: true
             }),
             timeout: this.configService.getOrThrow('resilience.circuitBreaker.timeout', { infer: true }),
-            errorThresholdPercentage: this.configService.getOrThrow(
-                'resilience.circuitBreaker.errorThresholdPercentage',
-                { infer: true },
-            ),
+            errorThresholdPercentage: this.configService.getOrThrow('resilience.circuitBreaker.errorThresholdPercentage', { infer: true }),
             resetTimeout: this.configService.getOrThrow('resilience.circuitBreaker.resetTimeout', { infer: true }),
             volumeThreshold: this.configService.getOrThrow('resilience.circuitBreaker.volumeThreshold', {
-                infer: true,
-            }),
+                infer: true
+            })
         };
 
         const maxCacheSize = this.configService.getOrThrow('resilience.circuitBreaker.maxCacheSize', { infer: true });
@@ -63,14 +60,14 @@ export class CircuitBreakerService implements OnModuleInit, OnModuleDestroy {
             max: maxCacheSize,
             dispose: (breaker) => {
                 breaker.shutdown();
-            },
+            }
         });
     }
 
     async onModuleInit(): Promise<void> {
         this.logger.log('Circuit Breaker Service initialized', {
             enabled: this.enabled,
-            config: this.config,
+            config: this.config
         });
     }
 
@@ -99,7 +96,7 @@ export class CircuitBreakerService implements OnModuleInit, OnModuleDestroy {
                 timeout: this.config.timeout,
                 errorThresholdPercentage: this.config.errorThresholdPercentage,
                 resetTimeout: this.config.resetTimeout,
-                volumeThreshold: this.config.volumeThreshold,
+                volumeThreshold: this.config.volumeThreshold
             });
 
             breaker.on('open', () => this.logger.warn(`Circuit breaker OPEN: ${serviceName}`));
@@ -139,7 +136,7 @@ export class CircuitBreakerService implements OnModuleInit, OnModuleDestroy {
             successes: stats.successes,
             totalCalls: stats.failures + stats.successes,
             consecutiveSuccesses: 0,
-            windowStart: Date.now(),
+            windowStart: Date.now()
         };
     }
 
@@ -157,7 +154,7 @@ export class CircuitBreakerService implements OnModuleInit, OnModuleDestroy {
                 successes: stats.successes,
                 totalCalls: stats.failures + stats.successes,
                 consecutiveSuccesses: 0,
-                windowStart: Date.now(),
+                windowStart: Date.now()
             });
         }
         return states;

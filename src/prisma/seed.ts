@@ -42,18 +42,18 @@ const DEFAULT_TENANT_ID = 'default-tenant';
 
 /** Stripe Price IDs — read from env so the seed works in all environments. */
 const STRIPE_PRICE = {
-    Free:       process.env.STRIPE_FREE_PRICE_ID       ?? '',
-    Starter:    process.env.STRIPE_STARTER_PRICE_ID    ?? '',
-    Growth:     process.env.STRIPE_GROWTH_PRICE_ID     ?? '',
-    Enterprise: process.env.STRIPE_ENTERPRISE_PRICE_ID ?? '',
+    Free: process.env.STRIPE_FREE_PRICE_ID ?? '',
+    Starter: process.env.STRIPE_STARTER_PRICE_ID ?? '',
+    Growth: process.env.STRIPE_GROWTH_PRICE_ID ?? '',
+    Enterprise: process.env.STRIPE_ENTERPRISE_PRICE_ID ?? ''
 };
 
 /** Stripe Product IDs — optional, used for matching during sync. */
 const STRIPE_PRODUCT = {
-    Free:       process.env.STRIPE_FREE_PRODUCT_ID       ?? '',
-    Starter:    process.env.STRIPE_STARTER_PRODUCT_ID    ?? '',
-    Growth:     process.env.STRIPE_GROWTH_PRODUCT_ID     ?? '',
-    Enterprise: process.env.STRIPE_ENTERPRISE_PRODUCT_ID ?? '',
+    Free: process.env.STRIPE_FREE_PRODUCT_ID ?? '',
+    Starter: process.env.STRIPE_STARTER_PRODUCT_ID ?? '',
+    Growth: process.env.STRIPE_GROWTH_PRODUCT_ID ?? '',
+    Enterprise: process.env.STRIPE_ENTERPRISE_PRODUCT_ID ?? ''
 };
 
 // ─── Setup ────────────────────────────────────────────────────────────────────
@@ -73,13 +73,13 @@ async function seedCurrencies() {
     const usd = await prisma.currency.upsert({
         where: { code: 'USD' },
         update: {},
-        create: { code: 'USD', name: 'US Dollar', symbol: '$', decimals: 2 },
+        create: { code: 'USD', name: 'US Dollar', symbol: '$', decimals: 2 }
     });
 
     const eur = await prisma.currency.upsert({
         where: { code: 'EUR' },
         update: {},
-        create: { code: 'EUR', name: 'Euro', symbol: '€', decimals: 2 },
+        create: { code: 'EUR', name: 'Euro', symbol: '€', decimals: 2 }
     });
 
     console.log('✅ Currencies:', { usd: usd.code, eur: eur.code });
@@ -89,82 +89,82 @@ async function seedPlans() {
     const plans = [
         {
             name: 'Free',
-            stripePriceId:   STRIPE_PRICE.Free   || null,
-            stripeProductId: STRIPE_PRODUCT.Free  || null,
-            interval:        null,
-            isActive:        true,
+            stripePriceId: STRIPE_PRICE.Free || null,
+            stripeProductId: STRIPE_PRODUCT.Free || null,
+            interval: null,
+            isActive: true,
             manualInvoicing: false,
             limits: {
-                campaigns:          3,
-                referred_users:     100,
-                seats:              2,
+                campaigns: 3,
+                referred_users: 100,
+                seats: 2,
                 leaderboard_entries: 100,
-                email_sends:        500,
-            },
+                email_sends: 500
+            }
         },
         {
             name: 'Starter',
-            stripePriceId:   STRIPE_PRICE.Starter   || null,
-            stripeProductId: STRIPE_PRODUCT.Starter  || null,
-            interval:        'month',
-            isActive:        true,
+            stripePriceId: STRIPE_PRICE.Starter || null,
+            stripeProductId: STRIPE_PRODUCT.Starter || null,
+            interval: 'month',
+            isActive: true,
             manualInvoicing: false,
             limits: {
-                campaigns:          10,
-                referred_users:     1_000,
-                seats:              5,
+                campaigns: 10,
+                referred_users: 1_000,
+                seats: 5,
                 leaderboard_entries: 1_000,
-                email_sends:        5_000,
-            },
+                email_sends: 5_000
+            }
         },
         {
             name: 'Growth',
-            stripePriceId:   STRIPE_PRICE.Growth   || null,
-            stripeProductId: STRIPE_PRODUCT.Growth  || null,
-            interval:        'month',
-            isActive:        true,
+            stripePriceId: STRIPE_PRICE.Growth || null,
+            stripeProductId: STRIPE_PRODUCT.Growth || null,
+            interval: 'month',
+            isActive: true,
             manualInvoicing: false,
             limits: {
-                campaigns:          50,
-                referred_users:     10_000,
-                seats:              15,
+                campaigns: 50,
+                referred_users: 10_000,
+                seats: 15,
                 leaderboard_entries: 10_000,
-                email_sends:        50_000,
-            },
+                email_sends: 50_000
+            }
         },
         {
             name: 'Enterprise',
-            stripePriceId:   STRIPE_PRICE.Enterprise   || null,
-            stripeProductId: STRIPE_PRODUCT.Enterprise  || null,
-            interval:        'year',
-            isActive:        true,
+            stripePriceId: STRIPE_PRICE.Enterprise || null,
+            stripeProductId: STRIPE_PRODUCT.Enterprise || null,
+            interval: 'year',
+            isActive: true,
             manualInvoicing: false,
             limits: {
-                campaigns:          500,
-                referred_users:     100_000,
-                seats:              100,
+                campaigns: 500,
+                referred_users: 100_000,
+                seats: 100,
                 leaderboard_entries: 100_000,
-                email_sends:        500_000,
-            },
-        },
+                email_sends: 500_000
+            }
+        }
     ];
 
     for (const plan of plans) {
         // Match on name + no tenantId (public plans only)
         const existing = await prisma.plan.findFirst({
-            where: { name: plan.name, tenantId: null, deletedAt: null },
+            where: { name: plan.name, tenantId: null, deletedAt: null }
         });
 
         if (existing) {
             await prisma.plan.update({
                 where: { id: existing.id },
                 data: {
-                    stripePriceId:   plan.stripePriceId,
+                    stripePriceId: plan.stripePriceId,
                     stripeProductId: plan.stripeProductId,
-                    interval:        plan.interval,
-                    isActive:        plan.isActive,
-                    limits:          plan.limits,
-                },
+                    interval: plan.interval,
+                    isActive: plan.isActive,
+                    limits: plan.limits
+                }
             });
             console.log(`✅ Plan updated:  ${plan.name} (id: ${existing.id})`);
         } else {
@@ -178,17 +178,17 @@ async function seedTestTenant() {
     const tenant = await prisma.tenant.upsert({
         where: { id: TEST_TENANT_ID },
         update: {
-            name:   'Test Tenant (dev)',
+            name: 'Test Tenant (dev)',
             status: 'active',
-            paymentStatus: 'active',
+            paymentStatus: 'active'
         },
         create: {
-            id:            TEST_TENANT_ID,
-            name:          'Test Tenant (dev)',
-            slug:          'test-tenant-dev',
-            status:        'active',
-            paymentStatus: 'active',
-        },
+            id: TEST_TENANT_ID,
+            name: 'Test Tenant (dev)',
+            slug: 'test-tenant-dev',
+            status: 'active',
+            paymentStatus: 'active'
+        }
     });
 
     console.log(`✅ Tenant: ${tenant.name} (id: ${tenant.id})`);
@@ -201,9 +201,9 @@ async function seedTestBilling() {
         update: {}, // Don't overwrite if already modified during testing
         create: {
             tenantId: TEST_TENANT_ID,
-            plan:     'Free',
-            status:   'none',
-        },
+            plan: 'Free',
+            status: 'none'
+        }
     });
 
     console.log(`✅ Billing: plan=${billing.plan}, status=${billing.status} (tenantId: ${billing.tenantId})`);
@@ -216,17 +216,17 @@ async function seedDefaultTenant() {
     const tenant = await prisma.tenant.upsert({
         where: { id: DEFAULT_TENANT_ID },
         update: {
-            name:          'Default Tenant (dev)',
-            status:        'active',
-            paymentStatus: 'active',
+            name: 'Default Tenant (dev)',
+            status: 'active',
+            paymentStatus: 'active'
         },
         create: {
-            id:            DEFAULT_TENANT_ID,
-            name:          'Default Tenant (dev)',
-            slug:          'default-tenant',
-            status:        'active',
-            paymentStatus: 'active',
-        },
+            id: DEFAULT_TENANT_ID,
+            name: 'Default Tenant (dev)',
+            slug: 'default-tenant',
+            status: 'active',
+            paymentStatus: 'active'
+        }
     });
 
     const billing = await prisma.billing.upsert({
@@ -234,9 +234,9 @@ async function seedDefaultTenant() {
         update: {},
         create: {
             tenantId: DEFAULT_TENANT_ID,
-            plan:     'Free',
-            status:   'none',
-        },
+            plan: 'Free',
+            status: 'none'
+        }
     });
 
     console.log(`✅ Default tenant: ${tenant.name} (id: ${tenant.id})`);

@@ -11,7 +11,7 @@ import { BaseDomainEvent } from '@domains/common/events';
 export enum ApiKeyStatus {
     ACTIVE = 'active',
     INACTIVE = 'inactive',
-    REVOKED = 'revoked',
+    REVOKED = 'revoked'
 }
 
 // ============================================================
@@ -150,7 +150,7 @@ export class ApiKeyCreatedEvent extends BaseDomainEvent {
             createdBy: string;
             createdAt: Date;
         },
-        public readonly userId?: string,
+        public readonly userId?: string
     ) {
         super();
     }
@@ -169,7 +169,7 @@ export class ApiKeyUpdatedEvent extends BaseDomainEvent {
             updatedBy: string;
             updatedAt: Date;
         },
-        public readonly userId?: string,
+        public readonly userId?: string
     ) {
         super();
     }
@@ -189,7 +189,7 @@ export class ApiKeyStatusUpdatedEvent extends BaseDomainEvent {
             updatedBy: string;
             updatedAt: Date;
         },
-        public readonly userId?: string,
+        public readonly userId?: string
     ) {
         super();
     }
@@ -209,7 +209,7 @@ export class ApiKeyDeletedEvent extends BaseDomainEvent {
             deletedBy: string;
             deletedAt: Date;
         },
-        public readonly userId?: string,
+        public readonly userId?: string
     ) {
         super();
     }
@@ -219,5 +219,5 @@ export const ApiKeyEvents = {
     CREATED: 'api-key.created',
     UPDATED: 'api-key.updated',
     STATUS: 'api-key.status',
-    DELETED: 'api-key.deleted',
+    DELETED: 'api-key.deleted'
 } as const;

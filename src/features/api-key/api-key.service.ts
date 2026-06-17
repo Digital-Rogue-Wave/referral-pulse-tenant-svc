@@ -19,7 +19,7 @@ import {
     ApiKeyCreatedEvent,
     ApiKeyUpdatedEvent,
     ApiKeyStatusUpdatedEvent,
-    ApiKeyDeletedEvent,
+    ApiKeyDeletedEvent
 } from '@domains/api-key';
 
 import { API_KEY_PAGINATE_CONFIG } from './api-key.pagination';
@@ -35,7 +35,7 @@ export class ApiKeyService {
         private readonly tenantAware: TenantAwareService,
         private readonly tenantContext: TenantContextService,
         private readonly txEventEmitter: TransactionEventEmitterService,
-        private readonly logger: AppLoggerService,
+        private readonly logger: AppLoggerService
     ) {
         this.logger.setContext(ApiKeyService.name);
     }
@@ -62,8 +62,8 @@ export class ApiKeyService {
                 scopes: dto.scopes,
                 createdBy: userId,
                 expiresAt: dto.expiresAt,
-                status: ApiKeyStatus.ACTIVE,
-            },
+                status: ApiKeyStatus.ACTIVE
+            }
         })) as ApiKeyProps;
 
         // Emit domain event + audit event after commit
@@ -77,16 +77,16 @@ export class ApiKeyService {
                 keyPrefix: saved.keyPrefix,
                 scopes: saved.scopes as string[],
                 createdBy: userId,
-                createdAt: saved.createdAt,
+                createdAt: saved.createdAt
             },
-            userId,
+            userId
         );
         this.txEventEmitter.emitAfterCommit('api-key.created', event);
         this.txEventEmitter.emitAfterCommit('audit.api-key.created', event);
 
         this.logger.log(`API key created: ${saved.id}`, {
             apiKeyId: saved.id,
-            name: saved.name,
+            name: saved.name
         });
 
         return apiKeyResponseMapper.toResponseWithRawKey(saved, rawKey);
@@ -102,7 +102,7 @@ export class ApiKeyService {
         return {
             data: apiKeyResponseMapper.toResponseArray(result.data as ApiKeyProps[]),
             meta: result.meta as Paginated<ApiKeyResponse>['meta'],
-            links: result.links,
+            links: result.links
         };
     }
 
@@ -111,7 +111,7 @@ export class ApiKeyService {
      */
     async findById(id: string): Promise<ApiKeyResponse> {
         const apiKey = (await this.apiKey.findUnique({
-            where: { id },
+            where: { id }
         })) as ApiKeyProps | null;
 
         if (!apiKey) {
@@ -132,7 +132,7 @@ export class ApiKeyService {
 
         const updated = (await this.apiKey.update({
             where: { id },
-            data: dto,
+            data: dto
         })) as ApiKeyProps;
 
         // Build changes object
@@ -153,9 +153,9 @@ export class ApiKeyService {
                     tenantId: updated.tenantId,
                     changes,
                     updatedBy: userId,
-                    updatedAt: updated.updatedAt,
+                    updatedAt: updated.updatedAt
                 },
-                userId,
+                userId
             );
             this.txEventEmitter.emitAfterCommit('api-key.updated', event);
             this.txEventEmitter.emitAfterCommit('audit.api-key.updated', event);
@@ -171,7 +171,7 @@ export class ApiKeyService {
      */
     async updateStatus(id: string, userId: string, newStatus: string): Promise<ApiKeyResponse> {
         const existing = (await this.apiKey.findUnique({
-            where: { id },
+            where: { id }
         })) as ApiKeyProps | null;
         if (!existing) {
             throw new NotFoundException(`API key with ID ${id} not found`);
@@ -181,7 +181,7 @@ export class ApiKeyService {
 
         const updated = (await this.apiKey.update({
             where: { id },
-            data: { status: newStatus },
+            data: { status: newStatus }
         })) as ApiKeyProps;
 
         const event = new ApiKeyStatusUpdatedEvent(
@@ -193,9 +193,9 @@ export class ApiKeyService {
                 previousStatus,
                 newStatus,
                 updatedBy: userId,
-                updatedAt: updated.updatedAt,
+                updatedAt: updated.updatedAt
             },
-            userId,
+            userId
         );
         this.txEventEmitter.emitAfterCommit('api-key.status', event);
         this.txEventEmitter.emitAfterCommit('audit.api-key.status', event);
@@ -203,7 +203,7 @@ export class ApiKeyService {
         this.logger.log(`API key status updated: ${id}`, {
             apiKeyId: id,
             previousStatus,
-            newStatus,
+            newStatus
         });
 
         return apiKeyResponseMapper.toResponse(updated);
@@ -214,7 +214,7 @@ export class ApiKeyService {
      */
     async delete(id: string, userId: string): Promise<void> {
         const existing = (await this.apiKey.findUnique({
-            where: { id },
+            where: { id }
         })) as ApiKeyProps | null;
         if (!existing) {
             throw new NotFoundException(`API key with ID ${id} not found`);
@@ -231,9 +231,9 @@ export class ApiKeyService {
                 keyName: existing.name,
                 keyPrefix: existing.keyPrefix,
                 deletedBy: userId,
-                deletedAt: new Date(),
+                deletedAt: new Date()
             },
-            userId,
+            userId
         );
         this.txEventEmitter.emitAfterCommit('api-key.deleted', event);
         this.txEventEmitter.emitAfterCommit('audit.api-key.deleted', event);
@@ -254,8 +254,8 @@ export class ApiKeyService {
             where: {
                 keyPrefix,
                 status: ApiKeyStatus.ACTIVE,
-                deletedAt: null,
-            },
+                deletedAt: null
+            }
         })) as ApiKeyProps | null;
 
         if (!apiKey) {
@@ -287,7 +287,7 @@ export class ApiKeyService {
     private async updateLastUsed(id: string): Promise<void> {
         await this.prisma.apiKey.update({
             where: { id },
-            data: { lastUsedAt: new Date() },
+            data: { lastUsedAt: new Date() }
         });
     }
 

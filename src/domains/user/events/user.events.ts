@@ -12,7 +12,7 @@ export class UserCreatedEvent extends BaseDomainEvent {
         public readonly email?: string,
         public readonly source?: string,
         public readonly referralCode?: string,
-        public readonly userId?: string,
+        public readonly userId?: string
     ) {
         super();
     }
@@ -28,7 +28,7 @@ export class UserUpdatedEvent extends BaseDomainEvent {
         public readonly aggregateId: string,
         public readonly tenantId: string,
         public readonly changes: Record<string, { from: unknown; to: unknown }>,
-        public readonly userId?: string,
+        public readonly userId?: string
     ) {
         super();
     }
@@ -43,7 +43,7 @@ export class UserDeletedEvent extends BaseDomainEvent {
     constructor(
         public readonly aggregateId: string,
         public readonly tenantId: string,
-        public readonly userId?: string,
+        public readonly userId?: string
     ) {
         super();
     }
@@ -55,5 +55,5 @@ export class UserDeletedEvent extends BaseDomainEvent {
 export const UserEvents = {
     CREATED: 'user.created',
     UPDATED: 'user.updated',
-    DELETED: 'user.deleted',
+    DELETED: 'user.deleted'
 } as const;

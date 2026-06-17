@@ -39,9 +39,7 @@ export function decodeCursor(cursor: string): CursorPayload {
 
         // Validate required fields
         if (!payload.sv || !payload.uid || !payload.d) {
-            throw new BadRequestException(
-                'Invalid cursor: cursor structure is malformed. Use the cursor value from a previous pagination response.',
-            );
+            throw new BadRequestException('Invalid cursor: cursor structure is malformed. Use the cursor value from a previous pagination response.');
         }
 
         return payload;
@@ -51,7 +49,7 @@ export function decodeCursor(cursor: string): CursorPayload {
         }
         throw new BadRequestException(
             'Invalid cursor format: the cursor must be a valid opaque string from a previous pagination response. ' +
-                'To get the first page, omit the "after" and "before" parameters.',
+                'To get the first page, omit the "after" and "before" parameters.'
         );
     }
 }
@@ -63,18 +61,18 @@ export function createCursor<T extends Record<string, any>>(
     entity: T,
     sortColumns: Array<{ column: string; direction: 'asc' | 'desc' }>,
     uniqueColumn: string,
-    direction: 'f' | 'b',
+    direction: 'f' | 'b'
 ): string {
     const payload: CursorPayload = {
         sv: sortColumns.map(({ column }) => ({
             c: column,
-            v: serializeValue(entity[column]),
+            v: serializeValue(entity[column])
         })),
         uid: {
             c: uniqueColumn,
-            v: String(entity[uniqueColumn]),
+            v: String(entity[uniqueColumn])
         },
-        d: direction,
+        d: direction
     };
 
     return encodeCursor(payload);
@@ -89,11 +87,7 @@ export function createCursor<T extends Record<string, any>>(
  *    OR (A = 'a' AND B > 'b')
  *    OR (A = 'a' AND B = 'b' AND uid > 'x')
  */
-export function buildCursorWhere(
-    cursor: CursorPayload,
-    orderBy: Array<Record<string, 'asc' | 'desc'>>,
-    isForward: boolean,
-): Record<string, unknown> {
+export function buildCursorWhere(cursor: CursorPayload, orderBy: Array<Record<string, 'asc' | 'desc'>>, isForward: boolean): Record<string, unknown> {
     const conditions: Record<string, unknown>[] = [];
 
     // Build compound cursor condition for multi-column sort

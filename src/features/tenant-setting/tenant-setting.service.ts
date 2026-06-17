@@ -15,7 +15,7 @@ import {
     tenantSettingResponseMapper,
     TenantSettingCreatedEvent,
     TenantSettingUpdatedEvent,
-    TenantSettingDeletedEvent,
+    TenantSettingDeletedEvent
 } from '@domains/tenant-setting';
 
 import { TENANT_SETTING_PAGINATE_CONFIG } from './tenant-setting.pagination';
@@ -31,7 +31,7 @@ export class TenantSettingService {
         private readonly tenantAware: TenantAwareService,
         private readonly tenantContext: TenantContextService,
         private readonly txEventEmitter: TransactionEventEmitterService,
-        private readonly logger: AppLoggerService,
+        private readonly logger: AppLoggerService
     ) {
         this.logger.setContext(TenantSettingService.name);
     }
@@ -52,8 +52,8 @@ export class TenantSettingService {
                 branding: dto.branding || {},
                 notifications: dto.notifications || {},
                 general: dto.general || {},
-                currencyCode: dto.currencyCode,
-            },
+                currencyCode: dto.currencyCode
+            }
         })) as TenantSettingProps;
 
         const event = new TenantSettingCreatedEvent(
@@ -63,16 +63,16 @@ export class TenantSettingService {
                 settingId: saved.id,
                 tenantId: saved.tenantId,
                 currencyCode: saved.currencyCode,
-                createdAt: saved.createdAt,
+                createdAt: saved.createdAt
             },
-            userId,
+            userId
         );
         this.txEventEmitter.emitAfterCommit('tenant-setting.created', event);
         this.txEventEmitter.emitAfterCommit('audit.tenant-setting.created', event);
 
         this.logger.log(`Tenant setting created: ${saved.id}`, {
             settingId: saved.id,
-            tenantId: saved.tenantId,
+            tenantId: saved.tenantId
         });
 
         return tenantSettingResponseMapper.toResponse(saved);
@@ -83,17 +83,12 @@ export class TenantSettingService {
      */
     async findAll(query: PaginateQuery): Promise<Paginated<TenantSettingResponse>> {
         const baseWhere = this.tenantAware.withTenantFilter({ deletedAt: null });
-        const result = await prismaPaginate(
-            query,
-            this.prisma.tenantSetting,
-            TENANT_SETTING_PAGINATE_CONFIG,
-            baseWhere,
-        );
+        const result = await prismaPaginate(query, this.prisma.tenantSetting, TENANT_SETTING_PAGINATE_CONFIG, baseWhere);
 
         return {
             data: tenantSettingResponseMapper.toResponseArray(result.data as TenantSettingProps[]),
             meta: result.meta as Paginated<TenantSettingResponse>['meta'],
-            links: result.links,
+            links: result.links
         };
     }
 
@@ -102,7 +97,7 @@ export class TenantSettingService {
      */
     async findById(id: string): Promise<TenantSettingResponse> {
         const setting = (await this.tenantSetting.findUnique({
-            where: { id },
+            where: { id }
         })) as TenantSettingProps | null;
 
         if (!setting) {
@@ -119,7 +114,7 @@ export class TenantSettingService {
         const tenantId = this.tenantContext.getTenantId();
 
         const setting = (await this.prisma.tenantSetting.findUnique({
-            where: { tenantId },
+            where: { tenantId }
         })) as TenantSettingProps | null;
 
         if (!setting) {
@@ -136,7 +131,7 @@ export class TenantSettingService {
         const userId = this.tenantContext.getUserId();
 
         const existing = (await this.tenantSetting.findUnique({
-            where: { id },
+            where: { id }
         })) as TenantSettingProps | null;
 
         if (!existing) {
@@ -154,7 +149,7 @@ export class TenantSettingService {
             updateData.notifications = dto.notifications;
             changes.notifications = {
                 from: existing.notifications,
-                to: dto.notifications,
+                to: dto.notifications
             };
         }
         if (dto.general !== undefined) {
@@ -165,13 +160,13 @@ export class TenantSettingService {
             updateData.currencyCode = dto.currencyCode;
             changes.currencyCode = {
                 from: existing.currencyCode,
-                to: dto.currencyCode,
+                to: dto.currencyCode
             };
         }
 
         const updated = (await this.tenantSetting.update({
             where: { id },
-            data: updateData,
+            data: updateData
         })) as TenantSettingProps;
 
         if (Object.keys(changes).length > 0) {
@@ -182,9 +177,9 @@ export class TenantSettingService {
                     settingId: id,
                     tenantId: updated.tenantId,
                     changes,
-                    updatedAt: updated.updatedAt,
+                    updatedAt: updated.updatedAt
                 },
-                userId,
+                userId
             );
             this.txEventEmitter.emitAfterCommit('tenant-setting.updated', event);
             this.txEventEmitter.emitAfterCommit('audit.tenant-setting.updated', event);
@@ -192,7 +187,7 @@ export class TenantSettingService {
 
         this.logger.log(`Tenant setting updated: ${id}`, {
             settingId: id,
-            changes,
+            changes
         });
 
         return tenantSettingResponseMapper.toResponse(updated);
@@ -205,7 +200,7 @@ export class TenantSettingService {
         const userId = this.tenantContext.getUserId();
 
         const existing = (await this.tenantSetting.findUnique({
-            where: { id },
+            where: { id }
         })) as TenantSettingProps | null;
 
         if (!existing) {
@@ -220,9 +215,9 @@ export class TenantSettingService {
             {
                 settingId: id,
                 tenantId: existing.tenantId,
-                deletedAt: new Date(),
+                deletedAt: new Date()
             },
-            userId,
+            userId
         );
         this.txEventEmitter.emitAfterCommit('tenant-setting.deleted', event);
         this.txEventEmitter.emitAfterCommit('audit.tenant-setting.deleted', event);

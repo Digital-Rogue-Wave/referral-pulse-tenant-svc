@@ -6,6 +6,6 @@ import { BillingModule } from '../billing/billing.module';
 
 @Module({
     imports: [TenantModule, BillingModule],
-    controllers: [WebhookController, WebhooksController],
+    controllers: [WebhookController, WebhooksController]
 })
 export class WebhookModule {}

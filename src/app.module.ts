@@ -35,19 +35,15 @@ import { GlobalExceptionsFilter } from '@common/exceptions/global-exceptions.fil
             load: configLoaders,
             cache: true,
             expandVariables: true,
-            envFilePath: `.env.${process.env.NODE_ENV || 'development'}`,
+            envFilePath: `.env.${process.env.NODE_ENV || 'development'}`
         }),
         I18nModule.forRoot({
             fallbackLanguage: 'en',
             loaderOptions: {
                 path: path.join(__dirname, 'i18n'),
-                watch: process.env.NODE_ENV !== 'production',
+                watch: process.env.NODE_ENV !== 'production'
             },
-            resolvers: [
-                { use: QueryResolver, options: ['lang'] },
-                AcceptLanguageResolver,
-                new HeaderResolver(['x-lang']),
-            ],
+            resolvers: [{ use: QueryResolver, options: ['lang'] }, AcceptLanguageResolver, new HeaderResolver(['x-lang'])]
         }),
         TerminusModule,
         CommonModule,
@@ -62,12 +58,12 @@ import { GlobalExceptionsFilter } from '@common/exceptions/global-exceptions.fil
         TeamMemberModule,
         TenantModule,
         TenantSettingModule,
-        WebhookModule,
+        WebhookModule
     ],
     providers: [
         { provide: APP_FILTER, useClass: GlobalExceptionsFilter },
         // { provide: APP_GUARD, useClass: JwtAuthGuard },
-        { provide: APP_INTERCEPTOR, useClass: AlsAuthInterceptor },
-    ],
+        { provide: APP_INTERCEPTOR, useClass: AlsAuthInterceptor }
+    ]
 })
 export class AppModule {}

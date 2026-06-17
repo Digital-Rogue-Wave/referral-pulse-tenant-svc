@@ -21,5 +21,5 @@ export enum FilterOperator {
     NOT_STARTS_WITH = '$not_sw',
     ENDS_WITH = '$ends',
     NOT_ENDS_WITH = '$not_ends',
-    ILIKE = '$ilike',
+    ILIKE = '$ilike'
 }

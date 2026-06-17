@@ -9,5 +9,5 @@ export const TENANT_SETTING_PAGINATE_CONFIG: PaginateConfig<TenantSettingProps> 
     defaultSortBy: [['createdAt', 'DESC']],
     filterableColumns: {},
     defaultLimit: 10,
-    maxLimit: 100,
+    maxLimit: 100
 };

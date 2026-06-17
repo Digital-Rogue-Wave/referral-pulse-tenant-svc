@@ -50,48 +50,32 @@ export function Idempotent(options: IdempotentHandlerOptions = {}): MethodDecora
         descriptor.value = async function (
             this: {
                 idempotencyService?: {
-                    executeOnce: <T>(
-                        key: string,
-                        fn: () => Promise<T>,
-                        ttl?: number,
-                    ) => Promise<{ result: T; isDuplicate: boolean }>;
+                    executeOnce: <T>(key: string, fn: () => Promise<T>, ttl?: number) => Promise<{ result: T; isDuplicate: boolean }>;
                 };
             },
-            message: IMessageEnvelope<unknown>,
+            message: IMessageEnvelope<unknown>
         ) {
             if (options.skip) {
                 return originalMethod.apply(this, [message]);
             }
 
             const idempotencyService = (this as { idempotencyService?: unknown }).idempotencyService;
-            if (
-                !idempotencyService ||
-                typeof (idempotencyService as { executeOnce?: unknown }).executeOnce !== 'function'
-            ) {
-                console.warn(
-                    `[Idempotent] IdempotencyService not found in ${target.constructor.name}. Skipping idempotency check.`,
-                );
+            if (!idempotencyService || typeof (idempotencyService as { executeOnce?: unknown }).executeOnce !== 'function') {
+                console.warn(`[Idempotent] IdempotencyService not found in ${target.constructor.name}. Skipping idempotency check.`);
                 return originalMethod.apply(this, [message]);
             }
 
-            const keyExtractor =
-                options.keyExtractor || ((msg: IMessageEnvelope<unknown>) => msg.idempotencyKey || msg.messageId);
+            const keyExtractor = options.keyExtractor || ((msg: IMessageEnvelope<unknown>) => msg.idempotencyKey || msg.messageId);
             const idempotencyKey = keyExtractor(message);
 
             const { result, isDuplicate } = await (
                 idempotencyService as {
-                    executeOnce: <T>(
-                        key: string,
-                        fn: () => Promise<T>,
-                        ttl?: number,
-                    ) => Promise<{ result: T; isDuplicate: boolean }>;
+                    executeOnce: <T>(key: string, fn: () => Promise<T>, ttl?: number) => Promise<{ result: T; isDuplicate: boolean }>;
                 }
             ).executeOnce(idempotencyKey, () => originalMethod.apply(this, [message]), options.ttl);
 
             if (isDuplicate) {
-                console.log(
-                    `[Idempotent] Message ${message.messageId} (key: ${idempotencyKey}) already processed. Skipping.`,
-                );
+                console.log(`[Idempotent] Message ${message.messageId} (key: ${idempotencyKey}) already processed. Skipping.`);
             }
 
             return result;

@@ -34,6 +34,6 @@ export const Paginate = createParamDecorator((_data: unknown, ctx: ExecutionCont
         searchBy: query.searchBy ? (Array.isArray(query.searchBy) ? query.searchBy : [query.searchBy]) : undefined,
         search: query.search,
         filter: filterParams,
-        select: query.select ? (Array.isArray(query.select) ? query.select : [query.select]) : undefined,
+        select: query.select ? (Array.isArray(query.select) ? query.select : [query.select]) : undefined
     };
 });

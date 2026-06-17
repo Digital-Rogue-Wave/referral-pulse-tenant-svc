@@ -25,8 +25,8 @@ import { AlsAuthInterceptor } from '../interceptor';
         { provide: APP_GUARD, useClass: PermissionGuard },
         AlsAuthInterceptor,
         KetoService,
-        KratosService,
+        KratosService
     ],
-    exports: [AlsAuthInterceptor, KetoService, KratosService, PassportModule],
+    exports: [AlsAuthInterceptor, KetoService, KratosService, PassportModule]
 })
 export class AuthModule {}

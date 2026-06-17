@@ -16,7 +16,7 @@ import { TENANT_SETTING_PAGINATE_CONFIG } from './tenant-setting.pagination';
     name: 'x-tenant-id',
     required: true,
     description: 'Tenant ID header',
-    schema: { type: 'string' },
+    schema: { type: 'string' }
 })
 @Controller({ path: 'tenant-settings', version: '1' })
 @ApiBearerAuth()
@@ -26,12 +26,12 @@ export class TenantSettingController {
     @ApiBody({ type: CreateTenantSettingDto })
     @ApiCreatedResponse({
         description: 'Tenant setting created successfully',
-        type: TenantSettingResponse,
+        type: TenantSettingResponse
     })
     @RequirePermission({
         namespace: KetoNamespace.TENANT,
         object: KetoResource.SETTINGS,
-        relation: KetoRelation.CREATE,
+        relation: KetoRelation.CREATE
     })
     @HttpCode(HttpStatus.CREATED)
     @Post()
@@ -44,7 +44,7 @@ export class TenantSettingController {
     @ApiOkResponse({
         description: 'List of tenant settings',
         type: TenantSettingResponse,
-        isArray: true,
+        isArray: true
     })
     @RequirePermission({ namespace: KetoNamespace.TENANT, relation: KetoRelation.READ })
     @HttpCode(HttpStatus.OK)
@@ -55,7 +55,7 @@ export class TenantSettingController {
 
     @ApiOkResponse({
         description: 'Current tenant setting',
-        type: TenantSettingResponse,
+        type: TenantSettingResponse
     })
     @RequirePermission({ namespace: KetoNamespace.TENANT, relation: KetoRelation.READ })
     @HttpCode(HttpStatus.OK)
@@ -66,7 +66,7 @@ export class TenantSettingController {
 
     @ApiOkResponse({
         description: 'Tenant setting details',
-        type: TenantSettingResponse,
+        type: TenantSettingResponse
     })
     @RequirePermission({ namespace: KetoNamespace.TENANT, relation: KetoRelation.READ })
     @HttpCode(HttpStatus.OK)
@@ -78,12 +78,12 @@ export class TenantSettingController {
     @ApiBody({ type: UpdateTenantSettingDto })
     @ApiOkResponse({
         description: 'Tenant setting updated successfully',
-        type: TenantSettingResponse,
+        type: TenantSettingResponse
     })
     @RequirePermission({
         namespace: KetoNamespace.TENANT,
         object: KetoResource.SETTINGS,
-        relation: KetoRelation.UPDATE,
+        relation: KetoRelation.UPDATE
     })
     @HttpCode(HttpStatus.OK)
     @Put(':id')
@@ -96,7 +96,7 @@ export class TenantSettingController {
     @RequirePermission({
         namespace: KetoNamespace.TENANT,
         object: KetoResource.SETTINGS,
-        relation: KetoRelation.DELETE,
+        relation: KetoRelation.DELETE
     })
     @HttpCode(HttpStatus.NO_CONTENT)
     @Delete(':id')

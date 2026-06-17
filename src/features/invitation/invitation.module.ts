@@ -6,6 +6,6 @@ import { InvitationService } from './invitation.service';
 @Module({
     controllers: [InvitationController, PublicInvitationController],
     providers: [InvitationService],
-    exports: [InvitationService],
+    exports: [InvitationService]
 })
 export class InvitationModule {}

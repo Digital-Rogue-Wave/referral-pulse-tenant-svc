@@ -8,6 +8,6 @@ import { TracingService } from './tracing.service';
 @Global()
 @Module({
     providers: [TracingService, MetricsService, MessagingMetricsService, HttpMetricsService],
-    exports: [TracingService, MetricsService, MessagingMetricsService, HttpMetricsService],
+    exports: [TracingService, MetricsService, MessagingMetricsService, HttpMetricsService]
 })
 export class TracingModule {}

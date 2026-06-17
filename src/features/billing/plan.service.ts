@@ -24,7 +24,7 @@ export class PlanService {
         private readonly prisma: DatabaseService,
         private readonly logger: AppLoggerService,
         private readonly redisService: RedisService,
-        private readonly keyBuilder: RedisKeyBuilder,
+        private readonly keyBuilder: RedisKeyBuilder
     ) {
         this.logger.setContext(PlanService.name);
     }
@@ -68,8 +68,8 @@ export class PlanService {
                 tenantId: dto.tenantId ?? null,
                 isActive: dto.isActive ?? true,
                 manualInvoicing: dto.manualInvoicing ?? false,
-                metadata: (dto.metadata as Prisma.InputJsonValue) ?? Prisma.JsonNull,
-            },
+                metadata: (dto.metadata as Prisma.InputJsonValue) ?? Prisma.JsonNull
+            }
         });
 
         await this.invalidateCaches();
@@ -78,7 +78,7 @@ export class PlanService {
 
     async findAllPaginated(query: PaginateQuery<PlanDto>, includeInactive = false): Promise<Paginated<PlanDto>> {
         const baseWhere: Prisma.PlanWhereInput = {
-            deletedAt: null,
+            deletedAt: null
         };
 
         if (!includeInactive) {
@@ -88,20 +88,20 @@ export class PlanService {
         const result = await prismaPaginate(query as PaginateQuery<Plan>, this.prisma.plan, PLAN_PAGINATE_CONFIG, baseWhere);
         return {
             ...result,
-            data: planResponseMapper.toResponseArray(result.data),
+            data: planResponseMapper.toResponseArray(result.data)
         } as unknown as Paginated<PlanDto>;
     }
 
     async findOne(where: Prisma.PlanWhereInput): Promise<NullableType<PlanDto>> {
         const plan = await this.prisma.plan.findFirst({
-            where: { ...where, deletedAt: null },
+            where: { ...where, deletedAt: null }
         });
         return plan ? planResponseMapper.toResponse(plan) : null;
     }
 
     async findOneOrFail(where: Prisma.PlanWhereInput): Promise<Plan> {
         const plan = await this.prisma.plan.findFirst({
-            where: { ...where, deletedAt: null },
+            where: { ...where, deletedAt: null }
         });
 
         if (!plan) {
@@ -149,8 +149,7 @@ export class PlanService {
             updateData.manualInvoicing = dto.manualInvoicing;
         }
 
-        const finalManualInvoicing =
-            dto.manualInvoicing !== undefined ? dto.manualInvoicing : existingPlan.manualInvoicing;
+        const finalManualInvoicing = dto.manualInvoicing !== undefined ? dto.manualInvoicing : existingPlan.manualInvoicing;
         const finalTenantId = dto.tenantId !== undefined ? dto.tenantId : existingPlan.tenantId;
 
         if (finalManualInvoicing && !finalTenantId) {
@@ -163,7 +162,7 @@ export class PlanService {
 
         const updated = await this.prisma.plan.update({
             where: { id },
-            data: updateData,
+            data: updateData
         });
 
         await this.invalidateCaches();
@@ -175,7 +174,7 @@ export class PlanService {
 
         await this.prisma.plan.update({
             where: { id },
-            data: { isActive: false },
+            data: { isActive: false }
         });
 
         await this.invalidateCaches();
@@ -185,7 +184,7 @@ export class PlanService {
         const cacheKey = this.buildPublicPlansCacheKey();
 
         const cached = await this.redisService.get<PlanDto[]>(cacheKey, {
-            tenantScoped: false,
+            tenantScoped: false
         });
         if (cached) {
             return cached;
@@ -195,18 +194,18 @@ export class PlanService {
             where: {
                 tenantId: null,
                 isActive: true,
-                deletedAt: null,
+                deletedAt: null
             },
             orderBy: {
-                createdAt: 'asc',
-            },
+                createdAt: 'asc'
+            }
         });
 
         const mapped = planResponseMapper.toResponseArray(plans);
 
         await this.redisService.set(cacheKey, mapped, {
             ttl: this.publicPlansCacheTtlSec,
-            tenantScoped: false,
+            tenantScoped: false
         });
         return mapped;
     }

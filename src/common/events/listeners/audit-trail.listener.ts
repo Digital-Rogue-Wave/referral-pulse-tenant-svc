@@ -30,7 +30,7 @@ export class AuditTrailListener {
         private readonly sideEffectService: SideEffectService,
         private readonly logger: AppLoggerService,
         private readonly configService: ConfigService<AllConfigType>,
-        private readonly redisKeyBuilder: RedisKeyBuilder,
+        private readonly redisKeyBuilder: RedisKeyBuilder
     ) {
         this.logger.setContext(AuditTrailListener.name);
         this.serviceName = this.configService.get('app.name', { infer: true }) || 'unknown-service';
@@ -60,27 +60,23 @@ export class AuditTrailListener {
                     userId: event.userId,
                     occurredAt: event.occurredAt,
                     // Include full event payload for audit trail
-                    payload: event,
+                    payload: event
                 },
                 {
                     critical: false, // Direct SQS with DLQ (after commit)
-                    idempotencyKey: this.redisKeyBuilder.buildIdempotencyKey(`audit-${event.eventId}`),
-                },
+                    idempotencyKey: this.redisKeyBuilder.buildIdempotencyKey(`audit-${event.eventId}`)
+                }
             );
 
             this.logger.debug(`Sent ${event.eventType} to audit service`, {
                 eventId: event.eventId,
-                aggregateId: event.aggregateId,
+                aggregateId: event.aggregateId
             });
         } catch (error) {
             // DLQ for compliance monitoring - don't lose audit events
-            this.logger.error(
-                `Failed to send ${event.eventType} to audit service (check DLQ)`,
-                error instanceof Error ? error.stack : undefined,
-                {
-                    eventId: event.eventId,
-                },
-            );
+            this.logger.error(`Failed to send ${event.eventType} to audit service (check DLQ)`, error instanceof Error ? error.stack : undefined, {
+                eventId: event.eventId
+            });
         }
     }
 }

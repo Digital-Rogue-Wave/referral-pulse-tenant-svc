@@ -10,10 +10,10 @@ export class RewardsClient {
 
     constructor(
         private readonly http: HttpClientService,
-        private readonly configService: ConfigService<AllConfigType>,
+        private readonly configService: ConfigService<AllConfigType>
     ) {
         this.baseUrl = this.configService.getOrThrow('services.rewards.url', {
-            infer: true,
+            infer: true
         });
     }
 

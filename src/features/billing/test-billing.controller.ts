@@ -36,7 +36,7 @@ export class TestBillingController {
         private readonly paymentStatusEscalationService: PaymentStatusEscalationService,
         private readonly trialLifecycleService: TrialLifecycleService,
         private readonly usageTracker: UsageTrackerService,
-        private readonly tenantContext: TenantContextService,
+        private readonly tenantContext: TenantContextService
     ) {}
 
     @Post('stripe/checkout-session')
@@ -48,17 +48,14 @@ export class TestBillingController {
                 plan: {
                     type: 'string',
                     enum: Object.values(BillingPlanEnum),
-                    example: Object.values(BillingPlanEnum)[0],
+                    example: Object.values(BillingPlanEnum)[0]
                 },
-                couponCode: { type: 'string', nullable: true, example: 'PROMO_CODE' },
+                couponCode: { type: 'string', nullable: true, example: 'PROMO_CODE' }
             },
-            additionalProperties: false,
-        },
+            additionalProperties: false
+        }
     })
-    async createRealStripeCheckoutSession(
-        @Req() req: Request,
-        @Body() body: { plan: BillingPlanEnum; couponCode?: string },
-    ) {
+    async createRealStripeCheckoutSession(@Req() req: Request, @Body() body: { plan: BillingPlanEnum; couponCode?: string }) {
         const tenantId = this.requireTenantId();
 
         const bodyObj = this.ensureObjectBody(body);
@@ -68,7 +65,7 @@ export class TestBillingController {
         const result = await this.billingService.subscriptionCheckout(bodyObj.plan as BillingPlanEnum, couponCode);
         return {
             tenantId,
-            ...result,
+            ...result
         };
     }
 
@@ -86,7 +83,7 @@ export class TestBillingController {
         return {
             tenantId,
             ok: true,
-            message: 'PaymentRequiredGuard allowed the request.',
+            message: 'PaymentRequiredGuard allowed the request.'
         };
     }
 
@@ -106,11 +103,11 @@ export class TestBillingController {
                 targetPlan: {
                     type: 'string',
                     enum: Object.values(BillingPlanEnum),
-                    example: Object.values(BillingPlanEnum)[0],
-                },
+                    example: Object.values(BillingPlanEnum)[0]
+                }
             },
-            additionalProperties: false,
-        },
+            additionalProperties: false
+        }
     })
     async upgradeSubscription(@Req() req: Request, @Body() body: { targetPlan: BillingPlanEnum }) {
         const tenantId = this.requireTenantId();
@@ -129,11 +126,11 @@ export class TestBillingController {
                 targetPlan: {
                     type: 'string',
                     enum: Object.values(BillingPlanEnum),
-                    example: Object.values(BillingPlanEnum)[0],
-                },
+                    example: Object.values(BillingPlanEnum)[0]
+                }
             },
-            additionalProperties: false,
-        },
+            additionalProperties: false
+        }
     })
     async downgradeSubscription(@Req() req: Request, @Body() body: { targetPlan: BillingPlanEnum }) {
         const tenantId = this.requireTenantId();
@@ -148,16 +145,16 @@ export class TestBillingController {
         schema: {
             type: 'object',
             properties: {
-                reason: { type: 'string', example: 'Testing cancel flow' },
+                reason: { type: 'string', example: 'Testing cancel flow' }
             },
-            additionalProperties: false,
-        },
+            additionalProperties: false
+        }
     })
     async cancelSubscription(@Req() req: Request, @Body() body: { reason?: string }) {
         const tenantId = this.requireTenantId();
         const bodyObj = (body ?? {}) as Record<string, unknown>;
         const status = await this.billingService.cancelSubscription({
-            reason: typeof bodyObj.reason === 'string' ? bodyObj.reason : undefined,
+            reason: typeof bodyObj.reason === 'string' ? bodyObj.reason : undefined
         });
         return { tenantId, ...status };
     }
@@ -176,10 +173,10 @@ export class TestBillingController {
             required: ['metric'],
             properties: {
                 metric: { type: 'string', example: 'campaigns' },
-                amount: { type: 'number', example: 1 },
+                amount: { type: 'number', example: 1 }
             },
-            additionalProperties: false,
-        },
+            additionalProperties: false
+        }
     })
     async incrementUsage(@Req() req: Request, @Body() body: { metric: string; amount?: number }) {
         const tenantId = this.requireTenantId();
@@ -195,7 +192,7 @@ export class TestBillingController {
             metric,
             amount,
             currentUsage,
-            periodDate,
+            periodDate
         };
     }
 
@@ -206,10 +203,10 @@ export class TestBillingController {
             required: ['metric'],
             properties: {
                 metric: { type: 'string', example: 'campaigns' },
-                amount: { type: 'number', example: 1 },
+                amount: { type: 'number', example: 1 }
             },
-            additionalProperties: false,
-        },
+            additionalProperties: false
+        }
     })
     async decrementUsage(@Req() req: Request, @Body() body: { metric: string; amount?: number }) {
         const tenantId = this.requireTenantId();
@@ -224,7 +221,7 @@ export class TestBillingController {
             metric,
             amount,
             currentUsage,
-            periodDate,
+            periodDate
         };
     }
 
@@ -243,9 +240,7 @@ export class TestBillingController {
 
     private ensurePlanId(value: unknown): void {
         if (typeof value !== 'string' || !Object.values(BillingPlanEnum).includes(value as BillingPlanEnum)) {
-            throw new BadRequestException(
-                `planId is required and must be one of: ${Object.values(BillingPlanEnum).join(', ')}`,
-            );
+            throw new BadRequestException(`planId is required and must be one of: ${Object.values(BillingPlanEnum).join(', ')}`);
         }
     }
 
@@ -264,13 +259,13 @@ export class TestBillingController {
         const tenantId = this.requireTenantId();
 
         const tenant = await this.prisma.tenant.findUnique({
-            where: { id: tenantId },
+            where: { id: tenantId }
         });
 
         if (!tenant) {
             return {
                 tenantId,
-                found: false,
+                found: false
             };
         }
 
@@ -279,7 +274,7 @@ export class TestBillingController {
             found: true,
             status: tenant.status,
             paymentStatus: tenant.paymentStatus,
-            paymentStatusChangedAt: tenant.paymentStatusChangedAt?.toISOString() ?? null,
+            paymentStatusChangedAt: tenant.paymentStatusChangedAt?.toISOString() ?? null
         };
     }
 
@@ -288,13 +283,13 @@ export class TestBillingController {
         const tenantId = this.requireTenantId();
 
         const billing = await this.prisma.billing.findUnique({
-            where: { tenantId },
+            where: { tenantId }
         });
 
         if (!billing) {
             return {
                 tenantId,
-                found: false,
+                found: false
             };
         }
 
@@ -311,7 +306,7 @@ export class TestBillingController {
             downgradeScheduledAt: billing.downgradeScheduledAt?.toISOString() ?? null,
             cancellationReason: billing.cancellationReason ?? null,
             cancellationRequestedAt: billing.cancellationRequestedAt?.toISOString() ?? null,
-            cancellationEffectiveAt: billing.cancellationEffectiveAt?.toISOString() ?? null,
+            cancellationEffectiveAt: billing.cancellationEffectiveAt?.toISOString() ?? null
         };
     }
 
@@ -325,7 +320,7 @@ export class TestBillingController {
         const events = await this.prisma.billingEvent.findMany({
             where: { tenantId },
             orderBy: { timestamp: 'desc' },
-            take: limit,
+            take: limit
         });
 
         return {
@@ -337,8 +332,8 @@ export class TestBillingController {
                 metricName: e.metricName ?? null,
                 increment: e.increment ?? null,
                 timestamp: e.timestamp?.toISOString() ?? null,
-                metadata: e.metadata ?? null,
-            })),
+                metadata: e.metadata ?? null
+            }))
         };
     }
 
@@ -347,7 +342,7 @@ export class TestBillingController {
         return {
             status: 'ok',
             port: 5001,
-            time: new Date().toISOString(),
+            time: new Date().toISOString()
         };
     }
 
@@ -366,8 +361,8 @@ export class TestBillingController {
                 id: p.id,
                 name: p.name,
                 stripePriceId: p.stripePriceId,
-                isActive: p.isActive,
-            })),
+                isActive: p.isActive
+            }))
         };
     }
 
@@ -384,13 +379,13 @@ export class TestBillingController {
                         campaigns: { type: 'number', example: 100 },
                         seats: { type: 'number', example: 10 },
                         leaderboard_entries: { type: 'number', example: 10000 },
-                        email_sends: { type: 'number', example: 50000 },
+                        email_sends: { type: 'number', example: 50000 }
                     },
-                    additionalProperties: false,
-                },
+                    additionalProperties: false
+                }
             },
-            additionalProperties: false,
-        },
+            additionalProperties: false
+        }
     })
     async seedManualPlan(@Body() body: { name?: string; limits?: Record<string, number> }) {
         const tenantId = this.tenantContext.getTenantId();
@@ -404,9 +399,7 @@ export class TestBillingController {
 
         const saved = await this.planService.create({
             name:
-                typeof bodyObj.name === 'string' && (bodyObj.name as string).trim().length > 0
-                    ? (bodyObj.name as string).trim()
-                    : 'Manual Dev Plan',
+                typeof bodyObj.name === 'string' && (bodyObj.name as string).trim().length > 0 ? (bodyObj.name as string).trim() : 'Manual Dev Plan',
             tenantId,
             manualInvoicing: true,
             isActive: true,
@@ -415,22 +408,22 @@ export class TestBillingController {
                 campaigns: Number.isFinite(limits.campaigns) ? limits.campaigns : 100,
                 seats: Number.isFinite(limits.seats) ? limits.seats : 10,
                 leaderboard_entries: Number.isFinite(limits.leaderboard_entries) ? limits.leaderboard_entries : 10000,
-                email_sends: Number.isFinite(limits.email_sends) ? limits.email_sends : 50000,
-            },
+                email_sends: Number.isFinite(limits.email_sends) ? limits.email_sends : 50000
+            }
         });
 
         return {
             ok: true,
             tenantId,
             planId: saved.id,
-            limits: saved.limits,
+            limits: saved.limits
         };
     }
 
     @Post('test-stripe-connection')
     async testStripe() {
         const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
-            apiVersion: '2026-02-25.clover',
+            apiVersion: '2026-02-25.clover'
         });
 
         const customers = await stripe.customers.list({ limit: 1 });
@@ -438,7 +431,7 @@ export class TestBillingController {
         return {
             connected: true,
             customerCount: customers.data.length,
-            defaultCurrency: customers.data[0]?.currency || 'usd',
+            defaultCurrency: customers.data[0]?.currency || 'usd'
         };
     }
 
@@ -447,7 +440,7 @@ export class TestBillingController {
         await this.paymentStatusEscalationService.runEscalation();
         return {
             ok: true,
-            message: 'Payment status escalation executed',
+            message: 'Payment status escalation executed'
         };
     }
 
@@ -456,7 +449,7 @@ export class TestBillingController {
         await this.trialLifecycleService.runDailyLifecycle();
         return {
             ok: true,
-            message: 'Trial lifecycle executed',
+            message: 'Trial lifecycle executed'
         };
     }
 
@@ -465,7 +458,7 @@ export class TestBillingController {
         await this.dailyUsageCalculator.runDailySnapshot();
         return {
             ok: true,
-            message: 'Daily usage snapshot executed',
+            message: 'Daily usage snapshot executed'
         };
     }
 
@@ -474,7 +467,7 @@ export class TestBillingController {
         await this.monthlyUsageResetService.runMonthlyReset();
         return {
             ok: true,
-            message: 'Monthly usage reset executed',
+            message: 'Monthly usage reset executed'
         };
     }
 
@@ -491,7 +484,7 @@ export class TestBillingController {
         return {
             tenantId,
             metric,
-            remaining,
+            remaining
         };
     }
 
@@ -500,7 +493,7 @@ export class TestBillingController {
     @BillingGuardConfig({
         metrics: ['campaigns'],
         amount: 1,
-        gracePercentage: 0,
+        gracePercentage: 0
     })
     async limitedCampaignTest(@Req() req: Request) {
         const tenantId = this.requireTenantId();
@@ -517,8 +510,7 @@ export class TestBillingController {
 
         const currentUsageBefore = await this.usageTracker.getUsage(metric);
 
-        const effectiveLimit =
-            limit !== null && gracePercentage > 0 ? Math.floor(limit * (1 + gracePercentage / 100)) : limit;
+        const effectiveLimit = limit !== null && gracePercentage > 0 ? Math.floor(limit * (1 + gracePercentage / 100)) : limit;
 
         const remainingBefore = effectiveLimit !== null ? Math.max(0, effectiveLimit - currentUsageBefore) : null;
 
@@ -538,7 +530,7 @@ export class TestBillingController {
             currentUsageBefore,
             remainingBefore,
             currentUsageAfter,
-            remainingAfter,
+            remainingAfter
         };
     }
 }

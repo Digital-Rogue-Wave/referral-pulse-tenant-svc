@@ -8,7 +8,7 @@ export class StripeRedirectController {
     success() {
         return {
             ok: true,
-            message: 'Stripe checkout completed successfully',
+            message: 'Stripe checkout completed successfully'
         };
     }
 
@@ -16,7 +16,7 @@ export class StripeRedirectController {
     cancel() {
         return {
             ok: true,
-            message: 'Stripe checkout cancelled',
+            message: 'Stripe checkout cancelled'
         };
     }
 }

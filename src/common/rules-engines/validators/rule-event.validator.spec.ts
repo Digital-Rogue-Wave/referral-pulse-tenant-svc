@@ -19,15 +19,15 @@ describe('IsRuleEventConstraint', () => {
         const validEvent = {
             type: 'payout',
             params: {
-                amount: 10,
-            },
+                amount: 10
+            }
         };
         expect(constraint.validate(validEvent, args)).toBe(true);
     });
 
     it('should return true for event with only type', () => {
         const validEvent = {
-            type: 'payout',
+            type: 'payout'
         };
         expect(constraint.validate(validEvent, args)).toBe(true);
     });
@@ -35,15 +35,15 @@ describe('IsRuleEventConstraint', () => {
     it('should return false for event missing type', () => {
         const invalidEvent = {
             params: {
-                amount: 10,
-            },
+                amount: 10
+            }
         };
         expect(constraint.validate(invalidEvent, args)).toBe(false);
     });
 
     it('should return false for event with non-string type', () => {
         const invalidEvent = {
-            type: 123,
+            type: 123
         };
         expect(constraint.validate(invalidEvent, args)).toBe(false);
     });

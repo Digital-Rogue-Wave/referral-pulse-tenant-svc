@@ -18,7 +18,7 @@ import { FilterItem } from './types/paginate-query.interface';
  */
 export function parseFilters<T>(
     query: Record<string, unknown>,
-    filterableColumns: Partial<Record<Extract<keyof T, string>, FilterOperator[]>>,
+    filterableColumns: Partial<Record<Extract<keyof T, string>, FilterOperator[]>>
 ): FilterItem<T>[] {
     const filters: FilterItem<T>[] = [];
 
@@ -125,7 +125,7 @@ export function parseFilters<T>(
         filters.push({
             column: columnName,
             operator: operatorStr,
-            value: filterItemValue,
+            value: filterItemValue
         } as FilterItem<T>);
     }
 
@@ -192,7 +192,7 @@ export function buildFilterWhere<T = unknown>(filters: FilterItem<T>[]): Record<
                 break;
             case FilterOperator.NOT_STARTS_WITH:
                 where[column as string] = {
-                    not: { startsWith: value, mode: 'insensitive' },
+                    not: { startsWith: value, mode: 'insensitive' }
                 };
                 break;
             case FilterOperator.ENDS_WITH:
@@ -200,7 +200,7 @@ export function buildFilterWhere<T = unknown>(filters: FilterItem<T>[]): Record<
                 break;
             case FilterOperator.NOT_ENDS_WITH:
                 where[column as string] = {
-                    not: { endsWith: value, mode: 'insensitive' },
+                    not: { endsWith: value, mode: 'insensitive' }
                 };
                 break;
         }

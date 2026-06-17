@@ -38,7 +38,7 @@ import { TenantLockGuard } from './guards/tenant-lock.guard';
         // BullJobsModule is @Global() - no need to import
 
         // Circular Dependencies
-        forwardRef(() => TeamMemberModule),
+        forwardRef(() => TeamMemberModule)
     ],
     controllers: [AwareTenantController, AgnosticTenantController, AdminTenantController],
     providers: [
@@ -55,8 +55,8 @@ import { TenantLockGuard } from './guards/tenant-lock.guard';
 
         // Guards
         TenantStatusGuard,
-        TenantLockGuard,
+        TenantLockGuard
     ],
-    exports: [TenantService, TenantStatsService, TenantStatusGuard, TenantLockGuard, DnsModule],
+    exports: [TenantService, TenantStatsService, TenantStatusGuard, TenantLockGuard, DnsModule]
 })
 export class TenantModule {}

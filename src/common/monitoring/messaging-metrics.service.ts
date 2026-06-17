@@ -40,7 +40,7 @@ export class MessagingMetricsService implements OnModuleInit {
         private readonly metricsService: MetricsService,
         private readonly tracingService: TracingService,
         private readonly tenantContext: TenantContextService,
-        private readonly logger: AppLoggerService,
+        private readonly logger: AppLoggerService
     ) {
         this.logger.setContext(MessagingMetricsService.name);
     }
@@ -56,21 +56,21 @@ export class MessagingMetricsService implements OnModuleInit {
         const meter = this.metricsService.getMeter();
 
         this.inboundMessagesCounter = meter.createCounter('messaging.inbound.messages.total', {
-            description: 'Total number of inbound messages received from SQS',
+            description: 'Total number of inbound messages received from SQS'
         });
 
         this.inboundDurationHistogram = this.metricsService.createHistogram('messaging.inbound.duration', {
             description: 'Inbound message processing duration in milliseconds',
-            unit: 'ms',
+            unit: 'ms'
         });
 
         this.inboundErrorsCounter = meter.createCounter('messaging.inbound.errors.total', {
-            description: 'Total number of inbound message processing errors',
+            description: 'Total number of inbound message processing errors'
         });
 
         this.inboundMessageSizeHistogram = this.metricsService.createHistogram('messaging.inbound.message.size', {
             description: 'Size of inbound messages in bytes',
-            unit: 'bytes',
+            unit: 'bytes'
         });
     }
 
@@ -78,25 +78,25 @@ export class MessagingMetricsService implements OnModuleInit {
         const meter = this.metricsService.getMeter();
 
         this.outboundMessagesCounter = meter.createCounter('messaging.outbound.messages.total', {
-            description: 'Total number of outbound messages published to SNS',
+            description: 'Total number of outbound messages published to SNS'
         });
 
         this.outboundDurationHistogram = this.metricsService.createHistogram('messaging.outbound.duration', {
             description: 'Outbound message publishing duration in milliseconds',
-            unit: 'ms',
+            unit: 'ms'
         });
 
         this.outboundErrorsCounter = meter.createCounter('messaging.outbound.errors.total', {
-            description: 'Total number of outbound message publishing errors',
+            description: 'Total number of outbound message publishing errors'
         });
 
         this.outboundMessageSizeHistogram = this.metricsService.createHistogram('messaging.outbound.message.size', {
             description: 'Size of outbound messages in bytes',
-            unit: 'bytes',
+            unit: 'bytes'
         });
 
         this.outboundRetriesCounter = meter.createCounter('messaging.outbound.retries.total', {
-            description: 'Total number of outbound message retry attempts',
+            description: 'Total number of outbound message retry attempts'
         });
     }
 
@@ -104,12 +104,12 @@ export class MessagingMetricsService implements OnModuleInit {
         const meter = this.metricsService.getMeter();
 
         this.dlqMessagesCounter = meter.createCounter('messaging.dlq.messages.total', {
-            description: 'Total number of messages sent to DLQ',
+            description: 'Total number of messages sent to DLQ'
         });
 
         this.messageReceiveCountHistogram = this.metricsService.createHistogram('messaging.message.receive_count', {
             description: 'Number of times a message has been received (retry indicator)',
-            unit: 'count',
+            unit: 'count'
         });
     }
 
@@ -118,27 +118,21 @@ export class MessagingMetricsService implements OnModuleInit {
     /**
      * Record an inbound message received from SQS (uses pre-initialized metrics)
      */
-    recordInboundMessage(
-        queueName: string,
-        eventType: string,
-        success: boolean,
-        durationMs: number,
-        tenantId?: string,
-    ): void {
+    recordInboundMessage(queueName: string, eventType: string, success: boolean, durationMs: number, tenantId?: string): void {
         const tenant = tenantId || this.tenantContext.getTenantId() || 'unknown';
 
         this.inboundMessagesCounter.add(1, {
             queue_name: queueName,
             event_type: eventType,
             success: success.toString(),
-            tenant_id: tenant,
+            tenant_id: tenant
         });
 
         this.inboundDurationHistogram.record(durationMs, {
             queue_name: queueName,
             event_type: eventType,
             success: success.toString(),
-            tenant_id: tenant,
+            tenant_id: tenant
         });
     }
 
@@ -152,7 +146,7 @@ export class MessagingMetricsService implements OnModuleInit {
             queue_name: queueName,
             event_type: eventType,
             error_type: errorType,
-            tenant_id: tenant,
+            tenant_id: tenant
         });
     }
 
@@ -162,7 +156,7 @@ export class MessagingMetricsService implements OnModuleInit {
     recordInboundMessageSize(queueName: string, eventType: string, sizeBytes: number): void {
         this.inboundMessageSizeHistogram.record(sizeBytes, {
             queue_name: queueName,
-            event_type: eventType,
+            event_type: eventType
         });
     }
 
@@ -171,27 +165,21 @@ export class MessagingMetricsService implements OnModuleInit {
     /**
      * Record an outbound message published to SNS (uses pre-initialized metrics)
      */
-    recordOutboundMessage(
-        topicName: string,
-        eventType: string,
-        success: boolean,
-        durationMs: number,
-        tenantId?: string,
-    ): void {
+    recordOutboundMessage(topicName: string, eventType: string, success: boolean, durationMs: number, tenantId?: string): void {
         const tenant = tenantId || this.tenantContext.getTenantId() || 'unknown';
 
         this.outboundMessagesCounter.add(1, {
             topic_name: topicName,
             event_type: eventType,
             success: success.toString(),
-            tenant_id: tenant,
+            tenant_id: tenant
         });
 
         this.outboundDurationHistogram.record(durationMs, {
             topic_name: topicName,
             event_type: eventType,
             success: success.toString(),
-            tenant_id: tenant,
+            tenant_id: tenant
         });
     }
 
@@ -205,7 +193,7 @@ export class MessagingMetricsService implements OnModuleInit {
             topic_name: topicName,
             event_type: eventType,
             error_type: errorType,
-            tenant_id: tenant,
+            tenant_id: tenant
         });
     }
 
@@ -215,7 +203,7 @@ export class MessagingMetricsService implements OnModuleInit {
     recordOutboundMessageSize(topicName: string, eventType: string, sizeBytes: number): void {
         this.outboundMessageSizeHistogram.record(sizeBytes, {
             topic_name: topicName,
-            event_type: eventType,
+            event_type: eventType
         });
     }
 
@@ -229,7 +217,7 @@ export class MessagingMetricsService implements OnModuleInit {
             topic_name: topicName,
             event_type: eventType,
             attempt: attemptNumber.toString(),
-            tenant_id: tenant,
+            tenant_id: tenant
         });
     }
 
@@ -244,7 +232,7 @@ export class MessagingMetricsService implements OnModuleInit {
         this.dlqMessagesCounter.add(1, {
             queue_name: queueName,
             event_type: eventType,
-            tenant_id: tenant,
+            tenant_id: tenant
         });
     }
 
@@ -257,7 +245,7 @@ export class MessagingMetricsService implements OnModuleInit {
         this.messageReceiveCountHistogram.record(receiveCount, {
             queue_name: queueName,
             event_type: eventType,
-            tenant_id: tenant,
+            tenant_id: tenant
         });
     }
 
@@ -271,7 +259,7 @@ export class MessagingMetricsService implements OnModuleInit {
         queueName: string,
         eventType: string,
         handler: (span: Span) => Promise<T>,
-        metadata?: Record<string, string | number>,
+        metadata?: Record<string, string | number>
     ): Promise<T> {
         const startTime = Date.now();
 
@@ -286,7 +274,7 @@ export class MessagingMetricsService implements OnModuleInit {
                 'messaging.message.type': eventType,
                 'span.kind': 'consumer',
                 'tenant.id': tenantId || 'unknown',
-                ...metadata,
+                ...metadata
             });
 
             try {
@@ -310,7 +298,7 @@ export class MessagingMetricsService implements OnModuleInit {
                 span.recordException(error as Error);
                 span.setStatus({
                     code: SpanStatusCode.ERROR,
-                    message: error instanceof Error ? error.message : 'Unknown error',
+                    message: error instanceof Error ? error.message : 'Unknown error'
                 });
 
                 throw error;
@@ -328,7 +316,7 @@ export class MessagingMetricsService implements OnModuleInit {
         topicName: string,
         eventType: string,
         publisher: (span: Span) => Promise<T>,
-        metadata?: Record<string, string | number>,
+        metadata?: Record<string, string | number>
     ): Promise<T> {
         const startTime = Date.now();
 
@@ -343,7 +331,7 @@ export class MessagingMetricsService implements OnModuleInit {
                 'messaging.message.type': eventType,
                 'span.kind': 'producer',
                 'tenant.id': tenantId || 'unknown',
-                ...metadata,
+                ...metadata
             });
 
             try {
@@ -367,7 +355,7 @@ export class MessagingMetricsService implements OnModuleInit {
                 span.recordException(error as Error);
                 span.setStatus({
                     code: SpanStatusCode.ERROR,
-                    message: error instanceof Error ? error.message : 'Unknown error',
+                    message: error instanceof Error ? error.message : 'Unknown error'
                 });
 
                 throw error;
@@ -387,8 +375,8 @@ export class MessagingMetricsService implements OnModuleInit {
                 'messaging.system': 'aws_sns',
                 'messaging.operation': 'publish',
                 'messaging.destination': topicName,
-                'messaging.message.type': eventType,
-            },
+                'messaging.message.type': eventType
+            }
         });
     }
 

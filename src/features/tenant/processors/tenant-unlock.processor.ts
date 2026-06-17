@@ -26,18 +26,9 @@ export class TenantUnlockProcessor extends BaseWorkerService<TenantUnlockJobData
         tracingService: TracingService,
         tenantContext: TenantContextService,
         dateService: DateService,
-        private readonly tenantService: TenantService,
+        private readonly tenantService: TenantService
     ) {
-        super(
-            TENANT_UNLOCK_QUEUE,
-            connectionFactory,
-            configService,
-            logger,
-            metricsService,
-            tracingService,
-            tenantContext,
-            dateService,
-        );
+        super(TENANT_UNLOCK_QUEUE, connectionFactory, configService, logger, metricsService, tracingService, tenantContext, dateService);
     }
 
     protected async processJob(job: Job<TenantUnlockJobData>): Promise<IJobResult> {
@@ -45,7 +36,7 @@ export class TenantUnlockProcessor extends BaseWorkerService<TenantUnlockJobData
 
         this.logger.log(`Processing auto-unlock job for tenant ${tenantId}`, {
             tenantId,
-            unlockAt,
+            unlockAt
         });
 
         try {
@@ -53,14 +44,10 @@ export class TenantUnlockProcessor extends BaseWorkerService<TenantUnlockJobData
             this.logger.log(`Successfully unlocked tenant ${tenantId}`, { tenantId });
             return { success: true };
         } catch (error) {
-            this.logger.error(
-                `Failed to auto-unlock tenant ${tenantId}`,
-                error instanceof Error ? error.stack : undefined,
-                {
-                    tenantId,
-                    error: error instanceof Error ? error.message : String(error),
-                },
-            );
+            this.logger.error(`Failed to auto-unlock tenant ${tenantId}`, error instanceof Error ? error.stack : undefined, {
+                tenantId,
+                error: error instanceof Error ? error.message : String(error)
+            });
             throw error;
         }
     }

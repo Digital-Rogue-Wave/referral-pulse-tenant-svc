@@ -5,7 +5,7 @@ export class BaseException extends HttpException {
         public readonly errorCode: string,
         message: string,
         status: HttpStatus,
-        public readonly details?: Record<string, unknown>,
+        public readonly details?: Record<string, unknown>
     ) {
         super({ errorCode, message, details }, status);
         this.name = this.constructor.name;

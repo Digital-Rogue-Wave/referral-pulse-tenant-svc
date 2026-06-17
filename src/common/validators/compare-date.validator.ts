@@ -1,16 +1,10 @@
-import {
-    registerDecorator,
-    ValidationOptions,
-    ValidatorConstraint,
-    ValidatorConstraintInterface,
-    ValidationArguments,
-} from 'class-validator';
+import { registerDecorator, ValidationOptions, ValidatorConstraint, ValidatorConstraintInterface, ValidationArguments } from 'class-validator';
 import moment, { MomentInput } from 'moment';
 
 export enum DateComparisonMethod {
     GREATER = 'greater',
     LESS = 'less',
-    EQUAL = 'equal',
+    EQUAL = 'equal'
 }
 
 @ValidatorConstraint({ async: false })
@@ -20,9 +14,7 @@ export class CompareDateConstraint implements ValidatorConstraintInterface {
 
         // Get the related value or use the provided Date
         const relatedValue =
-            relatedPropertyOrDate instanceof Date
-                ? relatedPropertyOrDate
-                : (args.object as Record<string, unknown>)[relatedPropertyOrDate];
+            relatedPropertyOrDate instanceof Date ? relatedPropertyOrDate : (args.object as Record<string, unknown>)[relatedPropertyOrDate];
 
         if (!relatedValue || !moment(relatedValue).isValid()) {
             return false;
@@ -66,18 +58,14 @@ export class CompareDateConstraint implements ValidatorConstraintInterface {
     }
 }
 
-export function CompareDate(
-    relatedPropertyOrDate: string | Date,
-    method: DateComparisonMethod,
-    validationOptions?: ValidationOptions,
-) {
+export function CompareDate(relatedPropertyOrDate: string | Date, method: DateComparisonMethod, validationOptions?: ValidationOptions) {
     return function (object: NonNullable<unknown>, propertyName: string) {
         registerDecorator({
             target: object.constructor,
             propertyName: propertyName,
             options: validationOptions,
             constraints: [relatedPropertyOrDate, method],
-            validator: CompareDateConstraint,
+            validator: CompareDateConstraint
         });
     };
 }

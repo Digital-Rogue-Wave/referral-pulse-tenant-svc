@@ -10,10 +10,10 @@ export class SdkConfigClient {
 
     constructor(
         private readonly http: HttpClientService,
-        private readonly configService: ConfigService<AllConfigType>,
+        private readonly configService: ConfigService<AllConfigType>
     ) {
         this.baseUrl = this.configService.getOrThrow('services.sdkConfig.url', {
-            infer: true,
+            infer: true
         });
     }
 

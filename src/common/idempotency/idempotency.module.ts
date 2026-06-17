@@ -66,9 +66,9 @@ import { IdempotencyInterceptor } from '../interceptor';
         // Register interceptor globally for all HTTP endpoints
         {
             provide: APP_INTERCEPTOR,
-            useClass: IdempotencyInterceptor,
-        },
+            useClass: IdempotencyInterceptor
+        }
     ],
-    exports: [IdempotencyService, IdempotencyKeyGenerator],
+    exports: [IdempotencyService, IdempotencyKeyGenerator]
 })
 export class IdempotencyModule {}

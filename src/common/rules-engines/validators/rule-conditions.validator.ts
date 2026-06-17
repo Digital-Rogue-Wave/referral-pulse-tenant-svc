@@ -1,10 +1,4 @@
-import {
-    registerDecorator,
-    ValidationOptions,
-    ValidatorConstraint,
-    ValidatorConstraintInterface,
-    ValidationArguments,
-} from 'class-validator';
+import { registerDecorator, ValidationOptions, ValidatorConstraint, ValidatorConstraintInterface, ValidationArguments } from 'class-validator';
 
 interface IRuleCondition {
     all?: IRuleCondition[];
@@ -67,7 +61,7 @@ export function IsRuleConditions(validationOptions?: ValidationOptions) {
             propertyName: propertyName,
             options: validationOptions,
             constraints: [],
-            validator: IsRuleConditionsConstraint,
+            validator: IsRuleConditionsConstraint
         });
     };
 }

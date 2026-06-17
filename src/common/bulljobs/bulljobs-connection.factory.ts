@@ -29,7 +29,7 @@ export class BullJobsConnectionFactory {
     constructor(
         private readonly configService: ConfigService<AllConfigType>,
         private readonly redisService: RedisService,
-        private readonly logger: AppLoggerService,
+        private readonly logger: AppLoggerService
     ) {
         this.logger.setContext(BullJobsConnectionFactory.name);
     }
@@ -53,13 +53,13 @@ export class BullJobsConnectionFactory {
      */
     createConnectionOptions(): ConnectionOptions {
         const iamAuthEnabled = this.configService.get('redis.iamAuthEnabled', {
-            infer: true,
+            infer: true
         });
 
         if (iamAuthEnabled) {
             this.logger.warn(
                 'IAM auth is enabled but BullMQ connection options do not support dynamic IAM tokens. ' +
-                    'Using shared Redis connection instead. This is the recommended approach.',
+                    'Using shared Redis connection instead. This is the recommended approach.'
             );
             // Return the shared client - BullMQ accepts ioredis client instances
             return this.redisService.getClient() as unknown as ConnectionOptions;
@@ -80,7 +80,7 @@ export class BullJobsConnectionFactory {
         const password = this.configService.get('redis.password', { infer: true });
         const db = this.configService.getOrThrow('redis.db', { infer: true });
         const tlsEnabled = this.configService.getOrThrow('redis.tlsEnabled', {
-            infer: true,
+            infer: true
         });
         const maxRetriesPerRequest = this.configService.get('redis.maxRetriesPerRequest', { infer: true });
         const connectTimeout = this.configService.getOrThrow('redis.connectTimeout', { infer: true });
@@ -88,7 +88,7 @@ export class BullJobsConnectionFactory {
         this.logger.debug('Creating BullMQ standalone connection', {
             host,
             port,
-            db,
+            db
         });
 
         return {
@@ -98,7 +98,7 @@ export class BullJobsConnectionFactory {
             db,
             maxRetriesPerRequest: maxRetriesPerRequest ?? null, // BullMQ recommends null for workers
             connectTimeout,
-            ...(tlsEnabled && { tls: {} }),
+            ...(tlsEnabled && { tls: {} })
         };
     }
 
@@ -106,12 +106,12 @@ export class BullJobsConnectionFactory {
         const clusterNodes = this.configService.get('redis.clusterNodes', { infer: true }) || [];
         const password = this.configService.get('redis.password', { infer: true });
         const tlsEnabled = this.configService.getOrThrow('redis.tlsEnabled', {
-            infer: true,
+            infer: true
         });
         const connectTimeout = this.configService.getOrThrow('redis.connectTimeout', { infer: true });
 
         this.logger.debug('Creating BullMQ cluster connection', {
-            nodeCount: clusterNodes.length,
+            nodeCount: clusterNodes.length
         });
 
         // For cluster mode, we need to return the first node's config
@@ -126,7 +126,7 @@ export class BullJobsConnectionFactory {
                 password: password || undefined,
                 maxRetriesPerRequest: null,
                 connectTimeout,
-                ...(tlsEnabled && { tls: {} }),
+                ...(tlsEnabled && { tls: {} })
             };
         }
 
@@ -140,7 +140,7 @@ export class BullJobsConnectionFactory {
      */
     getKeyPrefix(): string {
         const basePrefix = this.configService.getOrThrow('redis.keyPrefix', {
-            infer: true,
+            infer: true
         });
         return `${basePrefix}bull:`;
     }

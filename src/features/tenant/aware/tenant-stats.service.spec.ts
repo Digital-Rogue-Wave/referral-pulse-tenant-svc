@@ -34,7 +34,7 @@ describe('TenantStatsService', () => {
         configService.getOrThrow.mockReturnValue({
             campaigns: 'http://campaigns',
             rewards: 'http://rewards',
-            analytics: 'http://analytics',
+            analytics: 'http://analytics'
         });
 
         tenantContext.getTenantId.mockReturnValue(tenantId);
@@ -47,8 +47,8 @@ describe('TenantStatsService', () => {
                 { provide: RedisService, useValue: redisService },
                 { provide: TeamMemberService, useValue: teamMemberService },
                 { provide: TenantContextService, useValue: tenantContext },
-                { provide: AppLoggerService, useValue: logger },
-            ],
+                { provide: AppLoggerService, useValue: logger }
+            ]
         }).compile();
 
         service = module.get<TenantStatsService>(TenantStatsService);
@@ -65,7 +65,7 @@ describe('TenantStatsService', () => {
             totalReferralsThisMonth: 15,
             totalRevenue: 1000,
             pendingPayouts: 200,
-            planUsagePercentage: 50,
+            planUsagePercentage: 50
         };
         redisService.get.mockResolvedValue(cachedStats);
 

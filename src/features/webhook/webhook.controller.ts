@@ -14,7 +14,7 @@ export class WebhookController {
     constructor(
         private readonly tenantService: TenantService,
         private readonly configService: ConfigService,
-        private readonly billingService: BillingService,
+        private readonly billingService: BillingService
     ) {}
 
     @Post('ory/signup')
@@ -34,12 +34,11 @@ export class WebhookController {
 
         // We might want to use company name as tenant name, or user's name if company not present
         const name = traits.name as Record<string, unknown> | undefined;
-        const tenantName =
-            (traits.company_name as string) || (name ? `${name.first} ${name.last}` : undefined) || 'My Organization';
+        const tenantName = (traits.company_name as string) || (name ? `${name.first} ${name.last}` : undefined) || 'My Organization';
 
         await this.tenantService.create({
             name: tenantName,
-            ownerId: userId,
+            ownerId: userId
         });
 
         return { status: 'ok' };

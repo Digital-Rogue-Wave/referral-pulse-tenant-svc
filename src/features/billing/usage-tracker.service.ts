@@ -15,7 +15,7 @@ export class UsageTrackerService {
         private readonly tenantContext: TenantContextService,
         private readonly logger: AppLoggerService,
         private readonly redis: RedisService,
-        private readonly dateService: DateService,
+        private readonly dateService: DateService
     ) {
         this.logger.setContext(UsageTrackerService.name);
     }
@@ -30,8 +30,8 @@ export class UsageTrackerService {
                 tenantId,
                 metricName,
                 periodDate,
-                deletedAt: null,
-            },
+                deletedAt: null
+            }
         });
 
         if (!row) {
@@ -41,8 +41,8 @@ export class UsageTrackerService {
                     metricName,
                     periodDate,
                     currentUsage: 0,
-                    limitValue: null,
-                },
+                    limitValue: null
+                }
             });
         }
 
@@ -62,15 +62,13 @@ export class UsageTrackerService {
             return 0;
         }
 
-        await this.tenantContext.runWithContext({ tenantId }, () =>
-            this.redis.incrementUsage(metricName, amount),
-        );
+        await this.tenantContext.runWithContext({ tenantId }, () => this.redis.incrementUsage(metricName, amount));
 
         const row = await this.getOrCreateUsageRow(tenantId, metricName, periodDate);
 
         const updated = await this.prisma.tenantUsage.update({
             where: { id: row.id },
-            data: { currentUsage: row.currentUsage + amount },
+            data: { currentUsage: row.currentUsage + amount }
         });
 
         return updated.currentUsage;
@@ -89,16 +87,14 @@ export class UsageTrackerService {
             return 0;
         }
 
-        await this.tenantContext.runWithContext({ tenantId }, () =>
-            this.redis.decrementUsage(metricName, amount),
-        );
+        await this.tenantContext.runWithContext({ tenantId }, () => this.redis.decrementUsage(metricName, amount));
 
         const row = await this.getOrCreateUsageRow(tenantId, metricName, periodDate);
         const newUsage = Math.max(0, row.currentUsage - amount);
 
         const updated = await this.prisma.tenantUsage.update({
             where: { id: row.id },
-            data: { currentUsage: newUsage },
+            data: { currentUsage: newUsage }
         });
 
         return updated.currentUsage;
@@ -117,8 +113,8 @@ export class UsageTrackerService {
                 tenantId,
                 metricName,
                 periodDate: date,
-                deletedAt: null,
-            },
+                deletedAt: null
+            }
         });
 
         return row?.currentUsage ?? 0;

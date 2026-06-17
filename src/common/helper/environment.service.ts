@@ -17,7 +17,7 @@ export class EnvironmentService {
 
     constructor(private readonly configService: ConfigService<AllConfigType>) {
         this.nodeEnv = this.configService.getOrThrow('app.nodeEnv', {
-            infer: true,
+            infer: true
         });
     }
 
@@ -81,11 +81,11 @@ export class EnvironmentService {
         if (this.isLocal()) {
             return {
                 accessKeyId: this.configService.getOrThrow('aws.accessKeyId', {
-                    infer: true,
+                    infer: true
                 }),
                 secretAccessKey: this.configService.getOrThrow('aws.secretAccessKey', {
-                    infer: true,
-                }),
+                    infer: true
+                })
             };
         }
         return undefined;
@@ -118,7 +118,7 @@ export class EnvironmentService {
         return {
             region: this.getAwsRegion(),
             endpoint: this.getAwsEndpoint(),
-            credentials: this.getAwsCredentials(),
+            credentials: this.getAwsCredentials()
         };
     }
 }

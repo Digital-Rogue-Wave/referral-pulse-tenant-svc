@@ -10,8 +10,8 @@ export const TEAM_MEMBER_PAGINATE_CONFIG: PaginateConfig<TeamMemberProps> = {
     filterableColumns: {
         role: [FilterOperator.EQ, FilterOperator.IN],
         status: [FilterOperator.EQ, FilterOperator.IN],
-        userId: [FilterOperator.EQ],
+        userId: [FilterOperator.EQ]
     },
     defaultLimit: 10,
-    maxLimit: 100,
+    maxLimit: 100
 };

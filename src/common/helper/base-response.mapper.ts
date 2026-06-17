@@ -152,7 +152,7 @@ export abstract class BaseResponseMapper<TEntity extends object, TResponse exten
  * ```
  */
 export function createMapper<TEntity extends object, TResponse extends object>(
-    responseClass: Class<TResponse>,
+    responseClass: Class<TResponse>
 ): BaseResponseMapper<TEntity, TResponse> {
     return new (class extends BaseResponseMapper<TEntity, TResponse> {
         constructor() {

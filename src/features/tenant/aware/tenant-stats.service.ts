@@ -22,12 +22,12 @@ export class TenantStatsService {
         private readonly redisService: RedisService,
         private readonly teamMemberService: TeamMemberService,
         private readonly tenantContext: TenantContextService,
-        private readonly logger: AppLoggerService,
+        private readonly logger: AppLoggerService
     ) {
         this.logger.setContext(TenantStatsService.name);
 
         const srvCfg = this.configService.getOrThrow<ConfigType<typeof servicesConfig>>('services', {
-            infer: true,
+            infer: true
         });
         this.campaignServiceUrl = srvCfg.campaigns.url;
         this.rewardsServiceUrl = srvCfg.rewards.url;
@@ -52,27 +52,17 @@ export class TenantStatsService {
             totalReferralsThisMonth: 0,
             totalRevenue: 0,
             pendingPayouts: 0,
-            planUsagePercentage: 0,
+            planUsagePercentage: 0
         };
 
         this.logger.log(`Aggregating stats for tenant ${tenantId} from external services`, { tenantId });
 
         const results = await Promise.allSettled([
-            this.httpClient.get<{ count: number }>(
-                `${this.campaignServiceUrl}/internal/tenants/${tenantId}/stats/active-count`,
-            ),
-            this.httpClient.get<{ count: number }>(
-                `${this.analyticsServiceUrl}/internal/tenants/${tenantId}/stats/referrers-count`,
-            ),
-            this.httpClient.get<{ count: number }>(
-                `${this.analyticsServiceUrl}/internal/tenants/${tenantId}/stats/referrals-this-month`,
-            ),
-            this.httpClient.get<{ amount: number }>(
-                `${this.rewardsServiceUrl}/internal/tenants/${tenantId}/stats/total-revenue`,
-            ),
-            this.httpClient.get<{ amount: number }>(
-                `${this.rewardsServiceUrl}/internal/tenants/${tenantId}/stats/pending-payouts`,
-            ),
+            this.httpClient.get<{ count: number }>(`${this.campaignServiceUrl}/internal/tenants/${tenantId}/stats/active-count`),
+            this.httpClient.get<{ count: number }>(`${this.analyticsServiceUrl}/internal/tenants/${tenantId}/stats/referrers-count`),
+            this.httpClient.get<{ count: number }>(`${this.analyticsServiceUrl}/internal/tenants/${tenantId}/stats/referrals-this-month`),
+            this.httpClient.get<{ amount: number }>(`${this.rewardsServiceUrl}/internal/tenants/${tenantId}/stats/total-revenue`),
+            this.httpClient.get<{ amount: number }>(`${this.rewardsServiceUrl}/internal/tenants/${tenantId}/stats/pending-payouts`)
         ]);
 
         if (results[0].status === 'fulfilled') {

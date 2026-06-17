@@ -1,13 +1,5 @@
 import { Controller, Post, Body, HttpCode, HttpStatus, UseInterceptors, UploadedFile } from '@nestjs/common';
-import {
-    ApiBody,
-    ApiConsumes,
-    ApiCreatedResponse,
-    ApiExtraModels,
-    ApiTags,
-    getSchemaPath,
-    ApiBearerAuth,
-} from '@nestjs/swagger';
+import { ApiBody, ApiConsumes, ApiCreatedResponse, ApiExtraModels, ApiTags, getSchemaPath, ApiBearerAuth } from '@nestjs/swagger';
 import { FileInterceptor } from '@nestjs/platform-express';
 
 import { ParseFormdataPipe } from '@common/pipes/parse-formdata.pipe';
@@ -35,24 +27,24 @@ export class AgnosticTenantController {
             properties: {
                 file: {
                     type: 'string',
-                    format: 'binary',
+                    format: 'binary'
                 },
                 data: {
-                    $ref: getSchemaPath(CreateTenantDto),
-                },
-            },
-        },
+                    $ref: getSchemaPath(CreateTenantDto)
+                }
+            }
+        }
     })
     @ApiCreatedResponse({
         type: TenantResponse,
-        description: 'The tenant has been successfully created',
+        description: 'The tenant has been successfully created'
     })
     @UseInterceptors(FileInterceptor('file'))
     @HttpCode(HttpStatus.CREATED)
     async create(
         @CurrentUser() user: IAuthenticatedUser,
         @Body('data', ParseFormdataPipe) data: CreateTenantDto,
-        @UploadedFile() file?: Express.Multer.File | Express.MulterS3.File,
+        @UploadedFile() file?: Express.Multer.File | Express.MulterS3.File
     ): Promise<TenantResponse> {
         // Override ownerId with authenticated user
         data.ownerId = user.userId;

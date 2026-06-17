@@ -6,6 +6,6 @@ import { SubdomainService } from './subdomain.service';
 
 @Module({
     providers: [DnsVerificationService, DomainProvisioningService, SubdomainService],
-    exports: [DnsVerificationService, DomainProvisioningService, SubdomainService],
+    exports: [DnsVerificationService, DomainProvisioningService, SubdomainService]
 })
 export class DnsModule {}

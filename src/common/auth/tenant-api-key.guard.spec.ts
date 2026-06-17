@@ -25,41 +25,41 @@ describe('TenantApiKeyGuard', () => {
                 {
                     provide: Reflector,
                     useValue: {
-                        getAllAndOverride: jest.fn(),
-                    },
+                        getAllAndOverride: jest.fn()
+                    }
                 },
                 {
                     provide: RedisService,
                     useValue: {
                         get: jest.fn(),
-                        set: jest.fn(),
-                    },
+                        set: jest.fn()
+                    }
                 },
                 {
                     provide: RedisKeyBuilder,
                     useValue: {
-                        buildGlobalKey: jest.fn().mockReturnValue('api-key:test'),
-                    },
+                        buildGlobalKey: jest.fn().mockReturnValue('api-key:test')
+                    }
                 },
                 {
                     provide: TenantContextService,
                     useValue: {
-                        set: jest.fn(),
-                    },
+                        set: jest.fn()
+                    }
                 },
                 {
                     provide: HttpClientService,
                     useValue: {
-                        get: jest.fn(),
-                    },
+                        get: jest.fn()
+                    }
                 },
                 {
                     provide: ConfigService,
                     useValue: {
-                        getOrThrow: jest.fn().mockReturnValue('http://tenant-service'),
-                    },
-                },
-            ],
+                        getOrThrow: jest.fn().mockReturnValue('http://tenant-service')
+                    }
+                }
+            ]
         }).compile();
 
         guard = module.get<TenantApiKeyGuard>(TenantApiKeyGuard);
@@ -77,7 +77,7 @@ describe('TenantApiKeyGuard', () => {
         jest.spyOn(reflector, 'getAllAndOverride').mockReturnValue(false);
         const context = {
             getHandler: jest.fn(),
-            getClass: jest.fn(),
+            getClass: jest.fn()
         } as unknown as ExecutionContext;
 
         expect(await guard.canActivate(context)).toBe(true);
@@ -90,9 +90,9 @@ describe('TenantApiKeyGuard', () => {
             getClass: jest.fn(),
             switchToHttp: jest.fn().mockReturnValue({
                 getRequest: jest.fn().mockReturnValue({
-                    headers: {},
-                }),
-            }),
+                    headers: {}
+                })
+            })
         } as unknown as ExecutionContext;
 
         await expect(guard.canActivate(context)).rejects.toThrow(UnauthorizedException);
@@ -107,9 +107,9 @@ describe('TenantApiKeyGuard', () => {
             getClass: jest.fn(),
             switchToHttp: jest.fn().mockReturnValue({
                 getRequest: jest.fn().mockReturnValue({
-                    headers: { 'x-tenant-api-key': mockApiKey },
-                }),
-            }),
+                    headers: { 'x-tenant-api-key': mockApiKey }
+                })
+            })
         } as unknown as ExecutionContext;
 
         expect(await guard.canActivate(context)).toBe(true);
@@ -123,7 +123,7 @@ describe('TenantApiKeyGuard', () => {
             data: { tenantId: mockTenantId },
             status: 200,
             headers: {},
-            duration: 10,
+            duration: 10
         } as any);
 
         const context = {
@@ -131,9 +131,9 @@ describe('TenantApiKeyGuard', () => {
             getClass: jest.fn(),
             switchToHttp: jest.fn().mockReturnValue({
                 getRequest: jest.fn().mockReturnValue({
-                    headers: { 'x-tenant-api-key': mockApiKey },
-                }),
-            }),
+                    headers: { 'x-tenant-api-key': mockApiKey }
+                })
+            })
         } as unknown as ExecutionContext;
 
         expect(await guard.canActivate(context)).toBe(true);

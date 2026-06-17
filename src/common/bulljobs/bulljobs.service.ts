@@ -20,7 +20,7 @@ export class BullJobsService implements OnModuleDestroy {
     constructor(
         private readonly connectionFactory: BullJobsConnectionFactory,
         private readonly logger: AppLoggerService,
-        private readonly tenantContext: TenantContextService,
+        private readonly tenantContext: TenantContextService
     ) {
         this.logger.setContext(BullJobsService.name);
     }
@@ -45,7 +45,7 @@ export class BullJobsService implements OnModuleDestroy {
             const queue = new Queue<T>(queueName, {
                 connection,
                 prefix,
-                defaultJobOptions: this.getDefaultJobOptions(),
+                defaultJobOptions: this.getDefaultJobOptions()
             });
 
             this.queues.set(queueName, queue);
@@ -63,22 +63,17 @@ export class BullJobsService implements OnModuleDestroy {
             attempts: 3,
             backoff: {
                 type: 'exponential',
-                delay: 1000, // Start with 1 second
+                delay: 1000 // Start with 1 second
             },
             removeOnComplete: 100, // Keep last 100 completed jobs
-            removeOnFail: 500, // Keep last 500 failed jobs for debugging
+            removeOnFail: 500 // Keep last 500 failed jobs for debugging
         };
     }
 
     /**
      * Add a job to a queue with tenant context
      */
-    async addJob<T extends IBaseJobData>(
-        queueName: string,
-        jobName: string,
-        data: T,
-        options?: IJobOptions,
-    ): Promise<Job<T>> {
+    async addJob<T extends IBaseJobData>(queueName: string, jobName: string, data: T, options?: IJobOptions): Promise<Job<T>> {
         const queue = this.getQueue<T>(queueName);
 
         // Enrich job data with tenant context
@@ -88,20 +83,20 @@ export class BullJobsService implements OnModuleDestroy {
             userId: data.userId || this.tenantContext.getUserId(),
             correlationId: data.correlationId || this.tenantContext.getCorrelationId(),
             traceId: data.traceId || this.tenantContext.getTraceId(),
-            spanId: data.spanId || this.tenantContext.getSpanId(),
+            spanId: data.spanId || this.tenantContext.getSpanId()
         };
 
         // eslint-disable-next-line @typescript-eslint/no-explicit-any -- BullMQ's ExtractNameType doesn't accept plain string
         const job = await queue.add(jobName as any, enrichedData as any, {
             ...this.getDefaultJobOptions(),
-            ...options,
+            ...options
         });
 
         this.logger.debug(`✅ Job added to queue ${queueName}`, {
             queueName,
             jobName,
             jobId: job.id,
-            tenantId: enrichedData.tenantId,
+            tenantId: enrichedData.tenantId
         });
 
         return job;
@@ -110,10 +105,7 @@ export class BullJobsService implements OnModuleDestroy {
     /**
      * Add multiple jobs in bulk (more efficient)
      */
-    async addBulk<T extends IBaseJobData>(
-        queueName: string,
-        jobs: Array<{ name: string; data: T; options?: IJobOptions }>,
-    ): Promise<Job<T>[]> {
+    async addBulk<T extends IBaseJobData>(queueName: string, jobs: Array<{ name: string; data: T; options?: IJobOptions }>): Promise<Job<T>[]> {
         const queue = this.getQueue<T>(queueName);
 
         const enrichedJobs = jobs.map((job) => ({
@@ -122,12 +114,12 @@ export class BullJobsService implements OnModuleDestroy {
                 ...job.data,
                 tenantId: job.data.tenantId || this.tenantContext.getTenantId(),
                 userId: job.data.userId || this.tenantContext.getUserId(),
-                correlationId: job.data.correlationId || this.tenantContext.getCorrelationId(),
+                correlationId: job.data.correlationId || this.tenantContext.getCorrelationId()
             } as T,
             opts: {
                 ...this.getDefaultJobOptions(),
-                ...job.options,
-            },
+                ...job.options
+            }
         }));
 
         // eslint-disable-next-line @typescript-eslint/no-explicit-any -- BullMQ's ExtractNameType doesn't accept plain string
@@ -135,7 +127,7 @@ export class BullJobsService implements OnModuleDestroy {
 
         this.logger.log(`✅ Added ${jobs.length} jobs to queue ${queueName}`, {
             queueName,
-            count: jobs.length,
+            count: jobs.length
         });
 
         return addedJobs;
@@ -149,11 +141,11 @@ export class BullJobsService implements OnModuleDestroy {
         jobName: string,
         data: T,
         delayMs: number,
-        options?: IJobOptions,
+        options?: IJobOptions
     ): Promise<Job<T>> {
         return this.addJob(queueName, jobName, data, {
             ...options,
-            delay: delayMs,
+            delay: delayMs
         });
     }
 
@@ -169,11 +161,11 @@ export class BullJobsService implements OnModuleDestroy {
             every?: number; // Repeat every X milliseconds
             limit?: number; // Max number of times to repeat
         },
-        options?: IJobOptions,
+        options?: IJobOptions
     ): Promise<Job<T>> {
         return this.addJob(queueName, jobName, data, {
             ...options,
-            repeat: repeatOptions,
+            repeat: repeatOptions
         });
     }
 
@@ -231,18 +223,14 @@ export class BullJobsService implements OnModuleDestroy {
             completed: counts.completed || 0,
             failed: counts.failed || 0,
             delayed: counts.delayed || 0,
-            paused: counts.paused || 0,
+            paused: counts.paused || 0
         };
     }
 
     /**
      * Get failed jobs
      */
-    async getFailedJobs<T extends IBaseJobData = IBaseJobData>(
-        queueName: string,
-        start = 0,
-        end = 10,
-    ): Promise<Job<T>[]> {
+    async getFailedJobs<T extends IBaseJobData = IBaseJobData>(queueName: string, start = 0, end = 10): Promise<Job<T>[]> {
         const queue = this.getQueue<T>(queueName);
         return queue.getFailed(start, end);
     }
@@ -250,11 +238,7 @@ export class BullJobsService implements OnModuleDestroy {
     /**
      * Get completed jobs
      */
-    async getCompletedJobs<T extends IBaseJobData = IBaseJobData>(
-        queueName: string,
-        start = 0,
-        end = 10,
-    ): Promise<Job<T>[]> {
+    async getCompletedJobs<T extends IBaseJobData = IBaseJobData>(queueName: string, start = 0, end = 10): Promise<Job<T>[]> {
         const queue = this.getQueue<T>(queueName);
         return queue.getCompleted(start, end);
     }
@@ -262,11 +246,7 @@ export class BullJobsService implements OnModuleDestroy {
     /**
      * Get waiting jobs
      */
-    async getWaitingJobs<T extends IBaseJobData = IBaseJobData>(
-        queueName: string,
-        start = 0,
-        end = 10,
-    ): Promise<Job<T>[]> {
+    async getWaitingJobs<T extends IBaseJobData = IBaseJobData>(queueName: string, start = 0, end = 10): Promise<Job<T>[]> {
         const queue = this.getQueue<T>(queueName);
         return queue.getWaiting(start, end);
     }
@@ -274,11 +254,7 @@ export class BullJobsService implements OnModuleDestroy {
     /**
      * Get active jobs
      */
-    async getActiveJobs<T extends IBaseJobData = IBaseJobData>(
-        queueName: string,
-        start = 0,
-        end = 10,
-    ): Promise<Job<T>[]> {
+    async getActiveJobs<T extends IBaseJobData = IBaseJobData>(queueName: string, start = 0, end = 10): Promise<Job<T>[]> {
         const queue = this.getQueue<T>(queueName);
         return queue.getActive(start, end);
     }
@@ -290,7 +266,7 @@ export class BullJobsService implements OnModuleDestroy {
         queueName: string,
         grace: number = 3600000, // 1 hour in ms
         limit: number = 1000,
-        type: 'completed' | 'failed' = 'completed',
+        type: 'completed' | 'failed' = 'completed'
     ): Promise<string[]> {
         const queue = this.getQueue(queueName);
         const cleaned = await queue.clean(grace, limit, type);
@@ -298,7 +274,7 @@ export class BullJobsService implements OnModuleDestroy {
         this.logger.log(`🧹 Cleaned ${cleaned.length} ${type} jobs from queue ${queueName}`, {
             queueName,
             type,
-            count: cleaned.length,
+            count: cleaned.length
         });
 
         return cleaned;

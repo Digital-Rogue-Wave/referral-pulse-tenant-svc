@@ -27,7 +27,7 @@ export class MessageProcessorService {
         private readonly envelopeService: MessageEnvelopeService,
         private readonly tenantContext: TenantContextService,
         private readonly logger: AppLoggerService,
-        private readonly messagingMetrics: MessagingMetricsService,
+        private readonly messagingMetrics: MessagingMetricsService
     ) {
         this.logger.setContext(MessageProcessorService.name);
     }
@@ -53,7 +53,7 @@ export class MessageProcessorService {
         options?: {
             queueName?: string;
             skipIdempotency?: boolean;
-        },
+        }
     ): Promise<void> {
         const startTime = Date.now();
 
@@ -108,19 +108,14 @@ export class MessageProcessorService {
         this.recordMetrics(envelope, options?.queueName, isDuplicate, Date.now() - startTime);
     }
 
-    private recordMetrics(
-        envelope: IMessageEnvelope,
-        queueName?: string,
-        isDuplicate?: boolean,
-        durationMs?: number,
-    ): void {
+    private recordMetrics(envelope: IMessageEnvelope, queueName?: string, isDuplicate?: boolean, durationMs?: number): void {
         const queue = queueName || (envelope.metadata?.queueName as string) || 'unknown';
         this.messagingMetrics.recordInboundMessage(
             queue,
             envelope.eventType,
             !isDuplicate, // success = not a duplicate
             durationMs || 0,
-            envelope.tenantId,
+            envelope.tenantId
         );
     }
 }

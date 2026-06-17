@@ -45,6 +45,6 @@ export default registerAs<ClickHouseConfig>('clickhouse', () => {
         user: process.env.CLICKHOUSE_USER || 'default',
         pass: process.env.CLICKHOUSE_PASSWORD || '',
         db: process.env.CLICKHOUSE_DATABASE || 'default',
-        protocol: process.env.CLICKHOUSE_PROTOCOL || 'http',
+        protocol: process.env.CLICKHOUSE_PROTOCOL || 'http'
     };
 });

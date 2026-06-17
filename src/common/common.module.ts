@@ -43,7 +43,7 @@ import { TenantAwareModule } from './tenant-aware/tenant-aware.module';
         CurrencyModule,
         ClientsModule,
         IdempotencyModule,
-        EventsModule,
+        EventsModule
     ],
     providers: [],
     exports: [
@@ -63,7 +63,7 @@ import { TenantAwareModule } from './tenant-aware/tenant-aware.module';
         CurrencyModule,
         ClientsModule,
         IdempotencyModule,
-        EventsModule,
-    ],
+        EventsModule
+    ]
 })
 export class CommonModule {}

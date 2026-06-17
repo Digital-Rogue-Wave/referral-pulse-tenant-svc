@@ -59,6 +59,6 @@ export default registerAs<StripeConfig>('stripeConfig', () => {
         starterPriceId: process.env.STRIPE_STARTER_PRICE_ID,
         growthPriceId: process.env.STRIPE_GROWTH_PRICE_ID,
         enterprisePriceId: process.env.STRIPE_ENTERPRISE_PRICE_ID,
-        webhookSecret: process.env.STRIPE_WEBHOOK_SECRET,
+        webhookSecret: process.env.STRIPE_WEBHOOK_SECRET
     };
 });

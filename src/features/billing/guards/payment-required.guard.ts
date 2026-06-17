@@ -9,7 +9,7 @@ import { PaymentStatusEnum } from '@common/enums/billing.enum';
 export class PaymentRequiredGuard implements CanActivate {
     constructor(
         private readonly tenantService: TenantService,
-        private readonly tenantContext: TenantContextService,
+        private readonly tenantContext: TenantContextService
     ) {}
 
     async canActivate(_context: ExecutionContext): Promise<boolean> {
@@ -26,11 +26,7 @@ export class PaymentRequiredGuard implements CanActivate {
         }
 
         if (tenant.paymentStatus === PaymentStatusEnum.LOCKED) {
-            throw new BaseException(
-                'PAYMENT_REQUIRED' as ErrorCode,
-                'Payment is required to access this resource.',
-                HttpStatus.PAYMENT_REQUIRED,
-            );
+            throw new BaseException('PAYMENT_REQUIRED' as ErrorCode, 'Payment is required to access this resource.', HttpStatus.PAYMENT_REQUIRED);
         }
 
         return true;

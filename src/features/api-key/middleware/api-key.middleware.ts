@@ -8,7 +8,7 @@ import { ApiKeyService } from '../api-key.service';
 export class ApiKeyMiddleware implements NestMiddleware {
     constructor(
         private readonly apiKeyService: ApiKeyService,
-        private readonly tenantContext: TenantContextService,
+        private readonly tenantContext: TenantContextService
     ) {}
 
     async use(req: Request, res: Response, next: NextFunction) {
@@ -33,7 +33,7 @@ export class ApiKeyMiddleware implements NestMiddleware {
                 id: apiKey.createdBy,
                 tenantId: apiKey.tenantId,
                 viaApiKey: true,
-                scopes: apiKey.scopes,
+                scopes: apiKey.scopes
             };
         }
 

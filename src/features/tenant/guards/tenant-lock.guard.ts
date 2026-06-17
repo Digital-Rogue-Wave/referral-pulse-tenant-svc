@@ -11,7 +11,7 @@ import { TenantService } from '../tenant.service';
 export class TenantLockGuard implements CanActivate {
     constructor(
         private readonly tenantService: TenantService,
-        private readonly tenantContext: TenantContextService,
+        private readonly tenantContext: TenantContextService
     ) {}
 
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
@@ -33,7 +33,7 @@ export class TenantLockGuard implements CanActivate {
                 'TENANT_LOCKED' as ErrorCode,
                 'This account has been locked. Please unlock it using your password.',
                 HttpStatus.FORBIDDEN,
-                { lockedAt: tenant.lockedAt, lockUntil: tenant.lockUntil, reason: tenant.lockReason },
+                { lockedAt: tenant.lockedAt, lockUntil: tenant.lockUntil, reason: tenant.lockReason }
             );
         }
 

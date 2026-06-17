@@ -18,6 +18,6 @@ import { TenantAwareService } from './tenant-aware.service';
 @Global()
 @Module({
     providers: [DateService, TenantContextService, TenantAwareService],
-    exports: [TenantContextService, TenantAwareService],
+    exports: [TenantContextService, TenantAwareService]
 })
 export class TenantAwareModule {}

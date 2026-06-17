@@ -15,7 +15,7 @@ export class TenantCreatedEvent extends BaseDomainEvent {
         public readonly ownerId: string,
         public readonly trialStartedAt: Date,
         public readonly trialEndsAt: Date,
-        public readonly userId?: string,
+        public readonly userId?: string
     ) {
         super();
     }
@@ -28,7 +28,7 @@ export class TenantUpdatedEvent extends BaseDomainEvent {
         public readonly aggregateId: string,
         public readonly tenantId: string,
         public readonly changes: Record<string, { from: unknown; to: unknown }>,
-        public readonly userId?: string,
+        public readonly userId?: string
     ) {
         super();
     }
@@ -42,7 +42,7 @@ export class TenantDeletedEvent extends BaseDomainEvent {
         public readonly tenantId: string,
         public readonly name: string,
         public readonly slug: string,
-        public readonly userId?: string,
+        public readonly userId?: string
     ) {
         super();
     }
@@ -56,7 +56,7 @@ export class TenantSuspendedEvent extends BaseDomainEvent {
         public readonly tenantId: string,
         public readonly reason: string,
         public readonly suspendedAt: Date,
-        public readonly userId?: string,
+        public readonly userId?: string
     ) {
         super();
     }
@@ -69,7 +69,7 @@ export class TenantUnsuspendedEvent extends BaseDomainEvent {
         public readonly aggregateId: string,
         public readonly tenantId: string,
         public readonly unsuspendedAt: Date,
-        public readonly userId?: string,
+        public readonly userId?: string
     ) {
         super();
     }
@@ -84,7 +84,7 @@ export class TenantLockedEvent extends BaseDomainEvent {
         public readonly reason: string,
         public readonly lockedAt: Date,
         public readonly lockUntil?: Date,
-        public readonly userId?: string,
+        public readonly userId?: string
     ) {
         super();
     }
@@ -98,7 +98,7 @@ export class TenantUnlockedEvent extends BaseDomainEvent {
         public readonly tenantId: string,
         public readonly unlockedBy: string,
         public readonly unlockedAt: Date,
-        public readonly userId?: string,
+        public readonly userId?: string
     ) {
         super();
     }
@@ -113,7 +113,7 @@ export class TenantDeletionScheduledEvent extends BaseDomainEvent {
         public readonly scheduledAt: Date,
         public readonly executionDate: Date,
         public readonly reason: string,
-        public readonly userId?: string,
+        public readonly userId?: string
     ) {
         super();
     }
@@ -126,7 +126,7 @@ export class TenantDeletionCancelledEvent extends BaseDomainEvent {
         public readonly aggregateId: string,
         public readonly tenantId: string,
         public readonly cancelledAt: Date,
-        public readonly userId?: string,
+        public readonly userId?: string
     ) {
         super();
     }
@@ -141,7 +141,7 @@ export class TenantOwnershipTransferredEvent extends BaseDomainEvent {
         public readonly oldOwnerId: string,
         public readonly newOwnerId: string,
         public readonly transferredAt: Date,
-        public readonly userId?: string,
+        public readonly userId?: string
     ) {
         super();
     }
@@ -155,7 +155,7 @@ export class TenantDomainVerifiedEvent extends BaseDomainEvent {
         public readonly tenantId: string,
         public readonly domain: string,
         public readonly verifiedAt: Date,
-        public readonly userId?: string,
+        public readonly userId?: string
     ) {
         super();
     }
@@ -176,5 +176,5 @@ export const TenantEvents = {
     DELETION_SCHEDULED: 'tenant.deletion-scheduled',
     DELETION_CANCELLED: 'tenant.deletion-cancelled',
     OWNERSHIP_TRANSFERRED: 'tenant.ownership-transferred',
-    DOMAIN_VERIFIED: 'tenant.domain-verified',
+    DOMAIN_VERIFIED: 'tenant.domain-verified'
 } as const;

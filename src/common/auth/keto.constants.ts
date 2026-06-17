@@ -4,7 +4,7 @@ export const KETO_PERMISSION_KEY = 'keto_permission';
 
 export enum KetoNamespace {
     ROLE = 'role',
-    TENANT = 'tenants',
+    TENANT = 'tenants'
 }
 
 /**
@@ -17,7 +17,7 @@ export enum KetoRelation {
     CREATE = 'create',
     READ = 'read',
     UPDATE = 'update',
-    DELETE = 'delete',
+    DELETE = 'delete'
 }
 
 /** Role namespace relation: role:admin#assigned@user:123 */
@@ -31,5 +31,5 @@ export enum KetoResource {
     API_KEY = 'api_key',
     BILLING = 'billing',
     PLANS = 'plans',
-    SETTINGS = 'settings',
+    SETTINGS = 'settings'
 }

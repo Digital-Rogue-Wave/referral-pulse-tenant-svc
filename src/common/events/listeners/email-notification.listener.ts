@@ -27,7 +27,7 @@ export class EmailNotificationListener {
     constructor(
         private readonly sideEffectService: SideEffectService,
         private readonly logger: AppLoggerService,
-        private readonly redisKeyBuilder: RedisKeyBuilder,
+        private readonly redisKeyBuilder: RedisKeyBuilder
     ) {
         this.logger.setContext(EmailNotificationListener.name);
     }
@@ -54,28 +54,24 @@ export class EmailNotificationListener {
                         eventId: event.eventId,
                         aggregateId: event.aggregateId,
                         tenantId: event.tenantId,
-                        ...event.metadata,
-                    },
+                        ...event.metadata
+                    }
                 },
                 {
                     critical: false,
-                    idempotencyKey: this.redisKeyBuilder.buildIdempotencyKey(`email-${event.eventId}`),
-                },
+                    idempotencyKey: this.redisKeyBuilder.buildIdempotencyKey(`email-${event.eventId}`)
+                }
             );
 
             this.logger.log(`Email queued: ${event.subject}`, {
                 eventId: event.eventId,
-                to: event.to,
+                to: event.to
             });
         } catch (error) {
-            this.logger.error(
-                `Failed to queue email (check DLQ): ${event.subject}`,
-                error instanceof Error ? error.stack : undefined,
-                {
-                    eventId: event.eventId,
-                    to: event.to,
-                },
-            );
+            this.logger.error(`Failed to queue email (check DLQ): ${event.subject}`, error instanceof Error ? error.stack : undefined, {
+                eventId: event.eventId,
+                to: event.to
+            });
         }
     }
 
@@ -97,32 +93,28 @@ export class EmailNotificationListener {
                         invitationToken: event.payload.token,
                         tenantId: event.payload.tenantId,
                         role: event.payload.role,
-                        expiresAt: event.payload.expiresAt,
+                        expiresAt: event.payload.expiresAt
                     },
                     metadata: {
                         eventId: event.eventId,
                         aggregateId: event.aggregateId,
-                        tenantId: event.tenantId,
-                    },
+                        tenantId: event.tenantId
+                    }
                 },
                 {
                     critical: false,
-                    idempotencyKey: this.redisKeyBuilder.buildIdempotencyKey(`invitation-email-${event.aggregateId}`),
-                },
+                    idempotencyKey: this.redisKeyBuilder.buildIdempotencyKey(`invitation-email-${event.aggregateId}`)
+                }
             );
 
             this.logger.log(`Invitation email queued: ${event.payload.email}`, {
                 invitationId: event.aggregateId,
-                email: event.payload.email,
+                email: event.payload.email
             });
         } catch (error) {
-            this.logger.error(
-                `Failed to queue invitation email: ${event.payload.email}`,
-                error instanceof Error ? error.stack : undefined,
-                {
-                    invitationId: event.aggregateId,
-                },
-            );
+            this.logger.error(`Failed to queue invitation email: ${event.payload.email}`, error instanceof Error ? error.stack : undefined, {
+                invitationId: event.aggregateId
+            });
         }
     }
 
@@ -142,34 +134,30 @@ export class EmailNotificationListener {
                     templateId: 'invitation-resent-email',
                     templateData: {
                         tenantId: event.payload.tenantId,
-                        newExpiresAt: event.payload.newExpiresAt,
+                        newExpiresAt: event.payload.newExpiresAt
                     },
                     metadata: {
                         eventId: event.eventId,
                         aggregateId: event.aggregateId,
-                        tenantId: event.tenantId,
-                    },
+                        tenantId: event.tenantId
+                    }
                 },
                 {
                     critical: false,
                     idempotencyKey: this.redisKeyBuilder.buildIdempotencyKey(
-                        `invitation-resent-email-${event.aggregateId}-${event.payload.resentAt.getTime()}`,
-                    ),
-                },
+                        `invitation-resent-email-${event.aggregateId}-${event.payload.resentAt.getTime()}`
+                    )
+                }
             );
 
             this.logger.log(`Invitation resent email queued: ${event.payload.email}`, {
                 invitationId: event.aggregateId,
-                email: event.payload.email,
+                email: event.payload.email
             });
         } catch (error) {
-            this.logger.error(
-                `Failed to queue invitation resent email`,
-                error instanceof Error ? error.stack : undefined,
-                {
-                    invitationId: event.aggregateId,
-                },
-            );
+            this.logger.error(`Failed to queue invitation resent email`, error instanceof Error ? error.stack : undefined, {
+                invitationId: event.aggregateId
+            });
         }
     }
 }

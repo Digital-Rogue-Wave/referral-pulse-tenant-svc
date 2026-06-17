@@ -11,7 +11,7 @@ import {
     prismaPaginate,
     CursorPaginated,
     CursorPaginateQuery,
-    prismaCursorPaginate,
+    prismaCursorPaginate
 } from '@app/common/nestjs-prisma-pagination';
 import { CURRENCY_PAGINATE_CONFIG } from './currency.pagination';
 
@@ -27,13 +27,13 @@ export class CurrencyService implements BaseService<
 
     async create(createDto: Prisma.CurrencyCreateInput): Promise<CurrencyModel> {
         return this.prisma.currency.create({
-            data: createDto,
+            data: createDto
         });
     }
 
     async list(query: PaginateQuery<CurrencyModel>): Promise<Paginated<CurrencyModel>> {
         return prismaPaginate(query, this.prisma.currency, CURRENCY_PAGINATE_CONFIG, {
-            deletedAt: null,
+            deletedAt: null
         });
     }
 
@@ -43,7 +43,7 @@ export class CurrencyService implements BaseService<
      */
     async listCursor(query: CursorPaginateQuery<CurrencyModel>): Promise<CursorPaginated<CurrencyModel>> {
         return prismaCursorPaginate(query, this.prisma.currency, CURRENCY_PAGINATE_CONFIG, {
-            deletedAt: null,
+            deletedAt: null
         });
     }
 
@@ -53,32 +53,32 @@ export class CurrencyService implements BaseService<
 
     async readOne(field: Prisma.CurrencyWhereUniqueInput): Promise<NullableType<CurrencyModel>> {
         return this.prisma.currency.findUnique({
-            where: field,
+            where: field
         });
     }
 
     async readOneOrFail(field: Prisma.CurrencyWhereInput): Promise<CurrencyModel> {
         return this.prisma.currency.findFirstOrThrow({
-            where: field,
+            where: field
         });
     }
 
     async updateById(code: string, data: Prisma.CurrencyUpdateInput): Promise<CurrencyModel> {
         return this.prisma.currency.update({
             where: { code },
-            data,
+            data
         });
     }
 
     async deleteById(code: string): Promise<CurrencyModel> {
         return this.prisma.currency.delete({
-            where: { code },
+            where: { code }
         });
     }
 
     async getTotal(where?: Prisma.CurrencyWhereInput): Promise<number> {
         return this.prisma.currency.count({
-            where,
+            where
         });
     }
 }

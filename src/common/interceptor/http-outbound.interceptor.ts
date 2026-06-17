@@ -34,7 +34,7 @@ export class HttpOutboundInterceptor implements OnModuleInit {
         private readonly httpMetrics: HttpMetricsService,
         private readonly tenantContext: TenantContextService,
         private readonly logger: AppLoggerService,
-        private readonly dateService: DateService,
+        private readonly dateService: DateService
     ) {
         this.logger.setContext(HttpOutboundInterceptor.name);
 
@@ -48,13 +48,13 @@ export class HttpOutboundInterceptor implements OnModuleInit {
         // Request interceptor
         axiosInstance.interceptors.request.use(
             (config) => this.handleRequest(config),
-            (error) => this.handleRequestError(error),
+            (error) => this.handleRequestError(error)
         );
 
         // Response interceptor
         axiosInstance.interceptors.response.use(
             (response) => this.handleResponse(response),
-            (error) => this.handleResponseError(error),
+            (error) => this.handleResponseError(error)
         );
 
         this.logger.log('HTTP Outbound Interceptor initialized');
@@ -97,7 +97,7 @@ export class HttpOutboundInterceptor implements OnModuleInit {
                 this.logger.debug(`Forwarding JWT to internal service: ${serviceName}`, {
                     url,
                     serviceName,
-                    tenantId,
+                    tenantId
                 });
             }
         } else {
@@ -107,7 +107,7 @@ export class HttpOutboundInterceptor implements OnModuleInit {
             this.logger.debug(`External service call (JWT stripped): ${serviceName}`, {
                 url,
                 serviceName,
-                tenantId,
+                tenantId
             });
         }
 
@@ -116,7 +116,7 @@ export class HttpOutboundInterceptor implements OnModuleInit {
             url,
             serviceName,
             isInternal,
-            tenantId,
+            tenantId
         });
 
         return config;
@@ -147,13 +147,7 @@ export class HttpOutboundInterceptor implements OnModuleInit {
         // Record metrics
         try {
             const parsedUrl = new URL(url);
-            this.httpMetrics.recordOutboundRequest(
-                method,
-                parsedUrl.hostname,
-                parsedUrl.pathname,
-                response.status,
-                duration,
-            );
+            this.httpMetrics.recordOutboundRequest(method, parsedUrl.hostname, parsedUrl.pathname, response.status, duration);
         } catch {
             // URL parsing failed, skip metrics
         }
@@ -164,7 +158,7 @@ export class HttpOutboundInterceptor implements OnModuleInit {
             serviceName,
             status: response.status,
             duration,
-            tenantId,
+            tenantId
         });
 
         return response;
@@ -191,12 +185,7 @@ export class HttpOutboundInterceptor implements OnModuleInit {
             this.httpMetrics.recordOutboundRequest(method, parsedUrl.hostname, parsedUrl.pathname, status, duration);
 
             // Record error metrics
-            this.httpMetrics.recordOutboundError(
-                method,
-                parsedUrl.hostname,
-                parsedUrl.pathname,
-                error.code || 'UNKNOWN_ERROR',
-            );
+            this.httpMetrics.recordOutboundError(method, parsedUrl.hostname, parsedUrl.pathname, error.code || 'UNKNOWN_ERROR');
         } catch {
             // URL parsing failed, skip metrics
         }
@@ -209,7 +198,7 @@ export class HttpOutboundInterceptor implements OnModuleInit {
             errorMessage: error.message,
             code: error.code,
             duration,
-            tenantId,
+            tenantId
         });
 
         return Promise.reject(error);

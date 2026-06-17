@@ -4,13 +4,7 @@ import { RequirePermission } from '@common/auth/require-permission.decorator';
 import { KetoNamespace, KetoRelation, KetoResource } from '@common/auth/keto.constants';
 import { Idempotent, IdempotencyScope } from '@common/idempotency';
 import { AppLoggerService } from '@common/logging/app-logger.service';
-import {
-    Paginate,
-    PaginateQuery,
-    Paginated,
-    ApiPaginationQuery,
-    FilterOperator,
-} from '@common/nestjs-prisma-pagination';
+import { Paginate, PaginateQuery, Paginated, ApiPaginationQuery, FilterOperator } from '@common/nestjs-prisma-pagination';
 
 import { CreatePlanDto, UpdatePlanDto, PlanDto } from '@domains/billing';
 
@@ -23,13 +17,13 @@ import { NullableType } from '@app/types';
     name: 'tenant-id',
     required: true,
     description: 'Tenant-Id header',
-    schema: { type: 'string' },
+    schema: { type: 'string' }
 })
 @Controller({ path: 'billings/admin/plans', version: '1' })
 export class PlanAdminController {
     constructor(
         private readonly planService: PlanService,
-        private readonly logger: AppLoggerService,
+        private readonly logger: AppLoggerService
     ) {
         this.logger.setContext(PlanAdminController.name);
     }
@@ -37,7 +31,7 @@ export class PlanAdminController {
     @ApiBody({ type: CreatePlanDto })
     @ApiCreatedResponse({
         description: 'Plan created successfully',
-        type: PlanDto,
+        type: PlanDto
     })
     @RequirePermission({ namespace: KetoNamespace.TENANT, object: KetoResource.PLANS, relation: KetoRelation.CREATE })
     @Idempotent({ scope: IdempotencyScope.Tenant, ttl: 3600 })
@@ -51,11 +45,11 @@ export class PlanAdminController {
         sortableColumns: ['name', 'createdAt', 'isActive'],
         filterableColumns: {
             name: [FilterOperator.EQ, FilterOperator.CONTAINS],
-            isActive: [FilterOperator.EQ],
+            isActive: [FilterOperator.EQ]
         },
         searchableColumns: ['name'],
         defaultLimit: 20,
-        maxLimit: 100,
+        maxLimit: 100
     })
     @ApiOkResponse({ description: 'List of plans', type: PlanDto, isArray: true })
     @RequirePermission({ namespace: KetoNamespace.TENANT, object: KetoResource.PLANS, relation: KetoRelation.READ })

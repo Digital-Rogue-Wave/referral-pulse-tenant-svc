@@ -64,11 +64,7 @@ export class DateService {
     /**
      * Add duration to date
      */
-    add(
-        date: string | number | Date | moment.Moment,
-        amount: number,
-        unit: moment.unitOfTime.DurationConstructor,
-    ): moment.Moment {
+    add(date: string | number | Date | moment.Moment, amount: number, unit: moment.unitOfTime.DurationConstructor): moment.Moment {
         if (moment.isMoment(date)) {
             return date.clone().add(amount, unit);
         }
@@ -78,11 +74,7 @@ export class DateService {
     /**
      * Subtract duration from date
      */
-    subtract(
-        date: string | number | Date | moment.Moment,
-        amount: number,
-        unit: moment.unitOfTime.DurationConstructor,
-    ): moment.Moment {
+    subtract(date: string | number | Date | moment.Moment, amount: number, unit: moment.unitOfTime.DurationConstructor): moment.Moment {
         if (moment.isMoment(date)) {
             return date.clone().subtract(amount, unit);
         }
@@ -110,11 +102,7 @@ export class DateService {
     /**
      * Get difference between two dates
      */
-    diff(
-        date1: string | number | Date | moment.Moment,
-        date2: string | number | Date | moment.Moment,
-        unit?: moment.unitOfTime.Diff,
-    ): number {
+    diff(date1: string | number | Date | moment.Moment, date2: string | number | Date | moment.Moment, unit?: moment.unitOfTime.Diff): number {
         const m1 = moment.isMoment(date1) ? date1 : this.parse(date1);
         const m2 = moment.isMoment(date2) ? date2 : this.parse(date2);
         return m1.diff(m2, unit);
@@ -123,11 +111,7 @@ export class DateService {
     /**
      * Get start of day/week/month/year
      */
-    startOf(
-        date: string | number | Date | moment.Moment,
-        unit: moment.unitOfTime.StartOf,
-        timezone?: string,
-    ): moment.Moment {
+    startOf(date: string | number | Date | moment.Moment, unit: moment.unitOfTime.StartOf, timezone?: string): moment.Moment {
         if (moment.isMoment(date)) {
             return timezone ? date.clone().tz(timezone).startOf(unit) : date.clone().startOf(unit);
         }
@@ -137,11 +121,7 @@ export class DateService {
     /**
      * Get end of day/week/month/year
      */
-    endOf(
-        date: string | number | Date | moment.Moment,
-        unit: moment.unitOfTime.StartOf,
-        timezone?: string,
-    ): moment.Moment {
+    endOf(date: string | number | Date | moment.Moment, unit: moment.unitOfTime.StartOf, timezone?: string): moment.Moment {
         if (moment.isMoment(date)) {
             return timezone ? date.clone().tz(timezone).endOf(unit) : date.clone().endOf(unit);
         }

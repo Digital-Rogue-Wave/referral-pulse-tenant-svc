@@ -28,7 +28,7 @@ export class TenantServiceListener {
     constructor(
         private readonly sideEffectService: SideEffectService,
         private readonly logger: AppLoggerService,
-        private readonly redisKeyBuilder: RedisKeyBuilder,
+        private readonly redisKeyBuilder: RedisKeyBuilder
     ) {
         this.logger.setContext(TenantServiceListener.name);
     }
@@ -51,26 +51,24 @@ export class TenantServiceListener {
                     resourceType: 'toto',
                     resourceId: event.aggregateId,
                     action: 'created',
-                    timestamp: event.occurredAt,
+                    timestamp: event.occurredAt
                 },
                 {
                     critical: false,
-                    idempotencyKey: this.redisKeyBuilder.buildIdempotencyKey(
-                        `tenant-usage-${event.tenantId}-${event.aggregateId}`,
-                    ),
-                },
+                    idempotencyKey: this.redisKeyBuilder.buildIdempotencyKey(`tenant-usage-${event.tenantId}-${event.aggregateId}`)
+                }
             );
 
             this.logger.debug(`Sent usage tracking to tenant service`, {
                 eventId: event.eventId,
                 tenantId: event.tenantId,
-                resourceType: 'toto',
+                resourceType: 'toto'
             });
         } catch (error) {
             this.logger.warn(`Failed to send usage tracking to tenant service (check DLQ)`, {
                 eventId: event.eventId,
                 tenantId: event.tenantId,
-                error: error instanceof Error ? error.message : 'Unknown error',
+                error: error instanceof Error ? error.message : 'Unknown error'
             });
         }
     }
@@ -93,26 +91,24 @@ export class TenantServiceListener {
                     resourceType: 'toto',
                     resourceId: event.aggregateId,
                     action: 'deleted',
-                    timestamp: event.occurredAt,
+                    timestamp: event.occurredAt
                 },
                 {
                     critical: false,
-                    idempotencyKey: this.redisKeyBuilder.buildIdempotencyKey(
-                        `tenant-usage-delete-${event.tenantId}-${event.aggregateId}`,
-                    ),
-                },
+                    idempotencyKey: this.redisKeyBuilder.buildIdempotencyKey(`tenant-usage-delete-${event.tenantId}-${event.aggregateId}`)
+                }
             );
 
             this.logger.debug(`Sent deletion tracking to tenant service`, {
                 eventId: event.eventId,
                 tenantId: event.tenantId,
-                resourceType: 'toto',
+                resourceType: 'toto'
             });
         } catch (error) {
             this.logger.warn(`Failed to send deletion tracking to tenant service (check DLQ)`, {
                 eventId: event.eventId,
                 tenantId: event.tenantId,
-                error: error instanceof Error ? error.message : 'Unknown error',
+                error: error instanceof Error ? error.message : 'Unknown error'
             });
         }
     }

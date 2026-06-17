@@ -122,7 +122,7 @@ export class JsonService {
             totalParses: this.parseCount,
             fallbackCount: this.fallbackCount,
             fallbackRate: this.parseCount > 0 ? (this.fallbackCount / this.parseCount) * 100 : 0,
-            averageParseTime: this.parseCount > 0 ? this.totalParseTime / this.parseCount : 0,
+            averageParseTime: this.parseCount > 0 ? this.totalParseTime / this.parseCount : 0
         };
     }
 

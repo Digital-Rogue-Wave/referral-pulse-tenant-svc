@@ -136,7 +136,7 @@ export enum Environment {
     Development = 'development',
     Staging = 'staging',
     Production = 'production',
-    Test = 'test',
+    Test = 'test'
 }
 
 /**
@@ -161,7 +161,7 @@ export enum IdempotencyScope {
     /**
      * Custom scope - uses custom key from request
      */
-    Custom = 'custom',
+    Custom = 'custom'
 }
 
 /**
@@ -172,7 +172,7 @@ export enum JobPriority {
     High = 3,
     Normal = 5,
     Low = 7,
-    Lowest = 10,
+    Lowest = 10
 }
 
 // ============================================================================
@@ -273,12 +273,7 @@ export type CampaignEventType =
     | 'campaign.deleted';
 
 // Referral domain events
-export type ReferralEventType =
-    | 'referral.created'
-    | 'referral.clicked'
-    | 'referral.converted'
-    | 'referral.rewarded'
-    | 'referral.expired';
+export type ReferralEventType = 'referral.created' | 'referral.clicked' | 'referral.converted' | 'referral.rewarded' | 'referral.expired';
 
 // User domain events
 export type UserEventType = 'user.created' | 'user.updated' | 'user.activated' | 'user.deactivated' | 'user.deleted';
@@ -293,27 +288,13 @@ export type TenantSettingEventType = 'tenant-setting.created' | 'tenant-setting.
 export type NotificationEventType = 'notification.updated' | 'notification.sent';
 
 // Team Member domain events
-export type TeamMemberEventType =
-    | 'team-member.created'
-    | 'team-member.updated'
-    | 'team-member.deleted'
-    | 'team-member.status';
+export type TeamMemberEventType = 'team-member.created' | 'team-member.updated' | 'team-member.deleted' | 'team-member.status';
 
 // Invitation domain events
-export type InvitationEventType =
-    | 'invitation.created'
-    | 'invitation.accepted'
-    | 'invitation.revoked'
-    | 'invitation.rejected'
-    | 'invitation.resent';
+export type InvitationEventType = 'invitation.created' | 'invitation.accepted' | 'invitation.revoked' | 'invitation.rejected' | 'invitation.resent';
 
 // DNS domain events
-export type DnsEventType =
-    | 'dns.reserved'
-    | 'dns.released'
-    | 'dns.domain-added'
-    | 'dns.domain-verified'
-    | 'dns.domain-removed';
+export type DnsEventType = 'dns.reserved' | 'dns.released' | 'dns.domain-added' | 'dns.domain-verified' | 'dns.domain-removed';
 
 // Tenant domain events
 export type TenantEventType =
@@ -400,19 +381,19 @@ export type CampaignSqsEventType = 'campaign.created' | 'campaign.updated' | 'ca
 // Analytics events (sent to analytics service)
 export type AnalyticsSqsEventType = 'analytics.event';
 export const AnalyticsSqsEvents = {
-    EVENT: 'analytics.event' as AnalyticsSqsEventType,
+    EVENT: 'analytics.event' as AnalyticsSqsEventType
 } as const;
 
 // Audit trail events (sent to audit service)
 export type AuditSqsEventType = 'audit.event';
 export const AuditSqsEvents = {
-    EVENT: 'audit.event' as AuditSqsEventType,
+    EVENT: 'audit.event' as AuditSqsEventType
 } as const;
 
 // Email service events (sent to notification-webhook service)
 export type EmailSqsEventType = 'email.send';
 export const EmailSqsEvents = {
-    SEND: 'email.send' as EmailSqsEventType,
+    SEND: 'email.send' as EmailSqsEventType
 } as const;
 
 // API Key SQS events (sent to audit service)
@@ -557,11 +538,7 @@ export const NO_STRIPE_CUSTOMER_ERROR = 'No Stripe customer configured for this 
 /**
  * All BullMQ queue names
  */
-export type BullMQQueueName =
-    | typeof BILLING_USAGE_QUEUE
-    | typeof TENANT_DELETION_QUEUE
-    | typeof TENANT_UNLOCK_QUEUE
-    | typeof INVITATION_QUEUE;
+export type BullMQQueueName = typeof BILLING_USAGE_QUEUE | typeof TENANT_DELETION_QUEUE | typeof TENANT_UNLOCK_QUEUE | typeof INVITATION_QUEUE;
 
 // ============================================================================
 // BULLMQ JOB DATA TYPES

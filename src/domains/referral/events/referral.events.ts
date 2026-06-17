@@ -13,7 +13,7 @@ export class ReferralConvertedEvent extends BaseDomainEvent {
         public readonly referredUserId?: string,
         public readonly conversionType?: string,
         public readonly conversionValue?: number,
-        public readonly userId?: string,
+        public readonly userId?: string
     ) {
         super();
     }
@@ -30,7 +30,7 @@ export class ReferralCreatedEvent extends BaseDomainEvent {
         public readonly tenantId: string,
         public readonly referrerId: string,
         public readonly referralCode: string,
-        public readonly userId?: string,
+        public readonly userId?: string
     ) {
         super();
     }
@@ -46,7 +46,7 @@ export class ReferralClickedEvent extends BaseDomainEvent {
         public readonly aggregateId: string,
         public readonly tenantId: string,
         public readonly referralCode: string,
-        public readonly userId?: string,
+        public readonly userId?: string
     ) {
         super();
     }
@@ -59,5 +59,5 @@ export const ReferralEvents = {
     CREATED: 'referral.created',
     CLICKED: 'referral.clicked',
     CONVERTED: 'referral.converted',
-    REWARDED: 'referral.rewarded',
+    REWARDED: 'referral.rewarded'
 } as const;

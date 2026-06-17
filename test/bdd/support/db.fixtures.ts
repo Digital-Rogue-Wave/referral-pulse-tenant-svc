@@ -14,8 +14,7 @@ import { PrismaPg } from '@prisma/adapter-pg';
 
 // ─── Singleton client ──────────────────────────────────────────────────────────
 
-const connectionString =
-    process.env.DATABASE_URL ?? 'postgresql://root:root@localhost:5432/tenants';
+const connectionString = process.env.DATABASE_URL ?? 'postgresql://root:root@localhost:5432/tenants';
 
 const pool = new pg.Pool({ connectionString });
 const adapter = new PrismaPg(pool);
@@ -27,7 +26,7 @@ export const fixturesPrisma = new PrismaClient({ adapter });
 export const FIXTURE_IDS = {
     suspended: 'bdd-suspended-001',
     locked: 'bdd-locked-001',
-    active: 'bdd-active-001',
+    active: 'bdd-active-001'
 } as const;
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -41,14 +40,14 @@ export async function createSuspendedTenant(id: string): Promise<void> {
             name: `BDD Suspended Tenant (${id})`,
             slug: id,
             status: 'suspended',
-            paymentStatus: 'active',
-        },
+            paymentStatus: 'active'
+        }
     });
 
     await fixturesPrisma.billing.upsert({
         where: { tenantId: id },
         update: {},
-        create: { tenantId: id, plan: 'Free', status: 'none' },
+        create: { tenantId: id, plan: 'Free', status: 'none' }
     });
 }
 
@@ -61,7 +60,7 @@ export async function createLockedTenant(id: string): Promise<void> {
             status: 'locked',
             paymentStatus: 'active',
             lockedAt: now,
-            lockReason: 'bdd-test',
+            lockReason: 'bdd-test'
         },
         create: {
             id,
@@ -70,14 +69,14 @@ export async function createLockedTenant(id: string): Promise<void> {
             status: 'locked',
             paymentStatus: 'active',
             lockedAt: now,
-            lockReason: 'bdd-test',
-        },
+            lockReason: 'bdd-test'
+        }
     });
 
     await fixturesPrisma.billing.upsert({
         where: { tenantId: id },
         update: {},
-        create: { tenantId: id, plan: 'Free', status: 'none' },
+        create: { tenantId: id, plan: 'Free', status: 'none' }
     });
 }
 
@@ -90,14 +89,14 @@ export async function createActiveTenant(id: string): Promise<void> {
             name: `BDD Active Tenant (${id})`,
             slug: id,
             status: 'active',
-            paymentStatus: 'active',
-        },
+            paymentStatus: 'active'
+        }
     });
 
     await fixturesPrisma.billing.upsert({
         where: { tenantId: id },
         update: {},
-        create: { tenantId: id, plan: 'Free', status: 'none' },
+        create: { tenantId: id, plan: 'Free', status: 'none' }
     });
 }
 

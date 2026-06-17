@@ -11,7 +11,7 @@ import {
     ApiCursorPaginationQuery,
     CursorPaginate,
     CursorPaginateQuery,
-    CursorPaginated,
+    CursorPaginated
 } from '@app/common/nestjs-prisma-pagination';
 import { CurrencyDto, CreateCurrencyDto, UpdateCurrencyDto } from '@domains/common/currency';
 import { CURRENCY_PAGINATE_CONFIG } from './currency.pagination';
@@ -45,9 +45,9 @@ export class CurrencyController {
                         type: 'object',
                         properties: {
                             node: { $ref: '#/components/schemas/CurrencyDto' },
-                            cursor: { type: 'string' },
-                        },
-                    },
+                            cursor: { type: 'string' }
+                        }
+                    }
                 },
                 pageInfo: {
                     type: 'object',
@@ -55,18 +55,16 @@ export class CurrencyController {
                         startCursor: { type: 'string', nullable: true },
                         endCursor: { type: 'string', nullable: true },
                         hasNextPage: { type: 'boolean' },
-                        hasPreviousPage: { type: 'boolean' },
-                    },
+                        hasPreviousPage: { type: 'boolean' }
+                    }
                 },
-                totalCount: { type: 'number' },
-            },
-        },
+                totalCount: { type: 'number' }
+            }
+        }
     })
     @HttpCode(HttpStatus.OK)
     @Get('cursor')
-    async listCursor(
-        @CursorPaginate() query: CursorPaginateQuery<CurrencyModel>,
-    ): Promise<CursorPaginated<CurrencyModel>> {
+    async listCursor(@CursorPaginate() query: CursorPaginateQuery<CurrencyModel>): Promise<CursorPaginated<CurrencyModel>> {
         return this.currencyService.listCursor(query);
     }
 

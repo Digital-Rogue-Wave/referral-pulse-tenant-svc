@@ -29,7 +29,7 @@ export class ReferralServiceListener {
     constructor(
         private readonly sideEffectService: SideEffectService,
         private readonly logger: AppLoggerService,
-        private readonly redisKeyBuilder: RedisKeyBuilder,
+        private readonly redisKeyBuilder: RedisKeyBuilder
     ) {
         this.logger.setContext(ReferralServiceListener.name);
     }
@@ -53,28 +53,24 @@ export class ReferralServiceListener {
                     email: event.email,
                     signupSource: event.source,
                     referralCode: event.referralCode,
-                    timestamp: event.occurredAt,
+                    timestamp: event.occurredAt
                 },
                 {
                     critical: false, // Direct SQS with DLQ (after commit)
-                    idempotencyKey: this.redisKeyBuilder.buildIdempotencyKey(`referral-signup-${event.aggregateId}`),
-                },
+                    idempotencyKey: this.redisKeyBuilder.buildIdempotencyKey(`referral-signup-${event.aggregateId}`)
+                }
             );
 
             this.logger.debug(`Tracked referral signup (async SQS)`, {
                 eventId: event.eventId,
                 userId: event.aggregateId,
-                queue: REFERRAL_WORKFLOW_SVC_FIFO,
+                queue: REFERRAL_WORKFLOW_SVC_FIFO
             });
         } catch (error) {
-            this.logger.error(
-                `Failed to track referral signup (check DLQ)`,
-                error instanceof Error ? error.stack : undefined,
-                {
-                    eventId: event.eventId,
-                    userId: event.aggregateId,
-                },
-            );
+            this.logger.error(`Failed to track referral signup (check DLQ)`, error instanceof Error ? error.stack : undefined, {
+                eventId: event.eventId,
+                userId: event.aggregateId
+            });
         }
     }
 
@@ -98,30 +94,24 @@ export class ReferralServiceListener {
                     tenantId: event.tenantId,
                     conversionType: event.conversionType,
                     conversionValue: event.conversionValue,
-                    timestamp: event.occurredAt,
+                    timestamp: event.occurredAt
                 },
                 {
                     critical: false, // Direct SQS with DLQ (after commit)
-                    idempotencyKey: this.redisKeyBuilder.buildIdempotencyKey(
-                        `referral-conversion-${event.aggregateId}`,
-                    ),
-                },
+                    idempotencyKey: this.redisKeyBuilder.buildIdempotencyKey(`referral-conversion-${event.aggregateId}`)
+                }
             );
 
             this.logger.log(`Tracked referral conversion (async SQS)`, {
                 eventId: event.eventId,
                 referralId: event.aggregateId,
-                conversionType: event.conversionType,
+                conversionType: event.conversionType
             });
         } catch (error) {
-            this.logger.error(
-                `Failed to track referral conversion (check DLQ)`,
-                error instanceof Error ? error.stack : undefined,
-                {
-                    eventId: event.eventId,
-                    referralId: event.aggregateId,
-                },
-            );
+            this.logger.error(`Failed to track referral conversion (check DLQ)`, error instanceof Error ? error.stack : undefined, {
+                eventId: event.eventId,
+                referralId: event.aggregateId
+            });
         }
     }
 
@@ -146,26 +136,24 @@ export class ReferralServiceListener {
                     timestamp: event.occurredAt,
                     metadata: {
                         action: event.getEventAction(),
-                        details: event,
-                    },
+                        details: event
+                    }
                 },
                 {
                     critical: false, // Direct SQS with DLQ (after commit)
-                    idempotencyKey: this.redisKeyBuilder.buildIdempotencyKey(
-                        `referral-campaign-${event.aggregateId}-${event.eventId}`,
-                    ),
-                },
+                    idempotencyKey: this.redisKeyBuilder.buildIdempotencyKey(`referral-campaign-${event.aggregateId}-${event.eventId}`)
+                }
             );
 
             this.logger.debug(`Tracked campaign engagement for referrals (async SQS)`, {
                 eventType: event.eventType,
-                campaignId: event.aggregateId,
+                campaignId: event.aggregateId
             });
         } catch (error) {
             this.logger.warn(`Failed to track campaign engagement for referrals (check DLQ)`, {
                 eventType: event.eventType,
                 eventId: event.eventId,
-                error: error instanceof Error ? error.message : 'Unknown error',
+                error: error instanceof Error ? error.message : 'Unknown error'
             });
         }
     }

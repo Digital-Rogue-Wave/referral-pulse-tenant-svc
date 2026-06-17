@@ -22,7 +22,7 @@ interface ProblemDetail {
 export class GlobalExceptionsFilter implements ExceptionFilter {
     constructor(
         private readonly logger: AppLoggerService,
-        private readonly tenantContext: TenantContextService,
+        private readonly tenantContext: TenantContextService
     ) {
         this.logger.setContext(GlobalExceptionsFilter.name);
     }
@@ -67,12 +67,7 @@ export class GlobalExceptionsFilter implements ExceptionFilter {
         reply.status(problemDetail.status).send(problemDetail);
     }
 
-    private handleBaseException(
-        exception: BaseException,
-        instance: string,
-        correlationId: string,
-        timestamp: string,
-    ): ProblemDetail {
+    private handleBaseException(exception: BaseException, instance: string, correlationId: string, timestamp: string): ProblemDetail {
         const response = exception.getResponse() as {
             errorCode: string;
             message: string;
@@ -88,7 +83,7 @@ export class GlobalExceptionsFilter implements ExceptionFilter {
             errorCode: response.errorCode,
             correlationId,
             timestamp,
-            ...(response.details?.errors ? { errors: response.details.errors as string[] } : {}),
+            ...(response.details?.errors ? { errors: response.details.errors as string[] } : {})
         };
     }
 
@@ -145,12 +140,7 @@ export class GlobalExceptionsFilter implements ExceptionFilter {
   }
 
   */
-    private handleHttpException(
-        exception: HttpException,
-        instance: string,
-        correlationId: string,
-        timestamp: string,
-    ): ProblemDetail {
+    private handleHttpException(exception: HttpException, instance: string, correlationId: string, timestamp: string): ProblemDetail {
         const status = exception.getStatus();
         const response = exception.getResponse();
 
@@ -181,16 +171,11 @@ export class GlobalExceptionsFilter implements ExceptionFilter {
             errorCode: 'HTTP_ERROR',
             correlationId,
             timestamp,
-            ...(errors && { errors }),
+            ...(errors && { errors })
         };
     }
 
-    private handleUnknownError(
-        _exception: unknown,
-        instance: string,
-        correlationId: string,
-        timestamp: string,
-    ): ProblemDetail {
+    private handleUnknownError(_exception: unknown, instance: string, correlationId: string, timestamp: string): ProblemDetail {
         return {
             type: 'about:blank',
             title: 'Internal Server Error',
@@ -199,7 +184,7 @@ export class GlobalExceptionsFilter implements ExceptionFilter {
             instance,
             errorCode: 'INTERNAL_ERROR',
             correlationId,
-            timestamp,
+            timestamp
         };
     }
 
@@ -209,20 +194,17 @@ export class GlobalExceptionsFilter implements ExceptionFilter {
             url: request.url,
             correlationId: problemDetail.correlationId,
             errorCode: problemDetail.errorCode,
-            status: problemDetail.status,
+            status: problemDetail.status
         };
 
         if (problemDetail.status >= 500) {
             this.logger.error(
                 `${request.method} ${request.url} ${problemDetail.status}`,
                 exception instanceof Error ? exception.stack : String(exception),
-                logContext,
+                logContext
             );
         } else {
-            this.logger.warn(
-                `${request.method} ${request.url} ${problemDetail.status} - ${problemDetail.detail}`,
-                logContext,
-            );
+            this.logger.warn(`${request.method} ${request.url} ${problemDetail.status} - ${problemDetail.detail}`, logContext);
         }
     }
 
@@ -236,7 +218,7 @@ export class GlobalExceptionsFilter implements ExceptionFilter {
             422: 'Unprocessable Entity',
             500: 'Internal Server Error',
             502: 'Bad Gateway',
-            503: 'Service Unavailable',
+            503: 'Service Unavailable'
         };
 
         return statusTexts[status] ?? 'Error';

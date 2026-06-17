@@ -11,7 +11,7 @@ import { TenantService } from '../tenant.service';
 export class TenantStatusGuard implements CanActivate {
     constructor(
         private readonly tenantService: TenantService,
-        private readonly tenantContext: TenantContextService,
+        private readonly tenantContext: TenantContextService
     ) {}
 
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
@@ -32,16 +32,12 @@ export class TenantStatusGuard implements CanActivate {
             throw new BaseException(
                 'TENANT_SUSPENDED' as ErrorCode,
                 'This account has been suspended. Please contact support.',
-                HttpStatus.FORBIDDEN,
+                HttpStatus.FORBIDDEN
             );
         }
 
         if (tenant.status === TenantStatus.LOCKED) {
-            throw new BaseException(
-                'TENANT_LOCKED' as ErrorCode,
-                'This account has been locked due to security concerns.',
-                HttpStatus.FORBIDDEN,
-            );
+            throw new BaseException('TENANT_LOCKED' as ErrorCode, 'This account has been locked due to security concerns.', HttpStatus.FORBIDDEN);
         }
 
         return true;

@@ -101,7 +101,7 @@ export class TenantContextService implements ITenantContext {
             requestId: this.getRequestId(),
             correlationId: this.getCorrelationId(),
             traceId: this.getTraceId(),
-            spanId: this.getSpanId(),
+            spanId: this.getSpanId()
         };
     }
 
@@ -110,7 +110,7 @@ export class TenantContextService implements ITenantContext {
             requestId: context.requestId ?? '',
             tenantId: context.tenantId ?? '',
             userId: context.userId ?? '',
-            ...context,
+            ...context
         };
         return alsStorage.run(fullContext, fn);
     }

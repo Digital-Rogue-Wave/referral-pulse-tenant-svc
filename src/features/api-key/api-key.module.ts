@@ -7,6 +7,6 @@ import { ApiKeyListener } from './listeners/api-key.listener';
 @Module({
     controllers: [ApiKeyController],
     providers: [ApiKeyService, ApiKeyListener],
-    exports: [ApiKeyService],
+    exports: [ApiKeyService]
 })
 export class ApiKeyModule {}

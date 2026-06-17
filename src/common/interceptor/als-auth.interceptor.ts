@@ -39,7 +39,7 @@ export class AlsAuthInterceptor implements NestInterceptor {
                 return new Promise<Observable<unknown>>((resolve) => {
                     resolve(next.handle());
                 });
-            }),
+            })
         ).pipe(switchMap((obs) => obs));
     }
 
@@ -67,7 +67,7 @@ export class AlsAuthInterceptor implements NestInterceptor {
             startTime: this.dateService.now(),
             traceId,
             spanId,
-            metadata: {},
+            metadata: {}
         };
 
         // Add user metadata if authenticated
@@ -149,7 +149,7 @@ export class AlsAuthInterceptor implements NestInterceptor {
         // Fall back to B3 propagation headers (for compatibility)
         return {
             traceId: request.headers['x-b3-traceid'] as string,
-            spanId: request.headers['x-b3-spanid'] as string,
+            spanId: request.headers['x-b3-spanid'] as string
         };
     }
 }

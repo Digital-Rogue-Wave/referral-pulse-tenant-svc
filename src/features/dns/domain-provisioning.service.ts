@@ -19,7 +19,7 @@ export class DomainProvisioningService {
     provisionDomain(tenantId: string, domain: string): void {
         this.logger.log(`Starting provisioning for domain: ${domain}`, {
             tenantId,
-            domain,
+            domain
         });
 
         this.logger.log('1. Requesting ACM Certificate...', { tenantId, domain });
@@ -27,7 +27,7 @@ export class DomainProvisioningService {
 
         this.logger.log('2. Configuring CloudFront Distribution...', {
             tenantId,
-            domain,
+            domain
         });
         // TODO: aws.cloudfront.updateDistribution({ ...Aliases: [domain] })
 
@@ -39,7 +39,7 @@ export class DomainProvisioningService {
      */
     checkProvisioningStatus(domain: string): ProvisioningStatusType {
         this.logger.debug(`Checking provisioning status for: ${domain}`, {
-            domain,
+            domain
         });
 
         // TODO: Implement actual status check from AWS

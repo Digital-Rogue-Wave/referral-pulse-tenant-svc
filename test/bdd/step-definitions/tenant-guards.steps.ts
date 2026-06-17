@@ -12,9 +12,6 @@ import { makeActiveUserToken } from '../support/jwt.helper';
 import type { BddWorldInterface } from '../support/world';
 
 Given('I have a valid JWT for the current fixture tenant', function (this: BddWorldInterface) {
-    assert.ok(
-        this.currentTenantId,
-        'No fixture tenant set — add the correct @needs-* tag to the scenario',
-    );
+    assert.ok(this.currentTenantId, 'No fixture tenant set — add the correct @needs-* tag to the scenario');
     this.currentToken = makeActiveUserToken(this.currentTenantId);
 });

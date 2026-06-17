@@ -23,6 +23,6 @@ export default registerAs<BillingConfig>('billingConfig', () => {
 
     return {
         planStripeSyncEnabled: (process.env.BILLING_PLAN_STRIPE_SYNC_ENABLED ?? 'false') === 'true',
-        planStripeSyncCron: process.env.BILLING_PLAN_STRIPE_SYNC_CRON ?? '0 * * * *',
+        planStripeSyncCron: process.env.BILLING_PLAN_STRIPE_SYNC_CRON ?? '0 * * * *'
     };
 });

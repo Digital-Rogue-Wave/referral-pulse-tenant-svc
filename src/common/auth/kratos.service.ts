@@ -13,7 +13,7 @@ export class KratosService {
 
     constructor(
         private readonly http: HttpClientService,
-        private readonly config: ConfigService,
+        private readonly config: ConfigService
     ) {
         const oryCfg = this.config.getOrThrow<OryConfig>('oryConfig');
         this.adminUrl = oryCfg.kratos?.adminUrl || 'http://kratos:4434';
@@ -58,12 +58,9 @@ export class KratosService {
 
             // Use Kratos native API to verify credentials
             // This endpoint validates password without creating a session
-            const response = await this.http.post<{ valid: boolean }>(
-                `${this.adminUrl}/admin/identities/${identityId}/credentials/password/verify`,
-                {
-                    password,
-                },
-            );
+            const response = await this.http.post<{ valid: boolean }>(`${this.adminUrl}/admin/identities/${identityId}/credentials/password/verify`, {
+                password
+            });
 
             return response.data?.valid === true;
         } catch (error) {
@@ -78,7 +75,7 @@ export class KratosService {
         metadata: {
             public?: Record<string, unknown>;
             admin?: Record<string, unknown>;
-        },
+        }
     ): Promise<void> {
         const payload: {
             metadata_public?: Record<string, unknown>;

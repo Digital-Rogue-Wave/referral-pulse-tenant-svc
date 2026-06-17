@@ -18,7 +18,7 @@ import {
     TeamMemberCreatedEvent,
     TeamMemberRoleUpdatedEvent,
     TeamMemberRemovedEvent,
-    TeamMemberStatusUpdatedEvent,
+    TeamMemberStatusUpdatedEvent
 } from '@domains/team-member';
 
 import { TEAM_MEMBER_PAGINATE_CONFIG } from './team-member.pagination';
@@ -34,7 +34,7 @@ export class TeamMemberService {
         private readonly tenantAware: TenantAwareService,
         private readonly tenantContext: TenantContextService,
         private readonly txEventEmitter: TransactionEventEmitterService,
-        private readonly logger: AppLoggerService,
+        private readonly logger: AppLoggerService
     ) {
         this.logger.setContext(TeamMemberService.name);
     }
@@ -53,7 +53,7 @@ export class TeamMemberService {
 
         // Check if user is already a member of this tenant
         const existing = await this.teamMember.findFirst({
-            where: { userId: dto.userId },
+            where: { userId: dto.userId }
         });
 
         if (existing) {
@@ -64,8 +64,8 @@ export class TeamMemberService {
             data: {
                 userId: dto.userId,
                 role: dto.role,
-                status: dto.status ?? TeamMemberStatus.ACTIVE,
-            },
+                status: dto.status ?? TeamMemberStatus.ACTIVE
+            }
         })) as TeamMemberProps;
 
         const event = new TeamMemberCreatedEvent(
@@ -76,9 +76,9 @@ export class TeamMemberService {
                 userId: saved.userId,
                 tenantId: saved.tenantId,
                 role: saved.role,
-                createdAt: saved.createdAt,
+                createdAt: saved.createdAt
             },
-            userId,
+            userId
         );
         this.txEventEmitter.emitAfterCommit('team-member.created', event);
         this.txEventEmitter.emitAfterCommit('audit.team-member.created', event);
@@ -86,7 +86,7 @@ export class TeamMemberService {
         this.logger.log(`Team member created: ${saved.id}`, {
             memberId: saved.id,
             memberUserId: saved.userId,
-            role: saved.role,
+            role: saved.role
         });
 
         return teamMemberResponseMapper.toResponse(saved);
@@ -102,7 +102,7 @@ export class TeamMemberService {
         return {
             data: teamMemberResponseMapper.toResponseArray(result.data as TeamMemberProps[]),
             meta: result.meta as Paginated<TeamMemberResponse>['meta'],
-            links: result.links,
+            links: result.links
         };
     }
 
@@ -111,7 +111,7 @@ export class TeamMemberService {
      */
     async countMembers(): Promise<number> {
         return this.teamMember.count({
-            where: { deletedAt: null },
+            where: { deletedAt: null }
         });
     }
 
@@ -120,7 +120,7 @@ export class TeamMemberService {
      */
     async findById(id: string): Promise<TeamMemberResponse> {
         const member = (await this.teamMember.findUnique({
-            where: { id },
+            where: { id }
         })) as TeamMemberProps | null;
 
         if (!member) {
@@ -135,7 +135,7 @@ export class TeamMemberService {
      */
     async updateRole(id: string, actingUserId: string, dto: UpdateTeamMemberDto): Promise<TeamMemberResponse> {
         const existing = (await this.teamMember.findUnique({
-            where: { id },
+            where: { id }
         })) as TeamMemberProps | null;
 
         if (!existing) {
@@ -146,16 +146,12 @@ export class TeamMemberService {
         const newRole = dto.role;
 
         // Last admin protection: prevent downgrading the last admin/owner
-        if (
-            newRole &&
-            (oldRole === TeamMemberRole.ADMIN || oldRole === TeamMemberRole.OWNER) &&
-            newRole === TeamMemberRole.MEMBER
-        ) {
+        if (newRole && (oldRole === TeamMemberRole.ADMIN || oldRole === TeamMemberRole.OWNER) && newRole === TeamMemberRole.MEMBER) {
             const adminCount = await this.teamMember.count({
                 where: {
                     role: { in: [TeamMemberRole.ADMIN, TeamMemberRole.OWNER] },
-                    deletedAt: null,
-                },
+                    deletedAt: null
+                }
             });
 
             if (adminCount <= 1) {
@@ -173,7 +169,7 @@ export class TeamMemberService {
 
         const updated = (await this.teamMember.update({
             where: { id },
-            data: updateData,
+            data: updateData
         })) as TeamMemberProps;
 
         // Emit role update event if role changed
@@ -188,9 +184,9 @@ export class TeamMemberService {
                     oldRole,
                     newRole,
                     updatedBy: actingUserId,
-                    updatedAt: updated.updatedAt,
+                    updatedAt: updated.updatedAt
                 },
-                actingUserId,
+                actingUserId
             );
             this.txEventEmitter.emitAfterCommit('team-member.updated', roleEvent);
             this.txEventEmitter.emitAfterCommit('audit.team-member.updated', roleEvent);
@@ -208,9 +204,9 @@ export class TeamMemberService {
                     oldStatus: existing.status,
                     newStatus: dto.status,
                     updatedBy: actingUserId,
-                    updatedAt: updated.updatedAt,
+                    updatedAt: updated.updatedAt
                 },
-                actingUserId,
+                actingUserId
             );
             this.txEventEmitter.emitAfterCommit('team-member.status', statusEvent);
             this.txEventEmitter.emitAfterCommit('audit.team-member.status', statusEvent);
@@ -218,7 +214,7 @@ export class TeamMemberService {
 
         this.logger.log(`Team member updated: ${id}`, {
             memberId: id,
-            changes: updateData,
+            changes: updateData
         });
 
         return teamMemberResponseMapper.toResponse(updated);
@@ -229,7 +225,7 @@ export class TeamMemberService {
      */
     async remove(id: string, actingUserId: string): Promise<void> {
         const existing = (await this.teamMember.findUnique({
-            where: { id },
+            where: { id }
         })) as TeamMemberProps | null;
 
         if (!existing) {
@@ -241,8 +237,8 @@ export class TeamMemberService {
             const adminCount = await this.teamMember.count({
                 where: {
                     role: { in: [TeamMemberRole.ADMIN, TeamMemberRole.OWNER] },
-                    deletedAt: null,
-                },
+                    deletedAt: null
+                }
             });
 
             if (adminCount <= 1) {
@@ -260,16 +256,16 @@ export class TeamMemberService {
                 userId: existing.userId,
                 tenantId: existing.tenantId,
                 removedBy: actingUserId,
-                removedAt: new Date(),
+                removedAt: new Date()
             },
-            actingUserId,
+            actingUserId
         );
         this.txEventEmitter.emitAfterCommit('team-member.deleted', event);
         this.txEventEmitter.emitAfterCommit('audit.team-member.deleted', event);
 
         this.logger.log(`Team member removed: ${id}`, {
             memberId: id,
-            memberUserId: existing.userId,
+            memberUserId: existing.userId
         });
     }
 
@@ -278,7 +274,7 @@ export class TeamMemberService {
      */
     async findByUserId(userId: string): Promise<TeamMemberResponse | null> {
         const member = (await this.teamMember.findFirst({
-            where: { userId, deletedAt: null },
+            where: { userId, deletedAt: null }
         })) as TeamMemberProps | null;
 
         if (!member) {

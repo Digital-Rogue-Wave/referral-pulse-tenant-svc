@@ -12,8 +12,8 @@ export class PaginatedDto<T, V> {
         this.links = data.links;
         this.data = data.data.map((item: T) =>
             plainToInstance(dto, instanceToPlain(item), {
-                excludeExtraneousValues: true,
-            }),
+                excludeExtraneousValues: true
+            })
         );
     }
 }

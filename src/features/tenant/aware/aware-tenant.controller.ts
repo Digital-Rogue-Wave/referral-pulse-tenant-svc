@@ -1,26 +1,6 @@
-import {
-    Controller,
-    Get,
-    Body,
-    Put,
-    HttpCode,
-    HttpStatus,
-    UploadedFile,
-    UseGuards,
-    UseInterceptors,
-    Query,
-} from '@nestjs/common';
+import { Controller, Get, Body, Put, HttpCode, HttpStatus, UploadedFile, UseGuards, UseInterceptors, Query } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
-import {
-    ApiBody,
-    ApiConsumes,
-    ApiExtraModels,
-    ApiOkResponse,
-    ApiTags,
-    getSchemaPath,
-    ApiBearerAuth,
-    ApiHeader,
-} from '@nestjs/swagger';
+import { ApiBody, ApiConsumes, ApiExtraModels, ApiOkResponse, ApiTags, getSchemaPath, ApiBearerAuth, ApiHeader } from '@nestjs/swagger';
 
 import { RequirePermission } from '@common/auth/require-permission.decorator';
 import { KetoNamespace, KetoRelation } from '@common/auth/keto.constants';
@@ -41,7 +21,7 @@ import {
     CancelDeletionDto,
     LockTenantDto,
     UnlockTenantDto,
-    TenantStatsDto,
+    TenantStatsDto
 } from '@domains/tenant';
 
 import { TenantService } from '../tenant.service';
@@ -54,7 +34,7 @@ import { TenantLockGuard } from '../guards/tenant-lock.guard';
     name: 'tenant-id',
     required: true,
     description: 'Tenant-Id header',
-    schema: { type: 'string' },
+    schema: { type: 'string' }
 })
 @ApiBearerAuth()
 @UseGuards(TenantStatusGuard, TenantLockGuard)
@@ -62,13 +42,13 @@ import { TenantLockGuard } from '../guards/tenant-lock.guard';
 export class AwareTenantController {
     constructor(
         private readonly tenantService: TenantService,
-        private readonly statsService: TenantStatsService,
+        private readonly statsService: TenantStatsService
     ) {}
 
     @Get('subdomain/check')
     @ApiOkResponse({
         description: 'Check if subdomain is available',
-        type: SubdomainAvailabilityResponse,
+        type: SubdomainAvailabilityResponse
     })
     @HttpCode(HttpStatus.OK)
     async checkSubdomain(@Query('subdomain') subdomain: string): Promise<SubdomainAvailabilityResponse> {
@@ -78,7 +58,7 @@ export class AwareTenantController {
     @Get('stats')
     @ApiOkResponse({
         description: 'Get dashboard stats for current tenant',
-        type: TenantStatsDto,
+        type: TenantStatsDto
     })
     @HttpCode(HttpStatus.OK)
     async getStats(): Promise<TenantStatsDto> {
@@ -88,7 +68,7 @@ export class AwareTenantController {
     @Get('custom-domain/status')
     @ApiOkResponse({
         description: 'Get custom domain verification status',
-        type: DomainStatusResponse,
+        type: DomainStatusResponse
     })
     @HttpCode(HttpStatus.OK)
     async getDomainStatus(): Promise<DomainStatusResponse> {
@@ -112,13 +92,13 @@ export class AwareTenantController {
             properties: {
                 file: {
                     type: 'string',
-                    format: 'binary',
+                    format: 'binary'
                 },
                 data: {
-                    $ref: getSchemaPath(UpdateTenantDto),
-                },
-            },
-        },
+                    $ref: getSchemaPath(UpdateTenantDto)
+                }
+            }
+        }
     })
     @ApiOkResponse({ type: TenantResponse })
     @RequirePermission({ namespace: KetoNamespace.TENANT, relation: KetoRelation.UPDATE })
@@ -127,7 +107,7 @@ export class AwareTenantController {
     async update(
         @CurrentUser() user: IAuthenticatedUser,
         @Body('data', ParseFormdataPipe) data: UpdateTenantDto,
-        @UploadedFile() file?: Express.Multer.File | Express.MulterS3.File,
+        @UploadedFile() file?: Express.Multer.File | Express.MulterS3.File
     ): Promise<TenantResponse> {
         return await this.tenantService.update(data, user, file);
     }
@@ -136,7 +116,7 @@ export class AwareTenantController {
     @Idempotent({ scope: IdempotencyScope.Tenant, ttl: 1800 })
     @ApiOkResponse({
         description: 'Domain verified successfully',
-        type: TenantResponse,
+        type: TenantResponse
     })
     @RequirePermission({ namespace: KetoNamespace.TENANT, relation: KetoRelation.UPDATE })
     @HttpCode(HttpStatus.OK)
@@ -159,14 +139,11 @@ export class AwareTenantController {
     @ApiBody({ type: ScheduleDeletionDto })
     @ApiOkResponse({
         description: 'Deletion scheduled successfully',
-        type: DeletionScheduledResponse,
+        type: DeletionScheduledResponse
     })
     @RequirePermission({ namespace: KetoNamespace.TENANT, relation: KetoRelation.DELETE })
     @HttpCode(HttpStatus.OK)
-    async scheduleDeletion(
-        @Body() dto: ScheduleDeletionDto,
-        @CurrentUser() user: IAuthenticatedUser,
-    ): Promise<DeletionScheduledResponse> {
+    async scheduleDeletion(@Body() dto: ScheduleDeletionDto, @CurrentUser() user: IAuthenticatedUser): Promise<DeletionScheduledResponse> {
         return await this.tenantService.scheduleDeletion(dto, user);
     }
 

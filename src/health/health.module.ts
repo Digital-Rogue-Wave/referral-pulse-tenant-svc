@@ -1,12 +1,6 @@
 import { Module, Controller, Get, Param, Post, HttpCode, HttpStatus } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse } from '@nestjs/swagger';
-import {
-    TerminusModule,
-    HealthCheckService,
-    HealthCheck,
-    TypeOrmHealthIndicator,
-    MemoryHealthIndicator,
-} from '@nestjs/terminus';
+import { TerminusModule, HealthCheckService, HealthCheck, TypeOrmHealthIndicator, MemoryHealthIndicator } from '@nestjs/terminus';
 
 import type { CircuitBreakerInfo } from '@app/types';
 
@@ -24,7 +18,7 @@ export class HealthController {
         private readonly db: TypeOrmHealthIndicator,
         private readonly memory: MemoryHealthIndicator,
         private readonly redis: RedisHealthIndicator,
-        private readonly httpClient: HttpClientService,
+        private readonly httpClient: HttpClientService
     ) {}
 
     @Get('live')
@@ -49,7 +43,7 @@ export class HealthController {
             () => this.db.pingCheck('database'),
             () => this.redis.isHealthy('redis'),
             () => this.memory.checkHeap('memory_heap', 300 * 1024 * 1024),
-            () => this.memory.checkRSS('memory_rss', 500 * 1024 * 1024),
+            () => this.memory.checkRSS('memory_rss', 500 * 1024 * 1024)
         ]);
     }
 
@@ -71,7 +65,7 @@ export class HealthController {
     @ApiOperation({ summary: 'Manually reset a circuit breaker' })
     @ApiResponse({
         status: 204,
-        description: 'Circuit breaker reset successfully',
+        description: 'Circuit breaker reset successfully'
     })
     resetCircuitBreaker(@Param('serviceName') serviceName: string): void {
         this.httpClient.resetCircuitBreaker(serviceName);
@@ -80,6 +74,6 @@ export class HealthController {
 
 @Module({
     imports: [TerminusModule, HttpModule],
-    controllers: [HealthController],
+    controllers: [HealthController]
 })
 export class HealthModule {}

@@ -23,7 +23,7 @@ const schema = z.object({
     lockTtl: z.coerce.number().int().positive().default(30000),
     // AWS ElastiCache IAM Authentication
     iamAuthEnabled: z.preprocess((val) => val === 'true', z.boolean()).default(false),
-    iamAuthUsername: z.string().min(1).default('default'),
+    iamAuthUsername: z.string().min(1).default('default')
 });
 
 export type RedisConfig = z.infer<typeof schema>;
@@ -46,7 +46,7 @@ export default registerAs('redis', (): RedisConfig => {
         defaultTtl: process.env.REDIS_DEFAULT_TTL,
         lockTtl: process.env.REDIS_LOCK_TTL,
         iamAuthEnabled: process.env.REDIS_IAM_AUTH_ENABLED,
-        iamAuthUsername: process.env.REDIS_IAM_AUTH_USERNAME,
+        iamAuthUsername: process.env.REDIS_IAM_AUTH_USERNAME
     });
 
     if (!result.success) {

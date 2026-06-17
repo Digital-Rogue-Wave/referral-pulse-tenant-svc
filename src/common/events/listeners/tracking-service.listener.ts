@@ -26,7 +26,7 @@ export class TrackingServiceListener {
     constructor(
         private readonly sideEffectService: SideEffectService,
         private readonly logger: AppLoggerService,
-        private readonly redisKeyBuilder: RedisKeyBuilder,
+        private readonly redisKeyBuilder: RedisKeyBuilder
     ) {
         this.logger.setContext(TrackingServiceListener.name);
     }
@@ -57,24 +57,24 @@ export class TrackingServiceListener {
                     // Additional analytics metadata
                     metadata: {
                         source: 'referral-pulse',
-                        environment: process.env.NODE_ENV,
-                    },
+                        environment: process.env.NODE_ENV
+                    }
                 },
                 {
                     critical: false, // Direct SQS with DLQ (after commit)
-                    idempotencyKey: this.redisKeyBuilder.buildIdempotencyKey(`tracking-${event.eventId}`),
-                },
+                    idempotencyKey: this.redisKeyBuilder.buildIdempotencyKey(`tracking-${event.eventId}`)
+                }
             );
 
             this.logger.debug(`Sent ${event.eventType} to tracking service (async SQS)`, {
                 eventId: event.eventId,
-                queue: ANALYTICS_SVC_FIFO,
+                queue: ANALYTICS_SVC_FIFO
             });
         } catch (error) {
             // Minimal loss acceptable for tracking, DLQ monitors failures
             this.logger.warn(`Failed to send ${event.eventType} to tracking service (check DLQ)`, {
                 eventId: event.eventId,
-                error: error instanceof Error ? error.message : 'Unknown error',
+                error: error instanceof Error ? error.message : 'Unknown error'
             });
         }
     }

@@ -11,9 +11,9 @@ export const ENGINE_FACTORY = 'ENGINE_FACTORY';
         RulesEngineService,
         {
             provide: ENGINE_FACTORY,
-            useValue: () => new Engine(),
-        },
+            useValue: () => new Engine()
+        }
     ],
-    exports: [RulesEngineService],
+    exports: [RulesEngineService]
 })
 export class RulesEngineModule {}

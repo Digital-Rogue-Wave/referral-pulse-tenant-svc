@@ -12,8 +12,8 @@ const schema = z.object({
         errorThresholdPercentage: z.coerce.number().int().min(0).max(100).default(50),
         resetTimeout: z.coerce.number().int().positive().default(30000),
         volumeThreshold: z.coerce.number().int().positive().default(10),
-        maxCacheSize: z.coerce.number().int().positive().default(100),
-    }),
+        maxCacheSize: z.coerce.number().int().positive().default(100)
+    })
 });
 
 export type ResilienceConfig = z.infer<typeof schema>;
@@ -29,8 +29,8 @@ export default registerAs('resilience', (): ResilienceConfig => {
             errorThresholdPercentage: process.env.CIRCUIT_BREAKER_ERROR_THRESHOLD,
             resetTimeout: process.env.CIRCUIT_BREAKER_RESET_TIMEOUT,
             volumeThreshold: process.env.CIRCUIT_BREAKER_VOLUME_THRESHOLD,
-            maxCacheSize: process.env.CIRCUIT_BREAKER_MAX_CACHE_SIZE,
-        },
+            maxCacheSize: process.env.CIRCUIT_BREAKER_MAX_CACHE_SIZE
+        }
     });
 
     if (!result.success) {

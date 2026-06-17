@@ -10,7 +10,7 @@ import {
     UploadedFile,
     UploadedFiles,
     UseGuards,
-    UseInterceptors,
+    UseInterceptors
 } from '@nestjs/common';
 import { ApiBearerAuth, ApiBody, ApiConsumes, ApiOkResponse, ApiTags } from '@nestjs/swagger';
 import { Idempotent, IdempotencyScope } from '@common/idempotency';
@@ -26,7 +26,7 @@ import { FileInterceptor, FilesInterceptor } from '@nestjs/platform-express';
 @ApiBearerAuth()
 @Controller({
     path: 'files',
-    version: '1',
+    version: '1'
 })
 export class FilesController {
     constructor(private readonly filesService: FilesService) {}
@@ -41,10 +41,10 @@ export class FilesController {
             properties: {
                 file: {
                     type: 'string',
-                    format: 'binary',
-                },
-            },
-        },
+                    format: 'binary'
+                }
+            }
+        }
     })
     @ApiOkResponse({ type: FileDto })
     @UseInterceptors(FileInterceptor('file'))
@@ -64,18 +64,16 @@ export class FilesController {
                     type: 'array',
                     items: {
                         type: 'string',
-                        format: 'binary',
-                    },
-                },
-            },
-        },
+                        format: 'binary'
+                    }
+                }
+            }
+        }
     })
     @ApiOkResponse({ type: FileDto, isArray: true })
     @UseInterceptors(FilesInterceptor('files', 10))
     @HttpCode(HttpStatus.CREATED)
-    async uploadMultipleFiles(
-        @UploadedFiles() files: Array<Express.Multer.File | Express.MulterS3.File>,
-    ): Promise<File[]> {
+    async uploadMultipleFiles(@UploadedFiles() files: Array<Express.Multer.File | Express.MulterS3.File>): Promise<File[]> {
         return this.filesService.uploadMultipleFiles(files);
     }
 
@@ -109,19 +107,16 @@ export class FilesController {
             properties: {
                 file: {
                     type: 'string',
-                    format: 'binary',
-                },
-            },
-        },
+                    format: 'binary'
+                }
+            }
+        }
     })
     @ApiOkResponse({ type: FileDto })
     @UseGuards(AuthGuard('jwt'))
     @UseInterceptors(FileInterceptor('file'))
     @HttpCode(HttpStatus.OK)
-    async updateFile(
-        @Param('id') id: string,
-        @UploadedFile() file: Express.Multer.File | Express.MulterS3.File,
-    ): Promise<File> {
+    async updateFile(@Param('id') id: string, @UploadedFile() file: Express.Multer.File | Express.MulterS3.File): Promise<File> {
         return this.filesService.updateFile(id, file);
     }
 

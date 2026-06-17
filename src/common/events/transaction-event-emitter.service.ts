@@ -45,7 +45,7 @@ type NativePrismaTransaction = PrismaClient['$transaction'];
 export class TransactionEventEmitterService {
     constructor(
         private readonly eventEmitter: EventEmitter2,
-        private readonly tenantContext: TenantContextService,
+        private readonly tenantContext: TenantContextService
     ) {}
 
     /**
@@ -113,7 +113,7 @@ export class TransactionEventEmitterService {
     async transaction<T>(
         prisma: PrismaClient,
         arg: Prisma.PrismaPromise<T>[] | ((tx: Prisma.TransactionClient) => Promise<T>),
-        options?: ITransactionOptions,
+        options?: ITransactionOptions
     ): Promise<T | T[]> {
         // Handle sequential transactions (Array of Promises)
         if (Array.isArray(arg)) {
@@ -132,10 +132,7 @@ export class TransactionEventEmitterService {
     /**
      * Handle sequential transactions (Array of Promises)
      */
-    private async handleSequentialTransaction<T>(
-        prisma: PrismaClient,
-        promises: Prisma.PrismaPromise<T>[],
-    ): Promise<T[]> {
+    private async handleSequentialTransaction<T>(prisma: PrismaClient, promises: Prisma.PrismaPromise<T>[]): Promise<T[]> {
         if (this.tenantContext.get('isInTransaction')) {
             // Call native Prisma $transaction directly to avoid infinite recursion
             // Use bound method to preserve correct typing
@@ -148,13 +145,13 @@ export class TransactionEventEmitterService {
             {
                 ...(logContext as Partial<RequestContext>),
                 isInTransaction: true,
-                transactionEvents: [],
+                transactionEvents: []
             },
             async () => {
                 const result = await prisma.$transaction(promises);
                 this.emitTransactionEvents();
                 return result;
-            },
+            }
         );
     }
 
@@ -164,7 +161,7 @@ export class TransactionEventEmitterService {
     private async handleInteractiveTransaction<T>(
         prisma: PrismaClient,
         fn: (tx: Prisma.TransactionClient) => Promise<T>,
-        options?: ITransactionOptions,
+        options?: ITransactionOptions
     ): Promise<T> {
         if (this.tenantContext.get('isInTransaction')) {
             // Call native Prisma $transaction directly to avoid infinite recursion
@@ -178,13 +175,13 @@ export class TransactionEventEmitterService {
             {
                 ...(logContext as Partial<RequestContext>),
                 isInTransaction: true,
-                transactionEvents: [],
+                transactionEvents: []
             },
             async () => {
                 const result = await prisma.$transaction(fn, options);
                 this.emitTransactionEvents();
                 return result;
-            },
+            }
         );
     }
 }

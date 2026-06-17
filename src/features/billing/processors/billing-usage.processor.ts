@@ -8,7 +8,7 @@ import {
     DAILY_USAGE_SNAPSHOT_JOB,
     PAYMENT_STATUS_ESCALATION_JOB,
     TRIAL_LIFECYCLE_JOB,
-    PLAN_STRIPE_SYNC_JOB,
+    PLAN_STRIPE_SYNC_JOB
 } from '@app/types';
 import type { IBillingJobData, IJobResult } from '@app/types';
 
@@ -41,18 +41,9 @@ export class BillingUsageProcessor extends BaseWorkerService<IBillingJobData> {
         private readonly monthlyUsageResetService: MonthlyUsageResetService,
         private readonly paymentStatusEscalationService: PaymentStatusEscalationService,
         private readonly trialLifecycleService: TrialLifecycleService,
-        private readonly planStripeSyncService: PlanStripeSyncService,
+        private readonly planStripeSyncService: PlanStripeSyncService
     ) {
-        super(
-            BILLING_USAGE_QUEUE,
-            connectionFactory,
-            configService,
-            logger,
-            metricsService,
-            tracingService,
-            tenantContext,
-            dateService,
-        );
+        super(BILLING_USAGE_QUEUE, connectionFactory, configService, logger, metricsService, tracingService, tenantContext, dateService);
     }
 
     protected async processJob(job: Job<IBillingJobData>): Promise<IJobResult> {

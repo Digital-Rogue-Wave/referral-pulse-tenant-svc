@@ -31,8 +31,8 @@ const envelopeSchema = z.object({
     metadata: z.object({
         userId: z.string().min(1, 'userId is required'),
         traceId: z.string().min(1, 'traceId is required'),
-        spanId: z.string().optional(),
-    }),
+        spanId: z.string().optional()
+    })
 });
 
 /**
@@ -42,8 +42,8 @@ const systemEnvelopeSchema = envelopeSchema.extend({
     metadata: z.object({
         userId: z.string().optional(),
         traceId: z.string().optional(),
-        spanId: z.string().optional(),
-    }),
+        spanId: z.string().optional()
+    })
 });
 
 /**
@@ -60,11 +60,11 @@ export class MessageEnvelopeService {
         private readonly tracingService: TracingService,
         private readonly logger: AppLoggerService,
         private readonly dateService: DateService,
-        private readonly jsonService: JsonService,
+        private readonly jsonService: JsonService
     ) {
         this.logger.setContext(MessageEnvelopeService.name);
         this.serviceName = this.configService.getOrThrow('app.name', {
-            infer: true,
+            infer: true
         });
     }
 
@@ -113,8 +113,8 @@ export class MessageEnvelopeService {
             metadata: {
                 userId,
                 traceId,
-                spanId: traceInfo?.spanId,
-            },
+                spanId: traceInfo?.spanId
+            }
         };
 
         // Validate the envelope before returning
@@ -136,12 +136,7 @@ export class MessageEnvelopeService {
      * @param tenantId - Tenant ID (defaults to 'system' for system-wide messages)
      * @param idempotencyKey - Optional idempotency key for deduplication
      */
-    createSystemEnvelope<T>(
-        eventType: string,
-        payload: T,
-        tenantId?: string,
-        idempotencyKey?: string,
-    ): IMessageEnvelope<T> {
+    createSystemEnvelope<T>(eventType: string, payload: T, tenantId?: string, idempotencyKey?: string): IMessageEnvelope<T> {
         const traceInfo = this.tracingService.getCurrentTraceInfo();
 
         const envelope: IMessageEnvelope<T> = {
@@ -157,8 +152,8 @@ export class MessageEnvelopeService {
             metadata: {
                 userId: 'system',
                 traceId: traceInfo?.traceId || ulid(),
-                spanId: traceInfo?.spanId,
-            },
+                spanId: traceInfo?.spanId
+            }
         };
 
         // Validate the system envelope
@@ -200,7 +195,7 @@ export class MessageEnvelopeService {
             requestId: envelope.messageId,
             traceId: envelope.metadata?.traceId,
             spanId: envelope.metadata?.spanId,
-            idempotencyKey: envelope.idempotencyKey,
+            idempotencyKey: envelope.idempotencyKey
         };
     }
 
@@ -208,10 +203,7 @@ export class MessageEnvelopeService {
      * Wrap a handler to run within tenant context from envelope.
      * Use this in your message handlers to ensure multi-tenancy.
      */
-    async withTenantContext<T, R>(
-        envelope: IMessageEnvelope<T>,
-        handler: (payload: T, envelope: IMessageEnvelope<T>) => Promise<R>,
-    ): Promise<R> {
+    async withTenantContext<T, R>(envelope: IMessageEnvelope<T>, handler: (payload: T, envelope: IMessageEnvelope<T>) => Promise<R>): Promise<R> {
         const context = this.extractRequestContext(envelope);
         return this.tenantContext.runWithContext(context, async () => {
             return handler(envelope.payload, envelope);

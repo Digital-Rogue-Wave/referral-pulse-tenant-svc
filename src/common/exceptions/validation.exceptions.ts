@@ -6,7 +6,7 @@ export class ValidationException extends BaseException {
     constructor(message: string, errors: string[] = [], details?: Record<string, unknown>) {
         super('VALIDATION_ERROR', message, HttpStatus.BAD_REQUEST, {
             ...details,
-            errors,
+            errors
         });
     }
 }

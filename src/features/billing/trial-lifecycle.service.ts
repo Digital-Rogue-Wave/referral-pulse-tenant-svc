@@ -10,12 +10,7 @@ import { RedisService } from '@common/redis/redis.service';
 import { RedisKeyBuilder } from '@common/redis/redis-key.builder';
 import { TransactionEventEmitterService } from '@common/events/transaction-event-emitter.service';
 
-import {
-    BillingEvents,
-    TrialReminderEvent,
-    TrialExpiredEvent,
-    SubscriptionChangedEvent,
-} from '@domains/billing';
+import { BillingEvents, TrialReminderEvent, TrialExpiredEvent, SubscriptionChangedEvent } from '@domains/billing';
 
 @Injectable()
 export class TrialLifecycleService {
@@ -27,7 +22,7 @@ export class TrialLifecycleService {
         private readonly logger: AppLoggerService,
         private readonly redis: RedisService,
         private readonly keyBuilder: RedisKeyBuilder,
-        private readonly txEventEmitter: TransactionEventEmitterService,
+        private readonly txEventEmitter: TransactionEventEmitterService
     ) {
         this.logger.setContext(TrialLifecycleService.name);
     }
@@ -36,8 +31,8 @@ export class TrialLifecycleService {
         const tenants = await this.prisma.tenant.findMany({
             where: {
                 status: TenantStatusEnum.ACTIVE,
-                deletedAt: null,
-            },
+                deletedAt: null
+            }
         });
 
         for (const tenant of tenants) {
@@ -61,15 +56,10 @@ export class TrialLifecycleService {
         }
     }
 
-    private async handleTrialReminder(
-        tenantId: string,
-        trialEndsAt: Date,
-        daysRemaining: number,
-        now: Date,
-    ): Promise<void> {
+    private async handleTrialReminder(tenantId: string, trialEndsAt: Date, daysRemaining: number, now: Date): Promise<void> {
         const dedupKey = this.keyBuilder.buildDedupKey(
             `trial-reminder-${tenantId}-${String(daysRemaining)}-${trialEndsAt.toISOString().slice(0, 10)}`,
-            false,
+            false
         );
         const shouldEmit = await this.redis.setNx(dedupKey, '1', TrialLifecycleService.DEDUP_TTL_SECONDS);
 
@@ -79,7 +69,7 @@ export class TrialLifecycleService {
 
         this.txEventEmitter.emitAfterCommit(
             BillingEvents.TRIAL_REMINDER,
-            new TrialReminderEvent(tenantId, tenantId, trialEndsAt.toISOString(), daysRemaining, now.toISOString()),
+            new TrialReminderEvent(tenantId, tenantId, trialEndsAt.toISOString(), daysRemaining, now.toISOString())
         );
     }
 
@@ -91,8 +81,8 @@ export class TrialLifecycleService {
                 tenantId,
                 isActive: true,
                 manualInvoicing: true,
-                deletedAt: null,
-            },
+                deletedAt: null
+            }
         });
 
         if (manualPlan) {
@@ -116,8 +106,8 @@ export class TrialLifecycleService {
                     cancellationReason: null,
                     cancellationRequestedAt: null,
                     cancellationEffectiveAt: null,
-                    stripeSubscriptionId: null,
-                },
+                    stripeSubscriptionId: null
+                }
             });
 
             this.txEventEmitter.emitAfterCommit(
@@ -128,8 +118,8 @@ export class TrialLifecycleService {
                     BillingPlanEnum.FREE,
                     SubscriptionStatusEnum.NONE,
                     undefined,
-                    billing.stripeCustomerId ?? undefined,
-                ),
+                    billing.stripeCustomerId ?? undefined
+                )
             );
         }
 
@@ -137,13 +127,10 @@ export class TrialLifecycleService {
 
         await this.prisma.tenant.update({
             where: { id: tenantId },
-            data: { trialEndsAt: null },
+            data: { trialEndsAt: null }
         });
 
-        const dedupKey = this.keyBuilder.buildDedupKey(
-            `trial-expired-${tenantId}-${(oldTrialEndsAt ?? now).toISOString().slice(0, 10)}`,
-            false,
-        );
+        const dedupKey = this.keyBuilder.buildDedupKey(`trial-expired-${tenantId}-${(oldTrialEndsAt ?? now).toISOString().slice(0, 10)}`, false);
         const shouldEmit = await this.redis.setNx(dedupKey, '1', TrialLifecycleService.DEDUP_TTL_SECONDS);
 
         if (!shouldEmit) {
@@ -152,13 +139,13 @@ export class TrialLifecycleService {
 
         this.txEventEmitter.emitAfterCommit(
             BillingEvents.TRIAL_EXPIRED,
-            new TrialExpiredEvent(tenantId, tenantId, (oldTrialEndsAt ?? now).toISOString(), now.toISOString()),
+            new TrialExpiredEvent(tenantId, tenantId, (oldTrialEndsAt ?? now).toISOString(), now.toISOString())
         );
     }
 
     private async ensureBillingForTenant(tenantId: string): Promise<Billing> {
         const existing = await this.prisma.billing.findUnique({
-            where: { tenantId },
+            where: { tenantId }
         });
         if (existing) {
             return existing;
@@ -168,8 +155,8 @@ export class TrialLifecycleService {
             data: {
                 tenantId,
                 plan: BillingPlanEnum.FREE,
-                status: SubscriptionStatusEnum.NONE,
-            },
+                status: SubscriptionStatusEnum.NONE
+            }
         });
     }
 }

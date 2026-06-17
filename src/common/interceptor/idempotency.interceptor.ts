@@ -43,7 +43,7 @@ export class IdempotencyInterceptor implements NestInterceptor<unknown, unknown>
         private readonly idempotencyService: IdempotencyService,
         private readonly keyGenerator: IdempotencyKeyGenerator,
         private readonly tenantContext: TenantContextService,
-        private readonly logger: AppLoggerService,
+        private readonly logger: AppLoggerService
     ) {
         this.logger.setContext(IdempotencyInterceptor.name);
     }
@@ -71,9 +71,7 @@ export class IdempotencyInterceptor implements NestInterceptor<unknown, unknown>
 
         // If idempotency is required but no key provided, reject
         if (options.required && !customKey) {
-            throw new BadRequestException(
-                `${options.headerName || 'Idempotency-Key'} header is required for this endpoint`,
-            );
+            throw new BadRequestException(`${options.headerName || 'Idempotency-Key'} header is required for this endpoint`);
         }
 
         // If no key provided and not required, skip idempotency
@@ -92,15 +90,15 @@ export class IdempotencyInterceptor implements NestInterceptor<unknown, unknown>
             scopedKey,
             scope: options.scope,
             method: request.method,
-            path: request.path,
+            path: request.path
         });
 
         // Execute with idempotency protection
         return from(
             this.idempotencyService.executeOnce<unknown>(scopedKey, () => lastValueFrom(next.handle()), {
                 ttl: options.ttl,
-                storeResponse: options.storeResponse,
-            }),
+                storeResponse: options.storeResponse
+            })
         ).pipe(
             switchMap(({ result, isDuplicate }) => {
                 if (isDuplicate) {
@@ -108,30 +106,25 @@ export class IdempotencyInterceptor implements NestInterceptor<unknown, unknown>
                     this.logger.log('Returned cached response for duplicate request', {
                         scopedKey,
                         method: request.method,
-                        path: request.path,
+                        path: request.path
                     });
                 } else {
                     this.logger.log('Processed and cached new request', {
                         scopedKey,
                         method: request.method,
-                        path: request.path,
+                        path: request.path
                     });
                 }
 
                 return from([result]);
-            }),
+            })
         );
     }
 
     /**
      * Build scoped idempotency key based on scope configuration
      */
-    private buildScopedKey(
-        customKey: string,
-        scope: IdempotencyScope,
-        tenantId: string | undefined,
-        userId: string | undefined,
-    ): string {
+    private buildScopedKey(customKey: string, scope: IdempotencyScope, tenantId: string | undefined, userId: string | undefined): string {
         switch (scope) {
             case IdempotencyScope.Tenant:
                 if (!tenantId) {

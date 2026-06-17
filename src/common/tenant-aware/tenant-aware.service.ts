@@ -47,7 +47,7 @@ export class TenantAwareService {
                 const tenantId = this.getRequiredTenantId();
                 return delegate.create({
                     ...args,
-                    data: { ...args.data, tenantId },
+                    data: { ...args.data, tenantId }
                 });
             },
 
@@ -62,7 +62,7 @@ export class TenantAwareService {
                     select?: unknown;
                     include?: unknown;
                 },
-                options: ITenantReadOptions = {},
+                options: ITenantReadOptions = {}
             ) => {
                 const where = this.scopeWhere(args.where, options);
                 return delegate.findUnique({ ...args, where });
@@ -78,12 +78,7 @@ export class TenantAwareService {
                 return delegate.findFirstOrThrow({ ...args, where });
             },
 
-            update: (args: {
-                where: Record<string, unknown>;
-                data: Record<string, unknown>;
-                select?: unknown;
-                include?: unknown;
-            }) => {
+            update: (args: { where: Record<string, unknown>; data: Record<string, unknown>; select?: unknown; include?: unknown }) => {
                 const tenantId = this.getRequiredTenantId();
                 const where = { ...args.where, tenantId };
                 return delegate.update({ ...args, where });
@@ -104,7 +99,7 @@ export class TenantAwareService {
             count: (args = {}, options: ITenantReadOptions = {}) => {
                 const where = this.scopeWhere(args.where, options);
                 return delegate.count({ ...args, where });
-            },
+            }
         };
     }
 
@@ -118,9 +113,9 @@ export class TenantAwareService {
             throw new HttpException(
                 {
                     message: 'Tenant context is required but not set',
-                    errorCode: 'TENANT_CONTEXT_REQUIRED',
+                    errorCode: 'TENANT_CONTEXT_REQUIRED'
                 },
-                HttpStatus.UNAUTHORIZED,
+                HttpStatus.UNAUTHORIZED
             );
         }
         return tenantId;
@@ -135,7 +130,7 @@ export class TenantAwareService {
      */
     withTenantFilter<T extends Record<string, unknown>>(
         where: T = {} as T,
-        options: { includeSoftDeleted?: boolean } = {},
+        options: { includeSoftDeleted?: boolean } = {}
     ): T & { tenantId: string; deletedAt?: null } {
         const tenantId = this.getRequiredTenantId();
         const result = { ...where, tenantId } as T & {

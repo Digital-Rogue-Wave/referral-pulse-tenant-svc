@@ -6,7 +6,7 @@ describe('JsonService', () => {
 
     beforeEach(async () => {
         const module: TestingModule = await Test.createTestingModule({
-            providers: [JsonService],
+            providers: [JsonService]
         }).compile();
 
         service = module.get<JsonService>(JsonService);
@@ -34,7 +34,7 @@ describe('JsonService', () => {
             const result = service.parse(json);
             expect(result).toEqual({
                 user: { name: 'John', age: 30 },
-                items: [1, 2, 3],
+                items: [1, 2, 3]
             });
         });
 
@@ -118,7 +118,7 @@ describe('JsonService Performance Benchmarks', () => {
 
     beforeEach(async () => {
         const module: TestingModule = await Test.createTestingModule({
-            providers: [JsonService],
+            providers: [JsonService]
         }).compile();
 
         service = module.get<JsonService>(JsonService);
@@ -134,8 +134,8 @@ describe('JsonService Performance Benchmarks', () => {
                 tags: ['tag1', 'tag2', 'tag3'],
                 metadata: {
                     created: new Date().toISOString(),
-                    updated: new Date().toISOString(),
-                },
+                    updated: new Date().toISOString()
+                }
             };
         }
         return obj;
@@ -145,8 +145,8 @@ describe('JsonService Performance Benchmarks', () => {
         const data = {
             items: Array.from({ length: 10 }, (_, i) => ({
                 id: i,
-                name: `Item ${i}`,
-            })),
+                name: `Item ${i}`
+            }))
         };
         const json = JSON.stringify(data);
 
@@ -236,9 +236,7 @@ describe('JsonService Performance Benchmarks', () => {
         console.log(`\nPerformance Comparison (200KB+ payload):`);
         console.log(`  simdjson: ${simdjsonAvg.toFixed(3)}ms per parse`);
         console.log(`  native:   ${nativeAvg.toFixed(3)}ms per parse`);
-        console.log(
-            `  Speedup:  ${speedup >= 1 ? speedup.toFixed(2) + 'x faster' : '(native is faster for this size)'}`,
-        );
+        console.log(`  Speedup:  ${speedup >= 1 ? speedup.toFixed(2) + 'x faster' : '(native is faster for this size)'}`);
 
         // Just verify both parsers work correctly
         // Performance advantage varies by payload size and structure

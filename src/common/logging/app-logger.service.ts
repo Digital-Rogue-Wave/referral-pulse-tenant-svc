@@ -18,7 +18,7 @@ const LOG_EMOJIS = {
     info: '✅',
     warn: '⚠️',
     error: '❌',
-    fatal: '💀',
+    fatal: '💀'
 } as const;
 
 @Injectable({ scope: Scope.TRANSIENT })
@@ -29,20 +29,20 @@ export class AppLoggerService implements LoggerService {
     constructor(
         private readonly configService: ConfigService<AllConfigType>,
         private readonly tenantContext: TenantContextService,
-        private readonly jsonService: JsonService,
+        private readonly jsonService: JsonService
     ) {
         const nodeEnv = this.configService.getOrThrow('app.nodeEnv', {
-            infer: true,
+            infer: true
         });
         const serviceName = this.configService.getOrThrow('app.name', {
-            infer: true,
+            infer: true
         });
         const logLevel = this.configService.get('tracing.logLevel', { infer: true }) || 'info';
         const lokiEnabled = this.configService.get('tracing.lokiEnabled', {
-            infer: true,
+            infer: true
         });
         const lokiHost = this.configService.get('tracing.lokiHost', {
-            infer: true,
+            infer: true
         });
 
         const isDevelopment = nodeEnv === Environment.Development;
@@ -56,8 +56,8 @@ export class AppLoggerService implements LoggerService {
                       colorize: true,
                       translateTime: 'SYS:standard',
                       ignore: 'pid,hostname',
-                      messageFormat: '{emoji} {msg}',
-                  },
+                      messageFormat: '{emoji} {msg}'
+                  }
               }
             : shouldUseLoki
               ? {
@@ -65,17 +65,17 @@ export class AppLoggerService implements LoggerService {
                     options: {
                         host: lokiHost,
                         basicAuth: this.configService.get('tracing.lokiBasicAuth', {
-                            infer: true,
+                            infer: true
                         }),
                         labels: this.parseLokiLabels(this.configService.get('tracing.lokiLabels', { infer: true })),
                         batching: true,
                         interval:
                             this.configService.get('tracing.lokiBatchInterval', {
-                                infer: true,
+                                infer: true
                             }) || 5000,
                         timeout: 10000,
-                        replaceTimestamp: false,
-                    },
+                        replaceTimestamp: false
+                    }
                 }
               : undefined;
 
@@ -87,11 +87,11 @@ export class AppLoggerService implements LoggerService {
                 bindings: (bindings) => ({
                     pid: bindings.pid,
                     host: bindings.hostname,
-                    service: serviceName,
-                }),
+                    service: serviceName
+                })
             },
             timestamp: pino.stdTimeFunctions.isoTime,
-            ...(transport ? { transport } : {}),
+            ...(transport ? { transport } : {})
         });
     }
 
@@ -134,10 +134,7 @@ export class AppLoggerService implements LoggerService {
     }
 
     log(message: string, context?: Record<string, unknown>): void {
-        this.logger.info(
-            { ...this.getEnrichedContext(context), emoji: LOG_EMOJIS.info },
-            `${LOG_EMOJIS.info} ${message}`,
-        );
+        this.logger.info({ ...this.getEnrichedContext(context), emoji: LOG_EMOJIS.info }, `${LOG_EMOJIS.info} ${message}`);
     }
 
     info(message: string, context?: Record<string, unknown>): void {
@@ -145,38 +142,23 @@ export class AppLoggerService implements LoggerService {
     }
 
     debug(message: string, context?: Record<string, unknown>): void {
-        this.logger.debug(
-            { ...this.getEnrichedContext(context), emoji: LOG_EMOJIS.debug },
-            `${LOG_EMOJIS.debug} ${message}`,
-        );
+        this.logger.debug({ ...this.getEnrichedContext(context), emoji: LOG_EMOJIS.debug }, `${LOG_EMOJIS.debug} ${message}`);
     }
 
     warn(message: string, context?: Record<string, unknown>): void {
-        this.logger.warn(
-            { ...this.getEnrichedContext(context), emoji: LOG_EMOJIS.warn },
-            `${LOG_EMOJIS.warn} ${message}`,
-        );
+        this.logger.warn({ ...this.getEnrichedContext(context), emoji: LOG_EMOJIS.warn }, `${LOG_EMOJIS.warn} ${message}`);
     }
 
     error(message: string, trace?: string, context?: Record<string, unknown>): void {
-        this.logger.error(
-            { ...this.getEnrichedContext(context), emoji: LOG_EMOJIS.error, trace },
-            `${LOG_EMOJIS.error} ${message}`,
-        );
+        this.logger.error({ ...this.getEnrichedContext(context), emoji: LOG_EMOJIS.error, trace }, `${LOG_EMOJIS.error} ${message}`);
     }
 
     verbose(message: string, context?: Record<string, unknown>): void {
-        this.logger.trace(
-            { ...this.getEnrichedContext(context), emoji: LOG_EMOJIS.trace },
-            `${LOG_EMOJIS.trace} ${message}`,
-        );
+        this.logger.trace({ ...this.getEnrichedContext(context), emoji: LOG_EMOJIS.trace }, `${LOG_EMOJIS.trace} ${message}`);
     }
 
     fatal(message: string, context?: Record<string, unknown>): void {
-        this.logger.fatal(
-            { ...this.getEnrichedContext(context), emoji: LOG_EMOJIS.fatal },
-            `${LOG_EMOJIS.fatal} ${message}`,
-        );
+        this.logger.fatal({ ...this.getEnrichedContext(context), emoji: LOG_EMOJIS.fatal }, `${LOG_EMOJIS.fatal} ${message}`);
     }
 
     child(bindings: Record<string, unknown>): Logger {

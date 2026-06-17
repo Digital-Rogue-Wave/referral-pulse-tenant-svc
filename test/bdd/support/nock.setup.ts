@@ -26,16 +26,10 @@ export function setupNock(): void {
     nock.enableNetConnect(/^(?!localhost:4444|localhost:4466).*$/);
 
     // ── JWKS (must be .persist() — jwks-rsa fetches on every token when cache=false) ──
-    jwksScope = nock(HYDRA_BASE)
-        .persist()
-        .get('/.well-known/jwks.json')
-        .reply(200, buildJwks());
+    jwksScope = nock(HYDRA_BASE).persist().get('/.well-known/jwks.json').reply(200, buildJwks());
 
     // ── Keto permission check (allow everything by default) ──
-    ketoScope = nock(KETO_READ_BASE)
-        .persist()
-        .post('/relation-tuples/check')
-        .reply(200, { allowed: true });
+    ketoScope = nock(KETO_READ_BASE).persist().post('/relation-tuples/check').reply(200, { allowed: true });
 }
 
 /**
@@ -52,10 +46,7 @@ export function teardownNock(): void {
  * nock uses the most recently registered matching interceptor first.
  */
 export function denyNextKetoCheck(): void {
-    nock(KETO_READ_BASE)
-        .post('/relation-tuples/check')
-        .once()
-        .reply(200, { allowed: false });
+    nock(KETO_READ_BASE).post('/relation-tuples/check').once().reply(200, { allowed: false });
 }
 
 export { jwksScope, ketoScope };

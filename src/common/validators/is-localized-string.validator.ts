@@ -26,8 +26,8 @@ export function IsLocalizedString(validationOptions?: ValidationOptions) {
                 },
                 defaultMessage(args: ValidationArguments) {
                     return `${args.property} must be an object with at least one locale key containing a non-empty string value`;
-                },
-            },
+                }
+            }
         });
     };
 }

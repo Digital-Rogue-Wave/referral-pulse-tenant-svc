@@ -23,18 +23,9 @@ export class TenantDeletionProcessor extends BaseWorkerService<TenantDeletionJob
         tracingService: TracingService,
         tenantContext: TenantContextService,
         dateService: DateService,
-        private readonly tenantService: TenantService,
+        private readonly tenantService: TenantService
     ) {
-        super(
-            TENANT_DELETION_QUEUE,
-            connectionFactory,
-            configService,
-            logger,
-            metricsService,
-            tracingService,
-            tenantContext,
-            dateService,
-        );
+        super(TENANT_DELETION_QUEUE, connectionFactory, configService, logger, metricsService, tracingService, tenantContext, dateService);
     }
 
     protected async processJob(job: Job<TenantDeletionJobData>): Promise<IJobResult> {
@@ -43,7 +34,7 @@ export class TenantDeletionProcessor extends BaseWorkerService<TenantDeletionJob
         this.logger.log(`Processing tenant deletion job for tenant ${tenantId}`, {
             tenantId,
             scheduledAt,
-            reason,
+            reason
         });
 
         await this.tenantService.executeDeletion(tenantId);

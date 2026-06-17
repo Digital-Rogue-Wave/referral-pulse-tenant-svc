@@ -42,5 +42,5 @@ export const Idempotent = (options: IdempotencyDecoratorOptions = {}) =>
         headerName: 'Idempotency-Key',
         required: false,
         storeResponse: true,
-        ...options,
+        ...options
     });

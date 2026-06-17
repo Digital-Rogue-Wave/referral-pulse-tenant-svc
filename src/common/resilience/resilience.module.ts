@@ -13,6 +13,6 @@ import { CircuitBreakerService } from './circuit-breaker.service';
 @Global()
 @Module({
     providers: [CircuitBreakerService],
-    exports: [CircuitBreakerService],
+    exports: [CircuitBreakerService]
 })
 export class ResilienceModule {}

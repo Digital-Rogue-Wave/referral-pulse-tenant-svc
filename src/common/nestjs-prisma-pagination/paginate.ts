@@ -35,7 +35,7 @@ export async function prismaPaginate<T extends Record<string, any>>(
     query: PaginateQuery<T>,
     delegate: PrismaDelegate<T>,
     config: PaginateConfig<T>,
-    baseWhere: Record<string, any> = {},
+    baseWhere: Record<string, any> = {}
 ): Promise<Paginated<T>> {
     const {
         sortableColumns,
@@ -44,7 +44,7 @@ export async function prismaPaginate<T extends Record<string, any>>(
         searchableColumns = [],
         defaultLimit = 10,
         maxLimit = 100,
-        minLimit = 1,
+        minLimit = 1
     } = config;
 
     // Parse pagination
@@ -65,8 +65,8 @@ export async function prismaPaginate<T extends Record<string, any>>(
         searchWhere.OR = searchableColumns.map((column: keyof T) => ({
             [String(column)]: {
                 contains: query.search,
-                mode: 'insensitive',
-            },
+                mode: 'insensitive'
+            }
         }));
     }
 
@@ -74,7 +74,7 @@ export async function prismaPaginate<T extends Record<string, any>>(
     const where = {
         ...baseWhere,
         ...filterWhere,
-        ...searchWhere,
+        ...searchWhere
     };
 
     // Parse sort
@@ -86,9 +86,9 @@ export async function prismaPaginate<T extends Record<string, any>>(
             where,
             orderBy,
             skip,
-            take: limit,
+            take: limit
         }),
-        delegate.count({ where }),
+        delegate.count({ where })
     ]);
 
     // Build response
@@ -128,14 +128,14 @@ export async function prismaPaginate<T extends Record<string, any>>(
             }),
             searchBy: searchableColumns.map(String),
             search: query.search || '',
-            filter: filterItems,
+            filter: filterItems
         },
         links: {
             first: buildLink(1),
             previous: hasPreviousPage ? buildLink(page - 1) : '',
             current: buildLink(page),
             next: hasNextPage ? buildLink(page + 1) : '',
-            last: buildLink(totalPages),
-        },
+            last: buildLink(totalPages)
+        }
     };
 }

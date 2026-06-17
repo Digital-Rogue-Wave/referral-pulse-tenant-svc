@@ -18,7 +18,7 @@ import {
     TenantPaymentStatusChangedEvent,
     TrialExpiredEvent,
     TrialReminderEvent,
-    BillingEvents,
+    BillingEvents
 } from '@domains/billing';
 import { BILLING_EVENTS_TOPIC, type BaseEventType, type SnsTopicName } from '@app/types';
 
@@ -44,7 +44,7 @@ export class BroadcastEventListener {
         private readonly sideEffectService: SideEffectService,
         private readonly logger: AppLoggerService,
         private readonly configService: ConfigService<AllConfigType>,
-        private readonly redisKeyBuilder: RedisKeyBuilder,
+        private readonly redisKeyBuilder: RedisKeyBuilder
     ) {
         this.logger.setContext(BroadcastEventListener.name);
         this.serviceName = this.configService.get('app.name', { infer: true }) || 'unknown-service';
@@ -59,7 +59,7 @@ export class BroadcastEventListener {
         if (!topicName) {
             this.logger.debug('No topic specified for broadcast', {
                 eventType: event.eventType,
-                eventId: event.eventId,
+                eventId: event.eventId
             });
             return;
         }
@@ -79,22 +79,20 @@ export class BroadcastEventListener {
                     tenantId: event.tenantId,
                     userId: event.userId,
                     occurredAt: event.occurredAt.toISOString(),
-                    payload: event,
+                    payload: event
                 },
                 {
                     critical: false,
-                    idempotencyKey: this.redisKeyBuilder.buildIdempotencyKey(
-                        `broadcast-${event.eventType}-${event.eventId}`,
-                    ),
-                    messageGroupId: event.tenantId,
-                },
+                    idempotencyKey: this.redisKeyBuilder.buildIdempotencyKey(`broadcast-${event.eventType}-${event.eventId}`),
+                    messageGroupId: event.tenantId
+                }
             );
 
             this.logger.debug(`Broadcasted ${event.eventType} to topic ${topicName}`, {
                 broadcastId,
                 eventId: event.eventId,
                 aggregateId: event.aggregateId,
-                topicName,
+                topicName
             });
         } catch (error) {
             this.logger.warn(`Failed to broadcast ${event.eventType} to ${topicName}`, {
@@ -102,7 +100,7 @@ export class BroadcastEventListener {
                 eventId: event.eventId,
                 aggregateId: event.aggregateId,
                 topicName,
-                error: error instanceof Error ? error.message : 'Unknown error',
+                error: error instanceof Error ? error.message : 'Unknown error'
             });
         }
     }
@@ -121,7 +119,7 @@ export class BroadcastEventListener {
             currentPeriodEnd: event.currentPeriodEnd,
             stripeEventId: event.stripeEventId,
             tenantId: event.tenantId,
-            userId: event.userId,
+            userId: event.userId
         });
     }
 
@@ -133,7 +131,7 @@ export class BroadcastEventListener {
             endsAt: event.cancellationEffectiveAt,
             reason: event.reason,
             tenantId: event.tenantId,
-            userId: event.userId,
+            userId: event.userId
         });
     }
 
@@ -144,7 +142,7 @@ export class BroadcastEventListener {
             targetPlan: event.targetPlan,
             effectiveDate: event.effectiveDate,
             tenantId: event.tenantId,
-            userId: event.userId,
+            userId: event.userId
         });
     }
 
@@ -155,7 +153,7 @@ export class BroadcastEventListener {
             newPlan: event.billingPlan,
             effectiveDate: event.effectiveDate,
             tenantId: event.tenantId,
-            userId: event.userId,
+            userId: event.userId
         });
     }
 
@@ -166,7 +164,7 @@ export class BroadcastEventListener {
             daysRemaining: event.daysRemaining,
             triggeredAt: event.triggeredAt,
             tenantId: event.tenantId,
-            userId: event.userId,
+            userId: event.userId
         });
     }
 
@@ -176,7 +174,7 @@ export class BroadcastEventListener {
             trialEndsAt: event.trialEndsAt,
             triggeredAt: event.triggeredAt,
             tenantId: event.tenantId,
-            userId: event.userId,
+            userId: event.userId
         });
     }
 
@@ -191,68 +189,26 @@ export class BroadcastEventListener {
             changedAt: event.changedAt,
             reason: event.reason,
             tenantId: event.tenantId,
-            userId: event.userId,
+            userId: event.userId
         };
 
-        await this.broadcast(
-            'billing',
-            event.eventType,
-            event.tenantId,
-            event.eventId,
-            BILLING_EVENTS_TOPIC,
-            statusData,
-        );
+        await this.broadcast('billing', event.eventType, event.tenantId, event.eventId, BILLING_EVENTS_TOPIC, statusData);
 
         if (next === PaymentStatusEnum.PAST_DUE) {
-            await this.broadcast(
-                'billing',
-                BillingEvents.PAYMENT_FAILED,
-                event.tenantId,
-                event.eventId,
-                BILLING_EVENTS_TOPIC,
-                statusData,
-            );
+            await this.broadcast('billing', BillingEvents.PAYMENT_FAILED, event.tenantId, event.eventId, BILLING_EVENTS_TOPIC, statusData);
         }
 
         if (next === PaymentStatusEnum.RESTRICTED) {
-            await this.broadcast(
-                'billing',
-                BillingEvents.TENANT_RESTRICTED,
-                event.tenantId,
-                event.eventId,
-                BILLING_EVENTS_TOPIC,
-                statusData,
-            );
+            await this.broadcast('billing', BillingEvents.TENANT_RESTRICTED, event.tenantId, event.eventId, BILLING_EVENTS_TOPIC, statusData);
         }
 
         if (next === PaymentStatusEnum.LOCKED) {
-            await this.broadcast(
-                'billing',
-                BillingEvents.TENANT_LOCKED,
-                event.tenantId,
-                event.eventId,
-                BILLING_EVENTS_TOPIC,
-                statusData,
-            );
+            await this.broadcast('billing', BillingEvents.TENANT_LOCKED, event.tenantId, event.eventId, BILLING_EVENTS_TOPIC, statusData);
         }
 
         if (next === PaymentStatusEnum.ACTIVE && previous !== PaymentStatusEnum.ACTIVE) {
-            await this.broadcast(
-                'billing',
-                BillingEvents.PAYMENT_RESTORED,
-                event.tenantId,
-                event.eventId,
-                BILLING_EVENTS_TOPIC,
-                statusData,
-            );
-            await this.broadcast(
-                'billing',
-                BillingEvents.TENANT_RESTORED,
-                event.tenantId,
-                event.eventId,
-                BILLING_EVENTS_TOPIC,
-                statusData,
-            );
+            await this.broadcast('billing', BillingEvents.PAYMENT_RESTORED, event.tenantId, event.eventId, BILLING_EVENTS_TOPIC, statusData);
+            await this.broadcast('billing', BillingEvents.TENANT_RESTORED, event.tenantId, event.eventId, BILLING_EVENTS_TOPIC, statusData);
         }
     }
 
@@ -264,29 +220,20 @@ export class BroadcastEventListener {
         tenantId: string,
         eventId: string,
         topicName: SnsTopicName,
-        message: Record<string, unknown>,
+        message: Record<string, unknown>
     ): Promise<void> {
         try {
-            await this.sideEffectService.createBroadcastSideEffect(
-                aggregateType,
-                tenantId,
-                eventType,
-                topicName,
-                message,
-                {
-                    critical: false,
-                    messageGroupId: tenantId,
-                    idempotencyKey: this.redisKeyBuilder.buildIdempotencyKey(
-                        `${aggregateType}-${eventType}-${eventId}`,
-                    ),
-                },
-            );
+            await this.sideEffectService.createBroadcastSideEffect(aggregateType, tenantId, eventType, topicName, message, {
+                critical: false,
+                messageGroupId: tenantId,
+                idempotencyKey: this.redisKeyBuilder.buildIdempotencyKey(`${aggregateType}-${eventType}-${eventId}`)
+            });
 
             this.logger.debug(`Broadcast ${eventType} to ${topicName}`, { eventId, tenantId });
         } catch (error) {
             this.logger.warn(`Failed to broadcast ${eventType} to ${topicName} (check DLQ)`, {
                 eventId,
-                error: error instanceof Error ? error.message : 'Unknown error',
+                error: error instanceof Error ? error.message : 'Unknown error'
             });
         }
     }

@@ -15,13 +15,13 @@ import { HttpOutboundInterceptor } from '../interceptor';
             useFactory: (configService: ConfigService<AllConfigType>) => ({
                 timeout: configService.getOrThrow('http.timeout', { infer: true }),
                 maxRedirects: configService.getOrThrow('http.maxRedirects', {
-                    infer: true,
-                }),
-            }),
-        }),
+                    infer: true
+                })
+            })
+        })
     ],
     providers: [HttpClientService, HttpOutboundInterceptor],
-    exports: [HttpClientService, NestHttpModule],
+    exports: [HttpClientService, NestHttpModule]
 })
 export class HttpModule {}
 

@@ -16,26 +16,19 @@ export class PlanStripeSyncService {
         private readonly prisma: DatabaseService,
         private readonly logger: AppLoggerService,
         private readonly stripeService: StripeService,
-        private readonly planService: PlanService,
+        private readonly planService: PlanService
     ) {
         this.logger.setContext(PlanStripeSyncService.name);
     }
 
     private buildLimitsFromMetadata(price: Stripe.Price, product: Stripe.Product | null): PlanLimits | null {
-        const limitKeys: (keyof PlanLimits)[] = [
-            'referred_users',
-            'campaigns',
-            'seats',
-            'leaderboard_entries',
-            'email_sends',
-        ];
+        const limitKeys: (keyof PlanLimits)[] = ['referred_users', 'campaigns', 'seats', 'leaderboard_entries', 'email_sends'];
 
         const limits: PlanLimits = {};
 
         for (const key of limitKeys) {
             const rawValue =
-                (price.metadata && price.metadata[key as string]) ??
-                (product && product.metadata ? product.metadata[key as string] : undefined);
+                (price.metadata && price.metadata[key as string]) ?? (product && product.metadata ? product.metadata[key as string] : undefined);
 
             if (rawValue === null) {
                 continue;
@@ -43,9 +36,7 @@ export class PlanStripeSyncService {
 
             const num = Number(rawValue);
             if (!Number.isFinite(num) || num < 0) {
-                this.logger.warn(
-                    `Ignoring invalid limit value for key "${String(key)}" on Stripe price ${price.id}: rawValue=${rawValue}`,
-                );
+                this.logger.warn(`Ignoring invalid limit value for key "${String(key)}" on Stripe price ${price.id}: rawValue=${rawValue}`);
                 continue;
             }
 
@@ -63,7 +54,7 @@ export class PlanStripeSyncService {
 
     private buildMetadataSnapshot(price: Stripe.Price, product: Stripe.Product | null): Record<string, unknown> | null {
         const metadata: Record<string, unknown> = {
-            priceMetadata: { ...price.metadata },
+            priceMetadata: { ...price.metadata }
         };
 
         if (product) {
@@ -97,9 +88,7 @@ export class PlanStripeSyncService {
         try {
             prices = await this.stripeService.listActiveRecurringPricesWithProducts();
         } catch (error) {
-            this.logger.warn(
-                `Skipping Stripe Products/Prices sync because Stripe configuration or API is unavailable: ${(error as Error).message}`,
-            );
+            this.logger.warn(`Skipping Stripe Products/Prices sync because Stripe configuration or API is unavailable: ${(error as Error).message}`);
             return;
         }
 
@@ -130,7 +119,7 @@ export class PlanStripeSyncService {
             if (!limits) {
                 this.logger.debug(
                     `Skipping Stripe price ${price.id} because no recognized plan limit metadata was found; ` +
-                        'add PlanLimits keys (referred_users, campaigns, seats, leaderboard_entries, email_sends) to Stripe metadata to include it.',
+                        'add PlanLimits keys (referred_users, campaigns, seats, leaderboard_entries, email_sends) to Stripe metadata to include it.'
                 );
                 return false;
             }
@@ -143,7 +132,7 @@ export class PlanStripeSyncService {
             const metadataJson = (metadata as unknown as Prisma.InputJsonValue) ?? Prisma.JsonNull;
 
             const existing = await this.prisma.plan.findFirst({
-                where: { stripePriceId: price.id, deletedAt: null },
+                where: { stripePriceId: price.id, deletedAt: null }
             });
 
             if (!existing) {
@@ -157,8 +146,8 @@ export class PlanStripeSyncService {
                         tenantId: null,
                         isActive: true,
                         manualInvoicing: false,
-                        metadata: metadataJson,
-                    },
+                        metadata: metadataJson
+                    }
                 });
             } else {
                 await this.prisma.plan.update({
@@ -169,17 +158,14 @@ export class PlanStripeSyncService {
                         interval,
                         limits: limitsJson,
                         metadata: metadataJson,
-                        isActive: true,
-                    },
+                        isActive: true
+                    }
                 });
             }
 
             return true;
         } catch (error) {
-            this.logger.error(
-                `Failed to sync Stripe price ${price.id}: ${(error as Error).message}`,
-                (error as Error).stack,
-            );
+            this.logger.error(`Failed to sync Stripe price ${price.id}: ${(error as Error).message}`, (error as Error).stack);
             return false;
         }
     }
@@ -197,7 +183,7 @@ export class PlanStripeSyncService {
         }
 
         const existingPlans = await this.prisma.plan.findMany({
-            where: { deletedAt: null },
+            where: { deletedAt: null }
         });
 
         for (const plan of existingPlans) {
@@ -207,13 +193,13 @@ export class PlanStripeSyncService {
 
             if (plan.isActive) {
                 this.logger.log(
-                    `Marking plan ${plan.id} (stripePriceId=${plan.stripePriceId}) as inactive because it no longer exists in Stripe sync results`,
+                    `Marking plan ${plan.id} (stripePriceId=${plan.stripePriceId}) as inactive because it no longer exists in Stripe sync results`
                 );
             }
 
             await this.prisma.plan.update({
                 where: { id: plan.id },
-                data: { isActive: false },
+                data: { isActive: false }
             });
         }
     }

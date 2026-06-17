@@ -31,17 +31,17 @@ export class HttpClientService implements OnModuleInit {
         private readonly tracingService: TracingService,
         private readonly circuitBreakerService: CircuitBreakerService,
         private readonly logger: AppLoggerService,
-        private readonly dateService: DateService,
+        private readonly dateService: DateService
     ) {
         this.logger.setContext(HttpClientService.name);
         this.defaultTimeout = this.configService.getOrThrow('http.timeout', {
-            infer: true,
+            infer: true
         });
         this.retryAttempts = this.configService.getOrThrow('http.retryAttempts', {
-            infer: true,
+            infer: true
         });
         this.retryDelay = this.configService.getOrThrow('http.retryDelay', {
-            infer: true,
+            infer: true
         });
     }
 
@@ -52,7 +52,7 @@ export class HttpClientService implements OnModuleInit {
     private buildHeaders(customHeaders?: Record<string, string>): Record<string, string> {
         const headers: Record<string, string> = {
             'Content-Type': 'application/json',
-            ...customHeaders,
+            ...customHeaders
         };
 
         try {
@@ -86,12 +86,7 @@ export class HttpClientService implements OnModuleInit {
     /**
      * Execute HTTP request - OpenTelemetry HttpInstrumentation handles tracing automatically
      */
-    private async executeRequest<T>(
-        method: string,
-        url: string,
-        data?: unknown,
-        options?: IHttpRequestOptions,
-    ): Promise<IHttpResponse<T>> {
+    private async executeRequest<T>(method: string, url: string, data?: unknown, options?: IHttpRequestOptions): Promise<IHttpResponse<T>> {
         const startTime = this.dateService.now();
         const config: AxiosRequestConfig = {
             url,
@@ -99,7 +94,7 @@ export class HttpClientService implements OnModuleInit {
             headers: this.buildHeaders(options?.headers),
             params: options?.params,
             data,
-            timeout: options?.timeout || this.defaultTimeout,
+            timeout: options?.timeout || this.defaultTimeout
         };
 
         const execute = async (): Promise<AxiosResponse<T>> => {
@@ -108,9 +103,9 @@ export class HttpClientService implements OnModuleInit {
                     timeout(options?.timeout || this.defaultTimeout),
                     retry({
                         count: options?.retries ?? this.retryAttempts,
-                        delay: this.retryDelay,
-                    }),
-                ),
+                        delay: this.retryDelay
+                    })
+                )
             );
         };
 
@@ -128,7 +123,7 @@ export class HttpClientService implements OnModuleInit {
             data: response.data,
             status: response.status,
             headers: response.headers as Record<string, string>,
-            duration: this.dateService.now() - startTime,
+            duration: this.dateService.now() - startTime
         };
     }
 

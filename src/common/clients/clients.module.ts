@@ -15,23 +15,7 @@ import { WorkflowOrchestrationClient } from './workflow-orchestration.client';
 @Global()
 @Module({
     imports: [ConfigModule.forFeature(servicesConfig), HttpModule],
-    providers: [
-        WorkflowOrchestrationClient,
-        ContentAiClient,
-        RewardsClient,
-        CampaignsClient,
-        SdkConfigClient,
-        AnalyticsClient,
-        ClientIdentityClient,
-    ],
-    exports: [
-        WorkflowOrchestrationClient,
-        ContentAiClient,
-        RewardsClient,
-        CampaignsClient,
-        SdkConfigClient,
-        AnalyticsClient,
-        ClientIdentityClient,
-    ],
+    providers: [WorkflowOrchestrationClient, ContentAiClient, RewardsClient, CampaignsClient, SdkConfigClient, AnalyticsClient, ClientIdentityClient],
+    exports: [WorkflowOrchestrationClient, ContentAiClient, RewardsClient, CampaignsClient, SdkConfigClient, AnalyticsClient, ClientIdentityClient]
 })
 export class ClientsModule {}

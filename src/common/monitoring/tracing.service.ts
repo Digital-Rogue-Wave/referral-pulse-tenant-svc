@@ -33,17 +33,17 @@ export class TracingService implements OnModuleInit, OnModuleDestroy {
 
     constructor(
         private readonly configService: ConfigService<AllConfigType>,
-        private readonly logger: AppLoggerService,
+        private readonly logger: AppLoggerService
     ) {
         this.logger.setContext(TracingService.name);
     }
 
     onModuleInit(): void {
         const enabled = this.configService.getOrThrow('tracing.enabled', {
-            infer: true,
+            infer: true
         });
         const tracesEndpoint = this.configService.get('tracing.tracesEndpoint', {
-            infer: true,
+            infer: true
         });
 
         if (!enabled || !tracesEndpoint) {
@@ -52,11 +52,11 @@ export class TracingService implements OnModuleInit, OnModuleDestroy {
         }
 
         const serviceName = this.configService.getOrThrow('tracing.serviceName', {
-            infer: true,
+            infer: true
         });
         const serviceVersion = this.configService.getOrThrow('tracing.serviceVersion', { infer: true });
         const environment = this.configService.getOrThrow('tracing.environment', {
-            infer: true,
+            infer: true
         });
 
         this.logger.log(`Initializing OpenTelemetry for ${serviceName} v${serviceVersion} (env: ${environment})`);
@@ -66,7 +66,7 @@ export class TracingService implements OnModuleInit, OnModuleDestroy {
             [ATTR_SERVICE_NAME]: serviceName,
             [ATTR_SERVICE_VERSION]: serviceVersion,
             'deployment.environment': environment,
-            'service.namespace': this.configService.get('tracing.namespace', { infer: true }) || 'default',
+            'service.namespace': this.configService.get('tracing.namespace', { infer: true }) || 'default'
         });
 
         // Configure trace propagation
@@ -80,21 +80,19 @@ export class TracingService implements OnModuleInit, OnModuleDestroy {
 
         // Grafana Cloud authentication (if configured)
         const grafanaUser = this.configService.get('tracing.grafanaUser', {
-            infer: true,
+            infer: true
         });
         const grafanaApiKey = this.configService.get('tracing.grafanaApiKey', {
-            infer: true,
+            infer: true
         });
 
         // DEBUG: Log authentication configuration
-        this.logger.log(
-            `OTLP Auth Config - User: ${grafanaUser ? 'SET' : 'UNSET'}, API Key: ${grafanaApiKey ? 'SET' : 'UNSET'}`,
-        );
+        this.logger.log(`OTLP Auth Config - User: ${grafanaUser ? 'SET' : 'UNSET'}, API Key: ${grafanaApiKey ? 'SET' : 'UNSET'}`);
 
         const authHeaders: Record<string, string> | undefined =
             grafanaUser && grafanaApiKey
                 ? {
-                      Authorization: `Basic ${Buffer.from(`${grafanaUser}:${grafanaApiKey}`).toString('base64')}`,
+                      Authorization: `Basic ${Buffer.from(`${grafanaUser}:${grafanaApiKey}`).toString('base64')}`
                   }
                 : undefined;
 
@@ -108,12 +106,12 @@ export class TracingService implements OnModuleInit, OnModuleDestroy {
         // Trace exporter (Grafana Cloud Tempo)
         const traceExporter = new OTLPTraceExporter({
             url: tracesEndpoint,
-            headers: authHeaders,
+            headers: authHeaders
         });
 
         // Metrics exporter (Grafana Cloud Mimir/Prometheus) - optional
         const metricsEndpoint = this.configService.get('tracing.metricsEndpoint', {
-            infer: true,
+            infer: true
         });
 
         // DEBUG: Log metrics endpoint configuration
@@ -125,13 +123,13 @@ export class TracingService implements OnModuleInit, OnModuleDestroy {
                       new PeriodicExportingMetricReader({
                           exporter: new OTLPMetricExporter({
                               url: metricsEndpoint,
-                              headers: authHeaders,
+                              headers: authHeaders
                           }),
                           exportIntervalMillis:
                               this.configService.get('tracing.metricsExportInterval', {
-                                  infer: true,
-                              }) || 60000,
-                      }),
+                                  infer: true
+                              }) || 60000
+                      })
                   ]
                 : [];
 
@@ -139,7 +137,7 @@ export class TracingService implements OnModuleInit, OnModuleDestroy {
             this.logger.warn(
                 'Metrics endpoint is configured but authentication credentials are missing. ' +
                     'Metrics export has been DISABLED to prevent Unauthorized errors. ' +
-                    'Please set GRAFANA_CLOUD_USER and GRAFANA_CLOUD_API_KEY environment variables.',
+                    'Please set GRAFANA_CLOUD_USER and GRAFANA_CLOUD_API_KEY environment variables.'
             );
         } else if (metricReaders.length > 0) {
             this.logger.log(`Metrics export enabled to ${metricsEndpoint}`);
@@ -156,13 +154,13 @@ export class TracingService implements OnModuleInit, OnModuleDestroy {
                     ignoreIncomingRequestHook: (req) => {
                         const url = req.url || '';
                         return /^\/(health|metrics|ready|live)/.test(url);
-                    },
+                    }
                 }),
                 new ExpressInstrumentation(),
                 new PgInstrumentation(),
                 new IORedisInstrumentation(),
-                new AwsInstrumentation({ suppressInternalInstrumentation: true }),
-            ],
+                new AwsInstrumentation({ suppressInternalInstrumentation: true })
+            ]
         });
 
         this.sdk.start();
@@ -197,7 +195,7 @@ export class TracingService implements OnModuleInit, OnModuleDestroy {
             name,
             {
                 kind: SpanKind.INTERNAL,
-                attributes: attributes as Record<string, string | number | boolean>,
+                attributes: attributes as Record<string, string | number | boolean>
             },
             async (span) => {
                 try {
@@ -207,14 +205,14 @@ export class TracingService implements OnModuleInit, OnModuleDestroy {
                 } catch (error) {
                     span.setStatus({
                         code: SpanStatusCode.ERROR,
-                        message: error instanceof Error ? error.message : 'Unknown error',
+                        message: error instanceof Error ? error.message : 'Unknown error'
                     });
                     span.recordException(error as Error);
                     throw error;
                 } finally {
                     span.end();
                 }
-            },
+            }
         );
     }
 
@@ -231,7 +229,7 @@ export class TracingService implements OnModuleInit, OnModuleDestroy {
             span.recordException(error);
             span.setStatus({
                 code: SpanStatusCode.ERROR,
-                message: message || error.message,
+                message: message || error.message
             });
         }
     }

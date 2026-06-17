@@ -26,5 +26,5 @@ export const RESERVED_SUBDOMAINS = [
     'demo',
     'public',
     'referral',
-    'pulse',
+    'pulse'
 ];

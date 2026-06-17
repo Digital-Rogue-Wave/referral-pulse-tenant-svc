@@ -167,10 +167,7 @@ class TenantSettingResponseMapper extends BaseResponseMapper<TenantSettingProps,
 
 export const tenantSettingResponseMapper = new TenantSettingResponseMapper();
 
-class UserNotificationPreferenceResponseMapper extends BaseResponseMapper<
-    UserNotificationPreferenceProps,
-    UserNotificationPreferenceResponse
-> {
+class UserNotificationPreferenceResponseMapper extends BaseResponseMapper<UserNotificationPreferenceProps, UserNotificationPreferenceResponse> {
     constructor() {
         super(UserNotificationPreferenceResponse);
     }
@@ -194,7 +191,7 @@ export class TenantSettingCreatedEvent extends BaseDomainEvent {
             currencyCode?: string | null;
             createdAt: Date;
         },
-        public readonly userId?: string,
+        public readonly userId?: string
     ) {
         super();
     }
@@ -212,7 +209,7 @@ export class TenantSettingUpdatedEvent extends BaseDomainEvent {
             changes: Record<string, { from: unknown; to: unknown }>;
             updatedAt: Date;
         },
-        public readonly userId?: string,
+        public readonly userId?: string
     ) {
         super();
     }
@@ -229,7 +226,7 @@ export class TenantSettingDeletedEvent extends BaseDomainEvent {
             tenantId: string;
             deletedAt: Date;
         },
-        public readonly userId?: string,
+        public readonly userId?: string
     ) {
         super();
     }
@@ -252,7 +249,7 @@ export class UserNotificationPreferenceUpdatedEvent extends BaseDomainEvent {
             overrides: NotificationOverrides;
             updatedAt: Date;
         },
-        public readonly userId?: string,
+        public readonly userId?: string
     ) {
         super();
     }
@@ -262,5 +259,5 @@ export const TenantSettingEvents = {
     CREATED: 'tenant-setting.created',
     UPDATED: 'tenant-setting.updated',
     DELETED: 'tenant-setting.deleted',
-    NOTIFICATION_UPDATED: 'notification.updated',
+    NOTIFICATION_UPDATED: 'notification.updated'
 } as const;

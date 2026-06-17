@@ -1,10 +1,4 @@
-import {
-    registerDecorator,
-    ValidationOptions,
-    ValidatorConstraint,
-    ValidatorConstraintInterface,
-    ValidationArguments,
-} from 'class-validator';
+import { registerDecorator, ValidationOptions, ValidatorConstraint, ValidatorConstraintInterface, ValidationArguments } from 'class-validator';
 
 @ValidatorConstraint({ name: 'isRuleEvent', async: false })
 export class IsRuleEventConstraint implements ValidatorConstraintInterface {
@@ -29,7 +23,7 @@ export function IsRuleEvent(validationOptions?: ValidationOptions) {
             propertyName: propertyName,
             options: validationOptions,
             constraints: [],
-            validator: IsRuleEventConstraint,
+            validator: IsRuleEventConstraint
         });
     };
 }

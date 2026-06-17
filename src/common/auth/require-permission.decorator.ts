@@ -15,5 +15,4 @@ export const PERMISSIONS_KEY = 'permissions';
  * )
  * ```
  */
-export const RequirePermission = (...permissions: KetoPermission[]): CustomDecorator<string> =>
-    SetMetadata(PERMISSIONS_KEY, permissions);
+export const RequirePermission = (...permissions: KetoPermission[]): CustomDecorator<string> => SetMetadata(PERMISSIONS_KEY, permissions);

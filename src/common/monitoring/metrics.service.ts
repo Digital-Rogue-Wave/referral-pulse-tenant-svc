@@ -46,13 +46,13 @@ export class MetricsService implements OnModuleInit {
 
     constructor(private readonly configService: ConfigService<AllConfigType>) {
         this.serviceName = this.configService.getOrThrow('app.name', {
-            infer: true,
+            infer: true
         });
     }
 
     onModuleInit(): void {
         const metricsEnabled = this.configService.get('tracing.metricsEndpoint', {
-            infer: true,
+            infer: true
         });
 
         if (!metricsEnabled) {
@@ -82,23 +82,23 @@ export class MetricsService implements OnModuleInit {
 
         this.httpRequestsTotal = this.meter.createCounter('http.requests.total', {
             description: 'Total number of HTTP requests',
-            valueType: ValueType.INT,
+            valueType: ValueType.INT
         });
 
         this.httpRequestDuration = this.meter.createHistogram('http.request.duration', {
             description: 'HTTP request duration in milliseconds',
             unit: 'ms',
-            valueType: ValueType.DOUBLE,
+            valueType: ValueType.DOUBLE
         });
 
         this.httpRequestsActive = this.meter.createObservableGauge('http.requests.active', {
             description: 'Number of active HTTP requests',
-            valueType: ValueType.INT,
+            valueType: ValueType.INT
         });
 
         this.httpRequestsActive.addCallback((result) => {
             result.observe(this.activeHttpRequests, {
-                service: this.serviceName,
+                service: this.serviceName
             });
         });
     }
@@ -110,13 +110,13 @@ export class MetricsService implements OnModuleInit {
 
         this.dbQueriesTotal = this.meter.createCounter('db.queries.total', {
             description: 'Total number of database queries',
-            valueType: ValueType.INT,
+            valueType: ValueType.INT
         });
 
         this.dbQueryDuration = this.meter.createHistogram('db.query.duration', {
             description: 'Database query duration in milliseconds',
             unit: 'ms',
-            valueType: ValueType.DOUBLE,
+            valueType: ValueType.DOUBLE
         });
     }
 
@@ -127,7 +127,7 @@ export class MetricsService implements OnModuleInit {
 
         this.circuitBreakerState = this.meter.createObservableGauge('circuit_breaker.state', {
             description: 'Circuit breaker state (0=closed, 1=half-open, 2=open)',
-            valueType: ValueType.INT,
+            valueType: ValueType.INT
         });
     }
 
@@ -138,13 +138,13 @@ export class MetricsService implements OnModuleInit {
 
         this.redisOperationsTotal = this.meter.createCounter('redis.operations.total', {
             description: 'Total number of Redis operations',
-            valueType: ValueType.INT,
+            valueType: ValueType.INT
         });
 
         this.redisOperationDuration = this.meter.createHistogram('redis.operation.duration', {
             description: 'Redis operation duration in milliseconds',
             unit: 'ms',
-            valueType: ValueType.DOUBLE,
+            valueType: ValueType.DOUBLE
         });
     }
 
@@ -155,24 +155,24 @@ export class MetricsService implements OnModuleInit {
 
         this.jsonParseTotal = this.meter.createCounter('json.parse.total', {
             description: 'Total number of JSON parse operations',
-            valueType: ValueType.INT,
+            valueType: ValueType.INT
         });
 
         this.jsonParseDuration = this.meter.createHistogram('json.parse.duration', {
             description: 'JSON parse duration in milliseconds',
             unit: 'ms',
-            valueType: ValueType.DOUBLE,
+            valueType: ValueType.DOUBLE
         });
 
         this.jsonParseFallback = this.meter.createCounter('json.parse.fallback', {
             description: 'Number of times JSON parsing fell back to native parser',
-            valueType: ValueType.INT,
+            valueType: ValueType.INT
         });
 
         this.jsonParseSize = this.meter.createHistogram('json.parse.size', {
             description: 'Size of JSON strings being parsed',
             unit: 'bytes',
-            valueType: ValueType.INT,
+            valueType: ValueType.INT
         });
     }
 
@@ -187,7 +187,7 @@ export class MetricsService implements OnModuleInit {
             method,
             route,
             status_code: statusCode.toString(),
-            service: this.serviceName,
+            service: this.serviceName
         };
 
         this.httpRequestsTotal.add(1, labels);
@@ -213,7 +213,7 @@ export class MetricsService implements OnModuleInit {
             operation,
             table,
             success: success.toString(),
-            service: this.serviceName,
+            service: this.serviceName
         };
 
         this.dbQueriesTotal.add(1, labels);
@@ -237,7 +237,7 @@ export class MetricsService implements OnModuleInit {
         const labels = {
             operation,
             success: success.toString(),
-            service: this.serviceName,
+            service: this.serviceName
         };
 
         this.redisOperationsTotal.add(1, labels);
@@ -251,25 +251,25 @@ export class MetricsService implements OnModuleInit {
 
         this.queueJobsProcessed = this.meter.createCounter('queue.jobs.processed', {
             description: 'Total number of queue jobs processed',
-            valueType: ValueType.INT,
+            valueType: ValueType.INT
         });
 
         this.queueJobProcessingDuration = this.meter.createHistogram('queue.job.processing.duration', {
             description: 'Queue job processing duration in milliseconds',
             unit: 'ms',
-            valueType: ValueType.DOUBLE,
+            valueType: ValueType.DOUBLE
         });
 
         this.queueJobsActive = this.meter.createObservableGauge('queue.jobs.active', {
             description: 'Number of active queue jobs by queue name',
-            valueType: ValueType.INT,
+            valueType: ValueType.INT
         });
 
         this.queueJobsActive.addCallback((result) => {
             for (const [queueName, count] of this.activeQueueJobs.entries()) {
                 result.observe(count, {
                     queue: queueName,
-                    service: this.serviceName,
+                    service: this.serviceName
                 });
             }
         });
@@ -284,7 +284,7 @@ export class MetricsService implements OnModuleInit {
 
         const labels = {
             parser: usedFallback ? 'native' : 'simdjson',
-            service: this.serviceName,
+            service: this.serviceName
         };
 
         this.jsonParseTotal.add(1, labels);
@@ -306,7 +306,7 @@ export class MetricsService implements OnModuleInit {
         const labels = {
             queue: queueName,
             success: success.toString(),
-            service: this.serviceName,
+            service: this.serviceName
         };
 
         this.queueJobsProcessed.add(1, labels);
@@ -362,7 +362,7 @@ export class MetricsService implements OnModuleInit {
         return meter.createCounter(name, {
             description: options?.description,
             unit: options?.unit,
-            valueType: ValueType.INT,
+            valueType: ValueType.INT
         });
     }
 
@@ -383,7 +383,7 @@ export class MetricsService implements OnModuleInit {
         return meter.createHistogram(name, {
             description: options?.description,
             unit: options?.unit,
-            valueType: ValueType.DOUBLE,
+            valueType: ValueType.DOUBLE
         });
     }
 
@@ -406,7 +406,7 @@ export class MetricsService implements OnModuleInit {
         return meter.createObservableGauge(name, {
             description: options?.description,
             unit: options?.unit,
-            valueType: ValueType.INT,
+            valueType: ValueType.INT
         });
     }
 }

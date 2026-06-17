@@ -13,7 +13,7 @@ import {
     UserNotificationPreferenceResponse,
     userNotificationPreferenceResponseMapper,
     UserNotificationPreferenceUpdatedEvent,
-    NotificationOverrides,
+    NotificationOverrides
 } from '@domains/tenant-setting';
 
 /**
@@ -26,7 +26,7 @@ export class UserNotificationPreferenceService {
         private readonly tenantAware: TenantAwareService,
         private readonly tenantContext: TenantContextService,
         private readonly txEventEmitter: TransactionEventEmitterService,
-        private readonly logger: AppLoggerService,
+        private readonly logger: AppLoggerService
     ) {
         this.logger.setContext(UserNotificationPreferenceService.name);
     }
@@ -49,8 +49,8 @@ export class UserNotificationPreferenceService {
 
         const preference = (await this.prisma.userNotificationPreference.findUnique({
             where: {
-                userId_tenantId: { userId, tenantId },
-            },
+                userId_tenantId: { userId, tenantId }
+            }
         })) as UserNotificationPreferenceProps | null;
 
         if (!preference) {
@@ -74,21 +74,21 @@ export class UserNotificationPreferenceService {
         const overrides: NotificationOverrides = {
             emailEnabled: dto.emailEnabled,
             smsEnabled: dto.smsEnabled,
-            pushEnabled: dto.pushEnabled,
+            pushEnabled: dto.pushEnabled
         };
 
         const saved = (await this.prisma.userNotificationPreference.upsert({
             where: {
-                userId_tenantId: { userId, tenantId },
+                userId_tenantId: { userId, tenantId }
             },
             create: {
                 userId,
                 tenantId,
-                overrides: overrides as Prisma.InputJsonValue,
+                overrides: overrides as Prisma.InputJsonValue
             },
             update: {
-                overrides: overrides as Prisma.InputJsonValue,
-            },
+                overrides: overrides as Prisma.InputJsonValue
+            }
         })) as UserNotificationPreferenceProps;
 
         this.txEventEmitter.emitAfterCommit(
@@ -101,15 +101,15 @@ export class UserNotificationPreferenceService {
                     userId,
                     tenantId,
                     overrides,
-                    updatedAt: saved.updatedAt,
+                    updatedAt: saved.updatedAt
                 },
-                userId,
-            ),
+                userId
+            )
         );
 
         this.logger.log(`User notification preference updated: ${saved.id}`, {
             preferenceId: saved.id,
-            userId,
+            userId
         });
 
         return userNotificationPreferenceResponseMapper.toResponse(saved);
@@ -128,8 +128,8 @@ export class UserNotificationPreferenceService {
 
         const existing = await this.prisma.userNotificationPreference.findUnique({
             where: {
-                userId_tenantId: { userId, tenantId },
-            },
+                userId_tenantId: { userId, tenantId }
+            }
         });
 
         if (!existing) {
@@ -138,13 +138,13 @@ export class UserNotificationPreferenceService {
 
         await this.prisma.userNotificationPreference.delete({
             where: {
-                userId_tenantId: { userId, tenantId },
-            },
+                userId_tenantId: { userId, tenantId }
+            }
         });
 
         this.logger.log(`User notification preference deleted`, {
             userId,
-            tenantId,
+            tenantId
         });
     }
 }

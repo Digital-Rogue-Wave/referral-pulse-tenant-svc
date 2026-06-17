@@ -27,21 +27,21 @@ export class MessagingModule {
                     inject: [ConfigService],
                     useFactory: (configService: ConfigService<AllConfigType>) => {
                         const nodeEnv = configService.getOrThrow('app.nodeEnv', {
-                            infer: true,
+                            infer: true
                         });
                         const region = configService.getOrThrow('aws.region', {
-                            infer: true,
+                            infer: true
                         });
                         const endpoint = configService.get('aws.endpoint', { infer: true });
                         const queues = configService.getOrThrow('aws.sqs.queues', {
-                            infer: true,
+                            infer: true
                         });
                         const defaultBatchSize = configService.getOrThrow('aws.sqs.defaultBatchSize', { infer: true });
                         const defaultVisibilityTimeout = configService.getOrThrow('aws.sqs.defaultVisibilityTimeout', {
-                            infer: true,
+                            infer: true
                         });
                         const defaultWaitTimeSeconds = configService.getOrThrow('aws.sqs.defaultWaitTimeSeconds', {
-                            infer: true,
+                            infer: true
                         });
                         const pollingEnabled = configService.getOrThrow('aws.sqs.pollingEnabled', { infer: true });
 
@@ -49,9 +49,9 @@ export class MessagingModule {
                         const credentials = useCredentials
                             ? {
                                   accessKeyId: configService.getOrThrow('aws.accessKeyId', {
-                                      infer: true,
+                                      infer: true
                                   }),
-                                  secretAccessKey: configService.getOrThrow('aws.secretAccessKey', { infer: true }),
+                                  secretAccessKey: configService.getOrThrow('aws.secretAccessKey', { infer: true })
                               }
                             : undefined;
 
@@ -65,7 +65,7 @@ export class MessagingModule {
                                   waitTimeSeconds: defaultWaitTimeSeconds,
                                   terminateVisibilityTimeout: true,
                                   ...(endpoint && { endpoint }),
-                                  ...(credentials && { credentials }),
+                                  ...(credentials && { credentials })
                               }))
                             : [];
 
@@ -74,21 +74,14 @@ export class MessagingModule {
                             queueUrl: queue.url,
                             region,
                             ...(endpoint && { endpoint }),
-                            ...(credentials && { credentials }),
+                            ...(credentials && { credentials })
                         }));
 
                         return { consumers, producers };
-                    },
-                }),
+                    }
+                })
             ],
-            providers: [
-                SqsProducerService,
-                SnsPublisherService,
-                MessageEnvelopeService,
-                DlqConsumerService,
-                MessageProcessorService,
-                SesService,
-            ],
+            providers: [SqsProducerService, SnsPublisherService, MessageEnvelopeService, DlqConsumerService, MessageProcessorService, SesService],
             exports: [
                 SqsModule,
                 SqsProducerService,
@@ -96,8 +89,8 @@ export class MessagingModule {
                 MessageEnvelopeService,
                 DlqConsumerService,
                 MessageProcessorService,
-                SesService,
-            ],
+                SesService
+            ]
         };
     }
 }

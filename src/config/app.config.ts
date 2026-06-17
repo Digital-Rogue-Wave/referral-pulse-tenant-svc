@@ -16,7 +16,7 @@ const schema = z.object({
     isWorker: z.boolean().default(false),
     invitationExpiryDays: z.coerce.number().int().positive().default(7),
     trialDurationDays: z.coerce.number().int().positive().default(14),
-    frontendDomain: z.string().url().optional(),
+    frontendDomain: z.string().url().optional()
 });
 
 export type AppConfig = z.infer<typeof schema>;
@@ -31,7 +31,7 @@ export default registerAs('app', (): AppConfig => {
         isWorker: process.env.APP_MODE?.toLowerCase() === 'worker',
         invitationExpiryDays: process.env.INVITATION_EXPIRY_DAYS,
         trialDurationDays: process.env.TRIAL_DURATION_DAYS,
-        frontendDomain: process.env.FRONTEND_DOMAIN,
+        frontendDomain: process.env.FRONTEND_DOMAIN
     });
 
     if (!result.success) {

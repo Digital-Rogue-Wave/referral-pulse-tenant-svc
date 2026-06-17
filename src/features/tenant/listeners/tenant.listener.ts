@@ -26,7 +26,7 @@ import {
     TenantDeletionCancelledEvent,
     TenantOwnershipTransferredEvent,
     TenantDomainVerifiedEvent,
-    TenantEvents,
+    TenantEvents
 } from '@domains/tenant/events/tenant.events';
 
 @Injectable()
@@ -42,7 +42,7 @@ export class TenantListener {
         private readonly configService: ConfigService,
         private readonly domainProvisioningService: DomainProvisioningService,
         private readonly logger: AppLoggerService,
-        private readonly dateService: DateService,
+        private readonly dateService: DateService
     ) {
         this.logger.setContext(TenantListener.name);
 
@@ -54,7 +54,7 @@ export class TenantListener {
     async handleTenantCreatedEvent(event: TenantCreatedEvent): Promise<void> {
         this.logger.log(`Handling tenant.created event`, {
             tenantId: event.tenantId,
-            ownerId: event.ownerId,
+            ownerId: event.ownerId
         });
 
         // Publish SNS Event for other services
@@ -69,14 +69,14 @@ export class TenantListener {
                     slug: event.slug,
                     ownerId: event.ownerId,
                     trialStartedAt: this.dateService.toISO(event.trialStartedAt),
-                    trialEndsAt: this.dateService.toISO(event.trialEndsAt),
+                    trialEndsAt: this.dateService.toISO(event.trialEndsAt)
                 },
-                timestamp: this.dateService.toISO(event.occurredAt),
+                timestamp: this.dateService.toISO(event.occurredAt)
             },
             {
                 messageGroupId: event.tenantId,
-                messageDeduplicationId: event.eventId,
-            },
+                messageDeduplicationId: event.eventId
+            }
         );
     }
 
@@ -84,7 +84,7 @@ export class TenantListener {
     async handleTenantUpdatedEvent(event: TenantUpdatedEvent): Promise<void> {
         this.logger.log(`Handling tenant.updated event`, {
             tenantId: event.tenantId,
-            changes: Object.keys(event.changes),
+            changes: Object.keys(event.changes)
         });
 
         // Publish SNS Event
@@ -95,14 +95,14 @@ export class TenantListener {
                 eventId: event.eventId,
                 data: {
                     tenantId: event.tenantId,
-                    changes: event.changes,
+                    changes: event.changes
                 },
-                timestamp: this.dateService.toISO(event.occurredAt),
+                timestamp: this.dateService.toISO(event.occurredAt)
             },
             {
                 messageGroupId: event.tenantId,
-                messageDeduplicationId: event.eventId,
-            },
+                messageDeduplicationId: event.eventId
+            }
         );
     }
 
@@ -110,7 +110,7 @@ export class TenantListener {
     async handleTenantSuspendedEvent(event: TenantSuspendedEvent): Promise<void> {
         this.logger.log(`Handling tenant.suspended event`, {
             tenantId: event.tenantId,
-            reason: event.reason,
+            reason: event.reason
         });
 
         // Publish SNS Event (Campaign service, etc. will pause campaigns)
@@ -122,21 +122,21 @@ export class TenantListener {
                 data: {
                     tenantId: event.tenantId,
                     reason: event.reason,
-                    suspendedAt: this.dateService.toISO(event.suspendedAt),
+                    suspendedAt: this.dateService.toISO(event.suspendedAt)
                 },
-                timestamp: this.dateService.toISO(event.occurredAt),
+                timestamp: this.dateService.toISO(event.occurredAt)
             },
             {
                 messageGroupId: event.tenantId,
-                messageDeduplicationId: event.eventId,
-            },
+                messageDeduplicationId: event.eventId
+            }
         );
     }
 
     @OnEvent(TenantEvents.UNSUSPENDED)
     async handleTenantUnsuspendedEvent(event: TenantUnsuspendedEvent): Promise<void> {
         this.logger.log(`Handling tenant.unsuspended event`, {
-            tenantId: event.tenantId,
+            tenantId: event.tenantId
         });
 
         // Publish SNS Event
@@ -147,14 +147,14 @@ export class TenantListener {
                 eventId: event.eventId,
                 data: {
                     tenantId: event.tenantId,
-                    unsuspendedAt: this.dateService.toISO(event.unsuspendedAt),
+                    unsuspendedAt: this.dateService.toISO(event.unsuspendedAt)
                 },
-                timestamp: this.dateService.toISO(event.occurredAt),
+                timestamp: this.dateService.toISO(event.occurredAt)
             },
             {
                 messageGroupId: event.tenantId,
-                messageDeduplicationId: event.eventId,
-            },
+                messageDeduplicationId: event.eventId
+            }
         );
     }
 
@@ -162,7 +162,7 @@ export class TenantListener {
     async handleTenantLockedEvent(event: TenantLockedEvent): Promise<void> {
         this.logger.log(`Handling tenant.locked event`, {
             tenantId: event.tenantId,
-            reason: event.reason,
+            reason: event.reason
         });
 
         // Publish SNS Event
@@ -175,14 +175,14 @@ export class TenantListener {
                     tenantId: event.tenantId,
                     reason: event.reason,
                     lockUntil: event.lockUntil ? this.dateService.toISO(event.lockUntil) : undefined,
-                    lockedAt: this.dateService.toISO(event.lockedAt),
+                    lockedAt: this.dateService.toISO(event.lockedAt)
                 },
-                timestamp: this.dateService.toISO(event.occurredAt),
+                timestamp: this.dateService.toISO(event.occurredAt)
             },
             {
                 messageGroupId: event.tenantId,
-                messageDeduplicationId: event.eventId,
-            },
+                messageDeduplicationId: event.eventId
+            }
         );
     }
 
@@ -190,7 +190,7 @@ export class TenantListener {
     async handleTenantUnlockedEvent(event: TenantUnlockedEvent): Promise<void> {
         this.logger.log(`Handling tenant.unlocked event`, {
             tenantId: event.tenantId,
-            unlockedBy: event.unlockedBy,
+            unlockedBy: event.unlockedBy
         });
 
         // Publish SNS Event
@@ -202,14 +202,14 @@ export class TenantListener {
                 data: {
                     tenantId: event.tenantId,
                     unlockedBy: event.unlockedBy,
-                    unlockedAt: this.dateService.toISO(event.unlockedAt),
+                    unlockedAt: this.dateService.toISO(event.unlockedAt)
                 },
-                timestamp: this.dateService.toISO(event.occurredAt),
+                timestamp: this.dateService.toISO(event.occurredAt)
             },
             {
                 messageGroupId: event.tenantId,
-                messageDeduplicationId: event.eventId,
-            },
+                messageDeduplicationId: event.eventId
+            }
         );
     }
 
@@ -218,7 +218,7 @@ export class TenantListener {
         this.logger.log(`Handling tenant.deletion-scheduled event`, {
             tenantId: event.tenantId,
             scheduledAt: event.scheduledAt,
-            executionDate: event.executionDate,
+            executionDate: event.executionDate
         });
 
         // Publish SNS Event
@@ -231,14 +231,14 @@ export class TenantListener {
                     tenantId: event.tenantId,
                     scheduledAt: this.dateService.toISO(event.scheduledAt),
                     executionDate: this.dateService.toISO(event.executionDate),
-                    reason: event.reason,
+                    reason: event.reason
                 },
-                timestamp: this.dateService.toISO(event.occurredAt),
+                timestamp: this.dateService.toISO(event.occurredAt)
             },
             {
                 messageGroupId: event.tenantId,
-                messageDeduplicationId: event.eventId,
-            },
+                messageDeduplicationId: event.eventId
+            }
         );
 
         // Schedule deletion job
@@ -249,19 +249,19 @@ export class TenantListener {
             {
                 tenantId: event.tenantId,
                 scheduledAt: event.scheduledAt,
-                reason: event.reason,
+                reason: event.reason
             },
             Math.max(0, delay),
             {
-                jobId: `deletion-${event.tenantId}`,
-            },
+                jobId: `deletion-${event.tenantId}`
+            }
         );
     }
 
     @OnEvent(TenantEvents.DELETION_CANCELLED)
     async handleTenantDeletionCancelledEvent(event: TenantDeletionCancelledEvent): Promise<void> {
         this.logger.log(`Handling tenant.deletion-cancelled event`, {
-            tenantId: event.tenantId,
+            tenantId: event.tenantId
         });
 
         // Publish SNS Event
@@ -272,14 +272,14 @@ export class TenantListener {
                 eventId: event.eventId,
                 data: {
                     tenantId: event.tenantId,
-                    cancelledAt: this.dateService.toISO(event.cancelledAt),
+                    cancelledAt: this.dateService.toISO(event.cancelledAt)
                 },
-                timestamp: this.dateService.toISO(event.occurredAt),
+                timestamp: this.dateService.toISO(event.occurredAt)
             },
             {
                 messageGroupId: event.tenantId,
-                messageDeduplicationId: event.eventId,
-            },
+                messageDeduplicationId: event.eventId
+            }
         );
 
         // Cancel scheduled deletion job
@@ -293,7 +293,7 @@ export class TenantListener {
         this.logger.log(`Handling tenant.deleted event`, {
             tenantId: event.tenantId,
             name: event.name,
-            slug: event.slug,
+            slug: event.slug
         });
 
         // Publish SNS Event for cleanup by other services
@@ -305,14 +305,14 @@ export class TenantListener {
                 data: {
                     tenantId: event.tenantId,
                     name: event.name,
-                    slug: event.slug,
+                    slug: event.slug
                 },
-                timestamp: this.dateService.toISO(event.occurredAt),
+                timestamp: this.dateService.toISO(event.occurredAt)
             },
             {
                 messageGroupId: event.tenantId,
-                messageDeduplicationId: event.eventId,
-            },
+                messageDeduplicationId: event.eventId
+            }
         );
 
         // Cleanup Keto relations
@@ -321,7 +321,7 @@ export class TenantListener {
             await this.ketoService.deleteTuple(relation);
         }
         this.logger.log(`Cleaned up ${ketoRelations.length} Keto relations`, {
-            tenantId: event.tenantId,
+            tenantId: event.tenantId
         });
     }
 
@@ -330,7 +330,7 @@ export class TenantListener {
         this.logger.log(`Handling tenant.ownership-transferred event`, {
             tenantId: event.tenantId,
             oldOwnerId: event.oldOwnerId,
-            newOwnerId: event.newOwnerId,
+            newOwnerId: event.newOwnerId
         });
 
         // Publish SNS Event
@@ -343,14 +343,14 @@ export class TenantListener {
                     tenantId: event.tenantId,
                     oldOwnerId: event.oldOwnerId,
                     newOwnerId: event.newOwnerId,
-                    transferredAt: this.dateService.toISO(event.transferredAt),
+                    transferredAt: this.dateService.toISO(event.transferredAt)
                 },
-                timestamp: this.dateService.toISO(event.occurredAt),
+                timestamp: this.dateService.toISO(event.occurredAt)
             },
             {
                 messageGroupId: event.tenantId,
-                messageDeduplicationId: event.eventId,
-            },
+                messageDeduplicationId: event.eventId
+            }
         );
     }
 
@@ -358,7 +358,7 @@ export class TenantListener {
     async handleTenantDomainVerifiedEvent(event: TenantDomainVerifiedEvent): Promise<void> {
         this.logger.log(`Handling tenant.domain-verified event`, {
             tenantId: event.tenantId,
-            domain: event.domain,
+            domain: event.domain
         });
 
         // Provision custom domain
@@ -373,14 +373,14 @@ export class TenantListener {
                 data: {
                     tenantId: event.tenantId,
                     domain: event.domain,
-                    verifiedAt: this.dateService.toISO(event.verifiedAt),
+                    verifiedAt: this.dateService.toISO(event.verifiedAt)
                 },
-                timestamp: this.dateService.toISO(event.occurredAt),
+                timestamp: this.dateService.toISO(event.occurredAt)
             },
             {
                 messageGroupId: event.tenantId,
-                messageDeduplicationId: event.eventId,
-            },
+                messageDeduplicationId: event.eventId
+            }
         );
     }
 
@@ -405,8 +405,8 @@ export class TenantListener {
         }>(`${this.ketoReadUrl}/relation-tuples`, {
             params: {
                 namespace: KetoNamespace.TENANT,
-                object: tenantId,
-            },
+                object: tenantId
+            }
         });
 
         return data.relation_tuples || [];

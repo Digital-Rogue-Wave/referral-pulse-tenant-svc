@@ -21,7 +21,7 @@ export class IdempotencyService {
         private readonly redisService: RedisService,
         private readonly tracingService: TracingService,
         private readonly logger: AppLoggerService,
-        private readonly dateService: DateService,
+        private readonly dateService: DateService
     ) {
         this.logger.setContext(IdempotencyService.name);
     }
@@ -46,19 +46,19 @@ export class IdempotencyService {
                 response: T;
                 processedAt: string;
             }>(key, {
-                tenantScoped: false,
+                tenantScoped: false
             });
 
             if (existing) {
                 this.logger.debug(`🔄 Idempotency hit: ${idempotencyKey}`, {
                     key: idempotencyKey,
-                    processedAt: existing.processedAt,
+                    processedAt: existing.processedAt
                 });
 
                 return {
                     isDuplicate: true,
                     originalResponse: existing.response,
-                    processedAt: this.dateService.parse(existing.processedAt).toDate(),
+                    processedAt: this.dateService.parse(existing.processedAt).toDate()
                 };
             }
 
@@ -69,27 +69,23 @@ export class IdempotencyService {
     /**
      * Mark a request as processed with optional response storage
      */
-    async markProcessed<T = unknown>(
-        idempotencyKey: string,
-        response?: T,
-        options?: IIdempotencyOptions,
-    ): Promise<void> {
+    async markProcessed<T = unknown>(idempotencyKey: string, response?: T, options?: IIdempotencyOptions): Promise<void> {
         const key = this.buildKey(idempotencyKey, options);
         const storeResponse = options?.storeResponse !== false;
 
         const value = {
             response: storeResponse ? response : null,
-            processedAt: this.dateService.nowISO(),
+            processedAt: this.dateService.nowISO()
         };
 
         await this.redisService.set(key, value, {
             ttl: (options?.ttl || this.defaultTtl) * 1000,
-            tenantScoped: false,
+            tenantScoped: false
         });
 
         this.logger.debug(`✅ Idempotency key stored: ${idempotencyKey}`, {
             key: idempotencyKey,
-            ttl: options?.ttl || this.defaultTtl,
+            ttl: options?.ttl || this.defaultTtl
         });
     }
 
@@ -124,7 +120,7 @@ export class IdempotencyService {
     async executeOnce<T>(
         idempotencyKey: string,
         operation: () => Promise<T>,
-        options?: IIdempotencyOptions,
+        options?: IIdempotencyOptions
     ): Promise<{ result: T; isDuplicate: boolean }> {
         return this.tracingService.withSpan('idempotency.executeOnce', async () => {
             // Check if already processed

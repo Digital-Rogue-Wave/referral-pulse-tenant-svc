@@ -30,7 +30,7 @@ export class RewardServiceListener {
     constructor(
         private readonly sideEffectService: SideEffectService,
         private readonly logger: AppLoggerService,
-        private readonly redisKeyBuilder: RedisKeyBuilder,
+        private readonly redisKeyBuilder: RedisKeyBuilder
     ) {
         this.logger.setContext(RewardServiceListener.name);
     }
@@ -57,29 +57,25 @@ export class RewardServiceListener {
                     metadata: {
                         resourceType: 'toto',
                         name: event.name,
-                        status: event.status,
-                    },
+                        status: event.status
+                    }
                 },
                 {
                     critical: false, // Direct SQS with DLQ (after commit)
-                    idempotencyKey: this.redisKeyBuilder.buildIdempotencyKey(`reward-calc-${event.aggregateId}`),
-                },
+                    idempotencyKey: this.redisKeyBuilder.buildIdempotencyKey(`reward-calc-${event.aggregateId}`)
+                }
             );
 
             this.logger.debug(`Triggered reward calculation (async SQS)`, {
                 eventId: event.eventId,
                 totoId: event.aggregateId,
-                queue: REWARD_SVC_FIFO,
+                queue: REWARD_SVC_FIFO
             });
         } catch (error) {
-            this.logger.error(
-                `Failed to trigger reward calculation (check DLQ)`,
-                error instanceof Error ? error.stack : undefined,
-                {
-                    eventId: event.eventId,
-                    totoId: event.aggregateId,
-                },
-            );
+            this.logger.error(`Failed to trigger reward calculation (check DLQ)`, error instanceof Error ? error.stack : undefined, {
+                eventId: event.eventId,
+                totoId: event.aggregateId
+            });
         }
     }
 
@@ -103,26 +99,24 @@ export class RewardServiceListener {
                     timestamp: event.occurredAt,
                     activity: {
                         type: event.getEventAction(), // e.g., 'created', 'updated'
-                        metadata: event,
-                    },
+                        metadata: event
+                    }
                 },
                 {
                     critical: false, // Direct SQS with DLQ (after commit)
-                    idempotencyKey: this.redisKeyBuilder.buildIdempotencyKey(
-                        `reward-activity-${event.aggregateId}-${event.eventId}`,
-                    ),
-                },
+                    idempotencyKey: this.redisKeyBuilder.buildIdempotencyKey(`reward-activity-${event.aggregateId}-${event.eventId}`)
+                }
             );
 
             this.logger.debug(`Tracked user activity for rewards (async SQS)`, {
                 eventType: event.eventType,
-                userId: event.aggregateId,
+                userId: event.aggregateId
             });
         } catch (error) {
             this.logger.warn(`Failed to track user activity for rewards (check DLQ)`, {
                 eventType: event.eventType,
                 eventId: event.eventId,
-                error: error instanceof Error ? error.message : 'Unknown error',
+                error: error instanceof Error ? error.message : 'Unknown error'
             });
         }
     }

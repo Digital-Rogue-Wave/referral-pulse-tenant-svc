@@ -102,9 +102,9 @@ import { BullJobsService } from './bulljobs.service';
 @Module({
     imports: [
         RedisModule, // Required for BullJobsConnectionFactory to access RedisService
-        LoggingModule, // Required for logging
+        LoggingModule // Required for logging
     ],
     providers: [BullJobsService, BullJobsConnectionFactory],
-    exports: [BullJobsService, BullJobsConnectionFactory],
+    exports: [BullJobsService, BullJobsConnectionFactory]
 })
 export class BullJobsModule {}

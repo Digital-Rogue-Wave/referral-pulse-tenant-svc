@@ -19,7 +19,7 @@ export class DailyUsageCalculator {
         private readonly logger: AppLoggerService,
         private readonly redis: RedisService,
         private readonly txEventEmitter: TransactionEventEmitterService,
-        private readonly dateService: DateService,
+        private readonly dateService: DateService
     ) {
         this.logger.setContext(DailyUsageCalculator.name);
     }
@@ -32,13 +32,11 @@ export class DailyUsageCalculator {
         this.logger.log(`Running daily usage snapshot for date ${periodDate}`);
 
         const tenants = await this.prisma.tenant.findMany({
-            where: { status: TenantStatusEnum.ACTIVE, deletedAt: null },
+            where: { status: TenantStatusEnum.ACTIVE, deletedAt: null }
         });
 
         for (const tenant of tenants) {
-            await this.tenantContext.runWithContext({ tenantId: tenant.id }, () =>
-                this.snapshotTenant(tenant.id, periodDate, month, now.toDate()),
-            );
+            await this.tenantContext.runWithContext({ tenantId: tenant.id }, () => this.snapshotTenant(tenant.id, periodDate, month, now.toDate()));
         }
     }
 
@@ -53,13 +51,7 @@ export class DailyUsageCalculator {
         }
     }
 
-    private async snapshotMetric(
-        tenantId: string,
-        metric: string,
-        periodDate: string,
-        month: string,
-        now: Date,
-    ): Promise<void> {
+    private async snapshotMetric(tenantId: string, metric: string, periodDate: string, month: string, now: Date): Promise<void> {
         const usage = await this.redis.getUsage(metric, month);
         const limit = await this.redis.getLimit(metric);
 
@@ -71,25 +63,19 @@ export class DailyUsageCalculator {
         }
     }
 
-    private async upsertUsageRow(
-        tenantId: string,
-        metric: string,
-        periodDate: string,
-        usage: number,
-        limit: number | null,
-    ): Promise<void> {
+    private async upsertUsageRow(tenantId: string, metric: string, periodDate: string, usage: number, limit: number | null): Promise<void> {
         const existing = await this.prisma.tenantUsage.findFirst({
-            where: { tenantId, metricName: metric, periodDate, deletedAt: null },
+            where: { tenantId, metricName: metric, periodDate, deletedAt: null }
         });
 
         if (!existing) {
             await this.prisma.tenantUsage.create({
-                data: { tenantId, metricName: metric, periodDate, currentUsage: usage, limitValue: limit ?? null },
+                data: { tenantId, metricName: metric, periodDate, currentUsage: usage, limitValue: limit ?? null }
             });
         } else {
             await this.prisma.tenantUsage.update({
                 where: { id: existing.id },
-                data: { currentUsage: usage, limitValue: limit !== null ? limit : existing.limitValue },
+                data: { currentUsage: usage, limitValue: limit !== null ? limit : existing.limitValue }
             });
         }
     }
@@ -102,7 +88,7 @@ export class DailyUsageCalculator {
         percentage: number,
         periodDate: string,
         month: string,
-        now: Date,
+        now: Date
     ): Promise<void> {
         for (const threshold of [80, 100]) {
             if (percentage < threshold) {
@@ -123,17 +109,25 @@ export class DailyUsageCalculator {
                     metricName: metric,
                     increment: null,
                     timestamp: new Date(),
-                    metadata: { threshold, usage, limit, percentage },
-                },
+                    metadata: { threshold, usage, limit, percentage }
+                }
             });
 
-            this.logger.warn(
-                `Usage threshold ${threshold}% crossed for tenant ${tenantId}, metric ${metric} (usage=${usage}, limit=${limit})`,
-            );
+            this.logger.warn(`Usage threshold ${threshold}% crossed for tenant ${tenantId}, metric ${metric} (usage=${usage}, limit=${limit})`);
 
             this.txEventEmitter.emitAfterCommit(
                 BillingEvents.USAGE_THRESHOLD_CROSSED,
-                new UsageThresholdCrossedEvent(tenantId, tenantId, metric, threshold, usage, limit, percentage, periodDate, this.dateService.toISO(now)),
+                new UsageThresholdCrossedEvent(
+                    tenantId,
+                    tenantId,
+                    metric,
+                    threshold,
+                    usage,
+                    limit,
+                    percentage,
+                    periodDate,
+                    this.dateService.toISO(now)
+                )
             );
         }
     }

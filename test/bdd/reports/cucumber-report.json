@@ -1,0 +1,1490 @@
+[
+  {
+    "description": "  As a backend API\n  I want to enforce JWT authentication on all protected endpoints\n  So that only properly authenticated clients can access tenant data",
+    "elements": [
+      {
+        "description": "",
+        "id": "authentication-and-authorization;request-without-authorization-header-is-rejected",
+        "keyword": "Scenario",
+        "line": 10,
+        "name": "Request without Authorization header is rejected",
+        "steps": [
+          {
+            "arguments": [],
+            "keyword": "Given ",
+            "line": 8,
+            "name": "the application is running",
+            "match": {
+              "location": "test\\bdd\\step-definitions\\common.steps.ts:13"
+            },
+            "result": {
+              "status": "skipped",
+              "duration": 0
+            }
+          },
+          {
+            "arguments": [],
+            "keyword": "When ",
+            "line": 11,
+            "name": "I send a GET request to \"/api/v1/billings/subscription\" without any token",
+            "match": {
+              "location": "test\\bdd\\step-definitions\\common.steps.ts:21"
+            },
+            "result": {
+              "status": "skipped",
+              "duration": 0
+            }
+          },
+          {
+            "arguments": [],
+            "keyword": "Then ",
+            "line": 12,
+            "name": "the response status should be 401",
+            "match": {
+              "location": "test\\bdd\\step-definitions\\common.steps.ts:47"
+            },
+            "result": {
+              "status": "skipped",
+              "duration": 0
+            }
+          },
+          {
+            "arguments": [],
+            "keyword": "And ",
+            "line": 13,
+            "name": "the response should contain a \"title\" field with value \"Unauthorized\"",
+            "match": {
+              "location": "test\\bdd\\step-definitions\\common.steps.ts:94"
+            },
+            "result": {
+              "status": "skipped",
+              "duration": 0
+            }
+          }
+        ],
+        "tags": [
+          {
+            "name": "@auth",
+            "line": 1
+          }
+        ],
+        "type": "scenario"
+      },
+      {
+        "description": "",
+        "id": "authentication-and-authorization;request-with-expired-jwt-is-rejected",
+        "keyword": "Scenario",
+        "line": 15,
+        "name": "Request with expired JWT is rejected",
+        "steps": [
+          {
+            "arguments": [],
+            "keyword": "Given ",
+            "line": 8,
+            "name": "the application is running",
+            "match": {
+              "location": "test\\bdd\\step-definitions\\common.steps.ts:13"
+            },
+            "result": {
+              "status": "skipped",
+              "duration": 0
+            }
+          },
+          {
+            "arguments": [],
+            "keyword": "Given ",
+            "line": 16,
+            "name": "I have an expired JWT for tenant \"default-tenant\"",
+            "match": {
+              "location": "test\\bdd\\step-definitions\\auth.steps.ts:16"
+            },
+            "result": {
+              "status": "skipped",
+              "duration": 0
+            }
+          },
+          {
+            "arguments": [],
+            "keyword": "When ",
+            "line": 17,
+            "name": "I send a GET request to \"/api/v1/billings/subscription\" with that token",
+            "match": {
+              "location": "test\\bdd\\step-definitions\\common.steps.ts:25"
+            },
+            "result": {
+              "status": "skipped",
+              "duration": 0
+            }
+          },
+          {
+            "arguments": [],
+            "keyword": "Then ",
+            "line": 18,
+            "name": "the response status should be 401",
+            "match": {
+              "location": "test\\bdd\\step-definitions\\common.steps.ts:47"
+            },
+            "result": {
+              "status": "skipped",
+              "duration": 0
+            }
+          }
+        ],
+        "tags": [
+          {
+            "name": "@auth",
+            "line": 1
+          }
+        ],
+        "type": "scenario"
+      },
+      {
+        "description": "",
+        "id": "authentication-and-authorization;request-with-malformed-jwt-is-rejected",
+        "keyword": "Scenario",
+        "line": 20,
+        "name": "Request with malformed JWT is rejected",
+        "steps": [
+          {
+            "arguments": [],
+            "keyword": "Given ",
+            "line": 8,
+            "name": "the application is running",
+            "match": {
+              "location": "test\\bdd\\step-definitions\\common.steps.ts:13"
+            },
+            "result": {
+              "status": "skipped",
+              "duration": 0
+            }
+          },
+          {
+            "arguments": [],
+            "keyword": "Given ",
+            "line": 21,
+            "name": "I have a malformed token \"not.a.valid.jwt.at.all\"",
+            "match": {
+              "location": "test\\bdd\\step-definitions\\auth.steps.ts:20"
+            },
+            "result": {
+              "status": "skipped",
+              "duration": 0
+            }
+          },
+          {
+            "arguments": [],
+            "keyword": "When ",
+            "line": 22,
+            "name": "I send a GET request to \"/api/v1/billings/subscription\" with that token",
+            "match": {
+              "location": "test\\bdd\\step-definitions\\common.steps.ts:25"
+            },
+            "result": {
+              "status": "skipped",
+              "duration": 0
+            }
+          },
+          {
+            "arguments": [],
+            "keyword": "Then ",
+            "line": 23,
+            "name": "the response status should be 401",
+            "match": {
+              "location": "test\\bdd\\step-definitions\\common.steps.ts:47"
+            },
+            "result": {
+              "status": "skipped",
+              "duration": 0
+            }
+          }
+        ],
+        "tags": [
+          {
+            "name": "@auth",
+            "line": 1
+          }
+        ],
+        "type": "scenario"
+      },
+      {
+        "description": "",
+        "id": "authentication-and-authorization;valid-jwt-for-non-existent-tenant-returns-404",
+        "keyword": "Scenario",
+        "line": 25,
+        "name": "Valid JWT for non-existent tenant returns 404",
+        "steps": [
+          {
+            "arguments": [],
+            "keyword": "Given ",
+            "line": 8,
+            "name": "the application is running",
+            "match": {
+              "location": "test\\bdd\\step-definitions\\common.steps.ts:13"
+            },
+            "result": {
+              "status": "skipped",
+              "duration": 0
+            }
+          },
+          {
+            "arguments": [],
+            "keyword": "Given ",
+            "line": 26,
+            "name": "I have a valid JWT for tenant \"bdd-nonexistent-tenant-xyz\"",
+            "match": {
+              "location": "test\\bdd\\step-definitions\\auth.steps.ts:12"
+            },
+            "result": {
+              "status": "skipped",
+              "duration": 0
+            }
+          },
+          {
+            "arguments": [],
+            "keyword": "When ",
+            "line": 27,
+            "name": "I send a GET request to \"/api/v1/billings/subscription\" with that token",
+            "match": {
+              "location": "test\\bdd\\step-definitions\\common.steps.ts:25"
+            },
+            "result": {
+              "status": "skipped",
+              "duration": 0
+            }
+          },
+          {
+            "arguments": [],
+            "keyword": "Then ",
+            "line": 28,
+            "name": "the response status should be 404",
+            "match": {
+              "location": "test\\bdd\\step-definitions\\common.steps.ts:47"
+            },
+            "result": {
+              "status": "skipped",
+              "duration": 0
+            }
+          },
+          {
+            "arguments": [],
+            "keyword": "And ",
+            "line": 29,
+            "name": "the response should contain errorCode \"TENANT_NOT_FOUND\"",
+            "match": {
+              "location": "test\\bdd\\step-definitions\\common.steps.ts:101"
+            },
+            "result": {
+              "status": "skipped",
+              "duration": 0
+            }
+          }
+        ],
+        "tags": [
+          {
+            "name": "@auth",
+            "line": 1
+          }
+        ],
+        "type": "scenario"
+      },
+      {
+        "description": "",
+        "id": "authentication-and-authorization;active-tenant-with-valid-jwt-can-access-the-api",
+        "keyword": "Scenario",
+        "line": 31,
+        "name": "Active tenant with valid JWT can access the API",
+        "steps": [
+          {
+            "arguments": [],
+            "keyword": "Given ",
+            "line": 8,
+            "name": "the application is running",
+            "match": {
+              "location": "test\\bdd\\step-definitions\\common.steps.ts:13"
+            },
+            "result": {
+              "status": "skipped",
+              "duration": 0
+            }
+          },
+          {
+            "arguments": [],
+            "keyword": "Given ",
+            "line": 32,
+            "name": "I have a valid JWT for tenant \"default-tenant\"",
+            "match": {
+              "location": "test\\bdd\\step-definitions\\auth.steps.ts:12"
+            },
+            "result": {
+              "status": "skipped",
+              "duration": 0
+            }
+          },
+          {
+            "arguments": [],
+            "keyword": "When ",
+            "line": 33,
+            "name": "I send a GET request to \"/api/v1/billings/subscription\" with that token",
+            "match": {
+              "location": "test\\bdd\\step-definitions\\common.steps.ts:25"
+            },
+            "result": {
+              "status": "skipped",
+              "duration": 0
+            }
+          },
+          {
+            "arguments": [],
+            "keyword": "Then ",
+            "line": 34,
+            "name": "the response status is not 401",
+            "match": {
+              "location": "test\\bdd\\step-definitions\\common.steps.ts:56"
+            },
+            "result": {
+              "status": "skipped",
+              "duration": 0
+            }
+          },
+          {
+            "arguments": [],
+            "keyword": "And ",
+            "line": 35,
+            "name": "the response status is not 403",
+            "match": {
+              "location": "test\\bdd\\step-definitions\\common.steps.ts:56"
+            },
+            "result": {
+              "status": "skipped",
+              "duration": 0
+            }
+          }
+        ],
+        "tags": [
+          {
+            "name": "@auth",
+            "line": 1
+          }
+        ],
+        "type": "scenario"
+      },
+      {
+        "description": "",
+        "id": "authentication-and-authorization;public-endpoint-is-accessible-without-any-token",
+        "keyword": "Scenario",
+        "line": 38,
+        "name": "Public endpoint is accessible without any token",
+        "steps": [
+          {
+            "arguments": [],
+            "keyword": "Given ",
+            "line": 8,
+            "name": "the application is running",
+            "match": {
+              "location": "test\\bdd\\step-definitions\\common.steps.ts:13"
+            },
+            "result": {
+              "status": "skipped",
+              "duration": 0
+            }
+          },
+          {
+            "arguments": [],
+            "keyword": "When ",
+            "line": 39,
+            "name": "I send a GET request to \"/api/v1/billings/plans\" without any token",
+            "match": {
+              "location": "test\\bdd\\step-definitions\\common.steps.ts:21"
+            },
+            "result": {
+              "status": "skipped",
+              "duration": 0
+            }
+          },
+          {
+            "arguments": [],
+            "keyword": "Then ",
+            "line": 40,
+            "name": "the response status should be 200",
+            "match": {
+              "location": "test\\bdd\\step-definitions\\common.steps.ts:47"
+            },
+            "result": {
+              "status": "skipped",
+              "duration": 0
+            }
+          },
+          {
+            "arguments": [],
+            "keyword": "And ",
+            "line": 41,
+            "name": "the response should be a non-empty array",
+            "match": {
+              "location": "test\\bdd\\step-definitions\\common.steps.ts:72"
+            },
+            "result": {
+              "status": "skipped",
+              "duration": 0
+            }
+          }
+        ],
+        "tags": [
+          {
+            "name": "@auth",
+            "line": 1
+          },
+          {
+            "name": "@public-endpoint",
+            "line": 37
+          }
+        ],
+        "type": "scenario"
+      },
+      {
+        "description": "",
+        "id": "authentication-and-authorization;service-token-can-access-internal-endpoint",
+        "keyword": "Scenario",
+        "line": 43,
+        "name": "Service token can access internal endpoint",
+        "steps": [
+          {
+            "arguments": [],
+            "keyword": "Given ",
+            "line": 8,
+            "name": "the application is running",
+            "match": {
+              "location": "test\\bdd\\step-definitions\\common.steps.ts:13"
+            },
+            "result": {
+              "status": "skipped",
+              "duration": 0
+            }
+          },
+          {
+            "arguments": [],
+            "keyword": "Given ",
+            "line": 44,
+            "name": "I have a service token for tenant \"default-tenant\"",
+            "match": {
+              "location": "test\\bdd\\step-definitions\\auth.steps.ts:25"
+            },
+            "result": {
+              "status": "skipped",
+              "duration": 0
+            }
+          },
+          {
+            "arguments": [],
+            "keyword": "When ",
+            "line": 45,
+            "name": "I send a GET request to \"/api/v1/internal/tenants/default-tenant/status\" with that token",
+            "match": {
+              "location": "test\\bdd\\step-definitions\\common.steps.ts:25"
+            },
+            "result": {
+              "status": "skipped",
+              "duration": 0
+            }
+          },
+          {
+            "arguments": [],
+            "keyword": "Then ",
+            "line": 46,
+            "name": "the response status should be 200",
+            "match": {
+              "location": "test\\bdd\\step-definitions\\common.steps.ts:47"
+            },
+            "result": {
+              "status": "skipped",
+              "duration": 0
+            }
+          }
+        ],
+        "tags": [
+          {
+            "name": "@auth",
+            "line": 1
+          }
+        ],
+        "type": "scenario"
+      }
+    ],
+    "id": "authentication-and-authorization",
+    "line": 2,
+    "keyword": "Feature",
+    "name": "Authentication and Authorization",
+    "tags": [
+      {
+        "name": "@auth",
+        "line": 1
+      }
+    ],
+    "uri": "test\\bdd\\features\\auth.feature"
+  },
+  {
+    "description": "  As an authenticated tenant\n  I want to manage my subscription and billing information\n  So that I can view and change my plan",
+    "elements": [
+      {
+        "description": "",
+        "id": "billing-management;get-current-subscription-returns-plan-data",
+        "keyword": "Scenario",
+        "line": 11,
+        "name": "Get current subscription returns plan data",
+        "steps": [
+          {
+            "arguments": [],
+            "keyword": "Given ",
+            "line": 8,
+            "name": "the application is running",
+            "match": {
+              "location": "test\\bdd\\step-definitions\\common.steps.ts:13"
+            },
+            "result": {
+              "status": "skipped",
+              "duration": 0
+            }
+          },
+          {
+            "arguments": [],
+            "keyword": "And ",
+            "line": 9,
+            "name": "I have a valid JWT for tenant \"default-tenant\"",
+            "match": {
+              "location": "test\\bdd\\step-definitions\\auth.steps.ts:12"
+            },
+            "result": {
+              "status": "skipped",
+              "duration": 0
+            }
+          },
+          {
+            "arguments": [],
+            "keyword": "When ",
+            "line": 12,
+            "name": "I send a GET request to \"/api/v1/billings/subscription\" with that token",
+            "match": {
+              "location": "test\\bdd\\step-definitions\\common.steps.ts:25"
+            },
+            "result": {
+              "status": "skipped",
+              "duration": 0
+            }
+          },
+          {
+            "arguments": [],
+            "keyword": "Then ",
+            "line": 13,
+            "name": "the response status should be 200",
+            "match": {
+              "location": "test\\bdd\\step-definitions\\common.steps.ts:47"
+            },
+            "result": {
+              "status": "skipped",
+              "duration": 0
+            }
+          },
+          {
+            "arguments": [],
+            "keyword": "And ",
+            "line": 14,
+            "name": "the response should contain a \"plan\" field",
+            "match": {
+              "location": "test\\bdd\\step-definitions\\common.steps.ts:88"
+            },
+            "result": {
+              "status": "skipped",
+              "duration": 0
+            }
+          },
+          {
+            "arguments": [],
+            "keyword": "And ",
+            "line": 15,
+            "name": "the response should contain a \"status\" field",
+            "match": {
+              "location": "test\\bdd\\step-definitions\\common.steps.ts:88"
+            },
+            "result": {
+              "status": "skipped",
+              "duration": 0
+            }
+          }
+        ],
+        "tags": [
+          {
+            "name": "@billing",
+            "line": 1
+          }
+        ],
+        "type": "scenario"
+      },
+      {
+        "description": "",
+        "id": "billing-management;list-public-billing-plans-without-authentication",
+        "keyword": "Scenario",
+        "line": 18,
+        "name": "List public billing plans without authentication",
+        "steps": [
+          {
+            "arguments": [],
+            "keyword": "Given ",
+            "line": 8,
+            "name": "the application is running",
+            "match": {
+              "location": "test\\bdd\\step-definitions\\common.steps.ts:13"
+            },
+            "result": {
+              "status": "skipped",
+              "duration": 0
+            }
+          },
+          {
+            "arguments": [],
+            "keyword": "And ",
+            "line": 9,
+            "name": "I have a valid JWT for tenant \"default-tenant\"",
+            "match": {
+              "location": "test\\bdd\\step-definitions\\auth.steps.ts:12"
+            },
+            "result": {
+              "status": "skipped",
+              "duration": 0
+            }
+          },
+          {
+            "arguments": [],
+            "keyword": "When ",
+            "line": 19,
+            "name": "I send a GET request to \"/api/v1/billings/plans\" without any token",
+            "match": {
+              "location": "test\\bdd\\step-definitions\\common.steps.ts:21"
+            },
+            "result": {
+              "status": "skipped",
+              "duration": 0
+            }
+          },
+          {
+            "arguments": [],
+            "keyword": "Then ",
+            "line": 20,
+            "name": "the response status should be 200",
+            "match": {
+              "location": "test\\bdd\\step-definitions\\common.steps.ts:47"
+            },
+            "result": {
+              "status": "skipped",
+              "duration": 0
+            }
+          },
+          {
+            "arguments": [],
+            "keyword": "And ",
+            "line": 21,
+            "name": "the response should be a non-empty array",
+            "match": {
+              "location": "test\\bdd\\step-definitions\\common.steps.ts:72"
+            },
+            "result": {
+              "status": "skipped",
+              "duration": 0
+            }
+          },
+          {
+            "arguments": [],
+            "keyword": "And ",
+            "line": 22,
+            "name": "each item in the response should have a \"name\" field",
+            "match": {
+              "location": "test\\bdd\\step-definitions\\common.steps.ts:78"
+            },
+            "result": {
+              "status": "skipped",
+              "duration": 0
+            }
+          }
+        ],
+        "tags": [
+          {
+            "name": "@billing",
+            "line": 1
+          },
+          {
+            "name": "@public-endpoint",
+            "line": 17
+          }
+        ],
+        "type": "scenario"
+      },
+      {
+        "description": "",
+        "id": "billing-management;create-checkout-session-returns-a-stripe-url",
+        "keyword": "Scenario",
+        "line": 24,
+        "name": "Create checkout session returns a Stripe URL",
+        "steps": [
+          {
+            "arguments": [],
+            "keyword": "Given ",
+            "line": 8,
+            "name": "the application is running",
+            "match": {
+              "location": "test\\bdd\\step-definitions\\common.steps.ts:13"
+            },
+            "result": {
+              "status": "skipped",
+              "duration": 0
+            }
+          },
+          {
+            "arguments": [],
+            "keyword": "And ",
+            "line": 9,
+            "name": "I have a valid JWT for tenant \"default-tenant\"",
+            "match": {
+              "location": "test\\bdd\\step-definitions\\auth.steps.ts:12"
+            },
+            "result": {
+              "status": "skipped",
+              "duration": 0
+            }
+          },
+          {
+            "arguments": [],
+            "keyword": "Given ",
+            "line": 25,
+            "name": "the Stripe checkout API is mocked to return a checkout URL",
+            "match": {
+              "location": "test\\bdd\\step-definitions\\billing.steps.ts:12"
+            },
+            "result": {
+              "status": "skipped",
+              "duration": 0
+            }
+          },
+          {
+            "arguments": [
+              {
+                "content": "{ \"plan\": \"Starter\" }",
+                "line": 27
+              }
+            ],
+            "keyword": "When ",
+            "line": 26,
+            "name": "I send a POST request to \"/api/v1/billings/subscription/checkout\" with body:",
+            "match": {
+              "location": "test\\bdd\\step-definitions\\common.steps.ts:33"
+            },
+            "result": {
+              "status": "skipped",
+              "duration": 0
+            }
+          },
+          {
+            "arguments": [],
+            "keyword": "Then ",
+            "line": 30,
+            "name": "the response status should be 200",
+            "match": {
+              "location": "test\\bdd\\step-definitions\\common.steps.ts:47"
+            },
+            "result": {
+              "status": "skipped",
+              "duration": 0
+            }
+          },
+          {
+            "arguments": [],
+            "keyword": "And ",
+            "line": 31,
+            "name": "the response should contain a \"checkoutUrl\" field",
+            "match": {
+              "location": "test\\bdd\\step-definitions\\common.steps.ts:88"
+            },
+            "result": {
+              "status": "skipped",
+              "duration": 0
+            }
+          }
+        ],
+        "tags": [
+          {
+            "name": "@billing",
+            "line": 1
+          }
+        ],
+        "type": "scenario"
+      },
+      {
+        "description": "",
+        "id": "billing-management;get-usage-summary-returns-usage-metrics",
+        "keyword": "Scenario",
+        "line": 33,
+        "name": "Get usage summary returns usage metrics",
+        "steps": [
+          {
+            "arguments": [],
+            "keyword": "Given ",
+            "line": 8,
+            "name": "the application is running",
+            "match": {
+              "location": "test\\bdd\\step-definitions\\common.steps.ts:13"
+            },
+            "result": {
+              "status": "skipped",
+              "duration": 0
+            }
+          },
+          {
+            "arguments": [],
+            "keyword": "And ",
+            "line": 9,
+            "name": "I have a valid JWT for tenant \"default-tenant\"",
+            "match": {
+              "location": "test\\bdd\\step-definitions\\auth.steps.ts:12"
+            },
+            "result": {
+              "status": "skipped",
+              "duration": 0
+            }
+          },
+          {
+            "arguments": [],
+            "keyword": "When ",
+            "line": 34,
+            "name": "I send a GET request to \"/api/v1/billings/usage\" with that token",
+            "match": {
+              "location": "test\\bdd\\step-definitions\\common.steps.ts:25"
+            },
+            "result": {
+              "status": "skipped",
+              "duration": 0
+            }
+          },
+          {
+            "arguments": [],
+            "keyword": "Then ",
+            "line": 35,
+            "name": "the response status should be 200",
+            "match": {
+              "location": "test\\bdd\\step-definitions\\common.steps.ts:47"
+            },
+            "result": {
+              "status": "skipped",
+              "duration": 0
+            }
+          },
+          {
+            "arguments": [],
+            "keyword": "And ",
+            "line": 36,
+            "name": "the response should contain a \"metrics\" field",
+            "match": {
+              "location": "test\\bdd\\step-definitions\\common.steps.ts:88"
+            },
+            "result": {
+              "status": "skipped",
+              "duration": 0
+            }
+          }
+        ],
+        "tags": [
+          {
+            "name": "@billing",
+            "line": 1
+          }
+        ],
+        "type": "scenario"
+      },
+      {
+        "description": "",
+        "id": "billing-management;preview-subscription-upgrade-returns-200",
+        "keyword": "Scenario",
+        "line": 38,
+        "name": "Preview subscription upgrade returns 200",
+        "steps": [
+          {
+            "arguments": [],
+            "keyword": "Given ",
+            "line": 8,
+            "name": "the application is running",
+            "match": {
+              "location": "test\\bdd\\step-definitions\\common.steps.ts:13"
+            },
+            "result": {
+              "status": "skipped",
+              "duration": 0
+            }
+          },
+          {
+            "arguments": [],
+            "keyword": "And ",
+            "line": 9,
+            "name": "I have a valid JWT for tenant \"default-tenant\"",
+            "match": {
+              "location": "test\\bdd\\step-definitions\\auth.steps.ts:12"
+            },
+            "result": {
+              "status": "skipped",
+              "duration": 0
+            }
+          },
+          {
+            "arguments": [
+              {
+                "content": "{ \"targetPlan\": \"Growth\" }",
+                "line": 40
+              }
+            ],
+            "keyword": "When ",
+            "line": 39,
+            "name": "I send a POST request to \"/api/v1/billings/subscription/upgrade/preview\" with body:",
+            "match": {
+              "location": "test\\bdd\\step-definitions\\common.steps.ts:33"
+            },
+            "result": {
+              "status": "skipped",
+              "duration": 0
+            }
+          },
+          {
+            "arguments": [],
+            "keyword": "Then ",
+            "line": 43,
+            "name": "the response status should be 200",
+            "match": {
+              "location": "test\\bdd\\step-definitions\\common.steps.ts:47"
+            },
+            "result": {
+              "status": "skipped",
+              "duration": 0
+            }
+          }
+        ],
+        "tags": [
+          {
+            "name": "@billing",
+            "line": 1
+          }
+        ],
+        "type": "scenario"
+      }
+    ],
+    "id": "billing-management",
+    "line": 2,
+    "keyword": "Feature",
+    "name": "Billing Management",
+    "tags": [
+      {
+        "name": "@billing",
+        "line": 1
+      }
+    ],
+    "uri": "test\\bdd\\features\\billing.feature"
+  },
+  {
+    "description": "  As the platform\n  I want to enforce tenant status restrictions on protected endpoints\n  So that suspended or locked tenants cannot access resources",
+    "elements": [
+      {
+        "description": "",
+        "id": "tenant-status-guards;suspended-tenant-is-blocked-from-billing-endpoints",
+        "keyword": "Scenario",
+        "line": 11,
+        "name": "Suspended tenant is blocked from billing endpoints",
+        "steps": [
+          {
+            "keyword": "Before",
+            "hidden": true,
+            "result": {
+              "status": "skipped",
+              "duration": 0
+            }
+          },
+          {
+            "arguments": [],
+            "keyword": "Given ",
+            "line": 8,
+            "name": "the application is running",
+            "match": {
+              "location": "test\\bdd\\step-definitions\\common.steps.ts:13"
+            },
+            "result": {
+              "status": "skipped",
+              "duration": 0
+            }
+          },
+          {
+            "arguments": [],
+            "keyword": "Given ",
+            "line": 12,
+            "name": "I have a valid JWT for the current fixture tenant",
+            "match": {
+              "location": "test\\bdd\\step-definitions\\tenant-guards.steps.ts:14"
+            },
+            "result": {
+              "status": "skipped",
+              "duration": 0
+            }
+          },
+          {
+            "arguments": [],
+            "keyword": "When ",
+            "line": 13,
+            "name": "I send a GET request to \"/api/v1/billings/subscription\" with that token",
+            "match": {
+              "location": "test\\bdd\\step-definitions\\common.steps.ts:25"
+            },
+            "result": {
+              "status": "skipped",
+              "duration": 0
+            }
+          },
+          {
+            "arguments": [],
+            "keyword": "Then ",
+            "line": 14,
+            "name": "the response status should be 403",
+            "match": {
+              "location": "test\\bdd\\step-definitions\\common.steps.ts:47"
+            },
+            "result": {
+              "status": "skipped",
+              "duration": 0
+            }
+          },
+          {
+            "arguments": [],
+            "keyword": "And ",
+            "line": 15,
+            "name": "the response should contain errorCode \"TENANT_SUSPENDED\"",
+            "match": {
+              "location": "test\\bdd\\step-definitions\\common.steps.ts:101"
+            },
+            "result": {
+              "status": "skipped",
+              "duration": 0
+            }
+          },
+          {
+            "arguments": [],
+            "keyword": "And ",
+            "line": 16,
+            "name": "the response should contain a \"title\" field with value \"Forbidden\"",
+            "match": {
+              "location": "test\\bdd\\step-definitions\\common.steps.ts:94"
+            },
+            "result": {
+              "status": "skipped",
+              "duration": 0
+            }
+          },
+          {
+            "keyword": "After",
+            "hidden": true,
+            "result": {
+              "status": "skipped",
+              "duration": 0
+            }
+          }
+        ],
+        "tags": [
+          {
+            "name": "@guards",
+            "line": 1
+          },
+          {
+            "name": "@needs-suspended-tenant",
+            "line": 10
+          }
+        ],
+        "type": "scenario"
+      },
+      {
+        "description": "",
+        "id": "tenant-status-guards;locked-tenant-is-blocked-from-billing-endpoints",
+        "keyword": "Scenario",
+        "line": 19,
+        "name": "Locked tenant is blocked from billing endpoints",
+        "steps": [
+          {
+            "keyword": "Before",
+            "hidden": true,
+            "result": {
+              "status": "skipped",
+              "duration": 0
+            }
+          },
+          {
+            "arguments": [],
+            "keyword": "Given ",
+            "line": 8,
+            "name": "the application is running",
+            "match": {
+              "location": "test\\bdd\\step-definitions\\common.steps.ts:13"
+            },
+            "result": {
+              "status": "skipped",
+              "duration": 0
+            }
+          },
+          {
+            "arguments": [],
+            "keyword": "Given ",
+            "line": 20,
+            "name": "I have a valid JWT for the current fixture tenant",
+            "match": {
+              "location": "test\\bdd\\step-definitions\\tenant-guards.steps.ts:14"
+            },
+            "result": {
+              "status": "skipped",
+              "duration": 0
+            }
+          },
+          {
+            "arguments": [],
+            "keyword": "When ",
+            "line": 21,
+            "name": "I send a GET request to \"/api/v1/billings/subscription\" with that token",
+            "match": {
+              "location": "test\\bdd\\step-definitions\\common.steps.ts:25"
+            },
+            "result": {
+              "status": "skipped",
+              "duration": 0
+            }
+          },
+          {
+            "arguments": [],
+            "keyword": "Then ",
+            "line": 22,
+            "name": "the response status should be 403",
+            "match": {
+              "location": "test\\bdd\\step-definitions\\common.steps.ts:47"
+            },
+            "result": {
+              "status": "skipped",
+              "duration": 0
+            }
+          },
+          {
+            "arguments": [],
+            "keyword": "And ",
+            "line": 23,
+            "name": "the response should contain errorCode \"TENANT_LOCKED\"",
+            "match": {
+              "location": "test\\bdd\\step-definitions\\common.steps.ts:101"
+            },
+            "result": {
+              "status": "skipped",
+              "duration": 0
+            }
+          },
+          {
+            "keyword": "After",
+            "hidden": true,
+            "result": {
+              "status": "skipped",
+              "duration": 0
+            }
+          }
+        ],
+        "tags": [
+          {
+            "name": "@guards",
+            "line": 1
+          },
+          {
+            "name": "@needs-locked-tenant",
+            "line": 18
+          }
+        ],
+        "type": "scenario"
+      },
+      {
+        "description": "",
+        "id": "tenant-status-guards;locked-tenant-error-response-has-the-correct-shape",
+        "keyword": "Scenario",
+        "line": 26,
+        "name": "Locked tenant error response has the correct shape",
+        "steps": [
+          {
+            "keyword": "Before",
+            "hidden": true,
+            "result": {
+              "status": "skipped",
+              "duration": 0
+            }
+          },
+          {
+            "arguments": [],
+            "keyword": "Given ",
+            "line": 8,
+            "name": "the application is running",
+            "match": {
+              "location": "test\\bdd\\step-definitions\\common.steps.ts:13"
+            },
+            "result": {
+              "status": "skipped",
+              "duration": 0
+            }
+          },
+          {
+            "arguments": [],
+            "keyword": "Given ",
+            "line": 27,
+            "name": "I have a valid JWT for the current fixture tenant",
+            "match": {
+              "location": "test\\bdd\\step-definitions\\tenant-guards.steps.ts:14"
+            },
+            "result": {
+              "status": "skipped",
+              "duration": 0
+            }
+          },
+          {
+            "arguments": [],
+            "keyword": "When ",
+            "line": 28,
+            "name": "I send a GET request to \"/api/v1/billings/subscription\" with that token",
+            "match": {
+              "location": "test\\bdd\\step-definitions\\common.steps.ts:25"
+            },
+            "result": {
+              "status": "skipped",
+              "duration": 0
+            }
+          },
+          {
+            "arguments": [],
+            "keyword": "Then ",
+            "line": 29,
+            "name": "the response status should be 403",
+            "match": {
+              "location": "test\\bdd\\step-definitions\\common.steps.ts:47"
+            },
+            "result": {
+              "status": "skipped",
+              "duration": 0
+            }
+          },
+          {
+            "arguments": [],
+            "keyword": "And ",
+            "line": 30,
+            "name": "the response should contain a \"title\" field with value \"Forbidden\"",
+            "match": {
+              "location": "test\\bdd\\step-definitions\\common.steps.ts:94"
+            },
+            "result": {
+              "status": "skipped",
+              "duration": 0
+            }
+          },
+          {
+            "arguments": [],
+            "keyword": "And ",
+            "line": 31,
+            "name": "the response should contain a \"detail\" field",
+            "match": {
+              "location": "test\\bdd\\step-definitions\\common.steps.ts:88"
+            },
+            "result": {
+              "status": "skipped",
+              "duration": 0
+            }
+          },
+          {
+            "arguments": [],
+            "keyword": "And ",
+            "line": 32,
+            "name": "the response should contain a \"errorCode\" field",
+            "match": {
+              "location": "test\\bdd\\step-definitions\\common.steps.ts:88"
+            },
+            "result": {
+              "status": "skipped",
+              "duration": 0
+            }
+          },
+          {
+            "keyword": "After",
+            "hidden": true,
+            "result": {
+              "status": "skipped",
+              "duration": 0
+            }
+          }
+        ],
+        "tags": [
+          {
+            "name": "@guards",
+            "line": 1
+          },
+          {
+            "name": "@needs-locked-tenant",
+            "line": 25
+          }
+        ],
+        "type": "scenario"
+      },
+      {
+        "description": "",
+        "id": "tenant-status-guards;active-tenant-passes-the-tenant-status-guard",
+        "keyword": "Scenario",
+        "line": 35,
+        "name": "Active tenant passes the tenant status guard",
+        "steps": [
+          {
+            "keyword": "Before",
+            "hidden": true,
+            "result": {
+              "status": "skipped",
+              "duration": 0
+            }
+          },
+          {
+            "arguments": [],
+            "keyword": "Given ",
+            "line": 8,
+            "name": "the application is running",
+            "match": {
+              "location": "test\\bdd\\step-definitions\\common.steps.ts:13"
+            },
+            "result": {
+              "status": "skipped",
+              "duration": 0
+            }
+          },
+          {
+            "arguments": [],
+            "keyword": "Given ",
+            "line": 36,
+            "name": "I have a valid JWT for the current fixture tenant",
+            "match": {
+              "location": "test\\bdd\\step-definitions\\tenant-guards.steps.ts:14"
+            },
+            "result": {
+              "status": "skipped",
+              "duration": 0
+            }
+          },
+          {
+            "arguments": [],
+            "keyword": "When ",
+            "line": 37,
+            "name": "I send a GET request to \"/api/v1/billings/subscription\" with that token",
+            "match": {
+              "location": "test\\bdd\\step-definitions\\common.steps.ts:25"
+            },
+            "result": {
+              "status": "skipped",
+              "duration": 0
+            }
+          },
+          {
+            "arguments": [],
+            "keyword": "Then ",
+            "line": 38,
+            "name": "the response status is not 403",
+            "match": {
+              "location": "test\\bdd\\step-definitions\\common.steps.ts:56"
+            },
+            "result": {
+              "status": "skipped",
+              "duration": 0
+            }
+          },
+          {
+            "keyword": "After",
+            "hidden": true,
+            "result": {
+              "status": "skipped",
+              "duration": 0
+            }
+          }
+        ],
+        "tags": [
+          {
+            "name": "@guards",
+            "line": 1
+          },
+          {
+            "name": "@needs-active-tenant",
+            "line": 34
+          }
+        ],
+        "type": "scenario"
+      },
+      {
+        "description": "",
+        "id": "tenant-status-guards;public-endpoint-bypasses-tenant-status-guard-entirely",
+        "keyword": "Scenario",
+        "line": 41,
+        "name": "Public endpoint bypasses tenant status guard entirely",
+        "steps": [
+          {
+            "arguments": [],
+            "keyword": "Given ",
+            "line": 8,
+            "name": "the application is running",
+            "match": {
+              "location": "test\\bdd\\step-definitions\\common.steps.ts:13"
+            },
+            "result": {
+              "status": "skipped",
+              "duration": 0
+            }
+          },
+          {
+            "arguments": [],
+            "keyword": "When ",
+            "line": 42,
+            "name": "I send a GET request to \"/api/v1/billings/plans\" without any token",
+            "match": {
+              "location": "test\\bdd\\step-definitions\\common.steps.ts:21"
+            },
+            "result": {
+              "status": "skipped",
+              "duration": 0
+            }
+          },
+          {
+            "arguments": [],
+            "keyword": "Then ",
+            "line": 43,
+            "name": "the response status should be 200",
+            "match": {
+              "location": "test\\bdd\\step-definitions\\common.steps.ts:47"
+            },
+            "result": {
+              "status": "skipped",
+              "duration": 0
+            }
+          }
+        ],
+        "tags": [
+          {
+            "name": "@guards",
+            "line": 1
+          },
+          {
+            "name": "@public-endpoint",
+            "line": 40
+          }
+        ],
+        "type": "scenario"
+      }
+    ],
+    "id": "tenant-status-guards",
+    "line": 2,
+    "keyword": "Feature",
+    "name": "Tenant Status Guards",
+    "tags": [
+      {
+        "name": "@guards",
+        "line": 1
+      }
+    ],
+    "uri": "test\\bdd\\features\\tenant-guards.feature"
+  }
+]

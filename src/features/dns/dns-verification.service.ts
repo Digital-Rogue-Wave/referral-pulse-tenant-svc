@@ -21,7 +21,7 @@ export class DnsVerificationService {
 
         this.logger.log(`Verifying TXT record for ${challengeDomain}`, {
             domain,
-            challengeDomain,
+            challengeDomain
         });
 
         try {
@@ -31,28 +31,26 @@ export class DnsVerificationService {
 
             this.logger.log(`Verification result for ${domain}: ${isValid}`, {
                 domain,
-                verified: isValid,
+                verified: isValid
             });
 
             return {
                 verified: isValid,
                 domain,
-                message: isValid
-                    ? 'Domain ownership verified successfully'
-                    : 'TXT record not found or does not match expected token',
+                message: isValid ? 'Domain ownership verified successfully' : 'TXT record not found or does not match expected token'
             };
         } catch (error) {
             const errorMessage = error instanceof Error ? error.message : 'Unknown DNS error';
 
             this.logger.warn(`DNS verification failed for ${domain}`, {
                 domain,
-                error: errorMessage,
+                error: errorMessage
             });
 
             return {
                 verified: false,
                 domain,
-                message: `DNS lookup failed: ${errorMessage}`,
+                message: `DNS lookup failed: ${errorMessage}`
             };
         }
     }
@@ -64,17 +62,13 @@ export class DnsVerificationService {
         try {
             const records = await dns.resolveCname(domain);
             const isValid = records.some(
-                (record) =>
-                    record.toLowerCase() === expectedTarget.toLowerCase() ||
-                    record.toLowerCase().endsWith(`.${expectedTarget.toLowerCase()}`),
+                (record) => record.toLowerCase() === expectedTarget.toLowerCase() || record.toLowerCase().endsWith(`.${expectedTarget.toLowerCase()}`)
             );
 
             return {
                 verified: isValid,
                 domain,
-                message: isValid
-                    ? 'CNAME record verified successfully'
-                    : `CNAME record does not point to ${expectedTarget}`,
+                message: isValid ? 'CNAME record verified successfully' : `CNAME record does not point to ${expectedTarget}`
             };
         } catch (error) {
             const errorMessage = error instanceof Error ? error.message : 'Unknown DNS error';
@@ -82,7 +76,7 @@ export class DnsVerificationService {
             return {
                 verified: false,
                 domain,
-                message: `CNAME lookup failed: ${errorMessage}`,
+                message: `CNAME lookup failed: ${errorMessage}`
             };
         }
     }

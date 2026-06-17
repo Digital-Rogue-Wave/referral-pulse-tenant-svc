@@ -6,7 +6,7 @@ import { Engine, RuleProperties, Event } from 'json-rules-engine';
 export class RulesEngineService {
     constructor(
         @Inject('ENGINE_FACTORY')
-        private readonly createEngine: () => Engine,
+        private readonly createEngine: () => Engine
     ) {}
 
     /**
@@ -16,10 +16,7 @@ export class RulesEngineService {
      * @param facts - The facts to evaluate against the rules.
      * @returns A promise that resolves to an array of triggered events.
      */
-    async evaluate<TRule extends RuleProperties, TFacts extends Record<string, any>>(
-        rules: TRule[],
-        facts: TFacts,
-    ): Promise<Event[]> {
+    async evaluate<TRule extends RuleProperties, TFacts extends Record<string, any>>(rules: TRule[], facts: TFacts): Promise<Event[]> {
         const engine = this.createEngine();
 
         for (const rule of rules) {

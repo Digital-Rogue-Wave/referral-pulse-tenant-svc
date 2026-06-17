@@ -4,7 +4,7 @@ import { z } from 'zod';
 
 const serviceSchema = z.object({
     url: z.string().url(),
-    timeout: z.coerce.number().int().positive().default(5000),
+    timeout: z.coerce.number().int().positive().default(5000)
 });
 
 const schema = z.object({
@@ -17,7 +17,7 @@ const schema = z.object({
     sdkConfig: serviceSchema,
     contentAi: serviceSchema,
     clientIdentity: serviceSchema,
-    workflowOrchestration: serviceSchema,
+    workflowOrchestration: serviceSchema
 });
 
 export type ServicesConfig = z.infer<typeof schema>;
@@ -28,44 +28,44 @@ export default registerAs('services', (): ServicesConfig => {
     const result = schema.safeParse({
         tenants: {
             url: process.env.SERVICE_TENANTS_URL || 'http://localhost:5001',
-            timeout: defaultTimeout,
+            timeout: defaultTimeout
         },
         campaigns: {
             url: process.env.SERVICE_CAMPAIGNS_URL || 'http://localhost:5002',
-            timeout: defaultTimeout,
+            timeout: defaultTimeout
         },
         rewards: {
             url: process.env.SERVICE_REWARDS_URL || 'http://localhost:5003',
-            timeout: defaultTimeout,
+            timeout: defaultTimeout
         },
         analytics: {
             url: process.env.SERVICE_ANALYTICS_URL || 'http://localhost:5004',
-            timeout: defaultTimeout,
+            timeout: defaultTimeout
         },
         tracking: {
             url: process.env.SERVICE_TRACKING_URL || 'http://localhost:5005',
-            timeout: defaultTimeout,
+            timeout: defaultTimeout
         },
         referrals: {
             url: process.env.SERVICE_REFERRALS_URL || 'http://localhost:5006',
-            timeout: defaultTimeout,
+            timeout: defaultTimeout
         },
         sdkConfig: {
             url: process.env.SERVICE_SDK_CONFIG_URL || 'http://localhost:5007',
-            timeout: defaultTimeout,
+            timeout: defaultTimeout
         },
         contentAi: {
             url: process.env.SERVICE_CONTENT_AI_URL || 'http://localhost:5008',
-            timeout: defaultTimeout,
+            timeout: defaultTimeout
         },
         clientIdentity: {
             url: process.env.SERVICE_CLIENT_IDENTITY_URL || 'http://localhost:5009',
-            timeout: defaultTimeout,
+            timeout: defaultTimeout
         },
         workflowOrchestration: {
             url: process.env.SERVICE_WORKFLOW_ORCHESTRATION_URL || 'http://localhost:5010',
-            timeout: defaultTimeout,
-        },
+            timeout: defaultTimeout
+        }
     });
 
     if (!result.success) {

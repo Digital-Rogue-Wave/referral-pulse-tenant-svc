@@ -3,14 +3,7 @@ import type { Readable } from 'stream';
 import { Injectable, OnModuleInit } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 
-import {
-    S3Client,
-    PutObjectCommand,
-    GetObjectCommand,
-    DeleteObjectCommand,
-    HeadObjectCommand,
-    ListObjectsV2Command,
-} from '@aws-sdk/client-s3';
+import { S3Client, PutObjectCommand, GetObjectCommand, DeleteObjectCommand, HeadObjectCommand, ListObjectsV2Command } from '@aws-sdk/client-s3';
 import { Upload } from '@aws-sdk/lib-storage';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 
@@ -35,10 +28,10 @@ export class S3Service implements OnModuleInit {
         private readonly configService: ConfigService<AllConfigType>,
         private readonly tenantContext: TenantContextService,
         private readonly tracingService: TracingService,
-        private readonly dateService: DateService,
+        private readonly dateService: DateService
     ) {
         this.bucketName = this.configService.getOrThrow('aws.s3.bucketName', {
-            infer: true,
+            infer: true
         });
         this.presignedUrlExpiry = this.configService.getOrThrow('aws.s3.presignedUrlExpiry', { infer: true });
         this.uploadPartSize = this.configService.getOrThrow('aws.s3.uploadPartSize', { infer: true });
@@ -47,7 +40,7 @@ export class S3Service implements OnModuleInit {
 
     async onModuleInit(): Promise<void> {
         const nodeEnv = this.configService.getOrThrow('app.nodeEnv', {
-            infer: true,
+            infer: true
         });
         const region = this.configService.getOrThrow('aws.region', { infer: true });
         const endpoint = this.configService.get('aws.endpoint', { infer: true });
@@ -57,9 +50,9 @@ export class S3Service implements OnModuleInit {
         const credentials = useCredentials
             ? {
                   accessKeyId: this.configService.getOrThrow('aws.accessKeyId', {
-                      infer: true,
+                      infer: true
                   }),
-                  secretAccessKey: this.configService.getOrThrow('aws.secretAccessKey', { infer: true }),
+                  secretAccessKey: this.configService.getOrThrow('aws.secretAccessKey', { infer: true })
               }
             : undefined;
 
@@ -67,7 +60,7 @@ export class S3Service implements OnModuleInit {
             region,
             endpoint: endpoint || undefined,
             credentials,
-            forcePathStyle: !!endpoint,
+            forcePathStyle: !!endpoint
         });
     }
 
@@ -90,7 +83,7 @@ export class S3Service implements OnModuleInit {
                 Metadata: options?.metadata,
                 ACL: options?.acl,
                 ServerSideEncryption: options?.serverSideEncryption,
-                CacheControl: options?.cacheControl,
+                CacheControl: options?.cacheControl
             });
             const result = await this.client.send(command);
             return {
@@ -98,7 +91,7 @@ export class S3Service implements OnModuleInit {
                 bucket: this.bucketName,
                 location: `s3://${this.bucketName}/${fullKey}`,
                 etag: result.ETag?.replace(/"/g, '') || '',
-                versionId: result.VersionId,
+                versionId: result.VersionId
             };
         });
     }
@@ -115,10 +108,10 @@ export class S3Service implements OnModuleInit {
                     ContentType: options?.contentType,
                     Metadata: options?.metadata,
                     ACL: options?.acl,
-                    ServerSideEncryption: options?.serverSideEncryption,
+                    ServerSideEncryption: options?.serverSideEncryption
                 },
                 queueSize: this.maxConcurrentUploads,
-                partSize: this.uploadPartSize,
+                partSize: this.uploadPartSize
             });
             const result = await upload.done();
             return {
@@ -126,7 +119,7 @@ export class S3Service implements OnModuleInit {
                 bucket: this.bucketName,
                 location: result.Location || `s3://${this.bucketName}/${fullKey}`,
                 etag: result.ETag?.replace(/"/g, '') || '',
-                versionId: result.VersionId,
+                versionId: result.VersionId
             };
         });
     }
@@ -135,7 +128,7 @@ export class S3Service implements OnModuleInit {
         const fullKey = this.buildKey(key);
         const command = new GetObjectCommand({
             Bucket: this.bucketName,
-            Key: fullKey,
+            Key: fullKey
         });
         const result = await this.client.send(command);
         return result.Body as Readable;
@@ -154,7 +147,7 @@ export class S3Service implements OnModuleInit {
         const fullKey = this.buildKey(key);
         const command = new DeleteObjectCommand({
             Bucket: this.bucketName,
-            Key: fullKey,
+            Key: fullKey
         });
         await this.client.send(command);
     }
@@ -172,7 +165,7 @@ export class S3Service implements OnModuleInit {
         const fullKey = this.buildKey(key);
         const command = new HeadObjectCommand({
             Bucket: this.bucketName,
-            Key: fullKey,
+            Key: fullKey
         });
         const result = await this.client.send(command);
         return {
@@ -181,7 +174,7 @@ export class S3Service implements OnModuleInit {
             lastModified: result.LastModified || this.dateService.nowMoment().toDate(),
             contentType: result.ContentType,
             etag: result.ETag?.replace(/"/g, '') || '',
-            metadata: result.Metadata,
+            metadata: result.Metadata
         };
     }
 
@@ -190,14 +183,14 @@ export class S3Service implements OnModuleInit {
         const command = new ListObjectsV2Command({
             Bucket: this.bucketName,
             Prefix: fullPrefix,
-            MaxKeys: maxKeys,
+            MaxKeys: maxKeys
         });
         const result = await this.client.send(command);
         return (result.Contents || []).map((obj) => ({
             key: obj.Key || '',
             size: obj.Size || 0,
             lastModified: obj.LastModified || this.dateService.nowMoment().toDate(),
-            etag: obj.ETag?.replace(/"/g, '') || '',
+            etag: obj.ETag?.replace(/"/g, '') || ''
         }));
     }
 
@@ -207,10 +200,10 @@ export class S3Service implements OnModuleInit {
             Bucket: this.bucketName,
             Key: fullKey,
             ResponseContentDisposition: options?.contentDisposition,
-            ResponseContentType: options?.contentType,
+            ResponseContentType: options?.contentType
         });
         return getSignedUrl(this.client, command, {
-            expiresIn: options?.expiresIn || this.presignedUrlExpiry,
+            expiresIn: options?.expiresIn || this.presignedUrlExpiry
         });
     }
 
@@ -219,10 +212,10 @@ export class S3Service implements OnModuleInit {
         const command = new PutObjectCommand({
             Bucket: this.bucketName,
             Key: fullKey,
-            ContentType: options?.contentType,
+            ContentType: options?.contentType
         });
         return getSignedUrl(this.client, command, {
-            expiresIn: options?.expiresIn || this.presignedUrlExpiry,
+            expiresIn: options?.expiresIn || this.presignedUrlExpiry
         });
     }
 

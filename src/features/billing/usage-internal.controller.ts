@@ -10,14 +10,14 @@ export class UsageInternalController {
     constructor(
         private readonly usageTracker: UsageTrackerService,
         private readonly planLimitService: PlanLimitService,
-        private readonly tenantContext: TenantContextService,
+        private readonly tenantContext: TenantContextService
     ) {}
 
     @HttpCode(HttpStatus.OK)
     @Post(':tenantId/usage/increment')
     async incrementUsage(
         @Param('tenantId') tenantId: string,
-        @Body() dto: UsageUpdateDto,
+        @Body() dto: UsageUpdateDto
     ): Promise<{ metric: string; currentUsage: number; periodDate: string }> {
         this.tenantContext.set('tenantId', tenantId);
         await this.planLimitService.enforceLimit(tenantId, dto.metric, dto.amount ?? 1);
@@ -30,7 +30,7 @@ export class UsageInternalController {
     @Post(':tenantId/usage/decrement')
     async decrementUsage(
         @Param('tenantId') tenantId: string,
-        @Body() dto: UsageUpdateDto,
+        @Body() dto: UsageUpdateDto
     ): Promise<{ metric: string; currentUsage: number; periodDate: string }> {
         this.tenantContext.set('tenantId', tenantId);
         const current = await this.usageTracker.decrement(dto.metric, dto.amount ?? 1);

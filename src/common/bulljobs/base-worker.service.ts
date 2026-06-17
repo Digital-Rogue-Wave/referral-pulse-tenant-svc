@@ -35,9 +35,7 @@ import { BullJobsConnectionFactory } from './bulljobs-connection.factory';
  * }
  * ```
  */
-export abstract class BaseWorkerService<T extends IBaseJobData = IBaseJobData>
-    implements OnModuleInit, OnModuleDestroy
-{
+export abstract class BaseWorkerService<T extends IBaseJobData = IBaseJobData> implements OnModuleInit, OnModuleDestroy {
     protected worker!: Worker<T, IJobResult>;
     protected readonly queueName: string;
 
@@ -49,7 +47,7 @@ export abstract class BaseWorkerService<T extends IBaseJobData = IBaseJobData>
         protected readonly metricsService: MetricsService,
         protected readonly tracingService: TracingService,
         protected readonly tenantContext: TenantContextService,
-        protected readonly dateService: DateService,
+        protected readonly dateService: DateService
     ) {
         this.queueName = queueName;
         this.logger.setContext(`${this.constructor.name}`);
@@ -57,7 +55,7 @@ export abstract class BaseWorkerService<T extends IBaseJobData = IBaseJobData>
 
     onModuleInit(): void {
         const isWorker = this.configService.get<boolean>('app.isWorker', {
-            infer: true,
+            infer: true
         });
 
         if (!isWorker) {
@@ -71,7 +69,7 @@ export abstract class BaseWorkerService<T extends IBaseJobData = IBaseJobData>
         this.worker = new Worker<T, IJobResult>(this.queueName, async (job: Job<T>) => this.handleJob(job), {
             ...workerConfig,
             connection,
-            prefix: this.connectionFactory.getKeyPrefix(),
+            prefix: this.connectionFactory.getKeyPrefix()
         });
 
         this.setupEventHandlers();
@@ -96,8 +94,8 @@ export abstract class BaseWorkerService<T extends IBaseJobData = IBaseJobData>
             concurrency: 5, // Process 5 jobs concurrently per worker
             limiter: {
                 max: 10, // Max 10 jobs
-                duration: 1000, // Per second
-            },
+                duration: 1000 // Per second
+            }
         };
     }
 
@@ -114,7 +112,7 @@ export abstract class BaseWorkerService<T extends IBaseJobData = IBaseJobData>
             jobId: job.id,
             queueName: this.queueName,
             attemptNumber: job.attemptsMade + 1,
-            tenantId: job.data.tenantId,
+            tenantId: job.data.tenantId
         });
 
         try {
@@ -124,7 +122,7 @@ export abstract class BaseWorkerService<T extends IBaseJobData = IBaseJobData>
             this.logger.log(`✅ Job ${job.id} completed successfully`, {
                 jobId: job.id,
                 queueName: this.queueName,
-                processingTime,
+                processingTime
             });
 
             this.metricsService.recordQueueJobProcessed(this.queueName, true, processingTime);
@@ -132,22 +130,18 @@ export abstract class BaseWorkerService<T extends IBaseJobData = IBaseJobData>
             return {
                 ...result,
                 processingTime,
-                attemptNumber: job.attemptsMade + 1,
+                attemptNumber: job.attemptsMade + 1
             };
         } catch (error) {
             const processingTime = this.dateService.now() - startTime;
             const errorMessage = error instanceof Error ? error.message : 'Unknown error';
 
-            this.logger.error(
-                `❌ Job ${job.id} failed: ${errorMessage}`,
-                error instanceof Error ? error.stack : undefined,
-                {
-                    jobId: job.id,
-                    queueName: this.queueName,
-                    attemptNumber: job.attemptsMade + 1,
-                    error: errorMessage,
-                },
-            );
+            this.logger.error(`❌ Job ${job.id} failed: ${errorMessage}`, error instanceof Error ? error.stack : undefined, {
+                jobId: job.id,
+                queueName: this.queueName,
+                attemptNumber: job.attemptsMade + 1,
+                error: errorMessage
+            });
 
             this.metricsService.recordQueueJobProcessed(this.queueName, false, processingTime);
 
@@ -167,13 +161,7 @@ export abstract class BaseWorkerService<T extends IBaseJobData = IBaseJobData>
     protected isUnrecoverableError(error: unknown): boolean {
         if (error instanceof Error) {
             // Common unrecoverable errors
-            const unrecoverableMessages = [
-                'validation error',
-                'invalid data',
-                'unauthorized',
-                'forbidden',
-                'not found',
-            ];
+            const unrecoverableMessages = ['validation error', 'invalid data', 'unauthorized', 'forbidden', 'not found'];
             return unrecoverableMessages.some((msg) => error.message.toLowerCase().includes(msg));
         }
         return false;
@@ -187,7 +175,7 @@ export abstract class BaseWorkerService<T extends IBaseJobData = IBaseJobData>
             this.logger.debug(`✅ Job ${job.id} completed`, {
                 jobId: job.id,
                 queueName: this.queueName,
-                returnValue: job.returnvalue,
+                returnValue: job.returnvalue
             });
         });
 
@@ -196,14 +184,14 @@ export abstract class BaseWorkerService<T extends IBaseJobData = IBaseJobData>
                 jobId: job?.id,
                 queueName: this.queueName,
                 error: error.message,
-                attemptsMade: job?.attemptsMade,
+                attemptsMade: job?.attemptsMade
             });
         });
 
         this.worker.on('stalled', (jobId: string) => {
             this.logger.warn(`⚠️ Job ${jobId} stalled`, {
                 jobId,
-                queueName: this.queueName,
+                queueName: this.queueName
             });
         });
 
@@ -211,14 +199,14 @@ export abstract class BaseWorkerService<T extends IBaseJobData = IBaseJobData>
             this.logger.debug(`📊 Job ${job.id} progress: ${JSON.stringify(progress)}`, {
                 jobId: job.id,
                 queueName: this.queueName,
-                progress,
+                progress
             });
         });
 
         this.worker.on('error', (error: Error) => {
             this.logger.error(`❌ Worker error in queue ${this.queueName}`, error.stack, {
                 queueName: this.queueName,
-                error: error.message,
+                error: error.message
             });
         });
     }

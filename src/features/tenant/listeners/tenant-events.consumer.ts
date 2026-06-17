@@ -8,19 +8,13 @@ import { AppLoggerService } from '@common/logging/app-logger.service';
 import { MessageProcessorService } from '@common/messaging/message-processor.service';
 import { SqsConsumer } from '@common/messaging/sqs-consumer.decorator';
 
-import {
-    CampaignCreatedEvent,
-    CampaignUpdatedEvent,
-    CampaignInvitationSentEvent,
-    CampaignActivatedEvent,
-    CampaignEvents,
-} from '@domains/campaign';
+import { CampaignCreatedEvent, CampaignUpdatedEvent, CampaignInvitationSentEvent, CampaignActivatedEvent, CampaignEvents } from '@domains/campaign';
 
 @Injectable()
 export class CampaignEventsConsumer {
     constructor(
         private readonly messageProcessor: MessageProcessorService,
-        private readonly logger: AppLoggerService,
+        private readonly logger: AppLoggerService
     ) {
         this.logger.setContext(CampaignEventsConsumer.name);
     }
@@ -52,7 +46,7 @@ export class CampaignEventsConsumer {
                         this.logger.warn(`Unknown campaign event type: ${eventType}`);
                 }
             },
-            { queueName: CAMPAIGN_SVC_FIFO },
+            { queueName: CAMPAIGN_SVC_FIFO }
         );
     }
 
@@ -67,9 +61,7 @@ export class CampaignEventsConsumer {
     }
 
     private handleInvitationSent(payload: CampaignInvitationSentEvent): void {
-        this.logger.log(
-            `Campaign invitation sent processed - campaignId: ${payload.campaignId}, invitationId: ${payload.invitationId}`,
-        );
+        this.logger.log(`Campaign invitation sent processed - campaignId: ${payload.campaignId}, invitationId: ${payload.invitationId}`);
         // TODO: handleInvitationSent Business logic
     }
 

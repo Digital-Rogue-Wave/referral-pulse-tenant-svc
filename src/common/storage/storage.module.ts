@@ -7,6 +7,6 @@ import { S3Service } from './s3.service';
 @Global()
 @Module({
     providers: [S3Service, S3KeyBuilder, ClickHouseService],
-    exports: [S3Service, S3KeyBuilder, ClickHouseService],
+    exports: [S3Service, S3KeyBuilder, ClickHouseService]
 })
 export class StorageModule {}

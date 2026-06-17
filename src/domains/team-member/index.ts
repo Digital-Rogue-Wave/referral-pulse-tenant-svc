@@ -11,13 +11,13 @@ import { BaseDomainEvent } from '@domains/common/events';
 export enum TeamMemberRole {
     OWNER = 'OWNER',
     ADMIN = 'ADMIN',
-    MEMBER = 'MEMBER',
+    MEMBER = 'MEMBER'
 }
 
 export enum TeamMemberStatus {
     ACTIVE = 'ACTIVE',
     INACTIVE = 'INACTIVE',
-    SUSPENDED = 'SUSPENDED',
+    SUSPENDED = 'SUSPENDED'
 }
 
 // ============================================================
@@ -125,7 +125,7 @@ export class TeamMemberCreatedEvent extends BaseDomainEvent {
             role: string;
             createdAt: Date;
         },
-        public readonly userId?: string,
+        public readonly userId?: string
     ) {
         super();
     }
@@ -146,7 +146,7 @@ export class TeamMemberRoleUpdatedEvent extends BaseDomainEvent {
             updatedBy: string;
             updatedAt: Date;
         },
-        public readonly userId?: string,
+        public readonly userId?: string
     ) {
         super();
     }
@@ -167,7 +167,7 @@ export class TeamMemberStatusUpdatedEvent extends BaseDomainEvent {
             updatedBy: string;
             updatedAt: Date;
         },
-        public readonly userId?: string,
+        public readonly userId?: string
     ) {
         super();
     }
@@ -186,7 +186,7 @@ export class TeamMemberRemovedEvent extends BaseDomainEvent {
             removedBy: string;
             removedAt: Date;
         },
-        public readonly userId?: string,
+        public readonly userId?: string
     ) {
         super();
     }
@@ -196,5 +196,5 @@ export const TeamMemberEvents = {
     CREATED: 'team-member.created',
     UPDATED: 'team-member.updated',
     STATUS: 'team-member.status',
-    DELETED: 'team-member.deleted',
+    DELETED: 'team-member.deleted'
 } as const;

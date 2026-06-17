@@ -33,14 +33,14 @@ export class PlanLimitService {
         private readonly logger: AppLoggerService,
         private readonly redis: RedisService,
         private readonly tenantContext: TenantContextService,
-        private readonly configService: ConfigService<AllConfigType>,
+        private readonly configService: ConfigService<AllConfigType>
     ) {
         this.logger.setContext(PlanLimitService.name);
     }
 
     private buildUpgradeUrl(): string | null {
         const frontend = this.configService.get('app.frontendDomain', {
-            infer: true,
+            infer: true
         });
         if (!frontend) {
             return null;
@@ -50,7 +50,7 @@ export class PlanLimitService {
 
     private async enforceTrialExpiryOrThrow(tenantId: string): Promise<void> {
         const tenant = await this.prisma.tenant.findUnique({
-            where: { id: tenantId },
+            where: { id: tenantId }
         });
 
         if (!tenant?.trialEndsAt) {
@@ -67,8 +67,8 @@ export class PlanLimitService {
                 tenantId,
                 isActive: true,
                 manualInvoicing: true,
-                deletedAt: null,
-            },
+                deletedAt: null
+            }
         });
 
         if (manualPlan) {
@@ -76,7 +76,7 @@ export class PlanLimitService {
         }
 
         const billing = await this.prisma.billing.findUnique({
-            where: { tenantId },
+            where: { tenantId }
         });
         if (billing?.status === SubscriptionStatusEnum.ACTIVE) {
             return;
@@ -87,9 +87,9 @@ export class PlanLimitService {
                 message: 'Trial has expired. Please upgrade your subscription to continue.',
                 code: 'TRIAL_EXPIRED',
                 trialEndsAt: tenant.trialEndsAt.toISOString(),
-                upgradeUrl: this.buildUpgradeUrl(),
+                upgradeUrl: this.buildUpgradeUrl()
             },
-            HttpStatus.PAYMENT_REQUIRED,
+            HttpStatus.PAYMENT_REQUIRED
         );
     }
 
@@ -119,8 +119,8 @@ export class PlanLimitService {
                 tenantId,
                 isActive: true,
                 manualInvoicing: true,
-                deletedAt: null,
-            },
+                deletedAt: null
+            }
         });
 
         if (manualPlan) {
@@ -128,19 +128,15 @@ export class PlanLimitService {
         }
 
         const billing = await this.prisma.billing.findUnique({
-            where: { tenantId },
+            where: { tenantId }
         });
 
         if (!billing) {
-            this.logger.debug(
-                `No Billing found for tenant ${tenantId} when resolving plan limits; defaulting to FREE plan`,
-            );
+            this.logger.debug(`No Billing found for tenant ${tenantId} when resolving plan limits; defaulting to FREE plan`);
 
             const freeStripePriceId = this.getStripePriceIdForPlan(BillingPlanEnum.FREE);
             if (!freeStripePriceId) {
-                this.logger.debug(
-                    `No Stripe price mapping found for plan ${BillingPlanEnum.FREE} when resolving plan limits for tenant ${tenantId}`,
-                );
+                this.logger.debug(`No Stripe price mapping found for plan ${BillingPlanEnum.FREE} when resolving plan limits for tenant ${tenantId}`);
                 return null;
             }
 
@@ -149,14 +145,12 @@ export class PlanLimitService {
                     stripePriceId: freeStripePriceId,
                     tenantId: null,
                     isActive: true,
-                    deletedAt: null,
-                },
+                    deletedAt: null
+                }
             });
 
             if (!freePlan) {
-                this.logger.debug(
-                    `No Plan found for FREE stripePriceId=${freeStripePriceId} when resolving plan limits for tenant ${tenantId}`,
-                );
+                this.logger.debug(`No Plan found for FREE stripePriceId=${freeStripePriceId} when resolving plan limits for tenant ${tenantId}`);
             }
 
             return freePlan ?? null;
@@ -164,9 +158,7 @@ export class PlanLimitService {
 
         const stripePriceId = this.getStripePriceIdForPlan(billing.plan);
         if (!stripePriceId) {
-            this.logger.debug(
-                `No Stripe price mapping found for plan ${billing.plan} when resolving plan limits for tenant ${tenantId}`,
-            );
+            this.logger.debug(`No Stripe price mapping found for plan ${billing.plan} when resolving plan limits for tenant ${tenantId}`);
             return null;
         }
 
@@ -175,14 +167,12 @@ export class PlanLimitService {
                 stripePriceId,
                 tenantId: null,
                 isActive: true,
-                deletedAt: null,
-            },
+                deletedAt: null
+            }
         });
 
         if (!plan) {
-            this.logger.debug(
-                `No Plan found for stripePriceId=${stripePriceId} when resolving plan limits for tenant ${tenantId}`,
-            );
+            this.logger.debug(`No Plan found for stripePriceId=${stripePriceId} when resolving plan limits for tenant ${tenantId}`);
         }
 
         return plan ?? null;
@@ -195,7 +185,7 @@ export class PlanLimitService {
 
     async getCurrentPlanForTenant(tenantId: string): Promise<BillingPlanEnum> {
         const billing = await this.prisma.billing.findUnique({
-            where: { tenantId },
+            where: { tenantId }
         });
         return (billing?.plan as BillingPlanEnum) ?? BillingPlanEnum.FREE;
     }
@@ -208,9 +198,7 @@ export class PlanLimitService {
             return 0;
         }
 
-        const currentUsage = await this.tenantContext.runWithContext({ tenantId }, () =>
-            this.redis.getUsage(metric),
-        );
+        const currentUsage = await this.tenantContext.runWithContext({ tenantId }, () => this.redis.getUsage(metric));
         const remaining = rawLimit - currentUsage;
         return remaining >= 0 ? remaining : 0;
     }
@@ -220,9 +208,7 @@ export class PlanLimitService {
         const limits = await this.getPlanLimits(tenantId);
         const rawLimit = limits ? (limits as Record<string, number | undefined>)[metric] : undefined;
 
-        const currentUsage = await this.tenantContext.runWithContext({ tenantId }, () =>
-            this.redis.getUsage(metric),
-        );
+        const currentUsage = await this.tenantContext.runWithContext({ tenantId }, () => this.redis.getUsage(metric));
 
         if (rawLimit === null || rawLimit === undefined) {
             return {
@@ -230,7 +216,7 @@ export class PlanLimitService {
                 currentUsage,
                 limit: null,
                 remaining: null,
-                allowed: true,
+                allowed: true
             };
         }
 
@@ -243,7 +229,7 @@ export class PlanLimitService {
             currentUsage,
             limit,
             remaining: remaining >= 0 ? remaining : 0,
-            allowed,
+            allowed
         };
     }
 
@@ -257,9 +243,7 @@ export class PlanLimitService {
         const limits = await this.getPlanLimits(tenantId);
         const rawLimit = limits ? (limits as Record<string, number | undefined>)[metric] : undefined;
 
-        const currentUsage = await this.tenantContext.runWithContext({ tenantId }, () =>
-            this.redis.getUsage(metric),
-        );
+        const currentUsage = await this.tenantContext.runWithContext({ tenantId }, () => this.redis.getUsage(metric));
 
         if (rawLimit === null || rawLimit === undefined) {
             return;
@@ -277,9 +261,7 @@ export class PlanLimitService {
         const remaining = Math.max(0, effectiveLimit - currentUsage);
 
         if (nextValue > effectiveLimit) {
-            const upgradeSuggestions = options?.upgradeSuggestions ?? [
-                `Upgrade your subscription plan to increase the allowed ${metric} limit.`,
-            ];
+            const upgradeSuggestions = options?.upgradeSuggestions ?? [`Upgrade your subscription plan to increase the allowed ${metric} limit.`];
 
             const upgradeUrl = options?.upgradeUrl ?? null;
 
@@ -291,7 +273,7 @@ export class PlanLimitService {
                 remaining,
                 effectiveLimit,
                 upgradeSuggestions,
-                upgradeUrl,
+                upgradeUrl
             });
         }
     }

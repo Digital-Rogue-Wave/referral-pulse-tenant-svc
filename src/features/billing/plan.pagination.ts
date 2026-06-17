@@ -11,9 +11,9 @@ export const PLAN_PAGINATE_CONFIG: PaginateConfig<Plan> = {
         name: [FilterOperator.EQ, FilterOperator.CONTAINS],
         isActive: [FilterOperator.EQ],
         tenantId: [FilterOperator.EQ],
-        manualInvoicing: [FilterOperator.EQ],
+        manualInvoicing: [FilterOperator.EQ]
     },
     searchableColumns: ['name'],
     defaultLimit: 20,
-    maxLimit: 100,
+    maxLimit: 100
 };

@@ -56,7 +56,7 @@ import {
     SubscriptionDowngradeScheduledEvent,
     SubscriptionCancelledEvent,
     TenantPaymentStatusChangedEvent,
-    BillingEvents,
+    BillingEvents
 } from '@domains/billing';
 
 import { StripeService } from './stripe.service';
@@ -75,7 +75,7 @@ export class BillingService {
         private readonly tenantService: TenantService,
         private readonly tenantStatsService: TenantStatsService,
         private readonly planLimitService: PlanLimitService,
-        private readonly dateService: DateService,
+        private readonly dateService: DateService
     ) {
         this.logger.setContext(BillingService.name);
     }
@@ -83,7 +83,7 @@ export class BillingService {
     private async createBillingForTenant(): Promise<Billing> {
         const tenantId = this.tenantContext.getTenantId()!;
         let billing = await this.prisma.billing.findUnique({
-            where: { tenantId },
+            where: { tenantId }
         });
 
         if (!billing) {
@@ -91,8 +91,8 @@ export class BillingService {
                 data: {
                     tenantId,
                     plan: BillingPlanEnum.FREE,
-                    status: SubscriptionStatusEnum.NONE,
-                },
+                    status: SubscriptionStatusEnum.NONE
+                }
             });
         }
 
@@ -117,8 +117,8 @@ export class BillingService {
         const rows = await this.prisma.tenantUsage.findMany({
             where: {
                 tenantId,
-                periodDate: { in: periodDates },
-            },
+                periodDate: { in: periodDates }
+            }
         });
 
         const metricsMap = new Map<
@@ -134,14 +134,14 @@ export class BillingService {
             if (!entry) {
                 entry = {
                     currentUsage: 0,
-                    history: [],
+                    history: []
                 };
                 metricsMap.set(row.metricName, entry);
             }
 
             entry.history.push({
                 periodDate: row.periodDate,
-                usage: row.currentUsage,
+                usage: row.currentUsage
             });
 
             if (row.periodDate === todayStr) {
@@ -154,8 +154,7 @@ export class BillingService {
         for (const [metricName, value] of metricsMap.entries()) {
             const rawLimit = limits ? (limits as Record<string, number | undefined>)[metricName] : undefined;
             const limit: number | null = rawLimit === null || rawLimit === undefined ? null : rawLimit;
-            const percentageUsed: number | null =
-                limit !== null && limit > 0 ? Math.min((value.currentUsage / limit) * 100, 100) : null;
+            const percentageUsed: number | null = limit !== null && limit > 0 ? Math.min((value.currentUsage / limit) * 100, 100) : null;
 
             const history = [...value.history].sort((a, b) => a.periodDate.localeCompare(b.periodDate));
 
@@ -164,7 +163,7 @@ export class BillingService {
                 currentUsage: value.currentUsage,
                 limit,
                 percentageUsed,
-                history,
+                history
             });
         }
 
@@ -172,7 +171,7 @@ export class BillingService {
 
         return {
             plan: billing.plan as BillingPlanEnum,
-            metrics,
+            metrics
         };
     }
 
@@ -181,19 +180,17 @@ export class BillingService {
         const { invoiceId, paymentIntentId, subscriptionId } = this.extractInvoiceIds(invoice);
 
         if (!subscriptionId) {
-            this.logger.warn(
-                `invoice.payment_succeeded missing subscription reference: eventId=${event.id}, invoiceId=${invoiceId}`,
-            );
+            this.logger.warn(`invoice.payment_succeeded missing subscription reference: eventId=${event.id}, invoiceId=${invoiceId}`);
             return;
         }
 
         const billing = await this.prisma.billing.findFirst({
-            where: { stripeSubscriptionId: subscriptionId },
+            where: { stripeSubscriptionId: subscriptionId }
         });
 
         if (!billing) {
             this.logger.warn(
-                `invoice.payment_succeeded: no Billing found for subscriptionId=${subscriptionId}, eventId=${event.id}, invoiceId=${invoiceId}`,
+                `invoice.payment_succeeded: no Billing found for subscriptionId=${subscriptionId}, eventId=${event.id}, invoiceId=${invoiceId}`
             );
             return;
         }
@@ -201,7 +198,7 @@ export class BillingService {
         if (paymentIntentId) {
             await this.prisma.billing.update({
                 where: { id: billing.id },
-                data: { stripeTransactionId: paymentIntentId },
+                data: { stripeTransactionId: paymentIntentId }
             });
         }
 
@@ -209,7 +206,7 @@ export class BillingService {
         await this.reconcileBillingPlan(billing, subscriptionId, invoiceId, event);
 
         this.logger.log(
-            `Processed invoice.payment_succeeded from Stripe: eventId=${event.id}, invoiceId=${invoiceId}, subscriptionId=${subscriptionId}, paymentIntentId=${paymentIntentId ?? 'unknown'}`,
+            `Processed invoice.payment_succeeded from Stripe: eventId=${event.id}, invoiceId=${invoiceId}, subscriptionId=${subscriptionId}, paymentIntentId=${paymentIntentId ?? 'unknown'}`
         );
     }
 
@@ -221,14 +218,10 @@ export class BillingService {
         const invoiceWithRuntime = invoice as InvoiceWithRuntimeFields;
 
         const paymentIntentId =
-            typeof invoiceWithRuntime.payment_intent === 'string'
-                ? invoiceWithRuntime.payment_intent
-                : invoiceWithRuntime.payment_intent?.id;
+            typeof invoiceWithRuntime.payment_intent === 'string' ? invoiceWithRuntime.payment_intent : invoiceWithRuntime.payment_intent?.id;
 
         const subscriptionId =
-            typeof invoiceWithRuntime.subscription === 'string'
-                ? invoiceWithRuntime.subscription
-                : invoiceWithRuntime.subscription?.id;
+            typeof invoiceWithRuntime.subscription === 'string' ? invoiceWithRuntime.subscription : invoiceWithRuntime.subscription?.id;
 
         return { invoiceId: invoice.id, paymentIntentId, subscriptionId };
     }
@@ -237,16 +230,16 @@ export class BillingService {
         billing: Billing,
         event: Stripe.Event,
         invoiceId: string,
-        paymentIntentId: string | undefined,
+        paymentIntentId: string | undefined
     ): Promise<void> {
         try {
             const tenant = await this.prisma.tenant.findUnique({
-                where: { id: billing.tenantId },
+                where: { id: billing.tenantId }
             });
 
             if (!tenant) {
                 this.logger.warn(
-                    `invoice.payment_succeeded: no Tenant found for tenantId=${billing.tenantId}, eventId=${event.id}, invoiceId=${invoiceId}`,
+                    `invoice.payment_succeeded: no Tenant found for tenantId=${billing.tenantId}, eventId=${event.id}, invoiceId=${invoiceId}`
                 );
                 return;
             }
@@ -262,8 +255,8 @@ export class BillingService {
                 where: { id: tenant.id },
                 data: {
                     paymentStatus: PaymentStatusEnum.ACTIVE,
-                    paymentStatusChangedAt: changedAt,
-                },
+                    paymentStatusChangedAt: changedAt
+                }
             });
 
             this.txEventEmitter.emitAfterCommit(
@@ -280,23 +273,18 @@ export class BillingService {
                     billing.stripeSubscriptionId ?? undefined,
                     invoiceId,
                     paymentIntentId ?? undefined,
-                    null,
-                ),
+                    null
+                )
             );
         } catch (err) {
             this.logger.error(
                 `Failed to update tenant paymentStatus for invoice.payment_succeeded: tenantId=${billing.tenantId}, eventId=${event.id}, invoiceId=${invoiceId}`,
-                err instanceof Error ? err.stack : String(err),
+                err instanceof Error ? err.stack : String(err)
             );
         }
     }
 
-    private async reconcileBillingPlan(
-        billing: Billing,
-        subscriptionId: string,
-        invoiceId: string,
-        event: Stripe.Event,
-    ): Promise<void> {
+    private async reconcileBillingPlan(billing: Billing, subscriptionId: string, invoiceId: string, event: Stripe.Event): Promise<void> {
         try {
             const subscription = await this.stripeService.getSubscription(subscriptionId);
             const resolvedPlan = this.stripeService.resolvePlanFromSubscription(subscription);
@@ -315,7 +303,7 @@ export class BillingService {
 
             await this.prisma.billing.update({
                 where: { id: billing.id },
-                data: updateData,
+                data: updateData
             });
 
             this.txEventEmitter.emitAfterCommit(
@@ -329,20 +317,20 @@ export class BillingService {
                     billing.stripeCustomerId ?? undefined,
                     undefined,
                     undefined,
-                    event.id,
-                ),
+                    event.id
+                )
             );
 
             this.logger.log(`Subscription plan updated from ${previousPlan} to ${resolvedPlan}`, {
                 tenantId: billing.tenantId,
                 previousPlan,
                 newPlan: resolvedPlan,
-                stripeEventId: event.id,
+                stripeEventId: event.id
             });
         } catch (err) {
             this.logger.error(
                 `Failed to reconcile billing plan from Stripe after invoice.payment_succeeded: tenantId=${billing.tenantId}, subscriptionId=${subscriptionId}, invoiceId=${invoiceId}, eventId=${event.id}`,
-                err instanceof Error ? err.stack : String(err),
+                err instanceof Error ? err.stack : String(err)
             );
         }
     }
@@ -359,18 +347,16 @@ export class BillingService {
             tenantId: billing.tenantId,
             plan,
             userId,
-            couponCode,
+            couponCode
         });
 
-        this.logger.log(
-            `Created Stripe Checkout Session ${session.id} via BillingService for tenant ${billing.tenantId}, plan ${plan}`,
-        );
+        this.logger.log(`Created Stripe Checkout Session ${session.id} via BillingService for tenant ${billing.tenantId}, plan ${plan}`);
 
         return {
             plan,
             checkoutUrl: session.url ?? undefined,
             sessionId: session.id,
-            paymentStatus: PaymentStatusEnum.ACTIVE,
+            paymentStatus: PaymentStatusEnum.ACTIVE
         };
     }
 
@@ -403,10 +389,7 @@ export class BillingService {
                 trialActive = false;
             }
         } catch (err) {
-            this.logger.error(
-                `Failed to load tenant trial info for tenant ${tenantId}`,
-                err instanceof Error ? err.stack : String(err),
-            );
+            this.logger.error(`Failed to load tenant trial info for tenant ${tenantId}`, err instanceof Error ? err.stack : String(err));
         }
 
         let planUsagePercentage: number | null = null;
@@ -414,10 +397,7 @@ export class BillingService {
             const stats = await this.tenantStatsService.getStats();
             planUsagePercentage = stats.planUsagePercentage ?? null;
         } catch (err) {
-            this.logger.error(
-                `Failed to load usage stats for tenant ${tenantId}`,
-                err instanceof Error ? err.stack : String(err),
-            );
+            this.logger.error(`Failed to load usage stats for tenant ${tenantId}`, err instanceof Error ? err.stack : String(err));
         }
 
         let stripeSubscriptionStatus: string | null = null;
@@ -442,7 +422,7 @@ export class BillingService {
             } catch (err) {
                 this.logger.error(
                     `Failed to fetch Stripe subscription ${billing.stripeSubscriptionId} for tenant ${tenantId}`,
-                    err instanceof Error ? err.stack : String(err),
+                    err instanceof Error ? err.stack : String(err)
                 );
             }
         }
@@ -466,7 +446,7 @@ export class BillingService {
             downgradeScheduledAt: billing.downgradeScheduledAt ?? null,
             cancellationReason: billing.cancellationReason ?? null,
             cancellationRequestedAt: billing.cancellationRequestedAt ?? null,
-            cancellationEffectiveAt: billing.cancellationEffectiveAt ?? null,
+            cancellationEffectiveAt: billing.cancellationEffectiveAt ?? null
         };
     }
 
@@ -479,14 +459,14 @@ export class BillingService {
 
         const preview = await this.stripeService.previewSubscriptionUpgrade({
             stripeSubscriptionId: billing.stripeSubscriptionId,
-            targetPlan,
+            targetPlan
         });
 
         return {
             targetPlan,
             amountDueNow: preview.amountDueNow,
             currency: preview.currency,
-            nextInvoiceDate: preview.nextInvoiceDate,
+            nextInvoiceDate: preview.nextInvoiceDate
         };
     }
 
@@ -503,34 +483,27 @@ export class BillingService {
 
         await this.stripeService.upgradeSubscription({
             stripeSubscriptionId: billing.stripeSubscriptionId,
-            targetPlan,
+            targetPlan
         });
 
         await this.prisma.billing.update({
             where: { id: billing.id },
             data: {
                 plan: targetPlan,
-                status: SubscriptionStatusEnum.ACTIVE,
-            },
+                status: SubscriptionStatusEnum.ACTIVE
+            }
         });
 
         this.txEventEmitter.emitAfterCommit(
             BillingEvents.SUBSCRIPTION_UPGRADED,
-            new SubscriptionUpgradedEvent(
-                billing.id,
-                billing.tenantId,
-                previousPlan,
-                targetPlan,
-                this.dateService.nowISO(),
-                userId ?? undefined,
-            ),
+            new SubscriptionUpgradedEvent(billing.id, billing.tenantId, previousPlan, targetPlan, this.dateService.nowISO(), userId ?? undefined)
         );
 
         this.logger.log(`Subscription upgraded from ${previousPlan} to ${targetPlan}`, {
             tenantId: billing.tenantId,
             previousPlan,
             previousStatus,
-            newPlan: targetPlan,
+            newPlan: targetPlan
         });
 
         return await this.getCurrentSubscription();
@@ -551,7 +524,7 @@ export class BillingService {
 
         return {
             clientSecret: setupIntent.client_secret,
-            customerId: billing.stripeCustomerId,
+            customerId: billing.stripeCustomerId
         };
     }
 
@@ -599,15 +572,12 @@ export class BillingService {
         const billing = await this.getOrCreateBillingForCurrentTenant();
 
         if (!billing.stripeCustomerId || !billing.stripeSubscriptionId) {
-            throw new HttpException(
-                'No active subscription to preview upcoming invoice for this tenant',
-                HttpStatus.BAD_REQUEST,
-            );
+            throw new HttpException('No active subscription to preview upcoming invoice for this tenant', HttpStatus.BAD_REQUEST);
         }
 
         return await this.stripeService.retrieveUpcomingInvoiceForCustomer({
             customerId: billing.stripeCustomerId,
-            subscriptionId: billing.stripeSubscriptionId,
+            subscriptionId: billing.stripeSubscriptionId
         });
     }
 
@@ -624,11 +594,7 @@ export class BillingService {
 
         const now = new Date();
 
-        if (
-            billing.cancellationRequestedAt &&
-            billing.cancellationEffectiveAt &&
-            billing.cancellationEffectiveAt > now
-        ) {
+        if (billing.cancellationRequestedAt && billing.cancellationEffectiveAt && billing.cancellationEffectiveAt > now) {
             throw new HttpException('Subscription cancellation is already scheduled', HttpStatus.BAD_REQUEST);
         }
 
@@ -641,8 +607,8 @@ export class BillingService {
             data: {
                 cancellationReason: dto.reason ?? null,
                 cancellationRequestedAt: now,
-                cancellationEffectiveAt: schedule.effectiveDate ?? null,
-            },
+                cancellationEffectiveAt: schedule.effectiveDate ?? null
+            }
         });
 
         this.txEventEmitter.emitAfterCommit(
@@ -655,14 +621,14 @@ export class BillingService {
                 billing.stripeSubscriptionId ?? undefined,
                 billing.plan,
                 dto.reason ?? undefined,
-                userId ?? undefined,
-            ),
+                userId ?? undefined
+            )
         );
 
         this.logger.log(`Subscription cancellation scheduled`, {
             tenantId: billing.tenantId,
             effectiveDate: schedule.effectiveDate,
-            reason: dto.reason,
+            reason: dto.reason
         });
 
         return await this.getCurrentSubscription();
@@ -682,10 +648,7 @@ export class BillingService {
         }
 
         if (billing.cancellationEffectiveAt <= now) {
-            throw new HttpException(
-                'Cancellation is already effective and cannot be reactivated',
-                HttpStatus.BAD_REQUEST,
-            );
+            throw new HttpException('Cancellation is already effective and cannot be reactivated', HttpStatus.BAD_REQUEST);
         }
 
         await this.stripeService.reactivateSubscription(billing.stripeSubscriptionId);
@@ -695,12 +658,12 @@ export class BillingService {
             data: {
                 cancellationReason: null,
                 cancellationRequestedAt: null,
-                cancellationEffectiveAt: null,
-            },
+                cancellationEffectiveAt: null
+            }
         });
 
         this.logger.log(`Subscription cancellation was reactivated`, {
-            tenantId: billing.tenantId,
+            tenantId: billing.tenantId
         });
 
         return await this.getCurrentSubscription();
@@ -714,12 +677,12 @@ export class BillingService {
             const usage = stats.planUsagePercentage ?? null;
 
             this.logger.log(
-                `Downgrade usage validation placeholder for tenant ${tenantId}, targetPlan=${targetPlan}, planUsagePercentage=${usage ?? 'unknown'}`,
+                `Downgrade usage validation placeholder for tenant ${tenantId}, targetPlan=${targetPlan}, planUsagePercentage=${usage ?? 'unknown'}`
             );
         } catch (err) {
             this.logger.error(
                 `Failed to perform downgrade usage validation for tenant ${tenantId} and plan ${targetPlan}`,
-                err instanceof Error ? err.stack : String(err),
+                err instanceof Error ? err.stack : String(err)
             );
         }
     }
@@ -735,12 +698,7 @@ export class BillingService {
             throw new HttpException('Target plan must be different from current plan', HttpStatus.BAD_REQUEST);
         }
 
-        const planOrder = [
-            BillingPlanEnum.FREE,
-            BillingPlanEnum.STARTER,
-            BillingPlanEnum.GROWTH,
-            BillingPlanEnum.ENTERPRISE,
-        ];
+        const planOrder = [BillingPlanEnum.FREE, BillingPlanEnum.STARTER, BillingPlanEnum.GROWTH, BillingPlanEnum.ENTERPRISE];
 
         const currentIndex = planOrder.indexOf(billing.plan as BillingPlanEnum);
         const targetIndex = planOrder.indexOf(targetPlan);
@@ -750,17 +708,11 @@ export class BillingService {
         }
 
         if (targetIndex >= currentIndex) {
-            throw new HttpException(
-                'Target plan must be lower than current plan for downgrade',
-                HttpStatus.BAD_REQUEST,
-            );
+            throw new HttpException('Target plan must be lower than current plan for downgrade', HttpStatus.BAD_REQUEST);
         }
 
         if (billing.pendingDowngradePlan) {
-            throw new HttpException(
-                'There is already a pending downgrade scheduled for this subscription',
-                HttpStatus.BAD_REQUEST,
-            );
+            throw new HttpException('There is already a pending downgrade scheduled for this subscription', HttpStatus.BAD_REQUEST);
         }
 
         await this.validateDowngradeUsageOrThrow(targetPlan);
@@ -770,15 +722,15 @@ export class BillingService {
 
         const schedule = await this.stripeService.scheduleSubscriptionDowngrade({
             stripeSubscriptionId: billing.stripeSubscriptionId,
-            targetPlan,
+            targetPlan
         });
 
         await this.prisma.billing.update({
             where: { id: billing.id },
             data: {
                 pendingDowngradePlan: targetPlan,
-                downgradeScheduledAt: schedule.effectiveDate ?? null,
-            },
+                downgradeScheduledAt: schedule.effectiveDate ?? null
+            }
         });
 
         this.txEventEmitter.emitAfterCommit(
@@ -789,15 +741,15 @@ export class BillingService {
                 previousPlan,
                 targetPlan,
                 schedule.effectiveDate ? this.dateService.toISO(schedule.effectiveDate) : this.dateService.nowISO(),
-                userId ?? undefined,
-            ),
+                userId ?? undefined
+            )
         );
 
         this.logger.log(`Subscription downgrade scheduled from ${previousPlan} to ${targetPlan}`, {
             tenantId: billing.tenantId,
             previousPlan,
             targetPlan,
-            effectiveDate: schedule.effectiveDate,
+            effectiveDate: schedule.effectiveDate
         });
 
         return await this.getCurrentSubscription();
@@ -807,10 +759,7 @@ export class BillingService {
         const billing = await this.getOrCreateBillingForCurrentTenant();
 
         if (!billing.stripeSubscriptionId) {
-            throw new HttpException(
-                'No active subscription to cancel downgrade for this tenant',
-                HttpStatus.BAD_REQUEST,
-            );
+            throw new HttpException('No active subscription to cancel downgrade for this tenant', HttpStatus.BAD_REQUEST);
         }
 
         if (!billing.pendingDowngradePlan) {
@@ -826,14 +775,13 @@ export class BillingService {
             where: { id: billing.id },
             data: {
                 pendingDowngradePlan: null,
-                downgradeScheduledAt: null,
-            },
+                downgradeScheduledAt: null
+            }
         });
 
-        this.logger.log(
-            `Pending subscription downgrade to plan ${previousPendingPlan} scheduled at ${previousScheduledAt} was cancelled`,
-            { tenantId: billing.tenantId },
-        );
+        this.logger.log(`Pending subscription downgrade to plan ${previousPendingPlan} scheduled at ${previousScheduledAt} was cancelled`, {
+            tenantId: billing.tenantId
+        });
 
         return await this.getCurrentSubscription();
     }
@@ -843,10 +791,7 @@ export class BillingService {
         try {
             event = this.stripeService.constructWebhookEvent(rawBody, signature);
         } catch (err) {
-            this.logger.error(
-                'Failed to construct Stripe webhook event',
-                err instanceof Error ? err.stack : String(err),
-            );
+            this.logger.error('Failed to construct Stripe webhook event', err instanceof Error ? err.stack : String(err));
             const counter = this.metricsService.createCounter('billing_subscription_events_total');
             counter.add(1, { event: 'unknown', result: 'error' });
             throw err;
@@ -860,9 +805,7 @@ export class BillingService {
         if (eventId) {
             const isDuplicate = await this.idempotencyService.isDuplicate(`${consumerName}:${eventId}`);
             if (isDuplicate) {
-                this.logger.warn(
-                    `Stripe webhook event already processed - eventId: ${eventId}, type: ${event.type}, consumerName: ${consumerName}`,
-                );
+                this.logger.warn(`Stripe webhook event already processed - eventId: ${eventId}, type: ${event.type}, consumerName: ${consumerName}`);
                 const counter = this.metricsService.createCounter('billing_subscription_events_total');
                 counter.add(1, { event: event.type, result: 'duplicate' });
                 return;
@@ -901,7 +844,7 @@ export class BillingService {
             result = 'error';
             this.logger.error(
                 `Error handling Stripe webhook event ${event.type} (id=${eventId ?? 'unknown'})`,
-                err instanceof Error ? err.stack : String(err),
+                err instanceof Error ? err.stack : String(err)
             );
             throw err;
         } finally {
@@ -927,7 +870,7 @@ export class BillingService {
         }
 
         let billing = await this.prisma.billing.findUnique({
-            where: { tenantId },
+            where: { tenantId }
         });
 
         if (!billing) {
@@ -935,8 +878,8 @@ export class BillingService {
                 data: {
                     tenantId,
                     plan: BillingPlanEnum.FREE,
-                    status: SubscriptionStatusEnum.NONE,
-                },
+                    status: SubscriptionStatusEnum.NONE
+                }
             });
         }
 
@@ -944,37 +887,33 @@ export class BillingService {
         const previousStatus = billing.status;
         const previousStripeSubscriptionId = billing.stripeSubscriptionId;
 
-        const paymentIntentId =
-            typeof session.payment_intent === 'string' ? session.payment_intent : session.payment_intent?.id;
+        const paymentIntentId = typeof session.payment_intent === 'string' ? session.payment_intent : session.payment_intent?.id;
 
         const customerId = typeof session.customer === 'string' ? session.customer : session.customer?.id;
 
         const updateData: Prisma.BillingUpdateInput = {
             stripeCustomerId: customerId ?? null,
-            stripeTransactionId: paymentIntentId ?? billing.stripeTransactionId,
+            stripeTransactionId: paymentIntentId ?? billing.stripeTransactionId
         };
 
         if (planId === BillingPlanEnum.FREE) {
             updateData.plan = BillingPlanEnum.FREE;
             updateData.status = SubscriptionStatusEnum.NONE;
             updateData.stripeSubscriptionId = null;
-            this.logger.log(
-                `Processed checkout.session.completed for tenant ${tenantId}: plan=Free, status=None, customer=${session.customer}`,
-            );
+            this.logger.log(`Processed checkout.session.completed for tenant ${tenantId}: plan=Free, status=None, customer=${session.customer}`);
         } else {
             updateData.plan = planId;
             updateData.status = SubscriptionStatusEnum.ACTIVE;
-            const subscriptionId =
-                typeof session.subscription === 'string' ? session.subscription : session.subscription?.id;
+            const subscriptionId = typeof session.subscription === 'string' ? session.subscription : session.subscription?.id;
             updateData.stripeSubscriptionId = subscriptionId ?? null;
             this.logger.log(
-                `Processed checkout.session.completed for tenant ${tenantId}: plan=${planId}, status=Active, customer=${customerId}, subscription=${subscriptionId}`,
+                `Processed checkout.session.completed for tenant ${tenantId}: plan=${planId}, status=Active, customer=${customerId}, subscription=${subscriptionId}`
             );
         }
 
         await this.prisma.billing.update({
             where: { id: billing.id },
-            data: updateData,
+            data: updateData
         });
 
         if (planId !== BillingPlanEnum.FREE) {
@@ -999,8 +938,8 @@ export class BillingService {
                     undefined,
                     undefined,
                     event.id,
-                    userId ?? undefined,
-                ),
+                    userId ?? undefined
+                )
             );
         }
 
@@ -1015,8 +954,8 @@ export class BillingService {
                 typeof updateData.stripeCustomerId === 'string' ? updateData.stripeCustomerId : undefined,
                 undefined,
                 undefined,
-                event.id,
-            ),
+                event.id
+            )
         );
 
         this.logger.log(`Subscription updated via Stripe checkout`, {
@@ -1025,7 +964,7 @@ export class BillingService {
             previousStatus,
             newPlan: planId,
             newStatus: updateData.status,
-            stripeEventId: event.id,
+            stripeEventId: event.id
         });
     }
 
@@ -1036,9 +975,7 @@ export class BillingService {
         const customerId = typeof invoice.customer === 'string' ? invoice.customer : invoice.customer?.id;
 
         if (!subscriptionId && !customerId) {
-            this.logger.warn(
-                `invoice.payment_failed missing subscription/customer reference: eventId=${event.id}, invoiceId=${invoiceId}`,
-            );
+            this.logger.warn(`invoice.payment_failed missing subscription/customer reference: eventId=${event.id}, invoiceId=${invoiceId}`);
             return;
         }
 
@@ -1046,32 +983,27 @@ export class BillingService {
 
         if (!billing) {
             this.logger.warn(
-                `invoice.payment_failed: no Billing found for subscriptionId=${subscriptionId ?? 'unknown'}, customerId=${customerId ?? 'unknown'}, eventId=${event.id}, invoiceId=${invoiceId}`,
+                `invoice.payment_failed: no Billing found for subscriptionId=${subscriptionId ?? 'unknown'}, customerId=${customerId ?? 'unknown'}, eventId=${event.id}, invoiceId=${invoiceId}`
             );
             return;
         }
 
-        const nextAttempt = invoice.next_payment_attempt
-            ? this.dateService.fromUnix(invoice.next_payment_attempt).toDate()
-            : null;
+        const nextAttempt = invoice.next_payment_attempt ? this.dateService.fromUnix(invoice.next_payment_attempt).toDate() : null;
 
         await this.markTenantPaymentAsPastDue(billing, event, invoiceId, {
             paymentIntentId,
-            nextAttempt,
+            nextAttempt
         });
 
         this.logger.warn(
-            `Processed invoice.payment_failed from Stripe: eventId=${event.id}, invoiceId=${invoiceId}, subscriptionId=${subscriptionId ?? 'unknown'}, customerId=${customerId ?? 'unknown'}, paymentIntentId=${paymentIntentId ?? 'unknown'}`,
+            `Processed invoice.payment_failed from Stripe: eventId=${event.id}, invoiceId=${invoiceId}, subscriptionId=${subscriptionId ?? 'unknown'}, customerId=${customerId ?? 'unknown'}, paymentIntentId=${paymentIntentId ?? 'unknown'}`
         );
     }
 
-    private async findBillingBySubscriptionOrCustomer(
-        subscriptionId: string | undefined,
-        customerId: string | undefined,
-    ): Promise<Billing | null> {
+    private async findBillingBySubscriptionOrCustomer(subscriptionId: string | undefined, customerId: string | undefined): Promise<Billing | null> {
         if (subscriptionId) {
             const billing = await this.prisma.billing.findFirst({
-                where: { stripeSubscriptionId: subscriptionId },
+                where: { stripeSubscriptionId: subscriptionId }
             });
             if (billing) {
                 return billing;
@@ -1080,7 +1012,7 @@ export class BillingService {
 
         if (customerId) {
             return this.prisma.billing.findFirst({
-                where: { stripeCustomerId: customerId },
+                where: { stripeCustomerId: customerId }
             });
         }
 
@@ -1091,16 +1023,16 @@ export class BillingService {
         billing: Billing,
         event: Stripe.Event,
         invoiceId: string,
-        context: { paymentIntentId?: string; nextAttempt: Date | null },
+        context: { paymentIntentId?: string; nextAttempt: Date | null }
     ): Promise<void> {
         try {
             const tenant = await this.prisma.tenant.findUnique({
-                where: { id: billing.tenantId },
+                where: { id: billing.tenantId }
             });
 
             if (!tenant) {
                 this.logger.warn(
-                    `invoice.payment_failed: no Tenant found for tenantId=${billing.tenantId}, eventId=${event.id}, invoiceId=${invoiceId}`,
+                    `invoice.payment_failed: no Tenant found for tenantId=${billing.tenantId}, eventId=${event.id}, invoiceId=${invoiceId}`
                 );
                 return;
             }
@@ -1113,15 +1045,15 @@ export class BillingService {
             const changedAt = new Date();
 
             this.logger.warn(
-                `Set tenant ${tenant.id} paymentStatus=PAST_DUE due to invoice.payment_failed (next_attempt=${context.nextAttempt ? this.dateService.toISO(context.nextAttempt) : 'none'})`,
+                `Set tenant ${tenant.id} paymentStatus=PAST_DUE due to invoice.payment_failed (next_attempt=${context.nextAttempt ? this.dateService.toISO(context.nextAttempt) : 'none'})`
             );
 
             await this.prisma.tenant.update({
                 where: { id: tenant.id },
                 data: {
                     paymentStatus: PaymentStatusEnum.PAST_DUE,
-                    paymentStatusChangedAt: changedAt,
-                },
+                    paymentStatusChangedAt: changedAt
+                }
             });
 
             this.txEventEmitter.emitAfterCommit(
@@ -1138,13 +1070,13 @@ export class BillingService {
                     billing.stripeSubscriptionId ?? undefined,
                     invoiceId,
                     context.paymentIntentId ?? undefined,
-                    context.nextAttempt ? this.dateService.toISO(context.nextAttempt) : null,
-                ),
+                    context.nextAttempt ? this.dateService.toISO(context.nextAttempt) : null
+                )
             );
         } catch (err) {
             this.logger.error(
                 `Failed to update tenant paymentStatus for invoice.payment_failed: tenantId=${billing.tenantId}, eventId=${event.id}, invoiceId=${invoiceId}`,
-                err instanceof Error ? err.stack : String(err),
+                err instanceof Error ? err.stack : String(err)
             );
         }
     }
@@ -1152,7 +1084,7 @@ export class BillingService {
     private async endTenantTrialIfActive(tenantId: string): Promise<void> {
         try {
             const tenant = await this.prisma.tenant.findUnique({
-                where: { id: tenantId },
+                where: { id: tenantId }
             });
 
             if (!tenant?.trialEndsAt) {
@@ -1164,18 +1096,13 @@ export class BillingService {
             if (tenant.trialEndsAt > now) {
                 await this.prisma.tenant.update({
                     where: { id: tenantId },
-                    data: { trialEndsAt: now },
+                    data: { trialEndsAt: now }
                 });
 
-                this.logger.log(
-                    `Ended trial early for tenant ${tenantId} at ${this.dateService.toISO(now)} due to paid subscription checkout`,
-                );
+                this.logger.log(`Ended trial early for tenant ${tenantId} at ${this.dateService.toISO(now)} due to paid subscription checkout`);
             }
         } catch (err) {
-            this.logger.error(
-                `Failed to end trial early for tenant ${tenantId}`,
-                err instanceof Error ? err.stack : String(err),
-            );
+            this.logger.error(`Failed to end trial early for tenant ${tenantId}`, err instanceof Error ? err.stack : String(err));
         }
     }
 
@@ -1184,34 +1111,30 @@ export class BillingService {
         const subscriptionId = subscription.id;
 
         const billing = await this.prisma.billing.findFirst({
-            where: { stripeSubscriptionId: subscriptionId },
+            where: { stripeSubscriptionId: subscriptionId }
         });
 
         if (!billing) {
-            this.logger.warn(
-                `customer.subscription.deleted: no Billing found for subscriptionId=${subscriptionId}, eventId=${event.id}`,
-            );
+            this.logger.warn(`customer.subscription.deleted: no Billing found for subscriptionId=${subscriptionId}, eventId=${event.id}`);
             return;
         }
 
         const previousPlan = billing.plan;
         const previousStatus = billing.status;
 
-        const effectiveDate = subscription.ended_at
-            ? this.dateService.fromUnix(subscription.ended_at).toDate()
-            : new Date();
+        const effectiveDate = subscription.ended_at ? this.dateService.fromUnix(subscription.ended_at).toDate() : new Date();
 
         await this.prisma.billing.update({
             where: { id: billing.id },
             data: {
                 status: SubscriptionStatusEnum.CANCELED,
                 cancellationEffectiveAt: billing.cancellationEffectiveAt ?? effectiveDate,
-                stripeSubscriptionId: null,
-            },
+                stripeSubscriptionId: null
+            }
         });
 
         this.logger.log(
-            `Processed customer.subscription.deleted from Stripe: eventId=${event.id}, subscriptionId=${subscriptionId}, tenantId=${billing.tenantId}`,
+            `Processed customer.subscription.deleted from Stripe: eventId=${event.id}, subscriptionId=${subscriptionId}, tenantId=${billing.tenantId}`
         );
 
         this.logger.log(`Stripe subscription ${subscriptionId} expired/cancelled`, {
@@ -1219,7 +1142,7 @@ export class BillingService {
             previousPlan,
             previousStatus,
             newStatus: SubscriptionStatusEnum.CANCELED,
-            cancellationEffectiveAt: billing.cancellationEffectiveAt ?? effectiveDate,
+            cancellationEffectiveAt: billing.cancellationEffectiveAt ?? effectiveDate
         });
     }
 }

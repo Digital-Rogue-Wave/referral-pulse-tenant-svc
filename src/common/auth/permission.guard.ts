@@ -17,7 +17,7 @@ export class PermissionGuard implements CanActivate {
     constructor(
         @Inject(Reflector) private readonly reflector: Reflector,
         private readonly keto: KetoService,
-        private readonly tenantContext: TenantContextService,
+        private readonly tenantContext: TenantContextService
     ) {}
 
     async canActivate(context: ExecutionContext): Promise<boolean> {
@@ -38,19 +38,13 @@ export class PermissionGuard implements CanActivate {
         const user = req.user as IAuthenticatedUser | undefined;
 
         if (!user) {
-            throw new HttpException(
-                { message: 'No authenticated user', code: HttpStatus.FORBIDDEN },
-                HttpStatus.FORBIDDEN,
-            );
+            throw new HttpException({ message: 'No authenticated user', code: HttpStatus.FORBIDDEN }, HttpStatus.FORBIDDEN);
         }
 
         const tenantId = this.tenantContext.getTenantId() ?? user.tenantId;
 
         if (!tenantId) {
-            throw new HttpException(
-                { message: 'No tenant context available', code: HttpStatus.FORBIDDEN },
-                HttpStatus.FORBIDDEN,
-            );
+            throw new HttpException({ message: 'No tenant context available', code: HttpStatus.FORBIDDEN }, HttpStatus.FORBIDDEN);
         }
 
         for (const permission of requiredPermissions) {
@@ -65,15 +59,13 @@ export class PermissionGuard implements CanActivate {
             const allowed = await this.keto.check(permission.namespace, object, permission.relation, user.userId);
 
             if (!allowed) {
-                this.logger.warn(
-                    `User ${user.userId} denied: ${permission.namespace}:${object}#${permission.relation}`,
-                );
+                this.logger.warn(`User ${user.userId} denied: ${permission.namespace}:${object}#${permission.relation}`);
                 throw new HttpException(
                     {
                         message: `Missing permission: ${permission.namespace}:${object}#${permission.relation}`,
-                        code: HttpStatus.FORBIDDEN,
+                        code: HttpStatus.FORBIDDEN
                     },
-                    HttpStatus.FORBIDDEN,
+                    HttpStatus.FORBIDDEN
                 );
             }
         }

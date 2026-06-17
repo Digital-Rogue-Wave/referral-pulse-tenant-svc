@@ -33,7 +33,7 @@ export class ElastiCacheIamAuthProvider {
 
     constructor(
         private readonly configService: ConfigService<AllConfigType>,
-        private readonly logger: AppLoggerService,
+        private readonly logger: AppLoggerService
     ) {
         this.logger.setContext(ElastiCacheIamAuthProvider.name);
         this.region = this.configService.getOrThrow('aws.region', { infer: true });
@@ -94,11 +94,11 @@ export class ElastiCacheIamAuthProvider {
                 path: '/',
                 query: {
                     Action: 'connect',
-                    User: username,
+                    User: username
                 },
                 headers: {
-                    host: host,
-                },
+                    host: host
+                }
             });
 
             // Sign the request with AWS SigV4
@@ -106,7 +106,7 @@ export class ElastiCacheIamAuthProvider {
                 service: 'elasticache',
                 region: this.region,
                 credentials,
-                sha256: Sha256,
+                sha256: Sha256
             });
 
             const signedRequest = await signer.sign(request);
@@ -119,7 +119,7 @@ export class ElastiCacheIamAuthProvider {
                 host,
                 username,
                 region: this.region,
-                expiresIn: '15 minutes',
+                expiresIn: '15 minutes'
             });
 
             return token;
@@ -127,7 +127,7 @@ export class ElastiCacheIamAuthProvider {
             this.logger.error('Failed to generate IAM auth token', error instanceof Error ? error.stack : undefined, {
                 error: error instanceof Error ? error.message : 'Unknown error',
                 host,
-                username,
+                username
             });
             throw error;
         }
@@ -158,9 +158,8 @@ export class ElastiCacheIamAuthProvider {
             'X-Amz-Credential': signedRequest.headers['x-amz-credential'] ?? getQueryValue('X-Amz-Credential'),
             'X-Amz-Date': signedRequest.headers['x-amz-date'] ?? getQueryValue('X-Amz-Date'),
             'X-Amz-Expires': '900', // 15 minutes
-            'X-Amz-SignedHeaders':
-                signedRequest.headers['x-amz-signedheaders'] ?? (getQueryValue('X-Amz-SignedHeaders') || 'host'),
-            'X-Amz-Signature': getQueryValue('X-Amz-Signature'),
+            'X-Amz-SignedHeaders': signedRequest.headers['x-amz-signedheaders'] ?? (getQueryValue('X-Amz-SignedHeaders') || 'host'),
+            'X-Amz-Signature': getQueryValue('X-Amz-Signature')
         });
 
         return `${username}?${params.toString()}`;
@@ -185,19 +184,15 @@ export class ElastiCacheIamAuthProvider {
                     this.logger.debug('Refreshing IAM auth token');
                     await this.getAuthToken(username, host);
                 } catch (error) {
-                    this.logger.error(
-                        'Failed to refresh IAM auth token',
-                        error instanceof Error ? error.stack : undefined,
-                        {
-                            error: error instanceof Error ? error.message : 'Unknown error',
-                        },
-                    );
+                    this.logger.error('Failed to refresh IAM auth token', error instanceof Error ? error.stack : undefined, {
+                        error: error instanceof Error ? error.message : 'Unknown error'
+                    });
                 }
             })();
         }, this.tokenRefreshIntervalMs);
 
         this.logger.log('IAM auth token refresh started', {
-            refreshInterval: `${this.tokenRefreshIntervalMs / 1000 / 60} minutes`,
+            refreshInterval: `${this.tokenRefreshIntervalMs / 1000 / 60} minutes`
         });
     }
 

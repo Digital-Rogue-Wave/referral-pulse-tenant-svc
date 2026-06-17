@@ -36,7 +36,7 @@ export async function prismaCursorPaginate<T extends Record<string, any>>(
     query: CursorPaginateQuery<T>,
     delegate: PrismaDelegate<T>,
     config: PaginateConfig<T>,
-    baseWhere: Record<string, any> = {},
+    baseWhere: Record<string, any> = {}
 ): Promise<CursorPaginated<T>> {
     const {
         sortableColumns,
@@ -47,7 +47,7 @@ export async function prismaCursorPaginate<T extends Record<string, any>>(
         maxLimit = 100,
         minLimit = 1,
         cursorColumn = 'id' as Extract<keyof T, string>,
-        cursorIncludeTotalCount = false,
+        cursorIncludeTotalCount = false
     } = config;
 
     // Determine pagination direction and limit
@@ -57,12 +57,12 @@ export async function prismaCursorPaginate<T extends Record<string, any>>(
     // Validate mutual exclusivity
     if (query.after && query.before) {
         throw new BadRequestException(
-            'Cannot use both "after" and "before" cursors. Use "after" for forward pagination or "before" for backward pagination.',
+            'Cannot use both "after" and "before" cursors. Use "after" for forward pagination or "before" for backward pagination.'
         );
     }
     if (query.first && query.last) {
         throw new BadRequestException(
-            'Cannot use both "first" and "last" parameters. Use "first" for forward pagination or "last" for backward pagination.',
+            'Cannot use both "first" and "last" parameters. Use "first" for forward pagination or "last" for backward pagination.'
         );
     }
 
@@ -81,8 +81,8 @@ export async function prismaCursorPaginate<T extends Record<string, any>>(
         searchWhere.OR = searchableColumns.map((column: keyof T) => ({
             [String(column)]: {
                 contains: query.search,
-                mode: 'insensitive',
-            },
+                mode: 'insensitive'
+            }
         }));
     }
 
@@ -99,7 +99,7 @@ export async function prismaCursorPaginate<T extends Record<string, any>>(
     let where: Record<string, unknown> = {
         ...baseWhere,
         ...filterWhere,
-        ...searchWhere,
+        ...searchWhere
     };
 
     // Handle cursor-based where conditions
@@ -127,13 +127,13 @@ export async function prismaCursorPaginate<T extends Record<string, any>>(
         delegate.findMany({
             where,
             orderBy: queryOrderBy,
-            take: limit + 1, // Fetch one extra to check for more pages
+            take: limit + 1 // Fetch one extra to check for more pages
         }),
         cursorIncludeTotalCount
             ? delegate.count({
-                  where: { ...baseWhere, ...filterWhere, ...searchWhere },
+                  where: { ...baseWhere, ...filterWhere, ...searchWhere }
               })
-            : Promise.resolve(undefined),
+            : Promise.resolve(undefined)
     ]);
 
     // Check if there are more items
@@ -161,7 +161,7 @@ export async function prismaCursorPaginate<T extends Record<string, any>>(
 
     const edges: Edge<T>[] = items.map((item) => ({
         node: item,
-        cursor: createCursor(item, sortColumns, String(cursorColumn), 'f'),
+        cursor: createCursor(item, sortColumns, String(cursorColumn), 'f')
     }));
 
     // Determine hasNextPage and hasPreviousPage
@@ -178,7 +178,7 @@ export async function prismaCursorPaginate<T extends Record<string, any>>(
             startCursor: firstEdge?.cursor ?? null,
             endCursor: lastEdge?.cursor ?? null,
             hasNextPage,
-            hasPreviousPage,
+            hasPreviousPage
         },
         totalCount,
         meta: {
@@ -192,7 +192,7 @@ export async function prismaCursorPaginate<T extends Record<string, any>>(
             }),
             searchBy: searchableColumns.map(String),
             search: query.search || '',
-            filter: filterItems,
-        },
+            filter: filterItems
+        }
     };
 }

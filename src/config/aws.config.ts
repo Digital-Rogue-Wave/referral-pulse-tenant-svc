@@ -4,12 +4,12 @@ import { z } from 'zod';
 
 const queueConfigSchema = z.object({
     name: z.string().min(1),
-    url: z.string().url(),
+    url: z.string().url()
 });
 
 const topicConfigSchema = z.object({
     name: z.string().min(1),
-    arn: z.string().min(1),
+    arn: z.string().min(1)
 });
 
 const schema = z.object({
@@ -34,7 +34,7 @@ const schema = z.object({
         defaultBatchSize: z.coerce.number().int().positive().max(10).default(10),
         defaultVisibilityTimeout: z.coerce.number().int().positive().default(30),
         defaultWaitTimeSeconds: z.coerce.number().int().min(0).max(20).default(20),
-        pollingEnabled: z.preprocess((val) => val === 'true', z.boolean()).default(true),
+        pollingEnabled: z.preprocess((val) => val === 'true', z.boolean()).default(true)
     }),
     sns: z.object({
         topics: z
@@ -49,25 +49,25 @@ const schema = z.object({
                     return { name: name?.trim() ?? '', arn: arn?.trim() ?? '' };
                 });
             })
-            .pipe(z.array(topicConfigSchema)),
+            .pipe(z.array(topicConfigSchema))
     }),
     s3: z.object({
         bucketName: z.string().min(1).default('campaign-assets'),
         presignedUrlExpiry: z.coerce.number().int().positive().default(3600),
         uploadPartSize: z.coerce.number().int().positive().default(5242880),
-        maxConcurrentUploads: z.coerce.number().int().positive().default(4),
+        maxConcurrentUploads: z.coerce.number().int().positive().default(4)
     }),
     ses: z
         .object({
             fromEmail: z.string().email().optional(),
-            region: z.string().optional(),
+            region: z.string().optional()
         })
         .default({}),
     cloudfront: z
         .object({
-            distributionId: z.string().optional(),
+            distributionId: z.string().optional()
         })
-        .default({}),
+        .default({})
 });
 
 export type AwsConfig = z.infer<typeof schema>;
@@ -83,24 +83,24 @@ export default registerAs('aws', (): AwsConfig => {
             defaultBatchSize: process.env.SQS_DEFAULT_BATCH_SIZE,
             defaultVisibilityTimeout: process.env.SQS_DEFAULT_VISIBILITY_TIMEOUT,
             defaultWaitTimeSeconds: process.env.SQS_DEFAULT_WAIT_TIME_SECONDS,
-            pollingEnabled: process.env.SQS_POLLING_ENABLED,
+            pollingEnabled: process.env.SQS_POLLING_ENABLED
         },
         sns: {
-            topics: process.env.SNS_TOPICS,
+            topics: process.env.SNS_TOPICS
         },
         s3: {
             bucketName: process.env.S3_BUCKET_NAME,
             presignedUrlExpiry: process.env.S3_PRESIGNED_URL_EXPIRY,
             uploadPartSize: process.env.S3_UPLOAD_PART_SIZE,
-            maxConcurrentUploads: process.env.S3_MAX_CONCURRENT_UPLOADS,
+            maxConcurrentUploads: process.env.S3_MAX_CONCURRENT_UPLOADS
         },
         ses: {
             fromEmail: process.env.AWS_SES_FROM_EMAIL,
-            region: process.env.AWS_REGION, // Default to global region if not specified separately
+            region: process.env.AWS_REGION // Default to global region if not specified separately
         },
         cloudfront: {
-            distributionId: process.env.CLOUDFRONT_DISTRIBUTION_ID,
-        },
+            distributionId: process.env.CLOUDFRONT_DISTRIBUTION_ID
+        }
     });
 
     if (!result.success) {

@@ -11,9 +11,9 @@ describe('RulesEngineService (Common)', () => {
                 RulesEngineService,
                 {
                     provide: 'ENGINE_FACTORY',
-                    useValue: () => new Engine(),
-                },
-            ],
+                    useValue: () => new Engine()
+                }
+            ]
         }).compile();
 
         service = module.get<RulesEngineService>(RulesEngineService);
@@ -35,21 +35,21 @@ describe('RulesEngineService (Common)', () => {
                         {
                             fact: 'score',
                             operator: 'greaterThanInclusive',
-                            value: 100,
-                        },
-                    ],
+                            value: 100
+                        }
+                    ]
                 },
                 event: {
                     type: 'test-event',
                     params: {
-                        foo: 'bar',
-                    },
-                },
-            },
+                        foo: 'bar'
+                    }
+                }
+            }
         ];
 
         const facts: MyFacts = {
-            score: 150,
+            score: 150
         };
 
         const events = await service.evaluate(rules, facts);
@@ -70,18 +70,18 @@ describe('RulesEngineService (Common)', () => {
                         {
                             fact: 'score',
                             operator: 'greaterThanInclusive',
-                            value: 100,
-                        },
-                    ],
+                            value: 100
+                        }
+                    ]
                 },
                 event: {
-                    type: 'test-event',
-                },
-            },
+                    type: 'test-event'
+                }
+            }
         ];
 
         const facts: MyFacts = {
-            score: 50,
+            score: 50
         };
 
         const events = await service.evaluate(rules, facts);

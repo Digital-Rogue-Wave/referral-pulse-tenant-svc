@@ -1,10 +1,4 @@
-import {
-    PaginateConfig,
-    Paginated,
-    PaginateQuery,
-    CursorPaginated,
-    CursorPaginateQuery,
-} from '../nestjs-prisma-pagination';
+import { PaginateConfig, Paginated, PaginateQuery, CursorPaginated, CursorPaginateQuery } from '../nestjs-prisma-pagination';
 
 export class PaginateMockUtils {
     static query: PaginateQuery = { path: '' };
@@ -13,7 +7,7 @@ export class PaginateMockUtils {
         return {
             sortableColumns: ['id' as Extract<keyof T, string>],
             defaultSortBy: [['id' as Extract<keyof T, string>, 'ASC']],
-            defaultLimit: 1,
+            defaultLimit: 1
         };
     }
 
@@ -26,12 +20,12 @@ export class PaginateMockUtils {
                 totalPages: 1,
                 sortBy: [['id', 'ASC']] as [string, string][],
                 searchBy: [],
-                search: '',
+                search: ''
             },
             data: data,
             links: {
-                current: '',
-            },
+                current: ''
+            }
         };
     }
 
@@ -49,19 +43,19 @@ export class PaginateMockUtils {
         return {
             edges: data.map((item, index) => ({
                 node: item,
-                cursor: `cursor_${index}`,
+                cursor: `cursor_${index}`
             })),
             pageInfo: {
                 startCursor: data.length > 0 ? 'cursor_0' : null,
                 endCursor: data.length > 0 ? `cursor_${data.length - 1}` : null,
                 hasNextPage: false,
-                hasPreviousPage: false,
+                hasPreviousPage: false
             },
             meta: {
                 sortBy: [['id', 'ASC']] as [string, string][],
                 searchBy: [],
-                search: '',
-            },
+                search: ''
+            }
         };
     }
 }

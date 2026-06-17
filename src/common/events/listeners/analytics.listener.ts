@@ -32,7 +32,7 @@ export class AnalyticsListener {
         private readonly sideEffectService: SideEffectService,
         private readonly logger: AppLoggerService,
         private readonly configService: ConfigService<AllConfigType>,
-        private readonly redisKeyBuilder: RedisKeyBuilder,
+        private readonly redisKeyBuilder: RedisKeyBuilder
     ) {
         this.logger.setContext(AnalyticsListener.name);
         this.serviceName = this.configService.get('app.name', { infer: true }) || 'unknown-service';
@@ -58,22 +58,22 @@ export class AnalyticsListener {
                     aggregateId: event.aggregateId,
                     tenantId: event.tenantId,
                     userId: event.userId,
-                    occurredAt: event.occurredAt,
+                    occurredAt: event.occurredAt
                 },
                 {
                     critical: false,
-                    idempotencyKey: this.redisKeyBuilder.buildIdempotencyKey(`analytics-${event.eventId}`),
-                },
+                    idempotencyKey: this.redisKeyBuilder.buildIdempotencyKey(`analytics-${event.eventId}`)
+                }
             );
 
             this.logger.debug(`Sent ${event.eventType} to analytics service`, {
                 eventId: event.eventId,
-                aggregateId: event.aggregateId,
+                aggregateId: event.aggregateId
             });
         } catch (error) {
             this.logger.warn(`Failed to send ${event.eventType} to analytics service (check DLQ)`, {
                 eventId: event.eventId,
-                error: error instanceof Error ? error.message : 'Unknown error',
+                error: error instanceof Error ? error.message : 'Unknown error'
             });
         }
     }

@@ -5,12 +5,7 @@ import { TransactionEventEmitterService } from '@common/events/transaction-event
 import { AppLoggerService } from '@common/logging/app-logger.service';
 import { DateService } from '@common/helper/date.service';
 
-import {
-    ReservedSubdomainProps,
-    SubdomainValidationResult,
-    SubdomainReservedEvent,
-    SubdomainReleasedEvent,
-} from '@domains/dns';
+import { ReservedSubdomainProps, SubdomainValidationResult, SubdomainReservedEvent, SubdomainReleasedEvent } from '@domains/dns';
 
 import { RESERVED_SUBDOMAINS } from './reserved-subdomains.constant';
 
@@ -24,7 +19,7 @@ export class SubdomainService {
         private readonly prisma: DatabaseService,
         private readonly txEventEmitter: TransactionEventEmitterService,
         private readonly logger: AppLoggerService,
-        private readonly dateService: DateService,
+        private readonly dateService: DateService
     ) {
         this.logger.setContext(SubdomainService.name);
     }
@@ -39,22 +34,21 @@ export class SubdomainService {
         if (!regex.test(subdomain)) {
             return {
                 valid: false,
-                message:
-                    'Subdomain must consist of lowercase alphanumeric characters or hyphens, cannot start or end with a hyphen',
+                message: 'Subdomain must consist of lowercase alphanumeric characters or hyphens, cannot start or end with a hyphen'
             };
         }
 
         if (subdomain.length < 3 || subdomain.length > 63) {
             return {
                 valid: false,
-                message: 'Subdomain length must be between 3 and 63 characters',
+                message: 'Subdomain length must be between 3 and 63 characters'
             };
         }
 
         if (RESERVED_SUBDOMAINS.includes(subdomain.toLowerCase())) {
             return {
                 valid: false,
-                message: 'This subdomain is reserved and cannot be used',
+                message: 'This subdomain is reserved and cannot be used'
             };
         }
 
@@ -73,7 +67,7 @@ export class SubdomainService {
 
         // Check if used by any tenant
         const tenantCount = await this.prisma.tenant.count({
-            where: { slug: subdomain },
+            where: { slug: subdomain }
         });
 
         if (tenantCount > 0) {
@@ -85,8 +79,8 @@ export class SubdomainService {
             where: {
                 slug: subdomain,
                 expiresAt: { gt: new Date() },
-                deletedAt: null,
-            },
+                deletedAt: null
+            }
         });
 
         return reservedCount === 0;
@@ -105,19 +99,14 @@ export class SubdomainService {
         return {
             valid: true,
             available,
-            message: available ? 'Subdomain is available' : 'Subdomain is taken',
+            message: available ? 'Subdomain is available' : 'Subdomain is taken'
         };
     }
 
     /**
      * Reserve a subdomain for a tenant
      */
-    async reserveSubdomain(
-        slug: string,
-        tenantId: string,
-        days: number = 7,
-        userId?: string,
-    ): Promise<ReservedSubdomainProps> {
+    async reserveSubdomain(slug: string, tenantId: string, days: number = 7, userId?: string): Promise<ReservedSubdomainProps> {
         // Validate first
         const validation = this.validateSubdomain(slug);
         if (!validation.valid) {
@@ -136,8 +125,8 @@ export class SubdomainService {
             data: {
                 slug,
                 expiresAt,
-                originalTenantId: tenantId,
-            },
+                originalTenantId: tenantId
+            }
         })) as ReservedSubdomainProps;
 
         const event = new SubdomainReservedEvent(
@@ -147,9 +136,9 @@ export class SubdomainService {
                 slug,
                 tenantId,
                 expiresAt,
-                reservedAt: new Date(),
+                reservedAt: new Date()
             },
-            userId,
+            userId
         );
         this.txEventEmitter.emitAfterCommit('dns.reserved', event);
         this.txEventEmitter.emitAfterCommit('audit.dns.reserved', event);
@@ -157,7 +146,7 @@ export class SubdomainService {
         this.logger.log(`Subdomain reserved: ${slug}`, {
             slug,
             tenantId,
-            expiresAt,
+            expiresAt
         });
 
         return saved;
@@ -168,7 +157,7 @@ export class SubdomainService {
      */
     async releaseSubdomain(slug: string, tenantId: string, userId?: string): Promise<void> {
         const existing = await this.prisma.reservedSubdomain.findUnique({
-            where: { slug },
+            where: { slug }
         });
 
         if (!existing) {
@@ -181,7 +170,7 @@ export class SubdomainService {
 
         await this.prisma.reservedSubdomain.update({
             where: { slug },
-            data: { deletedAt: new Date() },
+            data: { deletedAt: new Date() }
         });
 
         const event = new SubdomainReleasedEvent(
@@ -190,9 +179,9 @@ export class SubdomainService {
             {
                 slug,
                 tenantId,
-                releasedAt: new Date(),
+                releasedAt: new Date()
             },
-            userId,
+            userId
         );
         this.txEventEmitter.emitAfterCommit('dns.released', event);
         this.txEventEmitter.emitAfterCommit('audit.dns.released', event);
@@ -208,8 +197,8 @@ export class SubdomainService {
             where: {
                 slug,
                 expiresAt: { gt: new Date() },
-                deletedAt: null,
-            },
+                deletedAt: null
+            }
         })) as ReservedSubdomainProps | null;
     }
 
@@ -220,9 +209,9 @@ export class SubdomainService {
         const result = await this.prisma.reservedSubdomain.updateMany({
             where: {
                 expiresAt: { lt: new Date() },
-                deletedAt: null,
+                deletedAt: null
             },
-            data: { deletedAt: new Date() },
+            data: { deletedAt: new Date() }
         });
 
         this.logger.log(`Cleaned up ${result.count} expired subdomain reservations`);

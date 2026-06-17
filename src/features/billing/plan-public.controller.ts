@@ -15,7 +15,7 @@ export class PlanPublicController {
     @ApiOkResponse({
         description: 'List of public plans',
         type: PlanDto,
-        isArray: true,
+        isArray: true
     })
     @HttpCode(HttpStatus.OK)
     @Get()

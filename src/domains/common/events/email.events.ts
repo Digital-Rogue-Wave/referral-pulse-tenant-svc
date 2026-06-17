@@ -27,7 +27,7 @@ export class EmailEvent extends BaseDomainEvent {
             templateId?: string;
             unsubscribeLink?: string;
             metadata?: Record<string, unknown>;
-        },
+        }
     ) {
         super();
     }

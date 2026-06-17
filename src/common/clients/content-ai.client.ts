@@ -10,10 +10,10 @@ export class ContentAiClient {
 
     constructor(
         private readonly http: HttpClientService,
-        private readonly configService: ConfigService<AllConfigType>,
+        private readonly configService: ConfigService<AllConfigType>
     ) {
         this.baseUrl = this.configService.getOrThrow('services.contentAi.url', {
-            infer: true,
+            infer: true
         });
     }
 

@@ -46,33 +46,24 @@ export class DlqReplayWorkerService extends BaseWorkerService<IDlqReplayJobData>
         dateService: DateService,
         private readonly environmentService: EnvironmentService,
         private readonly idempotencyService: IdempotencyService,
-        private readonly jsonService: JsonService,
+        private readonly jsonService: JsonService
     ) {
-        super(
-            'dlq-replay',
-            connectionFactory,
-            configService,
-            logger,
-            metricsService,
-            tracingService,
-            tenantContext,
-            dateService,
-        );
+        super('dlq-replay', connectionFactory, configService, logger, metricsService, tracingService, tenantContext, dateService);
 
         // Build queue map
         this.queueMap = new LRUCache<string, { queueUrl: string; dlqUrl: string }>({
             max: 100,
-            ttl: 1000 * 60 * 60 * 24, // 24 hours
+            ttl: 1000 * 60 * 60 * 24 // 24 hours
         });
 
         const queues = this.configService.getOrThrow('aws.sqs.queues', {
-            infer: true,
+            infer: true
         });
         for (const queue of queues) {
             const dlqUrl = this.deriveDlqUrl(queue.url);
             this.queueMap.set(queue.name, {
                 queueUrl: queue.url,
-                dlqUrl,
+                dlqUrl
             });
         }
     }
@@ -85,7 +76,7 @@ export class DlqReplayWorkerService extends BaseWorkerService<IDlqReplayJobData>
         this.sqsClient = new SQSClient(awsConfig);
 
         this.logger.log('DLQ Replay Worker initialized', {
-            queuesConfigured: this.queueMap.size,
+            queuesConfigured: this.queueMap.size
         });
     }
 
@@ -112,8 +103,8 @@ export class DlqReplayWorkerService extends BaseWorkerService<IDlqReplayJobData>
             concurrency: 5, // Conservative concurrency for replays
             limiter: {
                 max: 20, // Max 20 replays per second to avoid overwhelming main queue
-                duration: 1000,
-            },
+                duration: 1000
+            }
         };
     }
 
@@ -126,7 +117,7 @@ export class DlqReplayWorkerService extends BaseWorkerService<IDlqReplayJobData>
         this.logger.debug(`Replaying DLQ message: ${originalMessageId}`, {
             queueName,
             originalMessageId,
-            originalIdempotencyKey,
+            originalIdempotencyKey
         });
 
         const config = this.queueMap.get(queueName);
@@ -147,16 +138,12 @@ export class DlqReplayWorkerService extends BaseWorkerService<IDlqReplayJobData>
 
             return {
                 success: true,
-                data: { skipped: true, reason: 'already_replayed' },
+                data: { skipped: true, reason: 'already_replayed' }
             };
         }
 
         // Mark as being replayed (24 hour TTL)
-        await this.idempotencyService.markProcessed(
-            replayTrackingKey,
-            { replayed: true, replayedAt: this.dateService.nowISO() },
-            { ttl: 86400 },
-        );
+        await this.idempotencyService.markProcessed(replayTrackingKey, { replayed: true, replayedAt: this.dateService.nowISO() }, { ttl: 86400 });
 
         // Parse envelope to get tenant ID for message group
         const envelope = this.jsonService.parse<IMessageEnvelope>(messageBody);
@@ -172,18 +159,18 @@ export class DlqReplayWorkerService extends BaseWorkerService<IDlqReplayJobData>
                 MessageAttributes: {
                     reprocessed: {
                         DataType: 'String',
-                        StringValue: 'true',
+                        StringValue: 'true'
                     },
                     originalFailedAt: {
                         DataType: 'String',
-                        StringValue: this.dateService.nowISO(),
+                        StringValue: this.dateService.nowISO()
                     },
                     replayJobId: {
                         DataType: 'String',
-                        StringValue: job.id || 'unknown',
-                    },
-                },
-            }),
+                        StringValue: job.id || 'unknown'
+                    }
+                }
+            })
         );
 
         // Delete from DLQ after successful requeue
@@ -191,7 +178,7 @@ export class DlqReplayWorkerService extends BaseWorkerService<IDlqReplayJobData>
 
         this.logger.log(`Successfully replayed DLQ message: ${originalMessageId}`, {
             queueName,
-            originalMessageId,
+            originalMessageId
         });
 
         return { success: true };
@@ -204,8 +191,8 @@ export class DlqReplayWorkerService extends BaseWorkerService<IDlqReplayJobData>
         await this.sqsClient.send(
             new DeleteMessageCommand({
                 QueueUrl: dlqUrl,
-                ReceiptHandle: receiptHandle,
-            }),
+                ReceiptHandle: receiptHandle
+            })
         );
     }
 

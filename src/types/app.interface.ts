@@ -558,11 +558,7 @@ export interface IAuditSideEffectPayload {
 /**
  * Union type for all side effect payloads
  */
-export type SideEffectPayload =
-    | ISqsSideEffectPayload
-    | ISnsSideEffectPayload
-    | IEmailSideEffectPayload
-    | IAuditSideEffectPayload;
+export type SideEffectPayload = ISqsSideEffectPayload | ISnsSideEffectPayload | IEmailSideEffectPayload | IAuditSideEffectPayload;
 
 /**
  * DTO for creating a side effect in the outbox pattern
@@ -1214,14 +1210,7 @@ export interface ITransactionEvent {
 
 export interface IPrismaDelegate<T> {
     create(args: { data: any; select?: any; include?: any }): Promise<T>;
-    findMany(args?: {
-        where?: any;
-        orderBy?: any;
-        skip?: number;
-        take?: number;
-        select?: any;
-        include?: any;
-    }): Promise<T[]>;
+    findMany(args?: { where?: any; orderBy?: any; skip?: number; take?: number; select?: any; include?: any }): Promise<T[]>;
     findUnique(args: { where: any; select?: any; include?: any }): Promise<T | null>;
     findFirst(args?: { where?: any; orderBy?: any; select?: any; include?: any }): Promise<T | null>;
     findFirstOrThrow(args?: { where?: any; orderBy?: any; select?: any; include?: any }): Promise<T>;
@@ -1262,23 +1251,17 @@ export interface ITenantScopedDelegate<T> {
             select?: any;
             include?: any;
         },
-        options?: ITenantReadOptions,
+        options?: ITenantReadOptions
     ): Promise<T[]>;
 
     /** findUnique scoped to tenant + soft-delete guard */
     findUnique(args: { where: any; select?: any; include?: any }, options?: ITenantReadOptions): Promise<T | null>;
 
     /** findFirst scoped to tenant + soft-delete guard */
-    findFirst(
-        args?: { where?: any; orderBy?: any; select?: any; include?: any },
-        options?: ITenantReadOptions,
-    ): Promise<T | null>;
+    findFirst(args?: { where?: any; orderBy?: any; select?: any; include?: any }, options?: ITenantReadOptions): Promise<T | null>;
 
     /** findFirstOrThrow scoped to tenant + soft-delete guard */
-    findFirstOrThrow(
-        args?: { where?: any; orderBy?: any; select?: any; include?: any },
-        options?: ITenantReadOptions,
-    ): Promise<T>;
+    findFirstOrThrow(args?: { where?: any; orderBy?: any; select?: any; include?: any }, options?: ITenantReadOptions): Promise<T>;
 
     /** update scoped to tenant */
     update(args: { where: any; data: any; select?: any; include?: any }): Promise<T>;

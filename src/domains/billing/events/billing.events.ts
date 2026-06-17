@@ -13,7 +13,7 @@ export class SubscriptionChangedEvent extends BaseDomainEvent {
         public readonly currentPeriodStart?: Date,
         public readonly currentPeriodEnd?: Date,
         public readonly stripeEventId?: string,
-        public readonly userId?: string,
+        public readonly userId?: string
     ) {
         super();
     }
@@ -32,7 +32,7 @@ export class SubscriptionCreatedEvent extends BaseDomainEvent {
         public readonly currentPeriodStart?: Date,
         public readonly currentPeriodEnd?: Date,
         public readonly stripeEventId?: string,
-        public readonly userId?: string,
+        public readonly userId?: string
     ) {
         super();
     }
@@ -49,7 +49,7 @@ export class SubscriptionCancelledEvent extends BaseDomainEvent {
         public readonly stripeSubscriptionId?: string,
         public readonly billingPlan?: string,
         public readonly reason?: string,
-        public readonly userId?: string,
+        public readonly userId?: string
     ) {
         super();
     }
@@ -64,7 +64,7 @@ export class SubscriptionDowngradeScheduledEvent extends BaseDomainEvent {
         public readonly previousPlan: string,
         public readonly targetPlan: string,
         public readonly effectiveDate: string,
-        public readonly userId?: string,
+        public readonly userId?: string
     ) {
         super();
     }
@@ -79,7 +79,7 @@ export class SubscriptionUpgradedEvent extends BaseDomainEvent {
         public readonly previousPlan: string,
         public readonly billingPlan: string,
         public readonly effectiveDate: string,
-        public readonly userId?: string,
+        public readonly userId?: string
     ) {
         super();
     }
@@ -100,7 +100,7 @@ export class TenantPaymentStatusChangedEvent extends BaseDomainEvent {
         public readonly stripeSubscriptionId?: string,
         public readonly stripeInvoiceId?: string,
         public readonly stripePaymentIntentId?: string,
-        public readonly nextPaymentAttemptAt?: string | null,
+        public readonly nextPaymentAttemptAt?: string | null
     ) {
         super();
     }
@@ -115,7 +115,7 @@ export class TrialReminderEvent extends BaseDomainEvent {
         public readonly trialEndsAt: string,
         public readonly daysRemaining: number,
         public readonly triggeredAt: string,
-        public readonly userId?: string,
+        public readonly userId?: string
     ) {
         super();
     }
@@ -129,7 +129,7 @@ export class TrialExpiredEvent extends BaseDomainEvent {
         public readonly tenantId: string,
         public readonly trialEndsAt: string,
         public readonly triggeredAt: string,
-        public readonly userId?: string,
+        public readonly userId?: string
     ) {
         super();
     }
@@ -145,7 +145,7 @@ export class PaymentFailedEvent extends BaseDomainEvent {
         public readonly nextStatus: string,
         public readonly changedAt: string,
         public readonly reason?: string,
-        public readonly userId?: string,
+        public readonly userId?: string
     ) {
         super();
     }
@@ -161,7 +161,7 @@ export class PaymentRestoredEvent extends BaseDomainEvent {
         public readonly nextStatus: string,
         public readonly changedAt: string,
         public readonly reason?: string,
-        public readonly userId?: string,
+        public readonly userId?: string
     ) {
         super();
     }
@@ -177,7 +177,7 @@ export class TenantRestrictedEvent extends BaseDomainEvent {
         public readonly nextStatus: string,
         public readonly changedAt: string,
         public readonly reason?: string,
-        public readonly userId?: string,
+        public readonly userId?: string
     ) {
         super();
     }
@@ -193,7 +193,7 @@ export class TenantRestoredEvent extends BaseDomainEvent {
         public readonly nextStatus: string,
         public readonly changedAt: string,
         public readonly reason?: string,
-        public readonly userId?: string,
+        public readonly userId?: string
     ) {
         super();
     }
@@ -210,7 +210,7 @@ export class UsageMonthlySummaryEvent extends BaseDomainEvent {
         public readonly usage: number,
         public readonly limit: number | null,
         public readonly periodDate: string,
-        public readonly triggeredAt: string,
+        public readonly triggeredAt: string
     ) {
         super();
     }
@@ -228,7 +228,7 @@ export class UsageThresholdCrossedEvent extends BaseDomainEvent {
         public readonly limit: number,
         public readonly percentage: number,
         public readonly periodDate: string,
-        public readonly triggeredAt: string,
+        public readonly triggeredAt: string
     ) {
         super();
     }
@@ -249,5 +249,5 @@ export const BillingEvents = {
     PAYMENT_RESTORED: 'payment.restored',
     TENANT_RESTRICTED: 'tenant.restricted',
     TENANT_LOCKED: 'tenant.locked',
-    TENANT_RESTORED: 'tenant.restored',
+    TENANT_RESTORED: 'tenant.restored'
 } as const;

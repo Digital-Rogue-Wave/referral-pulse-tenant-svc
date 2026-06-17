@@ -35,7 +35,7 @@ export class KetoService {
 
     constructor(
         private readonly http: HttpClientService,
-        private readonly config: ConfigService,
+        private readonly config: ConfigService
     ) {
         const oryCfg = this.config.getOrThrow<OryConfig>('oryConfig');
         this.readUrl = oryCfg.keto.readUrl;
@@ -52,7 +52,7 @@ export class KetoService {
                 namespace,
                 object,
                 relation,
-                subject_id: subjectId,
+                subject_id: subjectId
             } as KetoCheckRequest);
 
             return response.data.allowed;
@@ -68,15 +68,12 @@ export class KetoService {
     /**
      * Batch check multiple permissions
      */
-    async checkBatch(
-        checks: Array<{ namespace: string; object: string; relation: string }>,
-        subjectId: string,
-    ): Promise<Record<string, boolean>> {
+    async checkBatch(checks: Array<{ namespace: string; object: string; relation: string }>, subjectId: string): Promise<Record<string, boolean>> {
         const results = await Promise.all(
             checks.map(async ({ namespace, object, relation }) => {
                 const allowed = await this.check(namespace, object, relation, subjectId);
                 return { key: `${namespace}:${object}#${relation}`, allowed };
-            }),
+            })
         );
 
         return Object.fromEntries(results.map((r) => [r.key, r.allowed]));
@@ -98,8 +95,8 @@ export class KetoService {
                 namespace: tuple.namespace,
                 object: tuple.object,
                 relation: tuple.relation,
-                subject_id: tuple.subject_id as string,
-            },
+                subject_id: tuple.subject_id as string
+            }
         });
     }
 }

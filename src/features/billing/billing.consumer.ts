@@ -18,7 +18,7 @@ export class BillingConsumer {
         private readonly messageProcessor: MessageProcessorService,
         private readonly prisma: DatabaseService,
         private readonly redis: RedisService,
-        private readonly logger: AppLoggerService,
+        private readonly logger: AppLoggerService
     ) {
         this.logger.setContext(BillingConsumer.name);
     }
@@ -39,9 +39,7 @@ export class BillingConsumer {
                 const { metric, delta } = payload;
 
                 if (typeof metric !== 'string' || !Number.isFinite(delta)) {
-                    this.logger.warn(
-                        `Invalid referral usage payload for tenant ${tenantId} - eventType: ${eventType}`,
-                    );
+                    this.logger.warn(`Invalid referral usage payload for tenant ${tenantId} - eventType: ${eventType}`);
                     return;
                 }
 
@@ -54,13 +52,13 @@ export class BillingConsumer {
                         metricName: metric,
                         increment: delta,
                         timestamp: new Date(),
-                        metadata: { ...payload, usageAfter: usage },
-                    },
+                        metadata: { ...payload, usageAfter: usage }
+                    }
                 });
 
                 this.logger.log(`Processed referral usage event`, { tenantId, metric, delta });
             },
-            { queueName: ANALYTICS_SVC_FIFO },
+            { queueName: ANALYTICS_SVC_FIFO }
         );
     }
 }

@@ -9,14 +9,14 @@
 export function parseSort<T>(
     sortBy: string | string[] | [string, string][] | undefined,
     sortableColumns: Array<keyof T>,
-    defaultSortBy?: Array<[keyof T, 'ASC' | 'DESC']>,
+    defaultSortBy?: Array<[keyof T, 'ASC' | 'DESC']>
 ): Array<Record<string, 'asc' | 'desc'>> {
     const orderBy: Array<Record<string, 'asc' | 'desc'>> = [];
 
     // Use default if no sort specified
     if (!sortBy && defaultSortBy) {
         return defaultSortBy.map(([column, direction]) => ({
-            [String(column)]: direction.toLowerCase() as 'asc' | 'desc',
+            [String(column)]: direction.toLowerCase() as 'asc' | 'desc'
         }));
     }
 
@@ -43,7 +43,7 @@ export function parseSort<T>(
         }
 
         orderBy.push({
-            [String(columnName)]: direction.toLowerCase() as 'asc' | 'desc',
+            [String(columnName)]: direction.toLowerCase() as 'asc' | 'desc'
         });
     }
 
@@ -51,7 +51,7 @@ export function parseSort<T>(
         ? orderBy
         : defaultSortBy
           ? defaultSortBy.map(([column, direction]) => ({
-                [String(column)]: direction.toLowerCase() as 'asc' | 'desc',
+                [String(column)]: direction.toLowerCase() as 'asc' | 'desc'
             }))
           : [];
 }

@@ -9,14 +9,14 @@ import { AppLoggerService } from '@common/logging/app-logger.service';
 export class StripeService {
     constructor(
         private readonly configService: ConfigService<AllConfigType>,
-        private readonly logger: AppLoggerService,
+        private readonly logger: AppLoggerService
     ) {
         this.logger.setContext(StripeService.name);
     }
 
     private stripeClient(): Stripe {
         const secretKey = this.configService.get('stripeConfig.secretKey', {
-            infer: true,
+            infer: true
         });
         if (!secretKey) {
             throw new Error('Stripe secret key is not configured');
@@ -49,17 +49,14 @@ export class StripeService {
         }
     }
 
-    async createSubscriptionCheckoutSession(params: {
-        tenantId: string;
-        plan: BillingPlanEnum;
-    }): Promise<{ id: string; url: string | null }> {
+    async createSubscriptionCheckoutSession(params: { tenantId: string; plan: BillingPlanEnum }): Promise<{ id: string; url: string | null }> {
         const stripe = this.stripeClient();
 
         const successUrl = this.configService.get('stripeConfig.successUrl', {
-            infer: true,
+            infer: true
         });
         const cancelUrl = this.configService.get('stripeConfig.cancelUrl', {
-            infer: true,
+            infer: true
         });
 
         if (!successUrl || !cancelUrl) {
@@ -75,13 +72,11 @@ export class StripeService {
             cancel_url: cancelUrl,
             metadata: {
                 tenantId: params.tenantId,
-                planId: params.plan,
-            },
+                planId: params.plan
+            }
         });
 
-        this.logger.log(
-            `Created Stripe Checkout Session ${session.id} for tenant ${params.tenantId}, plan ${params.plan}`,
-        );
+        this.logger.log(`Created Stripe Checkout Session ${session.id} for tenant ${params.tenantId}, plan ${params.plan}`);
 
         return { id: session.id, url: session.url };
     }

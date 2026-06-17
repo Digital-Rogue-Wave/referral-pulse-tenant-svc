@@ -8,6 +8,6 @@ import { UserNotificationPreferenceController } from './user-notification-prefer
 @Module({
     controllers: [TenantSettingController, UserNotificationPreferenceController],
     providers: [TenantSettingService, UserNotificationPreferenceService],
-    exports: [TenantSettingService, UserNotificationPreferenceService],
+    exports: [TenantSettingService, UserNotificationPreferenceService]
 })
 export class TenantSettingModule {}

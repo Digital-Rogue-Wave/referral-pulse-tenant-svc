@@ -14,7 +14,7 @@ import { Test, TestingModule } from '@nestjs/testing';
 
 // Set env overrides BEFORE AppModule is imported so ConfigModule picks them up
 process.env['NODE_ENV'] = 'test';
-process.env['AUTH_CACHE_ENABLED'] = 'false';   // CRITICAL: force JWKS re-fetch per token
+process.env['AUTH_CACHE_ENABLED'] = 'false'; // CRITICAL: force JWKS re-fetch per token
 process.env['AUTH_AUDIENCE'] = 'test-audience';
 
 import { AppModule } from '../../../src/app.module';
@@ -25,7 +25,7 @@ export async function bootstrapTestApp(): Promise<INestApplication> {
     if (app) return app;
 
     const moduleRef: TestingModule = await Test.createTestingModule({
-        imports: [AppModule],
+        imports: [AppModule]
     }).compile();
 
     app = moduleRef.createNestApplication({ logger: false });
@@ -33,7 +33,7 @@ export async function bootstrapTestApp(): Promise<INestApplication> {
     const apiPrefix = process.env['APP_API_PREFIX'] ?? 'api';
 
     app.setGlobalPrefix(apiPrefix, {
-        exclude: ['/health', '/health/ready', '/health/live', '/metrics'],
+        exclude: ['/health', '/health/ready', '/health/live', '/metrics']
     });
     app.enableVersioning({ type: VersioningType.URI, defaultVersion: '1' });
     app.useGlobalPipes(
@@ -41,8 +41,8 @@ export async function bootstrapTestApp(): Promise<INestApplication> {
             whitelist: true,
             forbidNonWhitelisted: true,
             transform: true,
-            transformOptions: { enableImplicitConversion: true },
-        }),
+            transformOptions: { enableImplicitConversion: true }
+        })
     );
 
     await app.init();

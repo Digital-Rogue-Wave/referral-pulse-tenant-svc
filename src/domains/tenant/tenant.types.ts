@@ -6,5 +6,5 @@ export enum TenantStatus {
     ACTIVE = 'active',
     SUSPENDED = 'suspended',
     LOCKED = 'locked',
-    DELETED = 'deleted',
+    DELETED = 'deleted'
 }

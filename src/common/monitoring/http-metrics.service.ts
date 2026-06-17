@@ -46,20 +46,20 @@ export class HttpMetricsService implements OnModuleInit {
     // Circuit breaker state tracking (LRU cache for bounded memory)
     private readonly circuitBreakerStates = new LRUCache<string, number>({
         max: 100, // Max 100 hosts tracked
-        ttl: 1000 * 60 * 60, // 1 hour TTL
+        ttl: 1000 * 60 * 60 // 1 hour TTL
     });
 
     // Connection pool stats tracking (LRU cache)
     private readonly connectionPoolStats = new LRUCache<string, { active: number; idle: number; waiting: number }>({
         max: 100,
-        ttl: 1000 * 60 * 5, // 5 min TTL
+        ttl: 1000 * 60 * 5 // 5 min TTL
     });
 
     constructor(
         private readonly metricsService: MetricsService,
         private readonly tracingService: TracingService,
         private readonly tenantContext: TenantContextService,
-        private readonly logger: AppLoggerService,
+        private readonly logger: AppLoggerService
     ) {
         this.logger.setContext(HttpMetricsService.name);
     }
@@ -74,43 +74,43 @@ export class HttpMetricsService implements OnModuleInit {
         const meter = this.metricsService.getMeter();
 
         this.outboundRequestsCounter = meter.createCounter('http.outbound.requests.total', {
-            description: 'Total number of outbound HTTP requests',
+            description: 'Total number of outbound HTTP requests'
         });
 
         this.outboundDurationHistogram = this.metricsService.createHistogram('http.outbound.duration', {
             description: 'Outbound HTTP request duration in milliseconds',
-            unit: 'ms',
+            unit: 'ms'
         });
 
         this.outboundErrorsCounter = meter.createCounter('http.outbound.errors.total', {
-            description: 'Total number of outbound HTTP errors',
+            description: 'Total number of outbound HTTP errors'
         });
 
         this.outboundTimeoutsCounter = meter.createCounter('http.outbound.timeouts.total', {
-            description: 'Total number of outbound HTTP timeouts',
+            description: 'Total number of outbound HTTP timeouts'
         });
 
         this.outboundRetriesCounter = meter.createCounter('http.outbound.retries.total', {
-            description: 'Total number of outbound HTTP retry attempts',
+            description: 'Total number of outbound HTTP retry attempts'
         });
 
         this.outboundCircuitBreakerTripsCounter = meter.createCounter('http.outbound.circuit_breaker.trips.total', {
-            description: 'Total number of circuit breaker trips',
+            description: 'Total number of circuit breaker trips'
         });
 
         this.outboundRequestSizeHistogram = this.metricsService.createHistogram('http.outbound.request.size', {
             description: 'Size of outbound HTTP request body in bytes',
-            unit: 'bytes',
+            unit: 'bytes'
         });
 
         this.outboundResponseSizeHistogram = this.metricsService.createHistogram('http.outbound.response.size', {
             description: 'Size of outbound HTTP response body in bytes',
-            unit: 'bytes',
+            unit: 'bytes'
         });
 
         // Circuit breaker state observable gauge
         this.circuitBreakerStateGauge = this.metricsService.createGauge('http.outbound.circuit_breaker.state', {
-            description: 'HTTP circuit breaker state (0=CLOSED, 1=HALF_OPEN, 2=OPEN)',
+            description: 'HTTP circuit breaker state (0=CLOSED, 1=HALF_OPEN, 2=OPEN)'
         });
         this.circuitBreakerStateGauge.addCallback((result) => {
             for (const [host, stateValue] of this.circuitBreakerStates.entries()) {
@@ -120,7 +120,7 @@ export class HttpMetricsService implements OnModuleInit {
 
         // Connection pool observable gauges
         this.connectionPoolActiveGauge = this.metricsService.createGauge('http.connection_pool.active', {
-            description: 'Number of active HTTP connections in pool',
+            description: 'Number of active HTTP connections in pool'
         });
         this.connectionPoolActiveGauge.addCallback((result) => {
             for (const [host, stats] of this.connectionPoolStats.entries()) {
@@ -129,7 +129,7 @@ export class HttpMetricsService implements OnModuleInit {
         });
 
         this.connectionPoolIdleGauge = this.metricsService.createGauge('http.connection_pool.idle', {
-            description: 'Number of idle HTTP connections in pool',
+            description: 'Number of idle HTTP connections in pool'
         });
         this.connectionPoolIdleGauge.addCallback((result) => {
             for (const [host, stats] of this.connectionPoolStats.entries()) {
@@ -138,7 +138,7 @@ export class HttpMetricsService implements OnModuleInit {
         });
 
         this.connectionPoolWaitingGauge = this.metricsService.createGauge('http.connection_pool.waiting', {
-            description: 'Number of requests waiting for HTTP connection',
+            description: 'Number of requests waiting for HTTP connection'
         });
         this.connectionPoolWaitingGauge.addCallback((result) => {
             for (const [host, stats] of this.connectionPoolStats.entries()) {
@@ -150,16 +150,16 @@ export class HttpMetricsService implements OnModuleInit {
     private initializeInboundMetrics(): void {
         this.inboundRequestSizeHistogram = this.metricsService.createHistogram('http.inbound.request.size', {
             description: 'Size of inbound HTTP request body in bytes',
-            unit: 'bytes',
+            unit: 'bytes'
         });
 
         this.inboundResponseSizeHistogram = this.metricsService.createHistogram('http.inbound.response.size', {
             description: 'Size of inbound HTTP response body in bytes',
-            unit: 'bytes',
+            unit: 'bytes'
         });
 
         this.inboundErrorsCounter = this.metricsService.createCounter('http.inbound.errors.total', {
-            description: 'Total number of inbound HTTP errors',
+            description: 'Total number of inbound HTTP errors'
         });
     }
 
@@ -174,7 +174,7 @@ export class HttpMetricsService implements OnModuleInit {
         statusCode: number,
         durationMs: number,
         requestSizeBytes?: number,
-        responseSizeBytes?: number,
+        responseSizeBytes?: number
     ): void {
         // Use the existing MetricsService method for consistency
         this.metricsService.recordHttpRequest(method, route, statusCode, durationMs);
@@ -183,14 +183,14 @@ export class HttpMetricsService implements OnModuleInit {
         if (requestSizeBytes !== undefined) {
             this.inboundRequestSizeHistogram.record(requestSizeBytes, {
                 method,
-                route,
+                route
             });
         }
 
         if (responseSizeBytes !== undefined) {
             this.inboundResponseSizeHistogram.record(responseSizeBytes, {
                 method,
-                route,
+                route
             });
         }
     }
@@ -203,7 +203,7 @@ export class HttpMetricsService implements OnModuleInit {
             method,
             route,
             status_code: statusCode.toString(),
-            error_type: errorType,
+            error_type: errorType
         });
     }
 
@@ -233,34 +233,34 @@ export class HttpMetricsService implements OnModuleInit {
         statusCode: number,
         durationMs: number,
         requestSizeBytes?: number,
-        responseSizeBytes?: number,
+        responseSizeBytes?: number
     ): void {
         this.outboundRequestsCounter.add(1, {
             method,
             host,
             path,
             status_code: statusCode.toString(),
-            success: (statusCode >= 200 && statusCode < 300).toString(),
+            success: (statusCode >= 200 && statusCode < 300).toString()
         });
 
         this.outboundDurationHistogram.record(durationMs, {
             method,
             host,
-            status_code: statusCode.toString(),
+            status_code: statusCode.toString()
         });
 
         // Record request/response sizes if provided
         if (requestSizeBytes !== undefined) {
             this.outboundRequestSizeHistogram.record(requestSizeBytes, {
                 method,
-                host,
+                host
             });
         }
 
         if (responseSizeBytes !== undefined) {
             this.outboundResponseSizeHistogram.record(responseSizeBytes, {
                 method,
-                host,
+                host
             });
         }
     }
@@ -273,7 +273,7 @@ export class HttpMetricsService implements OnModuleInit {
             method,
             host,
             path,
-            error_type: errorType,
+            error_type: errorType
         });
     }
 
@@ -285,7 +285,7 @@ export class HttpMetricsService implements OnModuleInit {
             method,
             host,
             path,
-            timeout: timeoutMs.toString(),
+            timeout: timeoutMs.toString()
         });
     }
 
@@ -298,7 +298,7 @@ export class HttpMetricsService implements OnModuleInit {
             host,
             path,
             attempt: attemptNumber.toString(),
-            reason,
+            reason
         });
     }
 
@@ -371,7 +371,7 @@ export class HttpMetricsService implements OnModuleInit {
         method: string,
         route: string,
         handler: (span: Span) => Promise<T>,
-        metadata?: Record<string, string | number>,
+        metadata?: Record<string, string | number>
     ): Promise<T> {
         const startTime = Date.now();
 
@@ -385,7 +385,7 @@ export class HttpMetricsService implements OnModuleInit {
                 'http.flavor': '1.1',
                 'span.kind': 'server',
                 'tenant.id': tenantId || 'unknown',
-                ...metadata,
+                ...metadata
             });
 
             try {
@@ -413,7 +413,7 @@ export class HttpMetricsService implements OnModuleInit {
                 span.recordException(error as Error);
                 span.setStatus({
                     code: SpanStatusCode.ERROR,
-                    message: error instanceof Error ? error.message : 'Unknown error',
+                    message: error instanceof Error ? error.message : 'Unknown error'
                 });
 
                 throw error;
@@ -437,7 +437,7 @@ export class HttpMetricsService implements OnModuleInit {
             statusCode: number;
             headers?: Record<string, string>;
         }>,
-        metadata?: Record<string, string | number>,
+        metadata?: Record<string, string | number>
     ): Promise<T> {
         const startTime = Date.now();
         const parsedUrl = new URL(url);
@@ -456,7 +456,7 @@ export class HttpMetricsService implements OnModuleInit {
                 'http.scheme': parsedUrl.protocol.replace(':', ''),
                 'span.kind': 'client',
                 'tenant.id': tenantId || 'unknown',
-                ...metadata,
+                ...metadata
             });
 
             try {
@@ -486,7 +486,7 @@ export class HttpMetricsService implements OnModuleInit {
                 span.recordException(error as Error);
                 span.setStatus({
                     code: SpanStatusCode.ERROR,
-                    message: error instanceof Error ? error.message : 'Unknown error',
+                    message: error instanceof Error ? error.message : 'Unknown error'
                 });
 
                 throw error;
@@ -510,8 +510,8 @@ export class HttpMetricsService implements OnModuleInit {
                 'http.url': url,
                 'http.host': parsedUrl.hostname,
                 'http.target': parsedUrl.pathname,
-                'http.scheme': parsedUrl.protocol.replace(':', ''),
-            },
+                'http.scheme': parsedUrl.protocol.replace(':', '')
+            }
         });
     }
 
@@ -606,7 +606,7 @@ export class HttpMetricsService implements OnModuleInit {
             'x-request-id',
             'x-forwarded-for',
             'x-forwarded-proto',
-            'x-forwarded-host',
+            'x-forwarded-host'
         ];
 
         for (const [key, value] of Object.entries(incomingHeaders)) {

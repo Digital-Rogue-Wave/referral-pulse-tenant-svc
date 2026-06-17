@@ -1,13 +1,7 @@
 import { Injectable, OnModuleInit } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 
-import {
-    SQSClient,
-    ReceiveMessageCommand,
-    DeleteMessageCommand,
-    SendMessageCommand,
-    GetQueueAttributesCommand,
-} from '@aws-sdk/client-sqs';
+import { SQSClient, ReceiveMessageCommand, DeleteMessageCommand, SendMessageCommand, GetQueueAttributesCommand } from '@aws-sdk/client-sqs';
 import { LRUCache } from 'lru-cache';
 
 import type { IDlqMessage, IMessageEnvelope } from '@app/types';
@@ -47,18 +41,18 @@ export class DlqConsumerService implements OnModuleInit {
         private readonly tracingService: TracingService,
         private readonly dateService: DateService,
         private readonly jsonService: JsonService,
-        private readonly logger: AppLoggerService,
+        private readonly logger: AppLoggerService
     ) {
         this.logger.setContext(DlqConsumerService.name);
 
         this.queueMap = new LRUCache<string, { queueUrl: string; dlqUrl: string }>({
             max: 100,
-            ttl: 1000 * 60 * 60 * 24, // 24 hours
+            ttl: 1000 * 60 * 60 * 24 // 24 hours
         });
 
         // Build queue map with auto-derived DLQ URLs
         const queues = this.configService.getOrThrow('aws.sqs.queues', {
-            infer: true,
+            infer: true
         });
         for (const queue of queues) {
             // Auto-derive DLQ URL from main queue URL
@@ -67,12 +61,12 @@ export class DlqConsumerService implements OnModuleInit {
 
             this.queueMap.set(queue.name, {
                 queueUrl: queue.url,
-                dlqUrl,
+                dlqUrl
             });
 
             this.logger.log(`Queue registered: ${queue.name}`, {
                 queueUrl: queue.url,
-                dlqUrl,
+                dlqUrl
             });
         }
     }
@@ -84,7 +78,7 @@ export class DlqConsumerService implements OnModuleInit {
 
         this.logger.log('DLQ Consumer initialized', {
             environment: this.environmentService.getEnvironment(),
-            queuesConfigured: this.queueMap.size,
+            queuesConfigured: this.queueMap.size
         });
     }
 
@@ -122,27 +116,23 @@ export class DlqConsumerService implements OnModuleInit {
                 const result = await this.client.send(
                     new GetQueueAttributesCommand({
                         QueueUrl: config.dlqUrl,
-                        AttributeNames: ['ApproximateNumberOfMessages'],
-                    }),
+                        AttributeNames: ['ApproximateNumberOfMessages']
+                    })
                 );
 
                 const count = parseInt(result.Attributes?.ApproximateNumberOfMessages || '0', 10);
 
                 this.logger.debug(`DLQ message count for ${queueName}: ${count}`, {
                     queueName,
-                    count,
+                    count
                 });
 
                 return count;
             } catch (error) {
-                this.logger.error(
-                    `Failed to get DLQ message count for ${queueName}`,
-                    error instanceof Error ? error.stack : undefined,
-                    {
-                        queueName,
-                        error: error instanceof Error ? error.message : 'Unknown',
-                    },
-                );
+                this.logger.error(`Failed to get DLQ message count for ${queueName}`, error instanceof Error ? error.stack : undefined, {
+                    queueName,
+                    error: error instanceof Error ? error.message : 'Unknown'
+                });
                 return 0;
             }
         });
@@ -158,7 +148,7 @@ export class DlqConsumerService implements OnModuleInit {
         await Promise.all(
             queueNames.map(async (queueName) => {
                 counts[queueName] = await this.getDlqMessageCount(queueName);
-            }),
+            })
         );
 
         return counts;
@@ -181,8 +171,8 @@ export class DlqConsumerService implements OnModuleInit {
                     MaxNumberOfMessages: Math.min(maxMessages, 10),
                     WaitTimeSeconds: 0,
                     AttributeNames: ['All'],
-                    MessageAttributeNames: ['All'],
-                }),
+                    MessageAttributeNames: ['All']
+                })
             );
 
             const messages = (result.Messages || [])
@@ -192,20 +182,18 @@ export class DlqConsumerService implements OnModuleInit {
                     const envelope = this.jsonService.parse<IMessageEnvelope>(m.Body!);
                     return {
                         originalMessage: envelope,
-                        error: m.Attributes?.['ApproximateFirstReceiveTimestamp']
-                            ? 'Max receive count exceeded'
-                            : 'Unknown error',
+                        error: m.Attributes?.['ApproximateFirstReceiveTimestamp'] ? 'Max receive count exceeded' : 'Unknown error',
                         failedAt: this.dateService.nowISO(),
                         receiveCount: parseInt(m.Attributes?.ApproximateReceiveCount || '0', 10),
                         sourceQueue: queueName,
                         messageId: envelope.messageId,
-                        idempotencyKey: envelope.idempotencyKey,
+                        idempotencyKey: envelope.idempotencyKey
                     };
                 });
 
             this.logger.log(`Retrieved ${messages.length} DLQ messages from ${queueName}`, {
                 queueName,
-                count: messages.length,
+                count: messages.length
             });
 
             return messages;
@@ -229,7 +217,7 @@ export class DlqConsumerService implements OnModuleInit {
             let hasMore = true;
 
             this.logger.log(`Starting DLQ reprocessing for ${queueName}`, {
-                queueName,
+                queueName
             });
 
             while (hasMore) {
@@ -237,8 +225,8 @@ export class DlqConsumerService implements OnModuleInit {
                     new ReceiveMessageCommand({
                         QueueUrl: config.dlqUrl,
                         MaxNumberOfMessages: 10,
-                        WaitTimeSeconds: 0,
-                    }),
+                        WaitTimeSeconds: 0
+                    })
                 );
 
                 const messages = result.Messages || [];
@@ -269,25 +257,21 @@ export class DlqConsumerService implements OnModuleInit {
                             this.logger.warn(`Message already replayed recently, skipping: ${envelope.messageId}`, {
                                 messageId: envelope.messageId,
                                 idempotencyKey: envelope.idempotencyKey,
-                                queueName,
+                                queueName
                             });
                             // Delete from DLQ to avoid reprocessing
                             await this.client.send(
                                 new DeleteMessageCommand({
                                     QueueUrl: config.dlqUrl,
-                                    ReceiptHandle: msg.ReceiptHandle,
-                                }),
+                                    ReceiptHandle: msg.ReceiptHandle
+                                })
                             );
                             skipped++;
                             continue;
                         }
 
                         // Mark as being replayed (24 hour TTL)
-                        await this.idempotencyService.markProcessed(
-                            replayTrackingKey,
-                            { replayed: true },
-                            { ttl: 86400 },
-                        );
+                        await this.idempotencyService.markProcessed(replayTrackingKey, { replayed: true }, { ttl: 86400 });
 
                         // AWS SQS FIFO deduplication ID for replay
                         // Use static prefix to allow replay even if original send is within 5-min window
@@ -304,26 +288,26 @@ export class DlqConsumerService implements OnModuleInit {
                                 MessageAttributes: {
                                     reprocessed: {
                                         DataType: 'String',
-                                        StringValue: 'true',
+                                        StringValue: 'true'
                                     },
                                     originalFailedAt: {
                                         DataType: 'String',
-                                        StringValue: this.dateService.nowISO(),
+                                        StringValue: this.dateService.nowISO()
                                     },
                                     replayAttempt: {
                                         DataType: 'Number',
-                                        StringValue: '1',
-                                    },
-                                },
-                            }),
+                                        StringValue: '1'
+                                    }
+                                }
+                            })
                         );
 
                         // Delete from DLQ only after successful requeue
                         await this.client.send(
                             new DeleteMessageCommand({
                                 QueueUrl: config.dlqUrl,
-                                ReceiptHandle: msg.ReceiptHandle,
-                            }),
+                                ReceiptHandle: msg.ReceiptHandle
+                            })
                         );
 
                         reprocessed++;
@@ -331,17 +315,13 @@ export class DlqConsumerService implements OnModuleInit {
                         this.logger.log(`Replayed DLQ message: ${envelope.messageId}`, {
                             messageId: envelope.messageId,
                             idempotencyKey: envelope.idempotencyKey,
-                            queueName,
+                            queueName
                         });
                     } catch (error) {
-                        this.logger.error(
-                            'Failed to reprocess DLQ message',
-                            error instanceof Error ? error.stack : undefined,
-                            {
-                                error: error instanceof Error ? error.message : 'Unknown',
-                                queueName,
-                            },
-                        );
+                        this.logger.error('Failed to reprocess DLQ message', error instanceof Error ? error.stack : undefined, {
+                            error: error instanceof Error ? error.message : 'Unknown',
+                            queueName
+                        });
                         failed++;
                     }
                 }
@@ -351,7 +331,7 @@ export class DlqConsumerService implements OnModuleInit {
                 queueName,
                 reprocessed,
                 skipped,
-                failed,
+                failed
             });
 
             return { reprocessed, skipped, failed };
@@ -373,7 +353,7 @@ export class DlqConsumerService implements OnModuleInit {
             let hasMore = true;
 
             this.logger.warn(`Starting DLQ purge for ${queueName} - This will permanently delete messages!`, {
-                queueName,
+                queueName
             });
 
             while (hasMore) {
@@ -381,8 +361,8 @@ export class DlqConsumerService implements OnModuleInit {
                     new ReceiveMessageCommand({
                         QueueUrl: config.dlqUrl,
                         MaxNumberOfMessages: 10,
-                        WaitTimeSeconds: 0,
-                    }),
+                        WaitTimeSeconds: 0
+                    })
                 );
 
                 const messages = result.Messages || [];
@@ -396,8 +376,8 @@ export class DlqConsumerService implements OnModuleInit {
                         await this.client.send(
                             new DeleteMessageCommand({
                                 QueueUrl: config.dlqUrl,
-                                ReceiptHandle: msg.ReceiptHandle,
-                            }),
+                                ReceiptHandle: msg.ReceiptHandle
+                            })
                         );
                         purged++;
                     }
@@ -406,7 +386,7 @@ export class DlqConsumerService implements OnModuleInit {
 
             this.logger.warn(`DLQ purge completed for ${queueName}`, {
                 queueName,
-                purged,
+                purged
             });
 
             return purged;
@@ -424,7 +404,7 @@ export class DlqConsumerService implements OnModuleInit {
         return Array.from(this.queueMap.entries()).map(([name, config]) => ({
             name,
             queueUrl: config.queueUrl,
-            dlqUrl: config.dlqUrl,
+            dlqUrl: config.dlqUrl
         }));
     }
 

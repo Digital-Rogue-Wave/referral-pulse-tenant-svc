@@ -10,7 +10,7 @@ export class UsageCheckGuard implements CanActivate {
     constructor(
         private readonly reflector: Reflector,
         private readonly planLimitService: PlanLimitService,
-        private readonly tenantContext: TenantContextService,
+        private readonly tenantContext: TenantContextService
     ) {}
 
     async canActivate(context: ExecutionContext): Promise<boolean> {
@@ -19,10 +19,7 @@ export class UsageCheckGuard implements CanActivate {
             return true;
         }
 
-        const options = this.reflector.getAllAndOverride<UsageCheckOptions | undefined>(USAGE_CHECK_KEY, [
-            context.getHandler(),
-            context.getClass(),
-        ]);
+        const options = this.reflector.getAllAndOverride<UsageCheckOptions | undefined>(USAGE_CHECK_KEY, [context.getHandler(), context.getClass()]);
 
         if (!options) {
             return true;
@@ -32,7 +29,7 @@ export class UsageCheckGuard implements CanActivate {
 
         try {
             await this.planLimitService.enforceLimit(tenantId, options.metric, amount, {
-                gracePercentage: options.gracePercentage,
+                gracePercentage: options.gracePercentage
             });
         } catch (error) {
             if (error instanceof LimitExceededException) {

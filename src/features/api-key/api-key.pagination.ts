@@ -9,8 +9,8 @@ export const API_KEY_PAGINATE_CONFIG: PaginateConfig<ApiKeyProps> = {
     defaultSortBy: [['createdAt', 'DESC']],
     filterableColumns: {
         status: [FilterOperator.EQ, FilterOperator.IN],
-        name: [FilterOperator.EQ, FilterOperator.CONTAINS],
+        name: [FilterOperator.EQ, FilterOperator.CONTAINS]
     },
     defaultLimit: 10,
-    maxLimit: 100,
+    maxLimit: 100
 };

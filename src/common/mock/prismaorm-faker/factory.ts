@@ -1,4 +1,4 @@
-import { FakerHelpers } from "./faker-helpers";
+import { FakerHelpers } from './faker-helpers';
 
 /**
  * Factory for generating fake Prisma entities
@@ -19,15 +19,15 @@ import { FakerHelpers } from "./faker-helpers";
  * ```
  */
 export interface Factory<T> {
-  /**
-   * Build a single entity with optional overrides
-   */
-  build(overrides?: Partial<T>): T;
+    /**
+     * Build a single entity with optional overrides
+     */
+    build(overrides?: Partial<T>): T;
 
-  /**
-   * Build multiple entities
-   */
-  buildList(count: number, overrides?: Partial<T>): T[];
+    /**
+     * Build multiple entities
+     */
+    buildList(count: number, overrides?: Partial<T>): T[];
 }
 
 /**
@@ -37,30 +37,29 @@ export interface Factory<T> {
  * @returns Factory instance
  */
 export function createFactory<T extends Record<string, any>>(defaults: {
-  [K in keyof T]: T[K] | (() => T[K]);
+    [K in keyof T]: T[K] | (() => T[K]);
 }): Factory<T> {
-  return {
-    build(overrides?: Partial<T>): T {
-      const entity = {} as T;
+    return {
+        build(overrides?: Partial<T>): T {
+            const entity = {} as T;
 
-      // Generate default values
-      for (const [key, value] of Object.entries(defaults)) {
-        entity[key as keyof T] =
-          typeof value === "function" ? (value as () => any)() : value;
-      }
+            // Generate default values
+            for (const [key, value] of Object.entries(defaults)) {
+                entity[key as keyof T] = typeof value === 'function' ? (value as () => any)() : value;
+            }
 
-      // Apply overrides
-      if (overrides) {
-        Object.assign(entity, overrides);
-      }
+            // Apply overrides
+            if (overrides) {
+                Object.assign(entity, overrides);
+            }
 
-      return entity;
-    },
+            return entity;
+        },
 
-    buildList(count: number, overrides?: Partial<T>): T[] {
-      return Array.from({ length: count }, () => this.build(overrides));
-    },
-  };
+        buildList(count: number, overrides?: Partial<T>): T[] {
+            return Array.from({ length: count }, () => this.build(overrides));
+        }
+    };
 }
 
 /**
@@ -78,15 +77,12 @@ export function createFactory<T extends Record<string, any>>(defaults: {
  * });
  * ```
  */
-export function autoFactory<T extends Record<string, any>>(
-  schema: Record<keyof T, string>,
-): Factory<T> {
-  const defaults = {} as { [K in keyof T]: () => T[K] };
+export function autoFactory<T extends Record<string, any>>(schema: Record<keyof T, string>): Factory<T> {
+    const defaults = {} as { [K in keyof T]: () => T[K] };
 
-  for (const [fieldName, fieldType] of Object.entries(schema)) {
-    defaults[fieldName as keyof T] = () =>
-      FakerHelpers.generateValue(fieldName, fieldType) as T[keyof T];
-  }
+    for (const [fieldName, fieldType] of Object.entries(schema)) {
+        defaults[fieldName as keyof T] = () => FakerHelpers.generateValue(fieldName, fieldType) as T[keyof T];
+    }
 
-  return createFactory(defaults);
+    return createFactory(defaults);
 }

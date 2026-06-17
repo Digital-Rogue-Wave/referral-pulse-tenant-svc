@@ -29,7 +29,7 @@ const schema = z.object({
     lokiHost: z.string().optional(),
     lokiBasicAuth: z.string().optional(),
     lokiLabels: z.string().optional(),
-    lokiBatchInterval: z.coerce.number().int().positive().default(5000),
+    lokiBatchInterval: z.coerce.number().int().positive().default(5000)
 });
 
 export type TracingConfig = z.infer<typeof schema>;
@@ -58,7 +58,7 @@ export default registerAs('tracing', (): TracingConfig => {
         lokiHost: process.env.LOKI_HOST,
         lokiBasicAuth: process.env.LOKI_BASIC_AUTH,
         lokiLabels: process.env.LOKI_LABELS,
-        lokiBatchInterval: process.env.LOKI_BATCH_INTERVAL,
+        lokiBatchInterval: process.env.LOKI_BATCH_INTERVAL
     });
 
     if (!result.success) {

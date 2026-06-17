@@ -39,7 +39,7 @@ export const ProvisioningStatus = {
     PENDING: 'PENDING',
     IN_PROGRESS: 'IN_PROGRESS',
     ACTIVE: 'ACTIVE',
-    FAILED: 'FAILED',
+    FAILED: 'FAILED'
 } as const;
 
 export type ProvisioningStatusType = (typeof ProvisioningStatus)[keyof typeof ProvisioningStatus];
@@ -60,7 +60,7 @@ export class SubdomainReservedEvent extends BaseDomainEvent {
             expiresAt: Date;
             reservedAt: Date;
         },
-        public readonly userId?: string,
+        public readonly userId?: string
     ) {
         super();
     }
@@ -77,7 +77,7 @@ export class SubdomainReleasedEvent extends BaseDomainEvent {
             tenantId: string;
             releasedAt: Date;
         },
-        public readonly userId?: string,
+        public readonly userId?: string
     ) {
         super();
     }
@@ -85,7 +85,7 @@ export class SubdomainReleasedEvent extends BaseDomainEvent {
 
 export const DnsEvents = {
     RESERVED: 'dns.reserved',
-    RELEASED: 'dns.released',
+    RELEASED: 'dns.released'
 } as const;
 
 // ============================================================

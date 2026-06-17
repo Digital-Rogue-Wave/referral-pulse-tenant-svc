@@ -15,7 +15,7 @@ import * as jwt from 'jsonwebtoken';
 const { privateKey, publicKey } = crypto.generateKeyPairSync('rsa', {
     modulusLength: 2048,
     publicKeyEncoding: { type: 'spki', format: 'pem' },
-    privateKeyEncoding: { type: 'pkcs8', format: 'pem' },
+    privateKeyEncoding: { type: 'pkcs8', format: 'pem' }
 });
 
 const TEST_KID = 'bdd-test-key-1';
@@ -38,9 +38,9 @@ export function buildJwks(): { keys: object[] } {
                 ...jwk,
                 alg: 'RS256',
                 use: 'sig',
-                kid: TEST_KID,
-            },
-        ],
+                kid: TEST_KID
+            }
+        ]
     };
 }
 
@@ -62,14 +62,14 @@ function sign(claims: TokenClaims & Record<string, unknown>): string {
             iss: TEST_ISSUER,
             aud: TEST_AUDIENCE,
             iat: Math.floor(Date.now() / 1000),
-            ...rest,
+            ...rest
         },
         privateKey,
         {
             algorithm: 'RS256',
             keyid: TEST_KID,
-            ...(exp !== undefined ? { expiresIn: exp - Math.floor(Date.now() / 1000) } : { expiresIn: 3600 }),
-        },
+            ...(exp !== undefined ? { expiresIn: exp - Math.floor(Date.now() / 1000) } : { expiresIn: 3600 })
+        }
     );
 }
 
@@ -83,8 +83,8 @@ export function makeActiveUserToken(tenantId: string, userId = 'user-bdd-001'): 
         ext: {
             tenant_id: tenantId,
             user_id: userId,
-            roles: ['member'],
-        },
+            roles: ['member']
+        }
     });
 }
 
@@ -99,14 +99,14 @@ export function makeExpiredToken(tenantId: string): string {
             iss: TEST_ISSUER,
             aud: TEST_AUDIENCE,
             iat: now - 7200,
-            exp: now - 3600,  // expired 1 hour ago
+            exp: now - 3600, // expired 1 hour ago
             ext: {
                 tenant_id: tenantId,
-                user_id: 'user-expired-001',
-            },
+                user_id: 'user-expired-001'
+            }
         },
         privateKey,
-        { algorithm: 'RS256', keyid: TEST_KID },
+        { algorithm: 'RS256', keyid: TEST_KID }
     );
 }
 
@@ -119,6 +119,6 @@ export function makeServiceToken(tenantId?: string): string {
         sub: 'svc-bdd-client',
         client_id: 'svc-bdd-client',
         grant_type: 'client_credentials',
-        ...(tenantId ? { ext: { tenant_id: tenantId } } : {}),
+        ...(tenantId ? { ext: { tenant_id: tenantId } } : {})
     });
 }

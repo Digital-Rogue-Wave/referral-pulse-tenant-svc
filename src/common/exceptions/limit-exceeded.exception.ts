@@ -18,7 +18,7 @@ export class LimitExceededException extends BaseException {
             'PLAN_LIMIT_EXCEEDED',
             'Plan limit exceeded for this resource.',
             HttpStatus.PAYMENT_REQUIRED,
-            details as unknown as Record<string, unknown>,
+            details as unknown as Record<string, unknown>
         );
     }
 }

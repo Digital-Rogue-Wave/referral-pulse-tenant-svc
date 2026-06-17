@@ -30,7 +30,7 @@ import type { AllConfigType } from '@config/config.type';
 export class S3KeyBuilder {
     constructor(
         private readonly configService: ConfigService<AllConfigType>,
-        private readonly tenantContext: TenantContextService,
+        private readonly tenantContext: TenantContextService
     ) {}
 
     /**

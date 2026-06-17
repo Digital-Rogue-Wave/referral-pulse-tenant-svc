@@ -19,7 +19,7 @@ import { UpdateApiKeyStatusDto } from '@domains/api-key/dto/update-api-key-statu
     name: 'x-tenant-id',
     required: true,
     description: 'Tenant ID header',
-    schema: { type: 'string' },
+    schema: { type: 'string' }
 })
 @Controller({ path: 'api-keys', version: '1' })
 @ApiBearerAuth()
@@ -29,16 +29,13 @@ export class ApiKeyController {
     @ApiBody({ type: CreateApiKeyDto })
     @ApiCreatedResponse({
         description: 'API key created successfully',
-        type: ApiKeyWithRawKeyResponse,
+        type: ApiKeyWithRawKeyResponse
     })
     @RequirePermission({ namespace: KetoNamespace.TENANT, object: KetoResource.API_KEY, relation: KetoRelation.CREATE })
     @HttpCode(HttpStatus.CREATED)
     @Post()
     @Idempotent({ scope: IdempotencyScope.Tenant, ttl: 3600 })
-    async create(
-        @Body() dto: CreateApiKeyDto,
-        @CurrentUser() user: IAuthenticatedUser,
-    ): Promise<ApiKeyWithRawKeyResponse> {
+    async create(@Body() dto: CreateApiKeyDto, @CurrentUser() user: IAuthenticatedUser): Promise<ApiKeyWithRawKeyResponse> {
         return this.apiKeyService.create(user.userId, dto);
     }
 
@@ -46,7 +43,7 @@ export class ApiKeyController {
     @ApiOkResponse({
         description: 'List of API keys',
         type: ApiKeyResponse,
-        isArray: true,
+        isArray: true
     })
     @RequirePermission({ namespace: KetoNamespace.TENANT, object: KetoResource.API_KEY, relation: KetoRelation.READ })
     @HttpCode(HttpStatus.OK)
@@ -57,7 +54,7 @@ export class ApiKeyController {
 
     @ApiOkResponse({
         description: 'API key details',
-        type: ApiKeyResponse,
+        type: ApiKeyResponse
     })
     @RequirePermission({ namespace: KetoNamespace.TENANT, relation: KetoRelation.READ })
     @HttpCode(HttpStatus.OK)
@@ -69,24 +66,20 @@ export class ApiKeyController {
     @ApiBody({ type: UpdateApiKeyDto })
     @ApiOkResponse({
         description: 'API key updated successfully',
-        type: ApiKeyResponse,
+        type: ApiKeyResponse
     })
     @RequirePermission({ namespace: KetoNamespace.TENANT, object: KetoResource.API_KEY, relation: KetoRelation.UPDATE })
     @HttpCode(HttpStatus.OK)
     @Put(':id')
     @Idempotent({ scope: IdempotencyScope.Tenant, ttl: 1800 })
-    async update(
-        @Param('id') id: string,
-        @Body() dto: UpdateApiKeyDto,
-        @CurrentUser() user: IAuthenticatedUser,
-    ): Promise<ApiKeyResponse> {
+    async update(@Param('id') id: string, @Body() dto: UpdateApiKeyDto, @CurrentUser() user: IAuthenticatedUser): Promise<ApiKeyResponse> {
         return this.apiKeyService.update(id, user.userId, dto);
     }
 
     @ApiBody({ type: UpdateApiKeyStatusDto })
     @ApiOkResponse({
         description: 'API key status updated successfully',
-        type: ApiKeyResponse,
+        type: ApiKeyResponse
     })
     @RequirePermission({ namespace: KetoNamespace.TENANT, object: KetoResource.API_KEY, relation: KetoRelation.UPDATE })
     @HttpCode(HttpStatus.OK)
@@ -95,7 +88,7 @@ export class ApiKeyController {
     async updateStatus(
         @Param('id') id: string,
         @Body() dto: UpdateApiKeyStatusDto,
-        @CurrentUser() user: IAuthenticatedUser,
+        @CurrentUser() user: IAuthenticatedUser
     ): Promise<ApiKeyResponse> {
         return this.apiKeyService.updateStatus(id, user.userId, dto.status);
     }

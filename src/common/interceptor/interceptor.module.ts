@@ -35,6 +35,6 @@ import { IdempotencyInterceptor } from '@app/common/interceptor/idempotency.inte
  */
 @Module({
     providers: [AlsAuthInterceptor, HttpOutboundInterceptor, IdempotencyInterceptor],
-    exports: [AlsAuthInterceptor, HttpOutboundInterceptor, IdempotencyInterceptor],
+    exports: [AlsAuthInterceptor, HttpOutboundInterceptor, IdempotencyInterceptor]
 })
 export class InterceptorModule {}

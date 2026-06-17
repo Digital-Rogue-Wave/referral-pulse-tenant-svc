@@ -43,7 +43,7 @@ import { BillingConsumer } from './billing.consumer';
         TestBillingController,
         UsageInternalController,
         InternalTenantStatusController,
-        StripeRedirectController,
+        StripeRedirectController
     ],
     providers: [
         BillingService,
@@ -61,7 +61,7 @@ import { BillingConsumer } from './billing.consumer';
         BillingConsumer,
         MonthlyUsageResetService,
         PaymentStatusEscalationService,
-        TrialLifecycleService,
+        TrialLifecycleService
     ],
     exports: [
         BillingService,
@@ -75,7 +75,7 @@ import { BillingConsumer } from './billing.consumer';
         BillingConsumer,
         MonthlyUsageResetService,
         PaymentStatusEscalationService,
-        TrialLifecycleService,
-    ],
+        TrialLifecycleService
+    ]
 })
 export class BillingModule {}

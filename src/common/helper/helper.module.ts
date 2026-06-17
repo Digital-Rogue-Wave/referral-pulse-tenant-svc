@@ -7,6 +7,6 @@ import { JsonService } from './json.service';
 @Global()
 @Module({
     providers: [DateService, JsonService, EnvironmentService],
-    exports: [DateService, JsonService, EnvironmentService],
+    exports: [DateService, JsonService, EnvironmentService]
 })
 export class HelperModule {}

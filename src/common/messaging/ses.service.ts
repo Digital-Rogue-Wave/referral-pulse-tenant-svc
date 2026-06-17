@@ -11,15 +11,15 @@ export class SesService {
 
     constructor(
         private readonly configService: ConfigService,
-        private readonly logger: AppLoggerService,
+        private readonly logger: AppLoggerService
     ) {
         this.logger.setContext(SesService.name);
         const region = this.configService.getOrThrow('aws.region', { infer: true });
         const accessKeyId = this.configService.get('aws.accessKeyId', {
-            infer: true,
+            infer: true
         });
         const secretAccessKey = this.configService.get('aws.secretAccessKey', {
-            infer: true,
+            infer: true
         });
 
         this.sesClient = new SESClient({
@@ -28,9 +28,9 @@ export class SesService {
                 accessKeyId && secretAccessKey
                     ? {
                           accessKeyId,
-                          secretAccessKey,
+                          secretAccessKey
                       }
-                    : undefined,
+                    : undefined
         });
     }
 
@@ -40,18 +40,18 @@ export class SesService {
         const command = new SendEmailCommand({
             Source: fromEmail as string,
             Destination: {
-                ToAddresses: [to],
+                ToAddresses: [to]
             },
             Message: {
                 Subject: {
-                    Data: subject,
+                    Data: subject
                 },
                 Body: {
                     Html: {
-                        Data: body,
-                    },
-                },
-            },
+                        Data: body
+                    }
+                }
+            }
         });
 
         try {

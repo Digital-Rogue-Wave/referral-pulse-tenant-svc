@@ -17,7 +17,7 @@ export class TotoCreatedEvent extends BaseDomainEvent {
         public readonly tenantId: string,
         public readonly name: string,
         public readonly status: string,
-        public readonly userId?: string,
+        public readonly userId?: string
     ) {
         super();
     }
@@ -39,7 +39,7 @@ export class TotoUpdatedEvent extends BaseDomainEvent {
         public readonly aggregateId: string,
         public readonly tenantId: string,
         public readonly changes: Record<string, { from: unknown; to: unknown }>,
-        public readonly userId?: string,
+        public readonly userId?: string
     ) {
         super();
     }
@@ -60,7 +60,7 @@ export class TotoDeletedEvent extends BaseDomainEvent {
     constructor(
         public readonly aggregateId: string,
         public readonly tenantId: string,
-        public readonly userId?: string,
+        public readonly userId?: string
     ) {
         super();
     }
@@ -84,7 +84,7 @@ export class TotoFileUploadedEvent extends BaseDomainEvent {
         public readonly fileName: string,
         public readonly fileUrl: string,
         public readonly s3Key: string,
-        public readonly userId?: string,
+        public readonly userId?: string
     ) {
         super();
     }
@@ -97,5 +97,5 @@ export const TotoEvents = {
     CREATED: 'toto.created',
     UPDATED: 'toto.updated',
     DELETED: 'toto.deleted',
-    UPLOADED: 'toto.uploaded',
+    UPLOADED: 'toto.uploaded'
 } as const;

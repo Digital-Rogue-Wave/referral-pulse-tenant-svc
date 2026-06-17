@@ -17,14 +17,14 @@ import type { AllConfigType } from '@config/config.type';
             inject: [ConfigService, JsonService],
             useFactory: (configService: ConfigService<AllConfigType>, jsonService: JsonService) => {
                 const nodeEnv = configService.getOrThrow('app.nodeEnv', {
-                    infer: true,
+                    infer: true
                 });
                 const serviceName = configService.getOrThrow('app.name', {
-                    infer: true,
+                    infer: true
                 });
                 const logLevel = configService.get('tracing.logLevel', { infer: true }) || 'info';
                 const lokiEnabled = configService.get('tracing.lokiEnabled', {
-                    infer: true,
+                    infer: true
                 });
                 const lokiHost = configService.get('tracing.lokiHost', { infer: true });
 
@@ -51,8 +51,8 @@ import type { AllConfigType } from '@config/config.type';
                               colorize: true,
                               translateTime: 'SYS:standard',
                               ignore: 'pid,hostname',
-                              singleLine: false,
-                          },
+                              singleLine: false
+                          }
                       }
                     : shouldUseLoki
                       ? {
@@ -60,17 +60,17 @@ import type { AllConfigType } from '@config/config.type';
                             options: {
                                 host: lokiHost,
                                 basicAuth: configService.get('tracing.lokiBasicAuth', {
-                                    infer: true,
+                                    infer: true
                                 }),
                                 labels: parseLokiLabels(configService.get('tracing.lokiLabels', { infer: true })),
                                 batching: true,
                                 interval:
                                     configService.get('tracing.lokiBatchInterval', {
-                                        infer: true,
+                                        infer: true
                                     }) || 5000,
                                 timeout: 10000,
-                                replaceTimestamp: false,
-                            },
+                                replaceTimestamp: false
+                            }
                         }
                       : undefined;
 
@@ -78,7 +78,7 @@ import type { AllConfigType } from '@config/config.type';
                     pinoHttp: {
                         level: logLevel,
                         autoLogging: {
-                            ignore: (req) => ['/health', '/metrics'].some((p) => req.url?.startsWith(p)),
+                            ignore: (req) => ['/health', '/metrics'].some((p) => req.url?.startsWith(p))
                         },
                         customSuccessMessage: (req, res) => {
                             return `✅ ${req.method} ${req.url} ${res.statusCode}`;
@@ -86,13 +86,13 @@ import type { AllConfigType } from '@config/config.type';
                         customErrorMessage: (req, res, err) => {
                             return `❌ ${req.method} ${req.url} ${res.statusCode} - ${err.message}`;
                         },
-                        ...(transport ? { transport } : {}),
-                    },
+                        ...(transport ? { transport } : {})
+                    }
                 };
-            },
-        }),
+            }
+        })
     ],
     providers: [AppLoggerService],
-    exports: [AppLoggerService, PinoLoggerModule],
+    exports: [AppLoggerService, PinoLoggerModule]
 })
 export class LoggingModule {}

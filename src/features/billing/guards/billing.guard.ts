@@ -13,7 +13,7 @@ export class BillingGuard implements CanActivate {
         private readonly tenantService: TenantService,
         private readonly planLimitService: PlanLimitService,
         private readonly tenantContext: TenantContextService,
-        private readonly reflector: Reflector,
+        private readonly reflector: Reflector
     ) {}
 
     async canActivate(context: ExecutionContext): Promise<boolean> {
@@ -31,7 +31,7 @@ export class BillingGuard implements CanActivate {
 
         const options = this.reflector.getAllAndOverride<BillingGuardOptions | undefined>(BILLING_GUARD_KEY, [
             context.getHandler(),
-            context.getClass(),
+            context.getClass()
         ]);
 
         if (!options || !options.metrics || options.metrics.length === 0) {
@@ -42,7 +42,7 @@ export class BillingGuard implements CanActivate {
 
         for (const metric of options.metrics) {
             await this.planLimitService.enforceLimit(tenantId, metric, amount, {
-                gracePercentage: options.gracePercentage,
+                gracePercentage: options.gracePercentage
             });
         }
 

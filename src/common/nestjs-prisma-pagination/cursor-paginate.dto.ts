@@ -14,9 +14,9 @@ export class CursorPaginatedDto<T, V> {
         this.meta = data.meta;
         this.edges = data.edges.map((edge) => ({
             node: plainToInstance(dto, instanceToPlain(edge.node), {
-                excludeExtraneousValues: true,
+                excludeExtraneousValues: true
             }),
-            cursor: edge.cursor,
+            cursor: edge.cursor
         }));
     }
 }
