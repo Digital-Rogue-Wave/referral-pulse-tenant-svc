@@ -1,489 +1,340 @@
-# CLAUDE.md - [SERVICE_NAME] Service
+# CLAUDE.md — NestJS Microservices Project Configuration
 
-> Replace `[SERVICE_NAME]` with actual service name (campaign, reward, analytics, etc.)
+## Identity
 
-## Project Overview
+You are an expert senior TypeScript/NestJS architect working on a production microservices platform.
+The tech lead reviewing your work has 17+ years of experience. Write code for a senior audience.
 
-NestJS microservice for a multi-tenant referral marketing SaaS platform.
+## Core Principles (Non-Negotiable)
 
-**Stack:** NestJS 10+ | TypeORM | PostgreSQL (RDS) | Redis (ElastiCache) | SQS/SNS (FIFO) | S3 | OpenTelemetry → Grafana Cloud
+### 1. Never Guess — Ask or Say "I Don't Know"
+- **NEVER fabricate** API signatures, config options, method names, or library behavior. If unsure, say so.
+- **NEVER suppose** what a method does, what a config accepts, or how a library works. Verify first.
+- **ALWAYS research** the latest version of library/framework documentation before writing code that uses it:
+  - Use Context7 MCP for NestJS, Prisma, Ory, BullMQ, Zod, opossum, Temporal, and any dependency.
+  - If Context7 has no result, say so — do not fall back to training data guesses.
+  - Training data is stale. The docs are the source of truth. Always.
+- State assumptions explicitly. If uncertain, ASK — do not guess.
+- If multiple interpretations exist, present them. Do not pick silently.
+- If a simpler approach exists, say so. Push back when warranted.
+- If something is unclear, stop. Name what's confusing.
+- If information is missing (a DTO shape, a queue name, an env var, a service contract), ask for it — do not invent it.
+- If you don't know the answer, say "I don't know" — that's always better than a wrong guess.
 
----
+### 2. Simplicity First (KISS + YAGNI)
+- Minimum code that solves the problem. Nothing speculative.
+- No abstractions for single-use code.
+- No "flexibility" or "configurability" that wasn't requested.
+- No premature optimization. No error handling for impossible scenarios.
+- If 200 lines could be 50, rewrite it.
+- Ask: "Would a senior engineer say this is overcomplicated?" If yes, simplify.
 
-## Package Manager: pnpm ONLY
+### 3. Surgical Changes
+- Touch only what you must. Clean up only your own mess.
+- Don't "improve" adjacent code, comments, or formatting uninvited.
+- Don't refactor things that aren't broken.
+- Match existing style, even if you'd do it differently.
+- If you notice unrelated issues, mention them — don't fix them silently.
+- Every changed line should trace directly to the request.
 
-```bash
-# ⚠️ NEVER use npm or yarn - enforced via preinstall hook
-pnpm install              # Install dependencies
-pnpm add <package>        # Add dependency
-pnpm add -D <package>     # Add dev dependency
-pnpm remove <package>     # Remove dependency
-pnpm update --latest      # Update all packages
-pnpm dedupe               # Remove duplicate packages
-```
+### 4. Plan Mode is Default
+- **ANY task with 3+ steps starts in plan mode.** No exceptions.
+- If something goes sideways mid-implementation, STOP — switch back to plan mode and re-plan.
+- Write detailed specs upfront. Ambiguity → wrong direction → wasted tokens.
+- State the plan with numbered steps, files involved, and verification for each step.
+- For complex plans, ask a second review: "As a staff engineer, would you approve this plan?"
 
-**Enforced in package.json:**
-```json
-{
-  "packageManager": "pnpm@8.15.0",
-  "engines": { "node": ">=20.0.0", "pnpm": ">=8.0.0" },
-  "scripts": { "preinstall": "npx only-allow pnpm" }
-}
-```
+### 5. Verify Before Done
+- **Never mark a task complete without proving it works.**
+- Run the tests. Check the logs. Demonstrate the behavior.
+- Ask: "Would a staff engineer approve this PR?"
+- Verification 2-3x the quality of the final output. Never skip it.
 
----
+### 6. Self-Improvement Loop (lessons.md)
+- After ANY correction from the developer, update `tasks/lessons.md` with a rule that prevents the same mistake.
+- Write rules in imperative form: "Always use ulid(), never uuid()" — not explanations.
+- Review `tasks/lessons.md` at the start of every session.
+- The file compounds over time — every line exists because it solved a real problem.
+- Ask: "Should I add this to lessons.md?" after fixing a non-obvious mistake.
 
-## Quick Commands
+## Tech Stack
 
-```bash
-# Development
-pnpm start:dev            # Dev with hot reload (SWC)
-pnpm start:debug          # Debug mode
-pnpm build                # Production build
-pnpm start:prod           # Run production build
+- **Runtime**: Node.js 22+ / TypeScript 5.x (strict mode always)
+- **Framework**: NestJS 11.x with Express adapter
+- **ORM**: Prisma 7.x (composition pattern, `@prisma/adapter-pg`) + PostgreSQL via AWS RDS
+- **Analytics DB**: ClickHouse (`@clickhouse/client`)
+- **Workflow Engine**: Temporal.io (referral workflows, reward approval, fraud review, optimization jobs)
+- **Background Jobs**: BullMQ with Redis (web/worker mode split via `APP_MODE`)
+- **Messaging**: AWS SQS FIFO / AWS SNS + EventEmitter2 for domain events
+- **Auth**: Ory Kratos (identity) + Ory Hydra (OAuth2) + Ory Keto (permissions)
+- **Resilience**: opossum circuit breaker, LRU cache, retry with backoff
+- **Observability**: OpenTelemetry (traces, metrics), Pino structured logging, Grafana Cloud
+- **Infrastructure**: AWS ALB → Traefik → NestJS (9 services), Kubernetes
+- **Testing**: Jest + Supertest for API integration tests
+- **Validation**: class-validator + class-transformer for DTOs, Zod for config validation
+- **Context**: AsyncLocalStorage (nestjs-cls) for tenant/correlation propagation
+- **IDs**: ULID (not UUID)
+- **Package Manager**: pnpm 10+ (monorepo with workspaces)
 
-# Code Quality
-pnpm lint                 # Fix lint issues
-pnpm lint:check           # Check only (CI)
-pnpm format               # Prettier format
+## Platform Architecture (9 Microservices)
 
-# Testing
-pnpm test                 # Unit tests
-pnpm test:watch           # Watch mode
-pnpm test:cov             # Coverage report
-pnpm test:e2e             # Integration tests
+Full architecture spec: `docs/referralai_system_architecture_v1.md` (read relevant sections on demand, never the whole file).
 
-# Database
-pnpm migration:generate -- -n MigrationName
-pnpm migration:run
-pnpm migration:revert
+| # | Service | DB | Owns |
+|---|---------|------|------|
+| 1 | `tenant-service` | tenant_db | Users, roles, API keys, Ory Kratos/Hydra/Keto |
+| 2 | `campaign-service` | campaign_db | Programs, campaigns, variants, pulses, playbooks |
+| 3 | `segmentation-service` | segmentation_db | Segments, eligibility rules, A/B allocation |
+| 4 | `ingestion-service` | Redis only | Stateless event gateway — validation, dedup, context derivation |
+| 5 | `referral-service` | referral_db | Referrals, links, profiles, attribution, Temporal workflows |
+| 6 | `reward-service` | reward_db | Rewards, payouts, caps, clawbacks |
+| 7 | `analytics-service` | analytics_db + ClickHouse | KPIs, funnels, A/B stats, revenue reporting |
+| 8 | `notification-service` | notification_db | Webhooks, email, delivery retry |
+| 9 | `ai-service` | ai_db | Fraud scoring (3-tier), LangChain agents, recommendations |
 
-# Maintenance
-pnpm clean                # Remove dist, node_modules, coverage
-pnpm clean:install        # Clean + fresh install
-```
+**Event bus**: SNS topics → FIFO SQS queues per consuming service. Each service has one inbound queue.
+**Each service has its own repo**, its own `.claude/` config, and its own Claude Code session.
 
----
+## Infrastructure Repository (Local Dev)
 
-## Path Aliases
+A separate `referralai-infra` repo contains `docker-compose.yml` with all dependencies for local development. **NestJS services run natively (not in Docker)** — they connect to these containers:
 
-Configured in `tsconfig.json` and `jest` config:
+| Container | Port | Purpose |
+|-----------|------|---------|
+| PostgreSQL 16 | 5432 | All RDS databases (separate DBs per service) |
+| Redis 7 | 6379 | Cache, dedup, BullMQ, rate limiting |
+| LocalStack | 4566 | SQS, SNS, S3 (local AWS emulation) |
+| Ory Hydra | 4444/4445 | OAuth2 public + admin APIs |
+| Ory Kratos | 4433/4434 | Identity public + admin APIs |
+| Ory Keto | 4466/4467 | Permission read + write APIs |
+| Temporal | 7233 | Workflow engine |
+| Temporal UI | 4040 | Workflow dashboard |
+| Adminer | 8080 | Database browser |
 
-```typescript
-import { Something } from '@app/common/something';     // src/*
-import { Campaign } from '@domains/campaign';          // src/domains/*
-import { RedisService } from '@common/redis';          // src/common/*
-import { AppConfig } from '@config/app.config';        // src/config/*
-```
+**Start infrastructure**: `docker compose up -d` (in the infra repo)
+**Run a service**: `pnpm start:dev` (in the service repo — connects to containers above)
+**Integration/e2e tests**: Run against the Docker infrastructure (real PostgreSQL, real Redis, real LocalStack)
 
-| Alias | Path |
-|-------|------|
-| `@app/*` | `src/*` |
-| `@domains/*` | `src/domains/*` |
-| `@common/*` | `src/common/*` |
-| `@config/*` | `src/config/*` |
-
----
-
-## Build: SWC Compiler
-
-Using SWC for ~20x faster builds than tsc:
-
-```json
-// nest-cli.json
-{
-  "compilerOptions": {
-    "builder": "swc",
-    "typeCheck": true
-  }
-}
-```
-
----
-
-## Workspace Structure (Monorepo)
-
-```yaml
-# pnpm-workspace.yaml
-packages:
-  - 'apps/**'      # Microservices
-  - 'packages/**'  # Shared libraries
-  - '!**/test/**'  # Exclude test dirs
-```
-
-```
-referral-platform/
-├── apps/
-│   ├── campaign-service/
-│   ├── reward-service/
-│   └── analytics-service/
-├── packages/
-│   ├── common/           # Shared utilities
-│   ├── messaging/        # SQS/SNS shared
-│   └── types/            # Shared TypeScript types
-├── pnpm-workspace.yaml
-├── pnpm-lock.yaml
-└── package.json          # Root package.json
-```
-
-**Workspace Commands:**
-```bash
-pnpm -F campaign-service start:dev    # Run specific app
-pnpm -F @referral/common build        # Build specific package
-pnpm -r build                         # Build all packages
-pnpm -r test                          # Test all packages
-```
-
----
-
-## Environment Configuration
-
-```bash
-# Loads .env.{NODE_ENV} automatically
-NODE_ENV=development pnpm start:dev   # → .env.development
-NODE_ENV=staging pnpm start:prod      # → .env.staging
-NODE_ENV=production pnpm start:prod   # → .env.production
-```
-
-**Files:**
-- `.env.development` - Local with LocalStack
-- `.env.test` - Test environment
-- `.env.staging` - AWS staging
-- `.env.production` - AWS production
-- `.env.example` - Template (not loaded)
-
-**AWS Credentials:**
-- **Local/Test:** Use access keys in `.env.development`
-- **Staging/Production:** Leave empty - uses IAM roles (IRSA/EC2)
-
----
-
-## Docker (pnpm)
-
-```dockerfile
-# Build stage
-FROM node:22-alpine AS build
-RUN corepack enable && corepack prepare pnpm@8.15.0 --activate
-WORKDIR /app
-
-# Install dependencies
-COPY pnpm-lock.yaml package.json ./
-RUN pnpm fetch --prod
-RUN pnpm install --offline --prod
-
-# Build
-COPY tsconfig.json tsconfig.build.json nest-cli.json ./
-COPY src ./src
-RUN pnpm build
-
-# Production stage
-FROM node:22-alpine
-RUN corepack enable && corepack prepare pnpm@8.15.0 --activate
-WORKDIR /app
-ENV NODE_ENV=production
-
-COPY --from=build /app/node_modules ./node_modules
-COPY --from=build /app/dist ./dist
-COPY --from=build /app/package.json ./
-
-EXPOSE 8080
-CMD ["node", "dist/main.js"]
-```
-
-**docker-compose.yaml (local dev):**
-```yaml
-services:
-  app:
-    build: .
-    environment:
-      - NODE_ENV=development
-    volumes:
-      - .:/app
-      - /app/node_modules
-    depends_on:
-      - postgres
-      - redis
-      - localstack
-
-  postgres:
-    image: postgres:16-alpine
-    environment:
-      POSTGRES_DB: referral
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: postgres
-    ports:
-      - "5432:5432"
-
-  redis:
-    image: redis:7-alpine
-    ports:
-      - "6379:6379"
-
-  localstack:
-    image: localstack/localstack:latest
-    environment:
-      - SERVICES=sqs,sns,s3
-      - DEFAULT_REGION=eu-central-1
-    ports:
-      - "4566:4566"
-```
-
----
-
-## Critical Rules
-
-### 1. NO `any` - Ever
-```typescript
-// ✅ Always explicit types
-async function process(dto: CreateDto): Promise<ResponseDto> { }
-// ❌ Forbidden
-async function process(dto: any): Promise<any> { }
-```
-
-### 2. ULID for All IDs
-```typescript
-import { ulid } from 'ulid';
-const id = ulid();  // ✅ Never uuid() or Math.random()
-```
-
-### 3. Every Operation is Tenant-Scoped
-```typescript
-// ✅ TenantAwareRepository auto-filters by tenantId
-const items = await this.repository.find({ where: { status: 'active' } });
-```
-
-### 4. Idempotency Required
-- HTTP mutations: `@Idempotent()` decorator
-- SQS handlers: `MessageProcessorService.process()`
-
-### 5. Events After Commit Only
-```typescript
-this.txEventEmitter.emitAfterCommit('entity.created', event);  // ✅
-```
-
----
-
-## File Structure
+## Project Structure (Per Microservice)
 
 ```
 src/
-├── common/
-│   ├── events/            # BaseDomainEvent, TransactionEventEmitter
-│   ├── helper/            # DateService, JsonService, MapperUtil
-│   ├── http/              # HttpClientService, circuit breaker
-│   ├── idempotency/       # @Idempotent, IdempotencyService
-│   ├── logging/           # AppLoggerService (pino → Loki)
-│   ├── messaging/         # SQS/SNS, MessageProcessor, DLQ
-│   ├── monitoring/        # MetricsService, TracingService
-│   ├── redis/             # RedisService, RedisKeyBuilder
-│   ├── storage/           # S3Service, S3KeyBuilder
-│   ├── side-effects/      # Outbox pattern
-│   └── tenant/            # ClsTenantContext, TenantAwareRepository
-├── config/                # Configuration modules
-├── database/              # TypeORM config, migrations
-├── domains/
-│   └── [toto]/
-│       ├── dto/
-│       ├── responses/
-│       ├── mappers/
-│       └── events/
-├── toto/              # Feature module
-│    └──[toto]/
-│       ├── toto.entity.ts
-│       ├── toto.service.ts
-│       ├── toto.module.ts
-│       ├── toto.consumer.ts
-│       ├── toto.consumer.ts
-│       ├── toto.paginate-config.ts
-│       └── toto.controller.ts
-├── types/              # Custom types and interfaces
-│    └──[types]/
-│       ├── app.interface.ts # Centalize all interfaces in the app
-│       ├── app.type.ts      # Centralize all types in the app
-│       └── toto.controller.ts
-└── main.ts
+├── main.ts                    # Bootstrap with global pipes/filters/interceptors
+├── app.module.ts              # Root module — ConfigModule → CommonModule → CoreModule → FeaturesModule
+├── config/                    # Fail-fast configuration (registerAs + Zod validation)
+├── common/                    # Cross-cutting: exceptions, filters, interceptors, middleware, pipes, context
+│   ├── exceptions/            # BaseException hierarchy (ValidationException, NotFoundException, etc.)
+│   ├── interceptors/          # AlsAuthInterceptor, LoggingInterceptor, TransformInterceptor
+│   ├── guards/                # JwtAuthGuard, RolesGuard
+│   ├── events/listeners/      # Event listeners → SideEffectService for async external calls
+│   ├── messaging/             # MessageEnvelopeService, SqsProducerService, SnsPublisherService
+│   ├── side-effects/          # SideEffectService (outbox pattern + direct SQS/SNS)
+│   ├── bulljobs/              # BullJobsService, BaseWorkerService, BullJobsConnectionFactory
+│   ├── tenant-aware/          # TenantContextService, TenantAwareService (multi-tenancy)
+│   ├── redis/                 # RedisService, RedisKeyBuilder
+│   └── logging/               # AppLoggerService (Pino-based structured logging)
+├── database/                  # DatabaseService (Prisma composition), data-source
+├── domains/                   # All DTOs, Responses, and mappers for HTTP and messaging
+├── health/                    # Health module: /health/live (ALB), /health/ready, /health
+├── types/                     # All custom types, interfaces, error codes, queue/job constants
+├── features/                  # Business feature modules
+│   └── {entity}/              # module, controller, service, repository, processors/
+└── deployment/                # Helm charts (variablised for staging/production)
+```
+
+**Deployment**: via GitHub Actions (CI/CD). Not manual.
+**When adding a new env variable**: always update `deployment/` Helm values files to include it. Review the Helm templates to ensure the variable is injected into the container spec.
+
+## Coding Standards
+
+Detailed patterns: `nestjs-api` skill (21 reference files) + `.claude/rules/` (7 files).
+Architecture rules (SOLID, OOP, Object Calisthenics, messaging flow, BullMQ): `.claude/rules/architecture.md`.
+
+- **Validation**: class-validator + class-transformer for DTOs. Zod for config only.
+- **Modules**: aggregation — ConfigModule → CommonModule → CoreModule → FeaturesModule.
+- **Controllers**: thin. Validate input, delegate to service, return DTO.
+- **Services**: business logic only. No HTTP concerns, no direct Prisma.
+- **Database**: Prisma 7.x composition. TenantAwareService for multi-tenancy.
+- **Auth**: Ory Kratos + Hydra + Keto. Deny-by-default.
+- **Errors**: BaseException → GlobalExceptionsFilter → RFC 9457 ProblemDetail.
+- **Observability**: Pino + OpenTelemetry. Correlation IDs via AsyncLocalStorage.
+- **IDs**: `ulid()` only. Never `uuid()`.
+- **Idempotency**: Business-domain keys (`order-${orderId}`), NEVER ULID/UUID. Pass explicitly via `IPublishOptions`. Three layers: SQS FIFO (5 min), Redis (24h), DLQ replay (24h).
+- **JSON parsing**: Use `JsonService` (simdjson) for payloads > 1KB — Redis, SQS, large responses. 2-10x faster.
+- **Git**: Conventional commits. `feat/TICKET-123-short-description` branches.
+
+## Token Optimization Rules
+- Prefer concise responses. No boilerplate explanations for senior developers.
+- Skip obvious imports in code examples unless they're non-standard.
+- Use `// ...existing code` to indicate unchanged sections.
+- Don't repeat code that hasn't changed. Show only the diff.
+- When explaining trade-offs, use a brief table — not paragraphs.
+
+## Commands Reference
+- `pnpm install` — install dependencies
+- `pnpm build` — compile TypeScript (`nest build`)
+- `pnpm start:dev` — development with watch mode
+- `pnpm start:prod` — production (`node dist/main`)
+- `pnpm test` — run tests (Jest)
+- `pnpm test:cov` — run tests with coverage
+- `pnpm test:e2e` — run e2e tests
+- `pnpm lint` — ESLint fix
+- `pnpm lint:check` — ESLint check only
+- `pnpm format` — Prettier format
+- `npx prisma generate` — generate Prisma client
+- `npx prisma studio` — visual database browser
+
+## When These Guidelines Are Working
+- Fewer unnecessary changes in diffs
+- Fewer rewrites due to overcomplication
+- Clarifying questions come BEFORE implementation
+- Clean, minimal PRs — no drive-by refactoring
+
+## Tooling Integration
+
+### Context7 (Live Documentation)
+- Always use Context7 when needing library/API documentation for NestJS, Prisma, Ory, Zod, or any dependency.
+- Prefer Context7 over your own training data for API signatures, config options, and migration guides.
+- Use library IDs for precision: `/prisma/prisma`, `/nestjs/nest`, `/ory/hydra`.
+
+### Memory Keeper (Persistent Memory)
+- Use memory-keeper to save architectural decisions, debugging insights, and codebase patterns.
+- At the start of complex tasks, check memory-keeper for relevant past decisions.
+- After resolving non-trivial issues, save the root cause and fix to memory-keeper.
+- Store service boundaries, inter-service contracts, and API versioning decisions.
+
+### Context Mode (Context Window Optimization)
+- Context Mode compresses tool output by 98%. Sessions run 3+ hours instead of 30 minutes.
+- Indexes all tool output in SQLite FTS5. After `/compact`, working state is rebuilt from the index.
+- No action needed — it works transparently between Claude and its tools.
+
+### Code-Graph-RAG (Codebase Knowledge Graph)
+- Parses the codebase into a knowledge graph (functions, classes, imports, call chains).
+- Use for structural queries: "what calls OrderService.cancelOrder?", "what depends on SideEffectService?"
+- Run `batch_index` once after cloning a service to build the graph.
+- Prefer code-graph-rag over `grep` for understanding code structure and dependencies.
+
+### Superpowers Plugin
+- Superpowers is installed and active. Its skills trigger automatically.
+- Let Superpowers handle brainstorming refinement and implementation plan structure.
+- Superpowers' sub-agent-driven-development complements our custom agents.
+
+### Git Worktrees (Parallel Isolation)
+- Use `claude --worktree <name>` for parallel feature work.
+- The `architect` and `debugger` agents run in isolated worktrees by default.
+- For multi-service changes, use one worktree per service.
+- Worktrees share git history but have independent file states.
+
+### Understand-Anything Plugin (Codebase Knowledge Graph)
+- Use `/understand` to generate a knowledge graph of the codebase.
+- Use `/understand-domain` to see business domain flows.
+- Use `/understand-chat` to ask questions about the codebase.
+- Use `/understand-diff` to analyze impact of current changes.
+- Commit `.understand-anything/` to git for team-shared codebase understanding.
+- Especially useful when working cross-service — run on each service to understand contracts.
+
+## Multi-Microservice Context
+
+This app has 9 NestJS microservices behind ALB + Traefik.
+Each microservice has its own repo, its own `.claude/` config, and its own Claude Code session.
+
+### Shared Context Pattern
+Maintain a shared `docs/` folder at each service root for cross-cutting knowledge:
+
+```
+docs/
+├── referral_platform_product_spec.md              # Product specification / PRD (the big spec doc)
+├── referralai_db_tables_per_service.md            # Database schema of each service
+├── referralai_system_architecture_v1.md           # System-wide architecture (all 8 services, contracts, flows)
+├── referralai_event_model_v2.1.md                 # Inter-service API contracts (event schemas, endpoints)
+├── referralai_failure_observability_model_v2.md   # Handle plateform failures and observability
+├── referralai_api_contract_v1.2.md                # Exposed REST API
+├── referralai_responsibility_contract_v2.md       # SDK responsability
+└── DECISIONS.md                                   # Architectural Decision Records (ADRs)
+```
+
+### How to feed business context to Claude Code
+- **Large spec**: Put it in `docs/referral_platform_product_spec.md`. Tell Claude: `"Read docs/referral_platform_product_spec.md for the full product spec"`
+- **Data Model**: Put it in `docs/referralai_db_tables_per_service.md`. Tell Claude: `"Read docs/referralai_db_tables_per_service.md to understand data model"`
+- **Cross-service contracts**: Put event schemas and API contracts in `docs/API-referralai_event_model_v2.md`
+- **System architecture**: Put it in `docs/referralai_system_architecture_v1.md` to understand the whole plateform architecture
+- **System architecture**: Put it in `docs/referralai_responsibility_contract_v2.md` to understand the SDK relation with Backend
+- **Never paste** the entire spec into the chat — point Claude at the file. It reads what it needs.
+- For very large specs (500+ lines), tell Claude which section: `"Read the Order Cancellation section of docs/referral_platform_product_spec.md"`
+
+### Working across services
+- One WebStorm window + one Claude Code session per service you're actively changing.
+- Use `@architect` in the first service to design the cross-service contract.
+- Copy the contract to `docs/API-referralai_event_model_v2.md` in both services.
+- Implement each side independently, referencing the shared contract.
+- Use Understand-Anything's `/understand-domain` to verify domain flows match across services.
+
+### Session start for multi-service work
+```
+"I'm working on [service-name]. Related services: [list them].
+Read docs/referral_platform_product_spec.md section [X] for business context.
+Read docs/referralai_event_model_v2.1.md for the event schema between these services.
+Read docs/referralai_api_contract_v1.1.md for the exposed api.
+Read docs/referralai_system_architecture_v1.md for plateform architecture.
+Check memory-keeper for past decisions about this flow."
 ```
 
 ---
 
-## Key Services Reference
+# Service-Specific: Tenant & Billing Service (`referral-pulse-tenant-svc`)
 
-| Service | Import | Purpose |
-|---------|--------|---------|
-| `ClsTenantContextService` | `@common/tenant` | Tenant/user context |
-| `TenantAwareRepository<T>` | `@common/tenant` | Auto-scoped DB queries |
-| `RedisService` | `@common/redis` | Cache, locks |
-| `RedisKeyBuilder` | `@common/redis` | Tenant-scoped keys |
-| `SqsProducerService` | `@common/messaging` | Send SQS messages |
-| `SnsPublisherService` | `@common/messaging` | Publish SNS events |
-| `MessageProcessorService` | `@common/messaging` | SQS with idempotency |
-| `DlqConsumerService` | `@common/messaging` | DLQ monitoring/replay |
-| `SideEffectService` | `@common/side-effects` | Outbox pattern |
-| `TransactionEventEmitterService` | `@common/events` | Post-commit events |
-| `AppLoggerService` | `@common/logging` | Structured logging |
-| `DateService` | `@common/helper` | Date ops (moment-tz) |
-| `JsonService` | `@common/helper` | Fast JSON (simdjson) |
-| `BaseResponseMapper` | `@common/helper` | Entity→DTO mapping |
+> Everything above is the shared platform standard. This section is what makes THIS service specific.
+> The canonical specs live (read-only) in `docs/`. Editable service docs: `tenant-implementation.md`
+> (whole-service technical reference), `TENANT_GUIDE.md` (beginner walkthrough), `NOTE.md` (decisions +
+> cross-team contract items), and the billing-focused `BILLING.md` / `BILLING_TASKS.md` / `TECH_DOC.md` /
+> `billing_scenarios.md`. `docs/` and `docs/specs/` are READ-ONLY — never edit them.
 
----
+## Scope (authoritative)
 
-## Service Pattern
+Derived from `docs/referralai_responsibility_contract_v2.md`, `docs/referralai_db_tables_per_service.md`,
+and `docs/referralai_system_architecture_v1.md`. This service is the platform's **Identity / Tenant**
+service AND — per the project decision — also owns **client billing** (see deviation below).
 
-```typescript
-@Injectable()
-export class ExampleService {
-    constructor(
-        @InjectTenantAwareRepository(ExampleEntity)
-        private readonly repository: TenantAwareRepository<ExampleEntity>,
-        private readonly tenantContext: ClsTenantContextService,
-        private readonly redisService: RedisService,
-        private readonly redisKeyBuilder: RedisKeyBuilder,
-        private readonly sideEffectService: SideEffectService,
-        private readonly txEventEmitter: TransactionEventEmitterService,
-        private readonly logger: AppLoggerService,
-    ) {
-        this.logger.setContext(ExampleService.name);
-    }
+**Owns (identity/tenant):** tenants, users, roles, user_roles, api_keys. Ory Kratos (identity), Ory Hydra
+(OAuth2), Ory Keto (permissions) are the credential/permission authorities; `oauth2_clients` and
+`sessions` are delegated to Ory (no local tables — intentional, recorded in `NOTE.md`).
 
-    @Transactional()
-    async create(dto: CreateDto): Promise<ResponseDto> {
-        const tenantId = this.tenantContext.getTenantId();
+**Owns (billing — intentional extension):** plans, billings, billing_events, tenant_usages, plus Stripe
+subscription/checkout/upgrade/downgrade, Stripe webhooks, usage metering, and payment-status escalation.
 
-        const entity = this.repository.create({ ...dto, tenantId });
-        const saved = await this.repository.save(entity);
+**Not this service's concern (per spec):** participant identity, programs/campaigns, referrals, rewards,
+payouts, event ingestion. Don't add those here.
 
-        // Cache
-        const key = this.redisKeyBuilder.buildTenantKey('example', `entity:${saved.id}`);
-        await this.redisService.set(key, saved, { ttl: 3600 });
+### Intentional deviation — billing is kept
 
-        // CRITICAL → Outbox
-        await this.sideEffectService.createSqsSideEffect(
-            'example', saved.id, 'example.created', 'example-queue',
-            { id: saved.id, name: saved.name, tenantId },
-        );
+The canonical specs scope billing OUT of this service (payout → reward service; Stripe-webhook relay →
+referral-workflow service; client subscriptions = later phase). Per the project decision, billing is
+**retained** here as a sanctioned extension. Nothing billing is removed. This is the one place this
+service knowingly diverges from the responsibility contract — see `NOTE.md` for the full record.
 
-        // NON-CRITICAL → Event after commit
-        this.txEventEmitter.emitAfterCommit('example.created', new ExampleCreatedEvent(saved));
+## Events
 
-        return exampleMapper.toResponse(saved);
-    }
-}
-```
+- **Publishes (identity):** `user.registered`, `user.role_changed`, `api_key.created`, `api_key.revoked`
+  — snake_case payloads per `docs/referralai_event_model_v2.1.md` §4.12, fanned out to SNS via the
+  broadcast listener (`src/common/events/listeners/broadcast-event.listener.ts`).
+- **Publishes (billing, intentional):** `subscription.*`, `payment.failed/restored`,
+  `tenant.restricted/locked/restored`, `usage.*` to `BILLING_EVENTS_TOPIC`.
+- **Consumes:** per spec, the identity/tenant service consumes nothing. The billing usage consumer on
+  `ANALYTICS_SVC_FIFO` is part of the intentional billing extension. Inbound handlers accept both
+  snake_case and camelCase defensively (see `NOTE.md`).
+- `user.logged_in` happens at Ory/gateway and is NOT emitted by this service.
 
----
+## Stack notes specific to this service
 
-## Consumer Pattern
+- **ORM is Prisma** (schemas in `src/prisma/schema/*.prisma`, one file per aggregate). Migrations under
+  `src/prisma/migrations/`. There is no TypeORM here.
+- **IDs:** `ulid()`. Prisma string ids in older models use `cuid()` — match the surrounding model when
+  editing existing schemas; use `ulid()` for new application-generated ids.
+- **Tests:** Jest unit (`pnpm test`) + Cucumber BDD (`pnpm test:bdd`, `:auth`, `:billing`, `:guards`),
+  config in `cucumber.cjs`, docs in `bdd-features.md`. BDD uses real JWT/guards with mocked JWKS/Keto/Stripe.
 
-```typescript
-@Injectable()
-export class ExampleConsumer {
-    constructor(
-        private readonly messageProcessor: MessageProcessorService,
-        private readonly logger: AppLoggerService,
-    ) {
-        this.logger.setContext(ExampleConsumer.name);
-    }
+## Service-specific commands
 
-    @SqsMessageHandler('example-queue', false)
-    async handle(message: Message): Promise<void> {
-        await this.messageProcessor.process<Payload>(
-            message,
-            async (envelope) => {
-                // Tenant context + idempotency handled automatically
-            },
-            { queueName: 'example-queue' },
-        );
-    }
-}
-```
-
----
-
-## Mapper Pattern
-
-```typescript
-export class ExampleMapper extends BaseResponseMapper<ExampleEntity, ExampleResponse> {
-    constructor() { super(ExampleResponse); }
-}
-export const exampleMapper = new ExampleMapper();
-
-// Usage
-exampleMapper.toResponse(entity)
-exampleMapper.toResponseArray(entities)
-exampleMapper.toListResponse(entity, ['id', 'name'])
-```
-
----
-
-## Redis Keys (Always Use Builder)
-
-```typescript
-this.redisKeyBuilder.buildTenantKey('cache', `entity:${id}`)  // → "app:tenant_123:cache:entity_abc"
-this.redisKeyBuilder.buildLockKey('import:csv')               // → "app:tenant_123:lock:import_csv"
-this.redisKeyBuilder.buildGlobalKey('config', 'flags')        // → "app:config:flags"
-```
-
----
-
-## Messaging (FIFO)
-
-```typescript
-// SQS with idempotency
-await this.sqsProducer.send('queue-name', 'event.type', payload, {
-    idempotencyKey: `create-order-${orderId}`,  // Business-domain key!
-    messageGroupId: tenantId,                    // FIFO ordering
-});
-
-// DLQ replay
-const result = await this.dlqConsumer.reprocessAll('queue-name');
-```
-
-**Queue naming:** `example-queue.fifo` → DLQ: `example-queue-dlq.fifo`
-
----
-
-## Key Dependencies
-
-| Package | Purpose |
-|---------|---------|
-| `@ssut/nestjs-sqs` | SQS integration |
-| `ioredis` | Redis client |
-| `typeorm` | Database ORM |
-| `typeorm-transactional` | Declarative transactions |
-| `nestjs-cls` | Request context (CLS) |
-| `nestjs-paginate` | Pagination |
-| `simdjson` | Fast JSON parsing |
-| `moment-timezone` | Date handling |
-| `ulid` | ID generation |
-| `opossum` | Circuit breaker |
-| `pino` / `pino-loki` | Logging |
-| `@opentelemetry/*` | Tracing & metrics |
-| `zod` | Runtime validation |
-
----
-
-## Naming Conventions
-
-| Type | Convention | Example |
-|------|------------|---------|
-| Files | kebab-case | `example.service.ts` |
-| Classes | PascalCase | `ExampleService` |
-| Interfaces | I prefix | `IExampleService` |
-| DTOs | suffix Dto | `CreateExampleDto` |
-| Events | suffix Event | `ExampleCreatedEvent` |
-| Entities | suffix Entity | `ExampleEntity` |
-
----
-
-## Checklist for New Features
-
-- [ ] Types explicit (no `any`)
-- [ ] Tenant-scoped (TenantAwareRepository)
-- [ ] `@Idempotent()` on mutations
-- [ ] `@Transactional()` where needed
-- [ ] Events via `txEventEmitter.emitAfterCommit()`
-- [ ] Critical ops via `sideEffectService`
-- [ ] Mapper extends `BaseResponseMapper`
-- [ ] Redis keys via `RedisKeyBuilder`
-- [ ] Structured logging
-- [ ] Tests written
+- `npx prisma generate` — regenerate the Prisma client after schema edits.
+- `npx prisma migrate dev --name <name>` — create + apply a dev migration.
+- `pnpm test:bdd` — run the full Cucumber suite (also `:auth` / `:billing` / `:guards`).

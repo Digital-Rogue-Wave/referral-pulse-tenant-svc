@@ -10,7 +10,7 @@
 - Feature-first modules: `src/features/{entity}/` with module, controller, service, dto, repository
 - Circuit breaker pattern for all external calls
 - Request context via `AsyncLocalStorage` for correlation ID propagation
-- Tests: Vitest + supertest for API integration tests
+- Tests: Jest + supertest for API integration tests
 
 ## Package Layout
 

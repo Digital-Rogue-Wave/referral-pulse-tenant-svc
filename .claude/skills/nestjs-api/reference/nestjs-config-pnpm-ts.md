@@ -1,6 +1,5 @@
 # NestJS Configuration — npm & TypeScript
 
-Package configuration and TypeScript setup for NestJS 11.x. For Typeorm schema and database configuration, see `nestjs-config-typeorm.md`.
 
 ## package.json
 
@@ -30,10 +29,6 @@ NestJS 11 backend service with enterprise-grade dependencies.
     "test:cov": "jest --coverage",
     "test:debug": "node --inspect-brk -r tsconfig-paths/register -r ts-node/register node_modules/.bin/jest --runInBand",
     "test:e2e": "jest --config ./test/jest-e2e.json",
-    "typeorm": "ts-node -r tsconfig-paths/register ./node_modules/typeorm/cli.js",
-    "migration:generate": "pnpm typeorm -- migration:generate -d src/database/data-source.ts",
-    "migration:run": "pnpm typeorm -- migration:run -d src/database/data-source.ts",
-    "migration:revert": "pnpm typeorm -- migration:revert -d src/database/data-source.ts",
     "pnpm:dedupe": "pnpm dedupe",
     "pnpm:update": "pnpm update --latest",
     "clean": "rimraf dist node_modules coverage",
@@ -64,7 +59,6 @@ NestJS 11 backend service with enterprise-grade dependencies.
     "@nestjs/swagger": "^8.0.0",
     "@nestjs/terminus": "^11.0.0",
     "@nestjs/throttler": "^6.0.0",
-    "@nestjs/typeorm": "^11.0.0",
     "@opentelemetry/api": "^1.9.0",
     "@opentelemetry/core": "^1.18.1",
     "@opentelemetry/exporter-metrics-otlp-http": "^0.57.0",
@@ -111,9 +105,6 @@ NestJS 11 backend service with enterprise-grade dependencies.
     "rxjs": "^7.8.1",
     "simdjson": "^0.9.2",
     "sinon": "^21.0.1",
-    "typeorm": "^0.3.20",
-    "typeorm-naming-strategies": "^4.1.0",
-    "typeorm-transactional": "^0.5.0",
     "ulid": "^2.3.0",
     "zod": "^3.24.1"
   },

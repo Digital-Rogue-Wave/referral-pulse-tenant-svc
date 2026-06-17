@@ -63,6 +63,18 @@ Captured on the working branch before any code change:
   stale tests are repaired minimally (add the missing provider mocks; update the guard test to the
   context-only behavior). This is not a spec change — recorded here for traceability.
 
+  **Resolved in Phase 2:**
+  - Added the template `.prettierrc` (`tabWidth: 4, singleQuote: true, printWidth: 150,
+    trailingComma: none`) + `.prettierrc.js` + `.prettierignore`. Per the decision, the codebase was
+    normalized to this config with `pnpm lint --fix` (behavior-free, ~244 files) so lint matches the
+    template/sibling services and the post-edit-lint hook won't churn future diffs.
+  - Cleared the 6 real lint errors the prettier noise had hidden: `Function`-type → `object` in the two
+    pagination decorators; `==`→`===`/`=== undefined` in `redis.service.ts`; merged a collapsible `if`
+    in `payment-status-escalation.service.ts`.
+  - Repaired the 3 stale suites (DateService provider mocks; context-only guard assertion; SNS
+    positional-args + availability-precheck mocks). `pnpm test` → 64/64. `pnpm lint:check` → 0 errors
+    (144 pre-existing warnings remain, non-failing). `pnpm build` → 0 issues.
+
 ## Open contract items (to be filled during Phase 3/4)
 
 - api_key.* event casing (camelCase in code vs snake_case in spec §4.12) — see Phase 3a.
