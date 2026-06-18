@@ -42,6 +42,7 @@ pnpm start:dev
 | [Architecture Overview](docs/architecture.md)                     | System design documentation          |
 | [Implementation Reference](tenant-implementation.md)              | Whole-service technical reference    |
 | [Service Guide](TENANT_GUIDE.md)                                  | Plain-language tour for newcomers    |
+| [Testing Guide](TESTING_GUIDE.md)                                 | Run & write unit/BDD tests with mock data |
 | [Decisions & Contract Notes](NOTE.md)                             | Spec deviations, gaps, cross-team items |
 | [Billing](BILLING.md)                                             | Billing-specific deep dive           |
 
