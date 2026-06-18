@@ -243,12 +243,39 @@ async function seedDefaultTenant() {
     console.log(`✅ Default billing: plan=${billing.plan}, status=${billing.status}`);
 }
 
+// Platform roles per referralai_db_tables_per_service.md (roles → scopes).
+// Names align with TeamMemberRole; scopes are coarse role tiers consumed by
+// /internal/validate-token. (Spec also names "Operator" — see NOTE.md naming note.)
+async function seedRoles() {
+    const roles = [
+        { name: 'OWNER', description: 'Full access to the tenant', scopes: ['tenant:*'] },
+        {
+            name: 'ADMIN',
+            description: 'Administer members, API keys and settings',
+            scopes: ['tenant:read', 'tenant:write', 'members:*', 'api_keys:*', 'billing:read']
+        },
+        { name: 'MEMBER', description: 'Operate campaigns and read tenant data', scopes: ['tenant:read', 'campaigns:read', 'campaigns:write'] },
+        { name: 'VIEWER', description: 'Read-only access', scopes: ['tenant:read', 'campaigns:read'] }
+    ];
+
+    for (const role of roles) {
+        await prisma.role.upsert({
+            where: { name: role.name },
+            update: { description: role.description, scopes: role.scopes },
+            create: role
+        });
+    }
+
+    console.log('✅ Roles:', roles.map((r) => r.name).join(', '));
+}
+
 // ─── Main ─────────────────────────────────────────────────────────────────────
 
 async function main() {
     console.log('\n🌱 Starting seed...\n');
 
     await seedCurrencies();
+    await seedRoles();
     await seedPlans();
     await seedTestTenant();
     await seedTestBilling();

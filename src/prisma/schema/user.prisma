@@ -1,0 +1,56 @@
+// Platform identity tables per referralai_db_tables_per_service.md (Tenant/Identity service).
+// Ory Kratos remains the credential authority; `users` is the local projection keyed by
+// kratos_identity_id. `team_members` is retained for the existing API surface — see NOTE.md
+// for the intentional users/user_roles vs team_members overlap and the consolidation follow-up.
+
+model User {
+  id               String    @id @default(cuid())
+  tenantId         String    @map("tenant_id") @db.VarChar(26)
+  email            String?   @db.VarChar(320)
+  name             String?   @db.VarChar(255)
+  kratosIdentityId String    @map("kratos_identity_id") @db.VarChar(64)
+  lastLoginAt      DateTime? @map("last_login_at") @db.Timestamptz
+
+  createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt DateTime  @updatedAt @map("updated_at") @db.Timestamptz
+  deletedAt DateTime? @map("deleted_at") @db.Timestamptz
+
+  // Relations
+  tenant    Tenant     @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  userRoles UserRole[]
+
+  @@unique([tenantId, kratosIdentityId])
+  @@index([tenantId])
+  @@map("users")
+}
+
+model Role {
+  id          String  @id @default(cuid())
+  name        String  @unique @db.VarChar(50)
+  scopes      Json    @default("[]")
+  description String? @db.VarChar(255)
+
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz
+
+  // Relations
+  userRoles UserRole[]
+
+  @@map("roles")
+}
+
+model UserRole {
+  userId     String   @map("user_id")
+  roleId     String   @map("role_id")
+  tenantId   String   @map("tenant_id") @db.VarChar(26)
+  assignedAt DateTime @default(now()) @map("assigned_at") @db.Timestamptz
+  assignedBy String?  @map("assigned_by") @db.VarChar(26)
+
+  // Relations
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  role Role @relation(fields: [roleId], references: [id], onDelete: Cascade)
+
+  @@id([userId, roleId])
+  @@index([tenantId])
+  @@map("user_roles")
+}

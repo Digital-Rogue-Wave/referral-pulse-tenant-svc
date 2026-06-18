@@ -27,6 +27,7 @@ model Tenant {
   setting                     TenantSetting?
   invitations                 Invitation[]
   members                     TeamMember[]
+  users                       User[]
   billing                     Billing?
   billingEvents               BillingEvent[]
   tenantUsages                TenantUsage[]
