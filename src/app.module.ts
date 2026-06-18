@@ -19,6 +19,7 @@ import { DnsModule } from '@app/features/dns/dns.module';
 import { FilesModule } from '@app/features/files/files.module';
 import { InvitationModule } from '@app/features/invitation/invitation.module';
 import { TeamMemberModule } from '@app/features/team-member/team-member.module';
+import { UsersModule } from '@app/features/users/users.module';
 import { TenantModule } from '@app/features/tenant/tenant.module';
 import { TenantSettingModule } from '@app/features/tenant-setting/tenant-setting.module';
 import { WebhookModule } from '@app/features/webhook/webhook.module';
@@ -56,6 +57,7 @@ import { GlobalExceptionsFilter } from '@common/exceptions/global-exceptions.fil
         FilesModule,
         InvitationModule,
         TeamMemberModule,
+        UsersModule,
         TenantModule,
         TenantSettingModule,
         WebhookModule
