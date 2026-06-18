@@ -109,21 +109,23 @@ so regeneration no longer breaks `pnpm lint:check`.
   **Open:** `revocation_reason` is emitted as `null` — the DELETE endpoint carries no reason body today;
   wire a reason field if a consumer needs it.
 - **Identity tables + user.* (Phase 3b — DONE):**
-  - Added spec tables `users` (keyed by `(tenant_id, kratos_identity_id)`), `roles` (seeded:
-    OWNER/ADMIN/MEMBER/VIEWER → scopes), `user_roles`. Synced via `prisma db push`.
+  - Added spec tables `users` (keyed by `(tenant_id, kratos_identity_id)`, with denormalized `role`),
+    `roles` (seeded: OWNER/ADMIN/OPERATOR/VIEWER → scopes), `user_roles`. Applied via Prisma migrations.
   - Published `user.registered` `{ user_id, tenant_id, role }` and `user.role_changed`
-    `{ user_id, tenant_id, old_role, new_role }` to `USER_EVENTS_TOPIC` (snake_case), projected from the
-    existing `team-member.created`/`team-member.updated` lifecycle via `UserProjectionListener`
-    (no change to the team-member transaction — surgical).
-  - **Intentional overlap (decision):** `team_members` already stores user+role per tenant; `users`/
-    `user_roles` are the spec-canonical store, populated as a projection. `team_members` is retained as
-    the existing API surface. Consolidating the two is a recommended follow-up, not done in this pass.
+    `{ user_id, tenant_id, old_role, new_role }` to `USER_EVENTS_TOPIC` (snake_case), emitted directly by
+    `UsersService` on membership add / role change.
+  - **Consolidation (DONE — was a follow-up):** `team_members` has been **removed**; `users` (now with a
+    denormalized `role` per spec) + `user_roles` are the single system of record. The membership surface
+    moved from `/team-members` to `/users` (`/users`, `/users/me`, `/users/:id/roles`), the Keto resource
+    `member` → `user`, and `UsersService` emits `user.registered`/`user.role_changed` directly (the
+    `UserProjectionListener` was deleted). Migration `consolidate_team_members_into_users`.
   - **Ory delegation (intentional):** `oauth2_clients` and `sessions` are NOT created as local tables —
     Ory Hydra/Kratos are the system of record (the spec's own table notes say "managed via Ory"), and
     there is no API/event surface for them here (YAGNI).
-  - **Naming discrepancy (contract item):** the API contract names roles Owner/Admin/**Operator**/Viewer;
-    this service uses OWNER/ADMIN/**MEMBER**/VIEWER (MEMBER ↔ Operator). Aligned to the existing
-    `TeamMemberRole`; flag for a cross-team naming decision.
+  - **Role naming (DONE):** roles renamed to match the spec — Owner / Admin / **Operator** / Viewer
+    (`MEMBER` → `OPERATOR`) across the enum, seed, and `users.role` default.
+  - **User status (decision):** per the spec, `users` has **no status column** (team_members' status was
+    dropped); member deactivation/suspension is deferred to Ory Kratos identity state.
   - **Spec gap (not built — out of scope):** `tenants.verification_status`
     (unverified→pending_review→verified→rejected, payout gate) from the responsibility contract is not
     present on the `tenants` table. Recorded for the Phase 4 audit / a separate task.
@@ -192,7 +194,9 @@ this service defines its side of the contract (the workflow service must match i
   its approve/reject decision; updates the field + emits `tenant.verification_status_changed`.
 - **Not built here (per spec):** the Temporal `account_verification` workflow itself (owned by the
   workflow service) and payout-gating (owned by the Reward service). Contract item for those teams.
-- Role naming `Operator` (spec) vs `MEMBER` (impl).
+- Role naming `Operator` vs `MEMBER` — **RESOLVED** (renamed to OPERATOR).
+- `team_members` ↔ `users`/`user_roles` consolidation — **RESOLVED** (team_members removed; users is the
+  system of record; `/users` endpoints; Keto `user`).
 - Prisma migration baseline — **RESOLVED** (squashed baseline + reset; see the migration-baseline section above).
 
 ## Verification
@@ -216,8 +220,7 @@ baseline with all later changes stashed). All now pass:
   set by the global `JwtAuthGuard`, then `x-tenant-id` header, then `req.tenantId`, then ALS as
   fallback), and applied `@UseGuards(TenantStatusGuard)` to `BillingController`. Now suspended → 403
   `TENANT_SUSPENDED`, locked → 403 `TENANT_LOCKED`, missing tenant → 404 `TENANT_NOT_FOUND`.
-  (`TenantLockGuard` has the same latent ALS-timing issue but is not exercised by BDD — left as-is and
-  noted here; `TenantStatusGuard` already covers the LOCKED case.)
+  (`TenantLockGuard` had the same latent ALS-timing issue and was fixed the same way.)
 - **JWKS rate-limit (`401 "Too many requests to the JWKS endpoint"`).** The test bootstrap forced
   `AUTH_CACHE_ENABLED=false`, so every token re-fetched the JWKS and jwks-rsa's 10-fetches/min limit
   tripped mid-suite. Enabled the JWKS cache in the bootstrap (key is cached; signature/exp/aud are still
@@ -233,5 +236,6 @@ baseline with all later changes stashed). All now pass:
 ### Intentional deviations (traceability)
 - Billing subsystem retained (per decision) though the responsibility contract scopes it out.
 - `oauth2_clients`/`sessions` delegated to Ory (no local tables).
-- `users`/`user_roles` are a projection alongside the retained `team_members` (consolidation follow-up).
+- `users` (+denormalized `role`) / `user_roles` are the system of record for membership; `team_members`
+  was removed (consolidated per spec).
 - `PUT /users/:id/roles` served by `PUT /team-members/:id` rather than a duplicate path.

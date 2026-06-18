@@ -27,8 +27,8 @@ facts, we don't consume other services' events).
 |---|---|
 | **Tenant** | A customer company/account. Everything else hangs off a tenant. The isolation boundary. |
 | **User** | A person who logs in (an operator). Their login/password lives in **Ory** (Kratos); we keep a local record keyed to their Ory identity. |
-| **Role** | A named bundle of permissions (OWNER, ADMIN, MEMBER, VIEWER) → a list of "scopes". |
-| **Team member** | A user's membership *in a specific tenant*, with a role. (Today this also doubles as the user↔role link.) |
+| **Role** | A named bundle of permissions (OWNER, ADMIN, OPERATOR, VIEWER) → a list of "scopes". |
+| **User (operator)** | A person who belongs to a tenant with a role. Stored in `users` (membership + role); their login lives in Ory. |
 | **API key** | A secret a tenant's backend uses to call the platform's APIs. We store only a hash + a short prefix, never the raw key. |
 | **Plan** | A subscription tier (Free/Starter/Growth/Enterprise) with usage limits. |
 | **Billing** | A tenant's subscription state with Stripe (customer, subscription, payment status). |
@@ -36,7 +36,7 @@ facts, we don't consume other services' events).
 ## Where the data lives
 
 Everything is in **PostgreSQL** (via Prisma). The main tables: `tenants`, `users`, `roles`,
-`user_roles`, `team_members`, `api_keys`, `invitations`, `tenant_settings`, plus the billing tables
+`user_roles`, `api_keys`, `invitations`, `tenant_settings`, plus the billing tables
 (`plans`, `billings`, `billing_events`, `tenant_usages`). Login credentials and sessions are **not** in
 our database — those live in **Ory** (Kratos/Hydra/Keto). We keep a lightweight `users` projection that
 points back to the Ory identity.
@@ -47,12 +47,12 @@ points back to the Ory identity.
 ## The main flows
 
 ### 1. A company joins
-A tenant record is created. The first person becomes a **team member** with the OWNER role. Behind the
+A tenant record is created. The first person becomes a **user** with the OWNER role. Behind the
 scenes that also creates their `users` row + role assignment and announces `user.registered` to the rest
 of the platform.
 
 ### 2. Inviting teammates
-An OWNER/ADMIN sends an **invitation**. When accepted, a new team member (and user projection) is created
+An OWNER/ADMIN sends an **invitation**. When accepted, a new user (membership + role) is created
 with the chosen role. Changing someone's role announces `user.role_changed`.
 
 ### 3. Creating an API key
@@ -104,7 +104,7 @@ pnpm install
 # needs Postgres + Redis (+ Ory/LocalStack for full auth/messaging) running locally
 npx prisma generate          # build the DB client
 npx prisma db push           # sync your local DB to the schema
-npx prisma db seed           # load currencies, plans, and the OWNER/ADMIN/MEMBER/VIEWER roles
+npx prisma db seed           # load currencies, plans, and the OWNER/ADMIN/OPERATOR/VIEWER roles
 pnpm start:dev               # run with hot reload
 ```
 

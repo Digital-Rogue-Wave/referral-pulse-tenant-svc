@@ -54,8 +54,7 @@ billing is **retained** here. This is the single knowing divergence — full rec
 | Module | Path | Responsibility |
 |---|---|---|
 | `tenant` | `src/features/tenant` | Tenant CRUD (agnostic/admin/aware), lifecycle (suspend/lock/delete), stats |
-| `users` | `src/features/users` | User/role projection, `user.*` events, `/users/me`, `/internal/validate-token` |
-| `team-member` | `src/features/team-member` | Membership + role per tenant (last-admin protection) |
+| `users` | `src/features/users` | Platform users: membership + role (last-admin protection), `user.*` events, `/users` CRUD, `/users/me`, `/internal/validate-token` |
 | `api-key` | `src/features/api-key` | API key lifecycle (SHA-256 hash, prefix, scopes, key_type) |
 | `invitation` | `src/features/invitation` | Team invitations (send/accept/revoke), expiry job |
 | `tenant-setting` | `src/features/tenant-setting` | Tenant settings + user notification preferences |
@@ -73,8 +72,9 @@ All routes are versioned (`/v1/...`) and tenant-scoped unless marked Public/Inte
 |---|---|---|---|
 | GET/POST/PUT/DELETE | `/v1/api-keys`, `/v1/api-keys/:id`, `/v1/api-keys/:id/status` | api-key | Keto-guarded; raw key shown once |
 | GET | `/v1/users/me` | users | Current user profile + roles/scopes |
+| POST/GET/PUT/DELETE | `/v1/users`, `/v1/users/:id`, `/v1/users/:id/roles` | users | Membership + role; last-admin protection |
 | GET | `/v1/internal/validate-token` | users | **Public/internal** — resolve API key or JWT → claims |
-| POST/GET/PUT/DELETE | `/v1/team-members`, `/v1/team-members/:id` | team-member | Role/status; last-admin protection |
+| PATCH | `/v1/internal/tenants/:id/verification` | tenant | **Internal** — workflow svc verification decision callback |
 | POST/GET | `/v1/tenants` | tenant | Create (agnostic), current-tenant reads |
 | GET/PUT/DELETE | `/v1/admin/tenants`, `/v1/admin/tenants/:id` | tenant | Admin tenant management |
 | GET (internal) | `/internal/tenants/:id/...` | billing/tenant | Internal billing/tenant status |
@@ -84,8 +84,8 @@ All routes are versioned (`/v1/...`) and tenant-scoped unless marked Public/Inte
 | GET/POST/PUT | `/v1/files`, `/v1/currencies` | files/currency | Uploads; currency reference data |
 | POST | `/v1/webhook/stripe`, `/webhooks/stripe` | webhook | Stripe webhook (version-neutral relay) |
 
-> Role assignment for the `/users/:id/roles` contract path is served by `PUT /v1/team-members/:id`
-> (projects `user_roles`, emits `user.role_changed`) — see `NOTE.md`.
+> `PUT /v1/users/:id/roles` updates the role and emits `user.role_changed`; `users`/`user_roles` is the
+> system of record (the former `/team-members` surface was consolidated away).
 
 ## Events
 
@@ -102,7 +102,7 @@ All routes are versioned (`/v1/...`) and tenant-scoped unless marked Public/Inte
 | `tenant.restricted` / `tenant.locked` / `tenant.restored` | `billing-events-topic` | payment-status fields |
 | `tenant.*` (created/updated/deletion-*) | `tenant`-domain | tenant lifecycle (audit + SNS) |
 
-Internal EventEmitter2 events keep camelCase payloads (`api-key.created`, `team-member.*`, etc.);
+Internal EventEmitter2 events keep camelCase payloads (`api-key.created`, etc.);
 camelCase→snake_case mapping happens only at the SNS boundary. Audit events route to `AUDIT_TRAIL_FIFO`.
 
 ### Consumed
@@ -121,10 +121,9 @@ billing extension:
 | Table | Schema file | Purpose |
 |---|---|---|
 | `tenants` | `tenant.prisma` | Tenant root; status, payment_status, trial, lock, custom domain |
-| `users` | `user.prisma` | Platform user projection, keyed by `(tenant_id, kratos_identity_id)` |
-| `roles` | `user.prisma` | Role definitions → scopes (seeded: OWNER/ADMIN/MEMBER/VIEWER) |
+| `users` | `user.prisma` | Platform users (operators): membership + denormalized `role`, keyed by `(tenant_id, kratos_identity_id)` |
+| `roles` | `user.prisma` | Role definitions → scopes (seeded: OWNER/ADMIN/OPERATOR/VIEWER) |
 | `user_roles` | `user.prisma` | User↔role assignment per tenant |
-| `team_members` | `team-member.prisma` | Membership + denormalized role (retained; overlaps users/user_roles) |
 | `api_keys` | `api-key.prisma` | API keys (key_hash, key_prefix, key_type, scopes) |
 | `invitations` | `invitation.prisma` | Team invitations |
 | `tenant_settings`, `user_notification_preferences` | `tenant-setting.prisma` | Settings + prefs |
@@ -152,14 +151,17 @@ billing extension:
 ## Scope decisions & deviations
 
 See `NOTE.md` for the full, meeting-shareable record. Summary:
-1. **Billing retained** (intentional) despite the spec scoping it out.
+1. **Billing retained** (intentional) despite the spec scoping it out — kept decoupled so it can move to
+   another service later.
 2. **`oauth2_clients`/`sessions`** delegated to Ory — no local tables (spec notes confirm Ory ownership).
-3. **`users`/`user_roles`** added as the spec-canonical store, projected from the team-member lifecycle;
-   `team_members` retained as the existing API surface (consolidation is a follow-up).
-4. **`PUT /users/:id/roles`** served by the existing team-member update (no duplicate path).
-5. **Inbound usage contract** hardened (shape-tolerant); producer/queue are cross-team items.
-6. **Recorded gaps:** `tenants.verification_status`; role naming `Operator`↔`MEMBER`; stale migration
-   baseline; out-of-scope `CampaignEventsConsumer` flagged for removal.
+3. **`users` (+`role`) / `user_roles`** are the system of record for membership; `team_members` was
+   removed (consolidated per spec). `/users` endpoints replace `/team-members`; Keto resource `user`.
+4. **Roles** renamed to the spec set Owner/Admin/**Operator**/Viewer. `users` has **no status** column
+   (per spec; member deactivation deferred to Ory Kratos).
+5. **`tenants.verification_status`** owned here; emits `tenant.verification_requested`, consumes the
+   workflow svc decision via `PATCH /internal/tenants/:id/verification`.
+6. **Inbound usage contract** hardened (shape-tolerant); producer/queue are cross-team items.
+7. **Migration baseline** squashed; `CampaignEventsConsumer` (dead, out-of-scope) removed.
 
 ## Verification
 
