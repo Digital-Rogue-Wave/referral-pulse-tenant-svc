@@ -40,6 +40,10 @@ pnpm start:dev
 | [Working with Database](docs/template/database.md)                | Prisma workflow, migrations, seeding |
 | [Serialization](docs/template/serialization.md)                   | Response transformation              |
 | [Architecture Overview](docs/architecture.md)                     | System design documentation          |
+| [Implementation Reference](tenant-implementation.md)              | Whole-service technical reference    |
+| [Service Guide](TENANT_GUIDE.md)                                  | Plain-language tour for newcomers    |
+| [Decisions & Contract Notes](NOTE.md)                             | Spec deviations, gaps, cross-team items |
+| [Billing](BILLING.md)                                             | Billing-specific deep dive           |
 
 ---
 
