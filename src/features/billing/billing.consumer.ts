@@ -36,9 +36,15 @@ export class BillingConsumer {
                     return;
                 }
 
-                const { metric, delta } = payload;
+                // Defensive: accept metric/delta nested under payload OR at the envelope root.
+                // Sibling producers are still in dev; ReferralUsageEvent carries metric/delta at the
+                // event top level, while our envelope nests the event under `payload` (see NOTE.md).
+                const usagePayload = (payload ?? {}) as Record<string, unknown>;
+                const envelopeRoot = envelope as unknown as Record<string, unknown>;
+                const metric = usagePayload.metric ?? envelopeRoot.metric;
+                const delta = usagePayload.delta ?? envelopeRoot.delta;
 
-                if (typeof metric !== 'string' || !Number.isFinite(delta)) {
+                if (typeof metric !== 'string' || typeof delta !== 'number' || !Number.isFinite(delta)) {
                     this.logger.warn(`Invalid referral usage payload for tenant ${tenantId} - eventType: ${eventType}`);
                     return;
                 }
@@ -52,7 +58,7 @@ export class BillingConsumer {
                         metricName: metric,
                         increment: delta,
                         timestamp: new Date(),
-                        metadata: { ...payload, usageAfter: usage }
+                        metadata: { ...usagePayload, usageAfter: usage }
                     }
                 });
 
