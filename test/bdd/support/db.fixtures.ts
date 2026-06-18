@@ -100,6 +100,36 @@ export async function createActiveTenant(id: string): Promise<void> {
     });
 }
 
+/** Give an existing tenant an active paid subscription (for upgrade/preview flows). */
+export async function setActiveSubscription(tenantId: string): Promise<void> {
+    await fixturesPrisma.billing.upsert({
+        where: { tenantId },
+        update: {
+            plan: 'Starter',
+            status: 'active',
+            stripeCustomerId: 'cus_bdd_active',
+            stripeSubscriptionId: 'sub_bdd_active'
+        },
+        create: {
+            tenantId,
+            plan: 'Starter',
+            status: 'active',
+            stripeCustomerId: 'cus_bdd_active',
+            stripeSubscriptionId: 'sub_bdd_active'
+        }
+    });
+}
+
+/** Reset a tenant's billing back to the default Free / no-subscription state. */
+export async function clearSubscription(tenantId: string): Promise<void> {
+    await fixturesPrisma.billing
+        .updateMany({
+            where: { tenantId },
+            data: { plan: 'Free', status: 'none', stripeCustomerId: null, stripeSubscriptionId: null }
+        })
+        .catch(() => undefined);
+}
+
 export async function cleanupTenant(id: string): Promise<void> {
     // Delete billing first (FK constraint)
     await fixturesPrisma.billing.deleteMany({ where: { tenantId: id } }).catch(() => undefined);

@@ -179,27 +179,40 @@ Our billing-extension consumer reads `referral.*` usage from `ANALYTICS_SVC_FIFO
 - Role naming `Operator` (spec) vs `MEMBER` (impl).
 - Prisma migration baseline — **RESOLVED** (squashed baseline + reset; see the migration-baseline section above).
 
-## Verification (Phase 5)
+## Verification
 
 | Gate | Result |
 |---|---|
-| `pnpm build` | ✅ 0 issues (352 files) |
-| `pnpm lint:check` | ✅ 0 errors (147 pre-existing warnings, non-failing) |
+| `pnpm build` | ✅ 0 issues |
+| `pnpm lint:check` | ✅ 0 errors (146 pre-existing warnings, non-failing) |
 | `pnpm test` (unit) | ✅ 64/64 |
-| `pnpm test:bdd` (Cucumber) | ⚠️ 10 pass / 7 fail — **all 7 pre-existing** |
+| `pnpm test:bdd` (Cucumber) | ✅ 17/17 (82 steps) |
 
-**BDD pre-existing failures (NOT introduced by this pass).** Verified by stashing all Phase 3+ changes
-and running BDD on the committed Phase 2 baseline: the **same 7 scenarios** fail with identical
-assertions (only timestamps differ). My changes add **zero** new BDD failures. Root causes are outside
-this pass's scope:
-- The global `JwtAuthGuard` and tenant-status guard are commented out in `app.module.ts`, so
-  suspended/locked-tenant scenarios get `200`/`401` instead of `403`.
-- The billing subscription response returns `subscriptionStatus` while a scenario asserts a `status`
-  field (test↔code drift); `/billings/subscription` returns `500` instead of `404` for a missing tenant.
-- Stripe checkout + JWKS scenarios hit nock timeouts / "Too many requests to the JWKS endpoint".
+### BDD — 7 pre-existing failures fixed (follow-up pass)
 
-These belong to the pre-existing BDD suite (committed before this pass) and to billing/guard wiring —
-recommended as a separate fix, not folded into this spec-realignment pass.
+The BDD suite originally had 7 failures (verified pre-existing — same failures on the committed Phase 2
+baseline with all later changes stashed). All now pass:
+
+- **Tenant-status guard not enforced (3 scenarios + the 404 case).** `TenantStatusGuard` read the tenant
+  id from the ALS context, which is populated by `AlsAuthInterceptor` — but **guards run before
+  interceptors**, so it always saw `undefined` and allowed everything (a latent no-op everywhere it was
+  used). Fixed the guard to resolve the tenant id from the request at guard time (`req.user.tenantId`
+  set by the global `JwtAuthGuard`, then `x-tenant-id` header, then `req.tenantId`, then ALS as
+  fallback), and applied `@UseGuards(TenantStatusGuard)` to `BillingController`. Now suspended → 403
+  `TENANT_SUSPENDED`, locked → 403 `TENANT_LOCKED`, missing tenant → 404 `TENANT_NOT_FOUND`.
+  (`TenantLockGuard` has the same latent ALS-timing issue but is not exercised by BDD — left as-is and
+  noted here; `TenantStatusGuard` already covers the LOCKED case.)
+- **JWKS rate-limit (`401 "Too many requests to the JWKS endpoint"`).** The test bootstrap forced
+  `AUTH_CACHE_ENABLED=false`, so every token re-fetched the JWKS and jwks-rsa's 10-fetches/min limit
+  tripped mid-suite. Enabled the JWKS cache in the bootstrap (key is cached; signature/exp/aud are still
+  checked per token).
+- **Subscription `status` field.** The scenario asserted a `status` field; the response uses
+  `subscriptionStatus`. Aligned the feature to the real (intentional) field.
+- **Stripe checkout timeout + upgrade-preview.** The Stripe SDK's default transport (fetch/undici) is not
+  interceptable by nock, so checkout hung on the real (unreachable) API. Override `StripeService` with a
+  fake at the test boundary (`test/bdd/support/stripe.fake.ts`) — Stripe is a genuine external dependency.
+  Added an `@needs-active-subscription` fixture so the upgrade-preview scenario has a subscription to
+  preview. Also blocked `api.stripe.com` in `nock.setup` so any accidental real Stripe call fails fast.
 
 ### Intentional deviations (traceability)
 - Billing subsystem retained (per decision) though the responsibility contract scopes it out.

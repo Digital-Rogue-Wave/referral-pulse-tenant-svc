@@ -14,10 +14,16 @@ import { Test, TestingModule } from '@nestjs/testing';
 
 // Set env overrides BEFORE AppModule is imported so ConfigModule picks them up
 process.env['NODE_ENV'] = 'test';
-process.env['AUTH_CACHE_ENABLED'] = 'false'; // CRITICAL: force JWKS re-fetch per token
+// Cache the JWKS signing key: jwks-rsa rate-limits at 10 fetches/min, and with cache
+// off every token re-fetched the key, tripping "Too many requests to the JWKS endpoint"
+// across a suite run. Caching the key does not weaken validation — signature/exp/aud are
+// still checked per token against the (stable) test key.
+process.env['AUTH_CACHE_ENABLED'] = 'true';
 process.env['AUTH_AUDIENCE'] = 'test-audience';
 
 import { AppModule } from '../../../src/app.module';
+import { StripeService } from '../../../src/features/billing/stripe.service';
+import { fakeStripeService } from './stripe.fake';
 
 let app: INestApplication | null = null;
 
@@ -26,7 +32,11 @@ export async function bootstrapTestApp(): Promise<INestApplication> {
 
     const moduleRef: TestingModule = await Test.createTestingModule({
         imports: [AppModule]
-    }).compile();
+    })
+        // Stripe is an external dependency reached over the network — override with a fake.
+        .overrideProvider(StripeService)
+        .useValue(fakeStripeService)
+        .compile();
 
     app = moduleRef.createNestApplication({ logger: false });
 

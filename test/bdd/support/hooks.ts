@@ -10,11 +10,23 @@
 import { BeforeAll, AfterAll, Before, After, setDefaultTimeout } from '@cucumber/cucumber';
 import { bootstrapTestApp, teardownTestApp } from './app.bootstrap';
 import { setupNock, teardownNock } from './nock.setup';
-import { createSuspendedTenant, createLockedTenant, createActiveTenant, cleanupTenant, disconnectFixturesPrisma, FIXTURE_IDS } from './db.fixtures';
+import {
+    createSuspendedTenant,
+    createLockedTenant,
+    createActiveTenant,
+    cleanupTenant,
+    setActiveSubscription,
+    clearSubscription,
+    disconnectFixturesPrisma,
+    FIXTURE_IDS
+} from './db.fixtures';
 import type { BddWorldInterface } from './world';
 
 // Give each scenario up to 30 s (NestJS boot + DB round-trips)
 setDefaultTimeout(30_000);
+
+// The default tenant the billing.feature Background authenticates as.
+const DEFAULT_TENANT_ID = 'default-tenant';
 
 // ─── Suite lifecycle ──────────────────────────────────────────────────────────
 
@@ -56,6 +68,16 @@ After({ tags: '@needs-locked-tenant' }, async function (this: BddWorldInterface)
         await cleanupTenant(this.currentTenantId);
         this.currentTenantId = null;
     }
+});
+
+// ─── Fixture: active subscription (default tenant) ────────────────────────────
+
+Before({ tags: '@needs-active-subscription' }, async function () {
+    await setActiveSubscription(DEFAULT_TENANT_ID);
+});
+
+After({ tags: '@needs-active-subscription' }, async function () {
+    await clearSubscription(DEFAULT_TENANT_ID);
 });
 
 // ─── Fixture: active tenant ───────────────────────────────────────────────────

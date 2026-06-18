@@ -22,8 +22,9 @@ let ketoScope: nock.Scope;
  * Call once from BeforeAll.
  */
 export function setupNock(): void {
-    // Allow outgoing connections that nock doesn't intercept (e.g. Prisma TCP)
-    nock.enableNetConnect(/^(?!localhost:4444|localhost:4466).*$/);
+    // Allow outgoing connections that nock doesn't intercept (e.g. Prisma TCP), but
+    // BLOCK Stripe so any unmocked Stripe call fails fast instead of hanging on the real API.
+    nock.enableNetConnect(/^(?!localhost:4444|localhost:4466|api\.stripe\.com).*$/);
 
     // ── JWKS (must be .persist() — jwks-rsa fetches on every token when cache=false) ──
     jwksScope = nock(HYDRA_BASE).persist().get('/.well-known/jwks.json').reply(200, buildJwks());
