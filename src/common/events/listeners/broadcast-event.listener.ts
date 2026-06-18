@@ -20,7 +20,9 @@ import {
     TrialReminderEvent,
     BillingEvents
 } from '@domains/billing';
-import { BILLING_EVENTS_TOPIC, type BaseEventType, type SnsTopicName } from '@app/types';
+import { ApiKeyCreatedEvent, ApiKeyDeletedEvent } from '@domains/api-key';
+import { UserRegisteredEvent, UserRoleChangedEvent } from '@domains/user';
+import { BILLING_EVENTS_TOPIC, USER_EVENTS_TOPIC, type BaseEventType, type SnsTopicName } from '@app/types';
 
 /**
  * Broadcast Event Listener - Cross-Service Event Broadcasting via SNS
@@ -210,6 +212,50 @@ export class BroadcastEventListener {
             await this.broadcast('billing', BillingEvents.PAYMENT_RESTORED, event.tenantId, event.eventId, BILLING_EVENTS_TOPIC, statusData);
             await this.broadcast('billing', BillingEvents.TENANT_RESTORED, event.tenantId, event.eventId, BILLING_EVENTS_TOPIC, statusData);
         }
+    }
+
+    // ── Identity broadcasts (api_key.*) ────────────────────────────────
+    // Published to the platform bus per referralai_event_model_v2.1.md §4.12.
+    // Wire contract is snake_case; internal TS payloads stay camelCase and are
+    // mapped to snake_case here at the SNS-envelope boundary.
+
+    @OnEvent('api-key.created', { async: true })
+    async handleApiKeyCreated(event: ApiKeyCreatedEvent): Promise<void> {
+        await this.broadcast('api_key', 'api_key.created', event.tenantId, event.eventId, USER_EVENTS_TOPIC, {
+            key_id: event.payload.apiKeyId,
+            key_type: event.payload.keyType,
+            tenant_id: event.tenantId,
+            created_by: event.payload.createdBy
+        });
+    }
+
+    @OnEvent('api-key.deleted', { async: true })
+    async handleApiKeyRevoked(event: ApiKeyDeletedEvent): Promise<void> {
+        await this.broadcast('api_key', 'api_key.revoked', event.tenantId, event.eventId, USER_EVENTS_TOPIC, {
+            key_id: event.payload.apiKeyId,
+            revoked_by: event.payload.deletedBy,
+            // DELETE carries no reason body today — emitted as null until a reason is captured (see NOTE.md)
+            revocation_reason: null
+        });
+    }
+
+    @OnEvent('user.registered', { async: true })
+    async handleUserRegistered(event: UserRegisteredEvent): Promise<void> {
+        await this.broadcast('user', 'user.registered', event.tenantId, event.eventId, USER_EVENTS_TOPIC, {
+            user_id: event.aggregateId,
+            tenant_id: event.tenantId,
+            role: event.role
+        });
+    }
+
+    @OnEvent('user.role_changed', { async: true })
+    async handleUserRoleChanged(event: UserRoleChangedEvent): Promise<void> {
+        await this.broadcast('user', 'user.role_changed', event.tenantId, event.eventId, USER_EVENTS_TOPIC, {
+            user_id: event.aggregateId,
+            tenant_id: event.tenantId,
+            old_role: event.oldRole,
+            new_role: event.newRole
+        });
     }
 
     // ── Private helper ─────────────────────────────────────────────────

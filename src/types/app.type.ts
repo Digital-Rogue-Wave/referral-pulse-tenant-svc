@@ -29,6 +29,7 @@ export type EventCategory =
     | 'email'
     | 'audit'
     | 'api-key'
+    | 'api_key'
     | 'tenant'
     | 'billing'
     | 'invitation'
@@ -89,7 +90,9 @@ export type EventAction =
     | 'restricted'
     | 'restored'
     | 'monthly_summary'
-    | 'threshold_crossed';
+    | 'threshold_crossed'
+    | 'registered'
+    | 'role_changed';
 
 /**
  * Valid base event type combining category and action
@@ -276,7 +279,14 @@ export type CampaignEventType =
 export type ReferralEventType = 'referral.created' | 'referral.clicked' | 'referral.converted' | 'referral.rewarded' | 'referral.expired';
 
 // User domain events
-export type UserEventType = 'user.created' | 'user.updated' | 'user.activated' | 'user.deactivated' | 'user.deleted';
+export type UserEventType =
+    | 'user.created'
+    | 'user.updated'
+    | 'user.activated'
+    | 'user.deactivated'
+    | 'user.deleted'
+    | 'user.registered'
+    | 'user.role_changed';
 
 // API Key domain events
 export type ApiKeyEventType = 'api-key.created' | 'api-key.updated' | 'api-key.status' | 'api-key.deleted';

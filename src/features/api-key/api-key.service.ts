@@ -19,7 +19,8 @@ import {
     ApiKeyCreatedEvent,
     ApiKeyUpdatedEvent,
     ApiKeyStatusUpdatedEvent,
-    ApiKeyDeletedEvent
+    ApiKeyDeletedEvent,
+    ApiKeyType
 } from '@domains/api-key';
 
 import { API_KEY_PAGINATE_CONFIG } from './api-key.pagination';
@@ -59,6 +60,7 @@ export class ApiKeyService {
                 name: dto.name,
                 keyHash,
                 keyPrefix,
+                keyType: dto.keyType ?? ApiKeyType.SECRET,
                 scopes: dto.scopes,
                 createdBy: userId,
                 expiresAt: dto.expiresAt,
@@ -75,6 +77,7 @@ export class ApiKeyService {
                 tenantId: saved.tenantId,
                 name: saved.name,
                 keyPrefix: saved.keyPrefix,
+                keyType: saved.keyType,
                 scopes: saved.scopes as string[],
                 createdBy: userId,
                 createdAt: saved.createdAt

@@ -14,6 +14,12 @@ export enum ApiKeyStatus {
     REVOKED = 'revoked'
 }
 
+// Per referralai_event_model_v2.1.md §4.12 / referralai_db_tables_per_service.md
+export enum ApiKeyType {
+    SECRET = 'secret',
+    PUBLISHABLE = 'publishable'
+}
+
 // ============================================================
 // Props (shape of the Prisma model)
 // ============================================================
@@ -24,6 +30,7 @@ export interface ApiKeyProps {
     name: string;
     keyHash: string;
     keyPrefix: string;
+    keyType: string;
     status: string;
     scopes: unknown;
     createdBy: string;
@@ -47,6 +54,11 @@ export class CreateApiKeyDto {
     @IsArray()
     @IsString({ each: true })
     scopes!: string[];
+
+    @ApiPropertyOptional({ enum: ApiKeyType, default: ApiKeyType.SECRET })
+    @IsOptional()
+    @IsEnum(ApiKeyType)
+    keyType?: ApiKeyType;
 
     @ApiPropertyOptional()
     @IsOptional()
@@ -83,6 +95,9 @@ export class ApiKeyResponse {
 
     @ApiProperty()
     keyPrefix!: string;
+
+    @ApiProperty({ enum: ApiKeyType })
+    keyType!: string;
 
     @ApiProperty({ enum: ApiKeyStatus })
     status!: string;
@@ -146,6 +161,7 @@ export class ApiKeyCreatedEvent extends BaseDomainEvent {
             tenantId: string;
             name: string;
             keyPrefix: string;
+            keyType: string;
             scopes: string[];
             createdBy: string;
             createdAt: Date;
