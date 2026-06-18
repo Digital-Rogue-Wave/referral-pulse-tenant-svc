@@ -1,6 +1,7 @@
-import { Body, Controller, Delete, Get, HttpCode, HttpStatus, Param, Post } from '@nestjs/common';
+import { Body, Controller, Delete, Get, HttpCode, HttpStatus, Param, Post, UseGuards } from '@nestjs/common';
 import { ApiBearerAuth, ApiHeader, ApiOkResponse, ApiTags } from '@nestjs/swagger';
 import { RequirePermission } from '@common/auth/require-permission.decorator';
+import { TenantStatusGuard } from '@app/features/tenant/guards/tenant-status.guard';
 import { KetoNamespace, KetoRelation, KetoResource } from '@common/auth/keto.constants';
 import { Idempotent, IdempotencyScope } from '@common/idempotency';
 import { AppLoggerService } from '@common/logging/app-logger.service';
@@ -30,6 +31,7 @@ import { BillingService } from './billing.service';
     description: 'Tenant-Id header',
     schema: { type: 'string' }
 })
+@UseGuards(TenantStatusGuard)
 @Controller({ path: 'billings', version: '1' })
 export class BillingController {
     constructor(
