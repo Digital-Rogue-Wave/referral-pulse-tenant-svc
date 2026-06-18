@@ -174,8 +174,24 @@ Our billing-extension consumer reads `referral.*` usage from `ANALYTICS_SVC_FIFO
   **producer** `campaign-service.listener.ts` (tenant → `CAMPAIGN_SVC_FIFO`) and the `@domains/campaign`
   types it uses are unaffected. Verified green (build 0, lint 0 errors, unit 64/64).
 
-### Spec gaps recorded (out of this pass's scope)
-- `tenants.verification_status` (unverified→pending_review→verified→rejected payout gate) — not present.
+### Company verification (`tenants.verification_status`) — IMPLEMENTED + cross-team contract
+
+Per `referralai_system_architecture_v1.md` §Company Verification, this service **owns**
+`verification_status` (unverified→pending_review→verified→rejected) and the workflow service runs the
+`account_verification` Temporal workflow. The workflow service has **not built that workflow yet**, so
+this service defines its side of the contract (the workflow service must match it):
+
+- **Field:** `tenants.verification_status` (default `unverified`), exposed on tenant responses.
+- **Published (→ `tenant-events` SNS topic):**
+  - `tenant.verification_requested` `{ tenant_id, tenant_name, requested_by }` — emitted at tenant
+    creation (signup) for the workflow service to start `account_verification`.
+  - `tenant.verification_status_changed` `{ tenant_id, previous_status, new_status, reason }` — emitted
+    when the decision is applied.
+- **Inbound decision callback (consumed):** `PATCH /v1/internal/tenants/:id/verification`
+  (service-token auth) body `{ status, reason?, reviewedBy? }` — the workflow service calls this to apply
+  its approve/reject decision; updates the field + emits `tenant.verification_status_changed`.
+- **Not built here (per spec):** the Temporal `account_verification` workflow itself (owned by the
+  workflow service) and payout-gating (owned by the Reward service). Contract item for those teams.
 - Role naming `Operator` (spec) vs `MEMBER` (impl).
 - Prisma migration baseline — **RESOLVED** (squashed baseline + reset; see the migration-baseline section above).
 

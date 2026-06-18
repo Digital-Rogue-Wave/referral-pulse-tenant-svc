@@ -161,6 +161,41 @@ export class TenantDomainVerifiedEvent extends BaseDomainEvent {
     }
 }
 
+/**
+ * Emitted when company verification is requested (at signup). Consumed by the workflow
+ * service to start the `account_verification` Temporal workflow. snake_case wire contract.
+ */
+export class TenantVerificationRequestedEvent extends BaseDomainEvent {
+    readonly eventType = 'tenant.verification_requested' as const;
+
+    constructor(
+        public readonly aggregateId: string,
+        public readonly tenantId: string,
+        public readonly tenantName: string,
+        public readonly userId?: string
+    ) {
+        super();
+    }
+}
+
+/**
+ * Emitted when verification_status changes (e.g. the workflow service's decision is applied).
+ */
+export class TenantVerificationStatusChangedEvent extends BaseDomainEvent {
+    readonly eventType = 'tenant.verification_status_changed' as const;
+
+    constructor(
+        public readonly aggregateId: string,
+        public readonly tenantId: string,
+        public readonly previousStatus: string,
+        public readonly newStatus: string,
+        public readonly reason?: string,
+        public readonly userId?: string
+    ) {
+        super();
+    }
+}
+
 // ============================================================
 // Event type constants
 // ============================================================
@@ -176,5 +211,7 @@ export const TenantEvents = {
     DELETION_SCHEDULED: 'tenant.deletion-scheduled',
     DELETION_CANCELLED: 'tenant.deletion-cancelled',
     OWNERSHIP_TRANSFERRED: 'tenant.ownership-transferred',
-    DOMAIN_VERIFIED: 'tenant.domain-verified'
+    DOMAIN_VERIFIED: 'tenant.domain-verified',
+    VERIFICATION_REQUESTED: 'tenant.verification_requested',
+    VERIFICATION_STATUS_CHANGED: 'tenant.verification_status_changed'
 } as const;

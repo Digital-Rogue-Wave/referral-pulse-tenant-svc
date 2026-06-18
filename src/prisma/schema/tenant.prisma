@@ -4,6 +4,7 @@ model Tenant {
   slug                     String    @unique @db.VarChar(255)
   imageId                  String?   @map("image_id")
   status                   String    @default("active") @db.VarChar(50)
+  verificationStatus       String    @default("unverified") @map("verification_status") @db.VarChar(50)
   paymentStatus            String    @default("active") @map("payment_status") @db.VarChar(50)
   paymentStatusChangedAt   DateTime? @map("payment_status_changed_at") @db.Timestamptz
   trialStartedAt           DateTime? @map("trial_started_at") @db.Timestamptz

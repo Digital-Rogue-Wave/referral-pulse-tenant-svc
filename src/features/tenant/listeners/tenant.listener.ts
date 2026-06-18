@@ -26,6 +26,8 @@ import {
     TenantDeletionCancelledEvent,
     TenantOwnershipTransferredEvent,
     TenantDomainVerifiedEvent,
+    TenantVerificationRequestedEvent,
+    TenantVerificationStatusChangedEvent,
     TenantEvents
 } from '@domains/tenant/events/tenant.events';
 
@@ -96,6 +98,56 @@ export class TenantListener {
                 data: {
                     tenantId: event.tenantId,
                     changes: event.changes
+                },
+                timestamp: this.dateService.toISO(event.occurredAt)
+            },
+            {
+                messageGroupId: event.tenantId,
+                messageDeduplicationId: event.eventId
+            }
+        );
+    }
+
+    @OnEvent(TenantEvents.VERIFICATION_REQUESTED)
+    async handleTenantVerificationRequestedEvent(event: TenantVerificationRequestedEvent): Promise<void> {
+        this.logger.log(`Handling tenant.verification_requested event`, { tenantId: event.tenantId });
+
+        await this.sns.publish(
+            TenantListener.TENANT_EVENTS_TOPIC,
+            event.eventType,
+            {
+                eventId: event.eventId,
+                data: {
+                    tenant_id: event.tenantId,
+                    tenant_name: event.tenantName,
+                    requested_by: event.userId ?? null
+                },
+                timestamp: this.dateService.toISO(event.occurredAt)
+            },
+            {
+                messageGroupId: event.tenantId,
+                messageDeduplicationId: event.eventId
+            }
+        );
+    }
+
+    @OnEvent(TenantEvents.VERIFICATION_STATUS_CHANGED)
+    async handleTenantVerificationStatusChangedEvent(event: TenantVerificationStatusChangedEvent): Promise<void> {
+        this.logger.log(`Handling tenant.verification_status_changed event`, {
+            tenantId: event.tenantId,
+            newStatus: event.newStatus
+        });
+
+        await this.sns.publish(
+            TenantListener.TENANT_EVENTS_TOPIC,
+            event.eventType,
+            {
+                eventId: event.eventId,
+                data: {
+                    tenant_id: event.tenantId,
+                    previous_status: event.previousStatus,
+                    new_status: event.newStatus,
+                    reason: event.reason ?? null
                 },
                 timestamp: this.dateService.toISO(event.occurredAt)
             },

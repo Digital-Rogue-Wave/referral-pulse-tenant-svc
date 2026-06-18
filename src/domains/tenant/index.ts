@@ -7,8 +7,8 @@ import { BaseResponseMapper } from '@common/helper';
 // Enums (canonical definition lives in tenant.types.ts)
 // ============================================================
 
-import { TenantStatus } from './tenant.types';
-export { TenantStatus };
+import { TenantStatus, VerificationStatus } from './tenant.types';
+export { TenantStatus, VerificationStatus };
 
 // ============================================================
 // Props (shape of the Prisma model)
@@ -20,6 +20,7 @@ export interface TenantProps {
     slug: string;
     imageId?: string | null;
     status: string;
+    verificationStatus: string;
     paymentStatus: string;
     trialStartedAt?: Date | null;
     trialEndsAt?: Date | null;
@@ -118,6 +119,22 @@ export class SuspendTenantDto {
     reason!: string;
 }
 
+export class UpdateVerificationStatusDto {
+    @ApiProperty({ enum: VerificationStatus })
+    @IsEnum(VerificationStatus)
+    status!: VerificationStatus;
+
+    @ApiPropertyOptional()
+    @IsOptional()
+    @IsString()
+    reason?: string;
+
+    @ApiPropertyOptional()
+    @IsOptional()
+    @IsString()
+    reviewedBy?: string;
+}
+
 // ============================================================
 // Responses
 // ============================================================
@@ -137,6 +154,9 @@ export class TenantResponse {
 
     @ApiProperty({ enum: TenantStatus })
     status!: string;
+
+    @ApiProperty({ enum: VerificationStatus })
+    verificationStatus!: string;
 
     @ApiProperty()
     paymentStatus!: string;

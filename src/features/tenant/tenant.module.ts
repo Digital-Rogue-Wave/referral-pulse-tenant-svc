@@ -11,6 +11,7 @@ import { DnsModule } from '../dns/dns.module';
 import { AwareTenantController } from './aware/aware-tenant.controller';
 import { AgnosticTenantController } from './agnostic/agnostic-tenant.controller';
 import { AdminTenantController } from './agnostic/admin-tenant.controller';
+import { InternalTenantVerificationController } from './internal-tenant-verification.controller';
 
 // Services
 import { TenantService } from './tenant.service';
@@ -40,7 +41,7 @@ import { TenantLockGuard } from './guards/tenant-lock.guard';
         // Circular Dependencies
         forwardRef(() => TeamMemberModule)
     ],
-    controllers: [AwareTenantController, AgnosticTenantController, AdminTenantController],
+    controllers: [AwareTenantController, AgnosticTenantController, AdminTenantController, InternalTenantVerificationController],
     providers: [
         // Core Services
         TenantService,

@@ -28,7 +28,8 @@ import {
     SubdomainAvailabilityResponse,
     DeletionScheduledResponse,
     tenantResponseMapper,
-    TenantStatus
+    TenantStatus,
+    VerificationStatus
 } from '@domains/tenant';
 
 import {
@@ -43,6 +44,8 @@ import {
     TenantDeletionCancelledEvent,
     TenantOwnershipTransferredEvent,
     TenantDomainVerifiedEvent,
+    TenantVerificationRequestedEvent,
+    TenantVerificationStatusChangedEvent,
     TenantEvents
 } from '@domains/tenant/events/tenant.events';
 
@@ -184,9 +187,46 @@ export class TenantService {
             new TenantCreatedEvent(tenant.id, tenant.id, tenant.name, tenant.slug, ownerId, trialStartedAt, trialEndsAt)
         );
 
+        // Company verification at signup (referralai_system_architecture_v1.md §Company Verification):
+        // request verification so the workflow service can run the account_verification workflow.
+        this.txEventEmitter.emitAfterCommit(
+            TenantEvents.VERIFICATION_REQUESTED,
+            new TenantVerificationRequestedEvent(tenant.id, tenant.id, tenant.name, ownerId)
+        );
+
         this.logger.log(`Tenant created: ${tenant.id}`, { tenantId: tenant.id, slug: tenant.slug });
 
         return tenantResponseMapper.toResponse(tenant);
+    }
+
+    /**
+     * Apply a company-verification decision (called by the workflow service's
+     * account_verification workflow via the internal endpoint). Updates verification_status
+     * and emits tenant.verification_status_changed.
+     */
+    async setVerificationStatus(tenantId: string, status: VerificationStatus, reason?: string, reviewedBy?: string): Promise<TenantResponse> {
+        const existing = await this.prisma.tenant.findUnique({ where: { id: tenantId } });
+        if (!existing) {
+            throw new NotFoundException(`Tenant with ID ${tenantId} not found`);
+        }
+
+        const updated = await this.prisma.tenant.update({
+            where: { id: tenantId },
+            data: { verificationStatus: status }
+        });
+
+        this.txEventEmitter.emitAfterCommit(
+            TenantEvents.VERIFICATION_STATUS_CHANGED,
+            new TenantVerificationStatusChangedEvent(tenantId, tenantId, existing.verificationStatus, status, reason, reviewedBy)
+        );
+
+        this.logger.log(`Tenant verification status changed: ${tenantId}`, {
+            tenantId,
+            previousStatus: existing.verificationStatus,
+            newStatus: status
+        });
+
+        return tenantResponseMapper.toResponse(updated);
     }
 
     // =========================================================

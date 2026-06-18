@@ -92,7 +92,9 @@ export type EventAction =
     | 'monthly_summary'
     | 'threshold_crossed'
     | 'registered'
-    | 'role_changed';
+    | 'role_changed'
+    | 'verification_requested'
+    | 'verification_status_changed';
 
 /**
  * Valid base event type combining category and action
@@ -321,7 +323,9 @@ export type TenantEventType =
     | 'tenant.domain-verified'
     | 'tenant.restricted'
     | 'tenant.restored'
-    | 'tenant.payment-status-changed';
+    | 'tenant.payment-status-changed'
+    | 'tenant.verification_requested'
+    | 'tenant.verification_status_changed';
 
 // Billing domain events
 export type BillingEventType =
