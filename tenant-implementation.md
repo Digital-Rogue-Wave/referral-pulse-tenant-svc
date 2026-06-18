@@ -134,8 +134,8 @@ billing extension:
 | `plans`, `billings`, `billing_events`, `tenant_usages` | `billing.prisma` | Billing extension |
 | `side_effect_outbox` | `side-effect-outbox.prisma` | Outbox pattern |
 
-> **Migration note:** the dev DB is synced via `prisma db push`; the `migrations/` history is stale
-> (`init` covers only 3 tables). Baselining migrations is a tracked follow-up (`NOTE.md`).
+> **Migration note:** the migration history was re-baselined — `20260219100415_init` is a single
+> squashed baseline of the full schema. Use `prisma migrate dev` for new changes (see `NOTE.md`).
 
 ## Background jobs (BullMQ)
 
@@ -170,5 +170,5 @@ pnpm test            # unit (Jest)
 pnpm test:bdd        # Cucumber (needs a live Postgres); also :auth / :billing / :guards
 ```
 
-Prisma: `npx prisma generate` after schema edits; `npx prisma db push` to sync the dev DB (not
-`migrate dev` — see the migration note above). Seed roles/plans/currencies via `npx prisma db seed`.
+Prisma: `npx prisma generate` after schema edits; `npx prisma migrate dev --name <name>` to create +
+apply migrations. Seed roles/plans/currencies + tenant/billing mock data via `npx prisma db seed`.

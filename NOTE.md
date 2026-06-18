@@ -75,20 +75,23 @@ Captured on the working branch before any code change:
     positional-args + availability-precheck mocks). `pnpm test` → 64/64. `pnpm lint:check` → 0 errors
     (144 pre-existing warnings remain, non-failing). `pnpm build` → 0 issues.
 
-## Pre-existing issue — Prisma migration drift (flagged, needs separate baseline)
+## Prisma migration baseline — RESOLVED
 
-The `src/prisma/migrations/` history is **stale**: the only migration (`20260219100415_init`) creates just
-3 tables (`currencies`, `side_effect_outbox`, `totos`), but the schema defines 14 (`tenants`, `api_keys`,
-`billings`, `team_members`, etc.). The live dev DB has all tables — it was clearly synced via
-`prisma db push`, not migrations (`migrate status` reports "up to date" because it only compares applied
-migration files, not actual schema drift).
+The `src/prisma/migrations/` history was **stale**: the only migration (`20260219100415_init`) created just
+3 tables (`currencies`, `side_effect_outbox`, `totos`), while the schema defines 17. The dev DB had been
+synced via `prisma db push`, not migrations.
 
-**Consequence for this pass:** running `prisma migrate dev` would try to reset the DB (data loss), so it
-is NOT used. Schema changes in Phase 3 are applied with `prisma db push` (additive-safe) + `prisma
-generate`. No migration files are fabricated against the broken baseline.
-**Recommendation (separate task, out of this pass):** baseline the migration history — `prisma migrate
-diff` from an empty DB to the current schema to produce a single squashed init migration, then mark it
-applied (`migrate resolve --applied`). Tracked as a cross-team item.
+**Fix (decision: clean squash + reset):** the `20260219100415_init` migration was replaced with a single
+**squashed baseline** generated from the current schema
+(`prisma migrate diff --from-empty --to-schema src/prisma --script`) — all 17 tables incl.
+`users`/`roles`/`user_roles`, the `EffectType` enum, 23 indexes, 13 FKs, and no stale `totos`. The dev DB
+was rebuilt with `prisma migrate reset` (drops + re-applies the baseline + reseeds). `migrate status` →
+"Database schema is up to date!". Fresh/CI/prod environments now get the full schema from one migration.
+
+The service is pre-deployment (not yet on any dev server), so the reset's data loss was limited to
+reproducible seed/mock data. The seed recreates the **tenant mock data** (test + default tenants) and
+**billing mock data** (plans, billing rows), plus currencies and roles. Going forward use
+`prisma migrate dev` for new changes (no longer `db push`).
 
 ## Tooling note — generated Prisma client excluded from lint/format
 
@@ -174,7 +177,7 @@ Our billing-extension consumer reads `referral.*` usage from `ANALYTICS_SVC_FIFO
 ### Spec gaps recorded (out of this pass's scope)
 - `tenants.verification_status` (unverified→pending_review→verified→rejected payout gate) — not present.
 - Role naming `Operator` (spec) vs `MEMBER` (impl).
-- Prisma migration baseline (stale `init`) — see the migration-drift section above.
+- Prisma migration baseline — **RESOLVED** (squashed baseline + reset; see the migration-baseline section above).
 
 ## Verification (Phase 5)
 
