@@ -140,6 +140,7 @@ export default [
             'node_modules/**',
             'coverage/**',
             'scripts/**',
+            'src/prisma/generated/**',
             '*.js',
             '*.mjs',
             '*.cjs',
