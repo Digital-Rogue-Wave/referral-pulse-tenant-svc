@@ -26,7 +26,7 @@ export const ROLE_ASSIGNMENT = 'assigned' as const;
 // ─── tenant-svc resources (each microservice defines its own) ────────────────
 
 export enum KetoResource {
-    MEMBER = 'member',
+    USER = 'user',
     INVITATION = 'invitation',
     API_KEY = 'api_key',
     BILLING = 'billing',

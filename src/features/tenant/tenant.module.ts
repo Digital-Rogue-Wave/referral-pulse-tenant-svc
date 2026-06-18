@@ -1,10 +1,9 @@
-import { Module, forwardRef } from '@nestjs/common';
+import { Module } from '@nestjs/common';
 
 // Modules
 import { FilesModule } from '../files/files.module';
 import { HttpModule } from '@common/http/http.module';
 import { TenantSettingModule } from '@app/features/tenant-setting/tenant-setting.module';
-import { TeamMemberModule } from '@app/features/team-member/team-member.module';
 import { DnsModule } from '../dns/dns.module';
 
 // Controllers
@@ -34,12 +33,9 @@ import { TenantLockGuard } from './guards/tenant-lock.guard';
         FilesModule,
         HttpModule,
         TenantSettingModule,
-        DnsModule,
+        DnsModule
 
         // BullJobsModule is @Global() - no need to import
-
-        // Circular Dependencies
-        forwardRef(() => TeamMemberModule)
     ],
     controllers: [AwareTenantController, AgnosticTenantController, AdminTenantController, InternalTenantVerificationController],
     providers: [

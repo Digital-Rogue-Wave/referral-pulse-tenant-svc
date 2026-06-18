@@ -8,6 +8,7 @@ model User {
   tenantId         String    @map("tenant_id") @db.VarChar(26)
   email            String?   @db.VarChar(320)
   name             String?   @db.VarChar(255)
+  role             String    @default("OPERATOR") @db.VarChar(50)
   kratosIdentityId String    @map("kratos_identity_id") @db.VarChar(64)
   lastLoginAt      DateTime? @map("last_login_at") @db.Timestamptz
 

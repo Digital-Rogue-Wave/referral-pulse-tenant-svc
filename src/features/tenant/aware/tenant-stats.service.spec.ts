@@ -6,7 +6,7 @@ import { HttpClientService } from '@common/http/http-client.service';
 import { RedisService } from '@common/redis/redis.service';
 import { TenantContextService } from '@common/tenant-aware/tenant-context.service';
 import { AppLoggerService } from '@common/logging/app-logger.service';
-import { TeamMemberService } from '@app/features/team-member/team-member.service';
+import { DatabaseService } from '@app/database/database.service';
 
 import { TenantStatsDto } from '@domains/tenant';
 
@@ -17,7 +17,7 @@ describe('TenantStatsService', () => {
     let configService: MockProxy<ConfigService>;
     let httpClient: MockProxy<HttpClientService>;
     let redisService: MockProxy<RedisService>;
-    let teamMemberService: MockProxy<TeamMemberService>;
+    let prisma: MockProxy<DatabaseService>;
     let tenantContext: MockProxy<TenantContextService>;
     let logger: MockProxy<AppLoggerService>;
 
@@ -27,9 +27,11 @@ describe('TenantStatsService', () => {
         configService = mock<ConfigService>();
         httpClient = mock<HttpClientService>();
         redisService = mock<RedisService>();
-        teamMemberService = mock<TeamMemberService>();
+        prisma = mock<DatabaseService>();
         tenantContext = mock<TenantContextService>();
         logger = mock<AppLoggerService>();
+
+        prisma.user = { count: jest.fn() } as never;
 
         configService.getOrThrow.mockReturnValue({
             campaigns: 'http://campaigns',
@@ -45,7 +47,7 @@ describe('TenantStatsService', () => {
                 { provide: ConfigService, useValue: configService },
                 { provide: HttpClientService, useValue: httpClient },
                 { provide: RedisService, useValue: redisService },
-                { provide: TeamMemberService, useValue: teamMemberService },
+                { provide: DatabaseService, useValue: prisma },
                 { provide: TenantContextService, useValue: tenantContext },
                 { provide: AppLoggerService, useValue: logger }
             ]
@@ -77,7 +79,7 @@ describe('TenantStatsService', () => {
 
     it('should aggregate stats from external services and cache them', async () => {
         redisService.get.mockResolvedValue(undefined);
-        teamMemberService.countMembers.mockResolvedValue(5);
+        (prisma.user.count as jest.Mock).mockResolvedValue(5);
 
         httpClient.get.mockImplementation((url: string) => {
             if (url.includes('active-count')) return Promise.resolve({ data: { count: 1 } });
@@ -95,14 +97,14 @@ describe('TenantStatsService', () => {
         expect(result.totalReferralsThisMonth).toBe(3);
         expect(result.totalRevenue).toBe(100);
         expect(result.pendingPayouts).toBe(10);
-        expect(result.planUsagePercentage).toBe(50); // 5 members / 10 limit
+        expect(result.planUsagePercentage).toBe(50); // 5 users / 10 limit
 
         expect(redisService.set).toHaveBeenCalledWith(`dashboard:stats:${tenantId}`, result, { ttl: 300 });
     });
 
     it('should handle partial failures from external services', async () => {
         redisService.get.mockResolvedValue(undefined);
-        teamMemberService.countMembers.mockResolvedValue(0);
+        (prisma.user.count as jest.Mock).mockResolvedValue(0);
 
         httpClient.get.mockImplementation((url: string) => {
             if (url.includes('active-count')) return Promise.resolve({ data: { count: 1 } });

@@ -27,7 +27,6 @@ model Tenant {
   image                       File?                        @relation(fields: [imageId], references: [id])
   setting                     TenantSetting?
   invitations                 Invitation[]
-  members                     TeamMember[]
   users                       User[]
   billing                     Billing?
   billingEvents               BillingEvent[]

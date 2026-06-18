@@ -244,17 +244,16 @@ async function seedDefaultTenant() {
 }
 
 // Platform roles per referralai_db_tables_per_service.md (roles → scopes).
-// Names align with TeamMemberRole; scopes are coarse role tiers consumed by
-// /internal/validate-token. (Spec also names "Operator" — see NOTE.md naming note.)
+// Names match the spec roles: Owner / Admin / Operator / Viewer.
 async function seedRoles() {
     const roles = [
         { name: 'OWNER', description: 'Full access to the tenant', scopes: ['tenant:*'] },
         {
             name: 'ADMIN',
-            description: 'Administer members, API keys and settings',
-            scopes: ['tenant:read', 'tenant:write', 'members:*', 'api_keys:*', 'billing:read']
+            description: 'Administer users, API keys and settings',
+            scopes: ['tenant:read', 'tenant:write', 'users:*', 'api_keys:*', 'billing:read']
         },
-        { name: 'MEMBER', description: 'Operate campaigns and read tenant data', scopes: ['tenant:read', 'campaigns:read', 'campaigns:write'] },
+        { name: 'OPERATOR', description: 'Operate campaigns and read tenant data', scopes: ['tenant:read', 'campaigns:read', 'campaigns:write'] },
         { name: 'VIEWER', description: 'Read-only access', scopes: ['tenant:read', 'campaigns:read'] }
     ];
 

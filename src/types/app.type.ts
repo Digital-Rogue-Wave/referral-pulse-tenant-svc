@@ -33,7 +33,6 @@ export type EventCategory =
     | 'tenant'
     | 'billing'
     | 'invitation'
-    | 'team-member'
     | 'tenant-setting'
     | 'dns'
     | 'subscription'
@@ -299,9 +298,6 @@ export type TenantSettingEventType = 'tenant-setting.created' | 'tenant-setting.
 // Notification domain events
 export type NotificationEventType = 'notification.updated' | 'notification.sent';
 
-// Team Member domain events
-export type TeamMemberEventType = 'team-member.created' | 'team-member.updated' | 'team-member.deleted' | 'team-member.status';
-
 // Invitation domain events
 export type InvitationEventType = 'invitation.created' | 'invitation.accepted' | 'invitation.revoked' | 'invitation.rejected' | 'invitation.resent';
 
@@ -365,7 +361,6 @@ export type DomainEventType =
     | ApiKeyEventType
     | TenantSettingEventType
     | NotificationEventType
-    | TeamMemberEventType
     | InvitationEventType
     | DnsEventType
     | TenantEventType

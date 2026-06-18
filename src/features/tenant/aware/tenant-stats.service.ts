@@ -7,7 +7,7 @@ import { TenantContextService } from '@common/tenant-aware/tenant-context.servic
 import { AppLoggerService } from '@common/logging/app-logger.service';
 import servicesConfig from '@config/services.config';
 
-import { TeamMemberService } from '@app/features/team-member/team-member.service';
+import { DatabaseService } from '@app/database/database.service';
 import { TenantStatsDto } from '@domains/tenant';
 
 @Injectable()
@@ -20,7 +20,7 @@ export class TenantStatsService {
         private readonly configService: ConfigService,
         private readonly httpClient: HttpClientService,
         private readonly redisService: RedisService,
-        private readonly teamMemberService: TeamMemberService,
+        private readonly prisma: DatabaseService,
         private readonly tenantContext: TenantContextService,
         private readonly logger: AppLoggerService
     ) {
@@ -83,7 +83,7 @@ export class TenantStatsService {
 
         // For plan usage, calculate members usage
         // Note: Assuming a hardcoded limit of 10 members for now
-        const memberCount = await this.teamMemberService.countMembers();
+        const memberCount = await this.prisma.user.count({ where: { tenantId, deletedAt: null } });
         const MEMBER_LIMIT = 10;
         stats.planUsagePercentage = Math.min((memberCount / MEMBER_LIMIT) * 100, 100);
 
