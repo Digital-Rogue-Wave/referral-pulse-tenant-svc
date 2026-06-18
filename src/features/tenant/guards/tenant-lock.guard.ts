@@ -14,9 +14,22 @@ export class TenantLockGuard implements CanActivate {
         private readonly tenantContext: TenantContextService
     ) {}
 
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     async canActivate(context: ExecutionContext): Promise<boolean> {
-        const tenantId = this.tenantContext.getTenantId();
+        // Guards run BEFORE interceptors, so the ALS tenant context (set by AlsAuthInterceptor)
+        // is not yet populated here. Resolve the tenant from the request the same way the
+        // interceptor does — user claim (set by the global JwtAuthGuard) → header → request —
+        // falling back to ALS for non-HTTP/late contexts.
+        const request = context.switchToHttp().getRequest<{
+            user?: { tenantId?: string };
+            headers?: Record<string, string | string[] | undefined>;
+            tenantId?: string;
+        }>();
+        const headerTenant = request.headers?.['x-tenant-id'];
+        const tenantId =
+            request.user?.tenantId ??
+            (typeof headerTenant === 'string' ? headerTenant : undefined) ??
+            request.tenantId ??
+            this.tenantContext.getTenantId();
 
         if (!tenantId) {
             return true;
