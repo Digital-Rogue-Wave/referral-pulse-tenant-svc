@@ -48,6 +48,10 @@ billing is **retained** here. This is the single knowing divergence — full rec
   listeners; critical side effects use the outbox (`SideEffectService`).
 - **Inbound SQS** is handled by `MessageProcessorService` (idempotency + tenant context).
 - **Background work** runs on BullMQ (billing usage/escalation/trials, tenant deletion/unlock).
+- **Errors** follow the canonical model (`referralai_api_contract` §error model): `BaseException(code,
+  message, status, param?, details?)` → `GlobalExceptionsFilter` emits
+  `{ error: { code, message, param?, requestId, correlationId?, details? } }` (+ `X-Request-Id` header);
+  `code` is lowercase snake_case (`ErrorCode` union).
 
 ## Module map
 
@@ -100,7 +104,9 @@ All routes are versioned (`/v1/...`) and tenant-scoped unless marked Public/Inte
 | `subscription.*` | `billing-events-topic` | subscription/stripe fields (billing extension) |
 | `payment.failed` / `payment.restored` | `billing-events-topic` | payment-status fields |
 | `tenant.restricted` / `tenant.locked` / `tenant.restored` | `billing-events-topic` | payment-status fields |
-| `tenant.*` (created/updated/deletion-*) | `tenant`-domain | tenant lifecycle (audit + SNS) |
+| `tenant.*` (created/updated/suspended/locked/deletion-*) | `tenant-events` | tenant lifecycle |
+| `tenant.verification_requested` | `tenant-events` | `tenant_id, tenant_name, requested_by` (emitted at signup) |
+| `tenant.verification_status_changed` | `tenant-events` | `tenant_id, previous_status, new_status, reason` |
 
 Internal EventEmitter2 events keep camelCase payloads (`api-key.created`, etc.);
 camelCase→snake_case mapping happens only at the SNS boundary. Audit events route to `AUDIT_TRAIL_FIFO`.
@@ -114,7 +120,7 @@ billing extension:
 |---|---|---|---|
 | `analytics-svc.fifo` | `referral.*` usage `{metric, delta}` | `BillingConsumer` | Hardened to accept metric/delta nested or top-level; queue/producer are cross-team contract items (see `NOTE.md`) |
 
-> `CampaignEventsConsumer` (`CAMPAIGN_SVC_FIFO`) is an out-of-scope dead stub flagged for removal in `NOTE.md`.
+> The former out-of-scope `CampaignEventsConsumer` (`CAMPAIGN_SVC_FIFO`) has been removed (it was a dead stub; the tenant service consumes no domain events except the billing-extension usage event above).
 
 ## Owned DB tables (Prisma — `src/prisma/schema/`)
 
@@ -124,7 +130,7 @@ billing extension:
 | `users` | `user.prisma` | Platform users (operators): membership + denormalized `role`, keyed by `(tenant_id, kratos_identity_id)` |
 | `roles` | `user.prisma` | Role definitions → scopes (seeded: OWNER/ADMIN/OPERATOR/VIEWER) |
 | `user_roles` | `user.prisma` | User↔role assignment per tenant |
-| `api_keys` | `api-key.prisma` | API keys (key_hash, key_prefix, key_type, scopes) |
+| `api_keys` | `api-key.prisma` | API keys: SHA-256 `key_hash`, `key_prefix`, `key_type` (secret/publishable). Raw key prefixed `rai_live_` (secret) / `rai_pub_` (publishable) per api_contract §2.2 |
 | `invitations` | `invitation.prisma` | Team invitations |
 | `tenant_settings`, `user_notification_preferences` | `tenant-setting.prisma` | Settings + prefs |
 | `reserved_subdomains` | `dns.prisma` | Subdomain reservations |

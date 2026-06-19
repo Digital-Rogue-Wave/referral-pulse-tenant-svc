@@ -239,6 +239,49 @@ utilities to adopt were found; if specific ones are known to have been updated u
 adopted individually. (Types/interfaces are centralized under `@app/types` here vs local files in the
 template — a deliberate convention, kept.)
 
+## Audit — spec(owned) ↔ code ↔ docs
+
+### Owned tables (db_tables_per_service §1 Identity & Access) → code
+| Spec table | In code | Notes |
+|---|---|---|
+| `tenants` | ✅ | richer than spec (billing/feature columns). Spec lists `plan` + `metadata` columns we don't have (plan lives in `billings`; no `metadata` jsonb). |
+| `users` | ✅ | matches (id, tenant_id, email, name, role, kratos_identity_id, last_login_at). |
+| `roles` | ✅ | matches. |
+| `user_roles` | ✅ | matches. |
+| `api_keys` | ✅ | **field divergences** — see below. |
+| `oauth2_clients` | ⚠️ Ory | delegated to Ory Hydra (no local table) — intentional. |
+| `sessions` | ⚠️ Ory | delegated to Ory Kratos (no local table) — intentional. |
+
+### Identity events (event_model §4.12) → code
+| Spec event | In code |
+|---|---|
+| `user.registered` `{user_id,tenant_id,role}` | ✅ |
+| `user.logged_in` `{user_id,auth_method}` | ⚠️ emitted at Ory/gateway, not here — correct per spec. |
+| `api_key.created` `{key_id,key_type,tenant_id,created_by}` | ✅ |
+| `api_key.revoked` `{key_id,revoked_by,revocation_reason}` | ✅ |
+
+### Endpoints (api_contract §2.2 + system_architecture) → code
+| Spec | In code |
+|---|---|
+| `POST /v1/api-keys`, `GET /v1/api-keys`, `DELETE /v1/api-keys/{id}` | ✅ (plus extra `GET/:id`, `PUT/:id`, `PUT/:id/status` — beyond contract) |
+| `GET /v1/internal/validate-token` (system_arch) | ✅ |
+
+### DIVERGENCES / DECISIONS (spec-owned items where code differs)
+1. **API key prefix — FIXED:** `generateSecureApiKey(keyType)` now emits `rai_pub_` (publishable) /
+   `rai_live_` (secret) per api_contract §2.2 (was always `sk_live_`). The gateway routes on this prefix.
+2. **api_keys field naming:** spec `label` / `revoked_at` vs our `name` / `status`(+`deletedAt`); spec
+   `key_hash` bcrypt + `key_prefix` last-4 vs our SHA-256 + first-20 (first-20 is our lookup prefix).
+3. **`user.role_changed`:** emitted by us but **not in event_model §4.12** — an extension (useful for
+   consumers). Keep-as-extension or drop.
+4. **`/v1/users/me`, `/v1/users/:id/roles`:** not in api_contract v1.2 (our additions for dashboard
+   user management) — extensions.
+5. **Extra events/tables (features/billing extension):** tenant.* lifecycle, subscription.*, payment.*,
+   verification.*, invitations, tenant_settings, dns, files — beyond the minimal identity spec; billing
+   is the sanctioned extension, the rest are tenant-management features.
+
+All strict identity-spec items (tables, §4.12 events, api-key + validate-token endpoints) are present;
+the actionable gap is the API key prefix (#1).
+
 ## Verification
 
 | Gate | Result |

@@ -51,7 +51,8 @@ export class ApiKeyService {
      * The raw key is returned only once and never stored
      */
     async create(userId: string, dto: CreateApiKeyDto): Promise<ApiKeyWithRawKeyResponse> {
-        const rawKey = this.generateSecureApiKey();
+        const keyType = dto.keyType ?? ApiKeyType.SECRET;
+        const rawKey = this.generateSecureApiKey(keyType);
         const keyHash = this.hashApiKey(rawKey);
         const keyPrefix = this.extractApiKeyPrefix(rawKey);
 
@@ -60,7 +61,7 @@ export class ApiKeyService {
                 name: dto.name,
                 keyHash,
                 keyPrefix,
-                keyType: dto.keyType ?? ApiKeyType.SECRET,
+                keyType,
                 scopes: dto.scopes,
                 createdBy: userId,
                 expiresAt: dto.expiresAt,
@@ -298,8 +299,9 @@ export class ApiKeyService {
     // Crypto helpers
     // ============================================================================
 
-    private generateSecureApiKey(): string {
-        const prefix = 'sk_live_';
+    private generateSecureApiKey(keyType: ApiKeyType): string {
+        // Prefix encodes the key type per referralai_api_contract §2.2 (the gateway routes on it).
+        const prefix = keyType === ApiKeyType.PUBLISHABLE ? 'rai_pub_' : 'rai_live_';
         const randomPart = randomBytes(32).toString('base64url');
         return `${prefix}${randomPart}`;
     }
