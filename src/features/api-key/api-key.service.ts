@@ -10,7 +10,6 @@ import { prismaPaginate, PaginateQuery, Paginated } from '@common/nestjs-prisma-
 
 import {
     ApiKeyProps,
-    ApiKeyStatus,
     CreateApiKeyDto,
     UpdateApiKeyDto,
     ApiKeyResponse,
@@ -18,7 +17,6 @@ import {
     apiKeyResponseMapper,
     ApiKeyCreatedEvent,
     ApiKeyUpdatedEvent,
-    ApiKeyStatusUpdatedEvent,
     ApiKeyDeletedEvent,
     ApiKeyType
 } from '@domains/api-key';
@@ -58,14 +56,13 @@ export class ApiKeyService {
 
         const saved = (await this.apiKey.create({
             data: {
-                name: dto.name,
+                label: dto.label,
                 keyHash,
                 keyPrefix,
                 keyType,
                 scopes: dto.scopes,
                 createdBy: userId,
-                expiresAt: dto.expiresAt,
-                status: ApiKeyStatus.ACTIVE
+                expiresAt: dto.expiresAt
             }
         })) as ApiKeyProps;
 
@@ -76,7 +73,7 @@ export class ApiKeyService {
             {
                 apiKeyId: saved.id,
                 tenantId: saved.tenantId,
-                name: saved.name,
+                label: saved.label,
                 keyPrefix: saved.keyPrefix,
                 keyType: saved.keyType,
                 scopes: saved.scopes as string[],
@@ -90,7 +87,7 @@ export class ApiKeyService {
 
         this.logger.log(`API key created: ${saved.id}`, {
             apiKeyId: saved.id,
-            name: saved.name
+            label: saved.label
         });
 
         return apiKeyResponseMapper.toResponseWithRawKey(saved, rawKey);
@@ -141,8 +138,8 @@ export class ApiKeyService {
 
         // Build changes object
         const changes: Record<string, { from: unknown; to: unknown }> = {};
-        if (dto.name && dto.name !== existing.name) {
-            changes.name = { from: existing.name, to: dto.name };
+        if (dto.label && dto.label !== existing.label) {
+            changes.label = { from: existing.label, to: dto.label };
         }
         if (dto.scopes) {
             changes.scopes = { from: existing.scopes, to: dto.scopes };
@@ -171,50 +168,8 @@ export class ApiKeyService {
     }
 
     /**
-     * Update API key status (active/stopped)
-     */
-    async updateStatus(id: string, userId: string, newStatus: string): Promise<ApiKeyResponse> {
-        const existing = (await this.apiKey.findUnique({
-            where: { id }
-        })) as ApiKeyProps | null;
-        if (!existing) {
-            throw new NotFoundException(`API key with ID ${id} not found`);
-        }
-
-        const previousStatus = existing.status;
-
-        const updated = (await this.apiKey.update({
-            where: { id },
-            data: { status: newStatus }
-        })) as ApiKeyProps;
-
-        const event = new ApiKeyStatusUpdatedEvent(
-            id,
-            updated.tenantId,
-            {
-                apiKeyId: id,
-                tenantId: updated.tenantId,
-                previousStatus,
-                newStatus,
-                updatedBy: userId,
-                updatedAt: updated.updatedAt
-            },
-            userId
-        );
-        this.txEventEmitter.emitAfterCommit('api-key.status', event);
-        this.txEventEmitter.emitAfterCommit('audit.api-key.status', event);
-
-        this.logger.log(`API key status updated: ${id}`, {
-            apiKeyId: id,
-            previousStatus,
-            newStatus
-        });
-
-        return apiKeyResponseMapper.toResponse(updated);
-    }
-
-    /**
-     * Soft delete an API key
+     * Revoke an API key (immediate, irreversible per api_contract §2.2).
+     * Sets revoked_at and soft-deletes the record.
      */
     async delete(id: string, userId: string): Promise<void> {
         const existing = (await this.apiKey.findUnique({
@@ -224,6 +179,8 @@ export class ApiKeyService {
             throw new NotFoundException(`API key with ID ${id} not found`);
         }
 
+        const revokedAt = new Date();
+        await this.apiKey.update({ where: { id }, data: { revokedAt } });
         await this.apiKey.delete({ where: { id } });
 
         const event = new ApiKeyDeletedEvent(
@@ -232,10 +189,10 @@ export class ApiKeyService {
             {
                 apiKeyId: id,
                 tenantId: existing.tenantId,
-                keyName: existing.name,
+                keyLabel: existing.label,
                 keyPrefix: existing.keyPrefix,
                 deletedBy: userId,
-                deletedAt: new Date()
+                deletedAt: revokedAt
             },
             userId
         );
@@ -257,7 +214,7 @@ export class ApiKeyService {
         const apiKey = (await this.prisma.apiKey.findFirst({
             where: {
                 keyPrefix,
-                status: ApiKeyStatus.ACTIVE,
+                revokedAt: null,
                 deletedAt: null
             }
         })) as ApiKeyProps | null;

@@ -239,6 +239,15 @@ utilities to adopt were found; if specific ones are known to have been updated u
 adopted individually. (Types/interfaces are centralized under `@app/types` here vs local files in the
 template — a deliberate convention, kept.)
 
+## Canonical docs location
+
+`docs/` is the **source of truth** (read-only). It is newer than `project-docs/specs/`: e.g.
+`docs/referralai_db_tables_per_service.md` places attribution in the Referral Workflow service (critical
+path), while `project-docs/specs/` still has the older layout (attribution under Analytics). `api_contract`,
+`responsibility_contract`, `failure_observability`, and `product_spec` are identical in both; only
+`system_architecture`, `db_tables_per_service`, and `event_model` differ. **Treat `project-docs/specs/` as
+a stale reference copy** (bundled with the template's `project-docs/`); align all work to `docs/`.
+
 ## Audit — spec(owned) ↔ code ↔ docs
 
 ### Owned tables (db_tables_per_service §1 Identity & Access) → code
@@ -269,8 +278,11 @@ template — a deliberate convention, kept.)
 ### DIVERGENCES / DECISIONS (spec-owned items where code differs)
 1. **API key prefix — FIXED:** `generateSecureApiKey(keyType)` now emits `rai_pub_` (publishable) /
    `rai_live_` (secret) per api_contract §2.2 (was always `sk_live_`). The gateway routes on this prefix.
-2. **api_keys field naming:** spec `label` / `revoked_at` vs our `name` / `status`(+`deletedAt`); spec
-   `key_hash` bcrypt + `key_prefix` last-4 vs our SHA-256 + first-20 (first-20 is our lookup prefix).
+2. **api_keys field naming — FIXED:** renamed `name`→`label` and replaced the `status` enum with
+   `revoked_at` (null = active) per db_tables; the status endpoint/event/enum were removed (revoke =
+   `DELETE /v1/api-keys/:id` sets `revoked_at`, per api_contract §2.2 "immediate, irreversible"). Still
+   accepted as impl choices: `key_hash` SHA-256 (spec says bcrypt — SHA-256 is standard for high-entropy
+   API keys) and lookup `key_prefix` first-20 (spec's "last 4" is a display concern).
 3. **`user.role_changed`:** emitted by us but **not in event_model §4.12** — an extension (useful for
    consumers). Keep-as-extension or drop.
 4. **`/v1/users/me`, `/v1/users/:id/roles`:** not in api_contract v1.2 (our additions for dashboard

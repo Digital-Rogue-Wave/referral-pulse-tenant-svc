@@ -74,7 +74,7 @@ All routes are versioned (`/v1/...`) and tenant-scoped unless marked Public/Inte
 
 | Method(s) | Path | Module | Notes |
 |---|---|---|---|
-| GET/POST/PUT/DELETE | `/v1/api-keys`, `/v1/api-keys/:id`, `/v1/api-keys/:id/status` | api-key | Keto-guarded; raw key shown once |
+| POST/GET/GET:id/PUT:id/DELETE:id | `/v1/api-keys` | api-key | Create/list/get/update(label,scopes)/revoke; Keto-guarded; raw key shown once. DELETE = revoke (sets `revoked_at`, irreversible) |
 | GET | `/v1/users/me` | users | Current user profile + roles/scopes |
 | POST/GET/PUT/DELETE | `/v1/users`, `/v1/users/:id`, `/v1/users/:id/roles` | users | Membership + role; last-admin protection |
 | GET | `/v1/internal/validate-token` | users | **Public/internal** — resolve API key or JWT → claims |
@@ -130,7 +130,7 @@ billing extension:
 | `users` | `user.prisma` | Platform users (operators): membership + denormalized `role`, keyed by `(tenant_id, kratos_identity_id)` |
 | `roles` | `user.prisma` | Role definitions → scopes (seeded: OWNER/ADMIN/OPERATOR/VIEWER) |
 | `user_roles` | `user.prisma` | User↔role assignment per tenant |
-| `api_keys` | `api-key.prisma` | API keys: SHA-256 `key_hash`, `key_prefix`, `key_type` (secret/publishable). Raw key prefixed `rai_live_` (secret) / `rai_pub_` (publishable) per api_contract §2.2 |
+| `api_keys` | `api-key.prisma` | `label`, SHA-256 `key_hash`, `key_prefix`, `key_type` (secret/publishable), `scopes`, `revoked_at` (null = active). Raw key prefixed `rai_live_` (secret) / `rai_pub_` (publishable) per api_contract §2.2 |
 | `invitations` | `invitation.prisma` | Team invitations |
 | `tenant_settings`, `user_notification_preferences` | `tenant-setting.prisma` | Settings + prefs |
 | `reserved_subdomains` | `dns.prisma` | Subdomain reservations |

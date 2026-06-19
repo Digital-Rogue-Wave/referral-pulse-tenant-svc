@@ -5,7 +5,7 @@ import { AUDIT_TRAIL_FIFO } from '@app/types';
 import { AppLoggerService } from '@common/logging/app-logger.service';
 import { SideEffectService } from '@common/side-effects/side-effect.service';
 
-import { ApiKeyCreatedEvent, ApiKeyUpdatedEvent, ApiKeyStatusUpdatedEvent, ApiKeyDeletedEvent, ApiKeyEvents } from '@domains/api-key';
+import { ApiKeyCreatedEvent, ApiKeyUpdatedEvent, ApiKeyDeletedEvent, ApiKeyEvents } from '@domains/api-key';
 
 /**
  * Listener for API Key domain events
@@ -24,7 +24,7 @@ export class ApiKeyListener {
     async handleApiKeyCreated(event: ApiKeyCreatedEvent): Promise<void> {
         this.logger.log(`API key created: ${event.payload.apiKeyId}`, {
             apiKeyId: event.payload.apiKeyId,
-            name: event.payload.name
+            label: event.payload.label
         });
 
         // Send audit trail event (non-critical)
@@ -38,7 +38,7 @@ export class ApiKeyListener {
                 tenantId: event.tenantId,
                 userId: event.userId,
                 apiKeyId: event.payload.apiKeyId,
-                name: event.payload.name,
+                label: event.payload.label,
                 keyPrefix: event.payload.keyPrefix,
                 scopes: event.payload.scopes,
                 timestamp: event.occurredAt
@@ -71,37 +71,11 @@ export class ApiKeyListener {
         );
     }
 
-    @OnEvent('api-key.status')
-    async handleApiKeyStatusUpdated(event: ApiKeyStatusUpdatedEvent): Promise<void> {
-        this.logger.log(`API key status updated: ${event.payload.apiKeyId}`, {
-            apiKeyId: event.payload.apiKeyId,
-            previousStatus: event.payload.previousStatus,
-            newStatus: event.payload.newStatus
-        });
-
-        await this.sideEffectService.createSqsSideEffect(
-            'api-key',
-            event.payload.apiKeyId,
-            ApiKeyEvents.STATUS,
-            AUDIT_TRAIL_FIFO,
-            {
-                action: event.payload.newStatus === 'stopped' ? 'API_KEY_STOPPED' : 'API_KEY_STATUS_UPDATED',
-                tenantId: event.tenantId,
-                userId: event.userId,
-                apiKeyId: event.payload.apiKeyId,
-                previousStatus: event.payload.previousStatus,
-                newStatus: event.payload.newStatus,
-                timestamp: event.occurredAt
-            },
-            { critical: false }
-        );
-    }
-
     @OnEvent('api-key.deleted')
     async handleApiKeyDeleted(event: ApiKeyDeletedEvent): Promise<void> {
-        this.logger.log(`API key deleted: ${event.payload.apiKeyId}`, {
+        this.logger.log(`API key revoked: ${event.payload.apiKeyId}`, {
             apiKeyId: event.payload.apiKeyId,
-            keyName: event.payload.keyName
+            keyLabel: event.payload.keyLabel
         });
 
         await this.sideEffectService.createSqsSideEffect(
@@ -114,7 +88,7 @@ export class ApiKeyListener {
                 tenantId: event.tenantId,
                 userId: event.userId,
                 apiKeyId: event.payload.apiKeyId,
-                keyName: event.payload.keyName,
+                keyLabel: event.payload.keyLabel,
                 keyPrefix: event.payload.keyPrefix,
                 timestamp: event.occurredAt
             },

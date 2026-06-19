@@ -12,7 +12,6 @@ import { CreateApiKeyDto, UpdateApiKeyDto, ApiKeyResponse, ApiKeyWithRawKeyRespo
 
 import { ApiKeyService } from './api-key.service';
 import { API_KEY_PAGINATE_CONFIG } from './api-key.pagination';
-import { UpdateApiKeyStatusDto } from '@domains/api-key/dto/update-api-key-status.dto';
 
 @ApiTags('API Keys')
 @ApiHeader({
@@ -76,24 +75,7 @@ export class ApiKeyController {
         return this.apiKeyService.update(id, user.userId, dto);
     }
 
-    @ApiBody({ type: UpdateApiKeyStatusDto })
-    @ApiOkResponse({
-        description: 'API key status updated successfully',
-        type: ApiKeyResponse
-    })
-    @RequirePermission({ namespace: KetoNamespace.TENANT, object: KetoResource.API_KEY, relation: KetoRelation.UPDATE })
-    @HttpCode(HttpStatus.OK)
-    @Put(':id/status')
-    @Idempotent({ scope: IdempotencyScope.Tenant, ttl: 1800 })
-    async updateStatus(
-        @Param('id') id: string,
-        @Body() dto: UpdateApiKeyStatusDto,
-        @CurrentUser() user: IAuthenticatedUser
-    ): Promise<ApiKeyResponse> {
-        return this.apiKeyService.updateStatus(id, user.userId, dto.status);
-    }
-
-    @ApiOkResponse({ description: 'API key deleted successfully' })
+    @ApiOkResponse({ description: 'API key revoked successfully' })
     @RequirePermission({ namespace: KetoNamespace.TENANT, object: KetoResource.API_KEY, relation: KetoRelation.DELETE })
     @HttpCode(HttpStatus.NO_CONTENT)
     @Delete(':id')

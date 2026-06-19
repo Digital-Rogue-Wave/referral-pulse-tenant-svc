@@ -317,7 +317,7 @@ export type UserEventType =
     | 'user.role_changed';
 
 // API Key domain events
-export type ApiKeyEventType = 'api-key.created' | 'api-key.updated' | 'api-key.status' | 'api-key.deleted';
+export type ApiKeyEventType = 'api-key.created' | 'api-key.updated' | 'api-key.deleted';
 
 // Tenant Setting domain events
 export type TenantSettingEventType = 'tenant-setting.created' | 'tenant-setting.updated' | 'tenant-setting.deleted';
@@ -433,7 +433,7 @@ export const EmailSqsEvents = {
 } as const;
 
 // API Key SQS events (sent to audit service)
-export type ApiKeySqsEventType = 'api-key.created' | 'api-key.updated' | 'api-key.status' | 'api-key.deleted';
+export type ApiKeySqsEventType = 'api-key.created' | 'api-key.updated' | 'api-key.deleted';
 
 // All SQS events
 export type SqsEventType =

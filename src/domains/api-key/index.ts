@@ -8,12 +8,6 @@ import { BaseDomainEvent } from '@domains/common/events';
 // Enums
 // ============================================================
 
-export enum ApiKeyStatus {
-    ACTIVE = 'active',
-    INACTIVE = 'inactive',
-    REVOKED = 'revoked'
-}
-
 // Per referralai_event_model_v2.1.md §4.12 / referralai_db_tables_per_service.md
 export enum ApiKeyType {
     SECRET = 'secret',
@@ -27,15 +21,15 @@ export enum ApiKeyType {
 export interface ApiKeyProps {
     id: string;
     tenantId: string;
-    name: string;
+    label: string;
     keyHash: string;
     keyPrefix: string;
     keyType: string;
-    status: string;
     scopes: unknown;
     createdBy: string;
     lastUsedAt?: Date | null;
     expiresAt?: Date | null;
+    revokedAt?: Date | null;
     createdAt: Date;
     updatedAt: Date;
     deletedAt?: Date | null;
@@ -48,7 +42,7 @@ export interface ApiKeyProps {
 export class CreateApiKeyDto {
     @ApiProperty()
     @IsString()
-    name!: string;
+    label!: string;
 
     @ApiProperty({ type: [String] })
     @IsArray()
@@ -70,7 +64,7 @@ export class UpdateApiKeyDto {
     @ApiPropertyOptional()
     @IsOptional()
     @IsString()
-    name?: string;
+    label?: string;
 
     @ApiPropertyOptional({ type: [String] })
     @IsOptional()
@@ -91,16 +85,13 @@ export class ApiKeyResponse {
     tenantId!: string;
 
     @ApiProperty()
-    name!: string;
+    label!: string;
 
     @ApiProperty()
     keyPrefix!: string;
 
     @ApiProperty({ enum: ApiKeyType })
     keyType!: string;
-
-    @ApiProperty({ enum: ApiKeyStatus })
-    status!: string;
 
     @ApiProperty({ type: [String] })
     scopes!: unknown;
@@ -113,6 +104,9 @@ export class ApiKeyResponse {
 
     @ApiPropertyOptional()
     expiresAt?: Date | null;
+
+    @ApiPropertyOptional({ description: 'Set when the key is revoked (null = active)' })
+    revokedAt?: Date | null;
 
     @ApiProperty()
     createdAt!: Date;
@@ -159,7 +153,7 @@ export class ApiKeyCreatedEvent extends BaseDomainEvent {
         public readonly payload: {
             apiKeyId: string;
             tenantId: string;
-            name: string;
+            label: string;
             keyPrefix: string;
             keyType: string;
             scopes: string[];
@@ -191,26 +185,6 @@ export class ApiKeyUpdatedEvent extends BaseDomainEvent {
     }
 }
 
-export class ApiKeyStatusUpdatedEvent extends BaseDomainEvent {
-    readonly eventType = 'api-key.status' as const;
-
-    constructor(
-        public readonly aggregateId: string,
-        public readonly tenantId: string,
-        public readonly payload: {
-            apiKeyId: string;
-            tenantId: string;
-            previousStatus: string;
-            newStatus: string;
-            updatedBy: string;
-            updatedAt: Date;
-        },
-        public readonly userId?: string
-    ) {
-        super();
-    }
-}
-
 export class ApiKeyDeletedEvent extends BaseDomainEvent {
     readonly eventType = 'api-key.deleted' as const;
 
@@ -220,7 +194,7 @@ export class ApiKeyDeletedEvent extends BaseDomainEvent {
         public readonly payload: {
             apiKeyId: string;
             tenantId: string;
-            keyName: string;
+            keyLabel: string;
             keyPrefix: string;
             deletedBy: string;
             deletedAt: Date;
@@ -234,6 +208,5 @@ export class ApiKeyDeletedEvent extends BaseDomainEvent {
 export const ApiKeyEvents = {
     CREATED: 'api-key.created',
     UPDATED: 'api-key.updated',
-    STATUS: 'api-key.status',
     DELETED: 'api-key.deleted'
 } as const;
