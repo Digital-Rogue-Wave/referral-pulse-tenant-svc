@@ -199,6 +199,28 @@ this service defines its side of the contract (the workflow service must match i
   system of record; `/users` endpoints; Keto `user`).
 - Prisma migration baseline — **RESOLVED** (squashed baseline + reset; see the migration-baseline section above).
 
+## Template structure mirror + shared-utility review
+
+Mirrored the missing top-level structure from the template (additive, non-breaking):
+`project-docs/` (architecture, dev-workflow, idempotency, event-architecture, onboarding + a `specs/`
+copy with json schemas), `tasks/lessons.md`, `scripts/` (LocalStack setup), `Dockerfile`, `swcrc.json`,
+`renovate.json`, `docker-compose.test.yaml`, `buildup.dev.sh`, `http-client.env.json`, `ingest.http`.
+
+**Shared `src/` utilities — reviewed, NOT overwritten (finding).** The `src/common`/`config`/`types`
+folder structure is identical to the template and the core utilities are functionally aligned **or ahead**
+of it — the template `src/` is an **older baseline** we forked from, not a newer source. Evidence:
+- `common/events/transaction-event-emitter.service.ts` — **identical**.
+- `common/auth/jwt.strategy.ts` — **ours is ahead** (service-token/M2M handling the template lacks).
+- `common/auth/permission.guard.ts` — **ours is ahead** (service-token bypass via `allowServiceTokens`).
+- `common/messaging/sns-publisher.service.ts` — diff is **cosmetic only** (prettier object-expansion;
+  both pass `prettier --check`).
+- The largest diffs (`broadcast-event.listener`, `redis.service`) are **our own feature work**.
+
+Conclusion: a blanket adoption of the template `src/` would **regress** this service. No newer template
+utilities to adopt were found; if specific ones are known to have been updated upstream they can be
+adopted individually. (Types/interfaces are centralized under `@app/types` here vs local files in the
+template — a deliberate convention, kept.)
+
 ## Verification
 
 | Gate | Result |

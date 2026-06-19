@@ -1,0 +1,823 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Claude Code Configuration — Architecture Diagrams</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #ffffff;
+    --surface: #f8f9fb;
+    --surface2: #f0f2f5;
+    --border: #d8dce5;
+    --text: #1a1d27;
+    --text-dim: #5f6577;
+    --accent: #6c5ce7;
+    --accent2: #0d9488;
+    --coral: #dc2626;
+    --amber: #b45309;
+    --blue: #2563eb;
+    --green: #059669;
+    --pink: #db2777;
+    --teal: #0d9488;
+    --purple: #7c3aed;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: 'DM Sans', sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    line-height: 1.7;
+    padding: 0;
+  }
+  .page {
+    max-width: 1000px;
+    margin: 0 auto;
+    padding: 60px 40px;
+  }
+  h1 {
+    font-size: 2.4rem;
+    font-weight: 700;
+    margin-bottom: 8px;
+    color: var(--accent);
+  }
+  .subtitle {
+    font-size: 1.05rem;
+    color: var(--text-dim);
+    margin-bottom: 60px;
+  }
+  h2 {
+    font-size: 1.5rem;
+    font-weight: 700;
+    margin-top: 80px;
+    margin-bottom: 12px;
+    color: var(--text);
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+  h2 .num {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 36px;
+    height: 36px;
+    border-radius: 10px;
+    background: var(--accent);
+    color: #fff;
+    font-size: 0.9rem;
+    font-weight: 700;
+    flex-shrink: 0;
+  }
+  .description {
+    color: var(--text-dim);
+    font-size: 0.95rem;
+    margin-bottom: 28px;
+    max-width: 720px;
+  }
+  .diagram-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 32px;
+    margin-bottom: 24px;
+    overflow-x: auto;
+  }
+  .diagram-card svg {
+    width: 100%;
+    height: auto;
+    display: block;
+  }
+  .insight {
+    background: var(--surface2);
+    border-left: 3px solid var(--accent);
+    border-radius: 0 10px 10px 0;
+    padding: 16px 20px;
+    margin-top: 20px;
+    margin-bottom: 40px;
+    font-size: 0.9rem;
+    color: var(--text-dim);
+  }
+  .insight strong { color: var(--text); }
+  /* SVG styling */
+  svg text { font-family: 'DM Sans', sans-serif; }
+  svg .th { font-size: 13px; font-weight: 700; fill: var(--text); }
+  svg .ts { font-size: 11px; font-weight: 400; fill: var(--text-dim); }
+  svg .tl { font-size: 10px; font-weight: 400; fill: var(--text-dim); }
+  svg rect { fill: var(--surface2); stroke: var(--border); }
+  svg line, svg path.arr { stroke: var(--border); stroke-width: 1.2; fill: none; }
+  svg marker path { stroke: var(--text-dim); }
+  /* Color classes */
+  svg .c-purple rect { fill: rgba(124,58,231,0.08); stroke: rgba(124,58,231,0.35); }
+  svg .c-purple text.th { fill: var(--purple); }
+  svg .c-teal rect { fill: rgba(13,148,136,0.08); stroke: rgba(13,148,136,0.35); }
+  svg .c-teal text.th { fill: var(--teal); }
+  svg .c-coral rect { fill: rgba(220,38,38,0.06); stroke: rgba(220,38,38,0.3); }
+  svg .c-coral text.th { fill: var(--coral); }
+  svg .c-amber rect { fill: rgba(180,83,9,0.08); stroke: rgba(180,83,9,0.35); }
+  svg .c-amber text.th { fill: var(--amber); }
+  svg .c-blue rect { fill: rgba(37,99,235,0.08); stroke: rgba(37,99,235,0.35); }
+  svg .c-blue text.th { fill: var(--blue); }
+  svg .c-green rect { fill: rgba(5,150,105,0.08); stroke: rgba(5,150,105,0.35); }
+  svg .c-green text.th { fill: var(--green); }
+  svg .c-pink rect { fill: rgba(219,39,119,0.08); stroke: rgba(219,39,119,0.35); }
+  svg .c-pink text.th { fill: var(--pink); }
+  svg .c-red rect { fill: rgba(220,38,38,0.1); stroke: rgba(220,38,38,0.4); }
+  svg .c-red text.th, svg .c-red text.ts { fill: #dc2626; }
+  svg .c-gray rect { fill: var(--surface2); stroke: var(--border); }
+  svg .arr { marker-end: url(#arrow); }
+  @page { margin: 1.5cm; }
+</style>
+</head>
+<body>
+<div class="page">
+
+<h1>Claude Code Configuration</h1>
+<p class="subtitle">Architecture diagrams for the ReferralAI NestJS microservices platform — 9 services, 6 agents, 3 tiers of context loading</p>
+
+<!-- Shared arrow marker -->
+<svg width="0" height="0" style="position:absolute">
+<defs>
+  <marker id="arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+    <path d="M2 1L8 5L2 9" fill="none" stroke="#5f6577" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+  </marker>
+</defs>
+</svg>
+
+<!-- ============================================================ -->
+<!-- DIAGRAM 1: Context Loading Tiers -->
+<!-- ============================================================ -->
+<h2><span class="num">1</span>Three-Tier Context Loading</h2>
+<p class="description">How Claude Code assembles its context window at startup. Only 548 lines are always loaded. 4,672 more are available on demand — loaded one file at a time when an agent needs a specific pattern.</p>
+
+<div class="diagram-card">
+<svg viewBox="0 0 900 540">
+  <!-- Tier 1 -->
+  <g class="c-purple">
+    <rect x="30" y="20" width="840" height="140" rx="14" stroke-width="0.5"/>
+    <text class="th" x="50" y="48">Tier 1 — Always in context (every conversation)</text>
+    <text class="ts" x="50" y="68">Loaded at startup. 548 lines. Present in every turn.</text>
+  </g>
+  <g class="c-purple">
+    <rect x="50" y="88" width="170" height="56" rx="8" stroke-width="0.5"/>
+    <text class="th" x="135" y="110" text-anchor="middle">CLAUDE.md</text>
+    <text class="ts" x="135" y="128" text-anchor="middle">150 lines</text>
+  </g>
+  <g class="c-purple">
+    <rect x="235" y="88" width="170" height="56" rx="8" stroke-width="0.5"/>
+    <text class="th" x="320" y="110" text-anchor="middle">architecture.md</text>
+    <text class="ts" x="320" y="128" text-anchor="middle">171 lines (rule)</text>
+  </g>
+  <g class="c-purple">
+    <rect x="420" y="88" width="170" height="56" rx="8" stroke-width="0.5"/>
+    <text class="th" x="505" y="110" text-anchor="middle">5 other rules</text>
+    <text class="ts" x="505" y="128" text-anchor="middle">95 lines total</text>
+  </g>
+  <g class="c-purple">
+    <rect x="605" y="88" width="250" height="56" rx="8" stroke-width="0.5"/>
+    <text class="th" x="730" y="110" text-anchor="middle">~/.claude/CLAUDE.md</text>
+    <text class="ts" x="730" y="128" text-anchor="middle">user-level defaults</text>
+  </g>
+
+  <text class="ts" x="450" y="190" text-anchor="middle">You type a prompt or invoke @agent</text>
+  <line x1="450" y1="198" x2="450" y2="222" class="arr"/>
+
+  <!-- Tier 2 -->
+  <g class="c-teal">
+    <rect x="30" y="230" width="840" height="110" rx="14" stroke-width="0.5"/>
+    <text class="th" x="50" y="258">Tier 2 — Preloaded into agents (94 lines per agent)</text>
+    <text class="ts" x="50" y="278">Loaded when a sub-agent spawns. Each agent gets the SKILL.md index.</text>
+  </g>
+  <g class="c-teal">
+    <rect x="50" y="296" width="500" height="32" rx="6" stroke-width="0.5"/>
+    <text class="ts" x="300" y="316" text-anchor="middle">nestjs-api/SKILL.md (94 lines) — index of 18 reference files + key patterns → loaded into all 6 agents</text>
+  </g>
+
+  <text class="ts" x="450" y="372" text-anchor="middle">Agent reads SKILL.md index, identifies the relevant reference file</text>
+  <line x1="450" y1="380" x2="450" y2="404" class="arr"/>
+
+  <!-- Tier 3 -->
+  <g class="c-amber">
+    <rect x="30" y="410" width="840" height="120" rx="14" stroke-width="0.5"/>
+    <text class="th" x="50" y="438">Tier 3 — On-demand references (4,672 lines across 18 files)</text>
+    <text class="ts" x="50" y="458">Never preloaded. Agent reads ONE specific file when a pattern is needed. Other 17 stay on disk.</text>
+  </g>
+  <g class="c-amber"><rect x="50" y="478" width="105" height="32" rx="5" stroke-width="0.5"/><text class="ts" x="102" y="498" text-anchor="middle">conventions</text></g>
+  <g class="c-amber"><rect x="165" y="478" width="90" height="32" rx="5" stroke-width="0.5"/><text class="ts" x="210" y="498" text-anchor="middle">bulljobs</text></g>
+  <g class="c-amber"><rect x="265" y="478" width="115" height="32" rx="5" stroke-width="0.5"/><text class="ts" x="322" y="498" text-anchor="middle">event-driven</text></g>
+  <g class="c-amber"><rect x="390" y="478" width="100" height="32" rx="5" stroke-width="0.5"/><text class="ts" x="440" y="498" text-anchor="middle">resilience</text></g>
+  <g class="c-amber"><rect x="500" y="478" width="110" height="32" rx="5" stroke-width="0.5"/><text class="ts" x="555" y="498" text-anchor="middle">observability</text></g>
+  <g class="c-amber"><rect x="620" y="478" width="100" height="32" rx="5" stroke-width="0.5"/><text class="ts" x="670" y="498" text-anchor="middle">ClickHouse</text></g>
+  <g class="c-amber"><rect x="730" y="478" width="120" height="32" rx="5" stroke-width="0.5"/><text class="ts" x="790" y="498" text-anchor="middle">+ 12 more files</text></g>
+</svg>
+</div>
+
+<div class="insight"><strong>Why this matters:</strong> Only ~548 lines are always loaded (~2,200 tokens). The other 4,672 lines are available but never enter context unless an agent specifically needs one file. This keeps the context window clean for your actual code work — you get ~3 hours of productive session instead of 30 minutes.</div>
+
+
+<!-- ============================================================ -->
+<!-- DIAGRAM 2: Runtime Prompt Flow -->
+<!-- ============================================================ -->
+<h2><span class="num">2</span>Runtime Prompt Flow</h2>
+<p class="description">What happens from the moment you type a prompt to the final code output. Shows how hooks, rules, agents, and MCP servers interact at each step.</p>
+
+<div class="diagram-card">
+<svg viewBox="0 0 900 780">
+  <!-- User prompt -->
+  <g class="c-gray">
+    <rect x="320" y="15" width="260" height="42" rx="8" stroke-width="0.5"/>
+    <text class="th" x="450" y="40" text-anchor="middle">Your prompt</text>
+  </g>
+  <line x1="450" y1="57" x2="450" y2="82" class="arr"/>
+
+  <!-- Reads context -->
+  <g class="c-purple">
+    <rect x="200" y="88" width="500" height="52" rx="8" stroke-width="0.5"/>
+    <text class="th" x="450" y="108" text-anchor="middle">Claude reads Tier 1 context</text>
+    <text class="ts" x="450" y="126" text-anchor="middle">CLAUDE.md + 7 rules = identity, stack, constraints, principles</text>
+  </g>
+  <line x1="450" y1="140" x2="450" y2="168" class="arr"/>
+
+  <!-- Decision -->
+  <g class="c-gray">
+    <rect x="290" y="174" width="320" height="40" rx="20" stroke-width="0.5"/>
+    <text class="th" x="450" y="198" text-anchor="middle">Delegate to sub-agent?</text>
+  </g>
+
+  <!-- Yes branch -->
+  <text class="ts" x="220" y="198">yes</text>
+  <line x1="290" y1="194" x2="235" y2="194" stroke="#5f6577" stroke-width="1"/>
+  <line x1="235" y1="194" x2="235" y2="248" class="arr"/>
+
+  <!-- No branch -->
+  <text class="ts" x="640" y="198">no — Claude handles directly</text>
+  <line x1="610" y1="194" x2="700" y2="194" stroke="#5f6577" stroke-width="1" stroke-dasharray="4 3"/>
+
+  <!-- Agent box -->
+  <g class="c-coral">
+    <rect x="100" y="254" width="270" height="100" rx="10" stroke-width="0.5"/>
+    <text class="th" x="235" y="278" text-anchor="middle">Sub-agent spawns</text>
+    <text class="ts" x="235" y="298" text-anchor="middle">Own context window (isolated)</text>
+    <text class="ts" x="235" y="316" text-anchor="middle">Loads SKILL.md (Tier 2)</text>
+    <text class="ts" x="235" y="334" text-anchor="middle">Worktree isolation (architect, debugger)</text>
+  </g>
+  <line x1="370" y1="304" x2="415" y2="304" class="arr"/>
+
+  <!-- Tool call -->
+  <g class="c-teal">
+    <rect x="420" y="268" width="230" height="50" rx="8" stroke-width="0.5"/>
+    <text class="th" x="535" y="288" text-anchor="middle">Tool call</text>
+    <text class="ts" x="535" y="306" text-anchor="middle">Read, Write, Edit, or Bash</text>
+  </g>
+
+  <!-- MCP servers -->
+  <g class="c-teal">
+    <rect x="680" y="248" width="190" height="120" rx="8" stroke-width="0.5"/>
+    <text class="th" x="775" y="272" text-anchor="middle">MCP servers</text>
+    <text class="ts" x="775" y="294" text-anchor="middle">Context7 (live docs)</text>
+    <text class="ts" x="775" y="312" text-anchor="middle">Memory Keeper</text>
+    <text class="ts" x="775" y="330" text-anchor="middle">GitHub</text>
+    <text class="ts" x="775" y="348" text-anchor="middle">Context Mode + Code-Graph-RAG</text>
+  </g>
+  <line x1="650" y1="293" x2="678" y2="293" class="arr"/>
+
+  <line x1="535" y1="318" x2="535" y2="388" class="arr"/>
+
+  <!-- PreToolUse hooks -->
+  <g class="c-amber">
+    <rect x="280" y="394" width="510" height="120" rx="10" stroke-width="0.5"/>
+    <text class="th" x="535" y="418" text-anchor="middle">PreToolUse hooks fire</text>
+  </g>
+  <g class="c-amber">
+    <rect x="300" y="430" width="220" height="26" rx="4" stroke-width="0.5"/>
+    <text class="ts" x="410" y="447" text-anchor="middle">validate-edit.js (Write/Edit)</text>
+  </g>
+  <g class="c-amber">
+    <rect x="540" y="430" width="230" height="26" rx="4" stroke-width="0.5"/>
+    <text class="ts" x="655" y="447" text-anchor="middle">validate-bash.js (Bash)</text>
+  </g>
+  <g class="c-amber">
+    <rect x="300" y="464" width="110" height="24" rx="4" stroke-width="0.5"/>
+    <text class="ts" x="355" y="480" text-anchor="middle">> 100 lines?</text>
+  </g>
+  <g class="c-red">
+    <rect x="420" y="464" width="60" height="24" rx="4" stroke-width="0.5"/>
+    <text class="ts" x="450" y="480" text-anchor="middle">BLOCK</text>
+  </g>
+  <g class="c-amber">
+    <rect x="500" y="464" width="110" height="24" rx="4" stroke-width="0.5"/>
+    <text class="ts" x="555" y="480" text-anchor="middle">uuid() / any?</text>
+  </g>
+  <g class="c-red">
+    <rect x="620" y="464" width="60" height="24" rx="4" stroke-width="0.5"/>
+    <text class="ts" x="650" y="480" text-anchor="middle">BLOCK</text>
+  </g>
+  <g class="c-amber">
+    <rect x="700" y="464" width="70" height="24" rx="4" stroke-width="0.5"/>
+    <text class="ts" x="735" y="480" text-anchor="middle">rm -rf?</text>
+  </g>
+
+  <!-- Blocked indicator -->
+  <g class="c-red">
+    <rect x="100" y="440" width="160" height="36" rx="18" stroke-width="0.5"/>
+    <text class="ts" x="180" y="462" text-anchor="middle">Blocked → Claude adjusts</text>
+  </g>
+  <line x1="280" y1="458" x2="262" y2="458" stroke="#dc2626" stroke-width="1"/>
+
+  <line x1="535" y1="514" x2="535" y2="548" class="arr"/>
+
+  <!-- Tool executes -->
+  <g class="c-teal">
+    <rect x="380" y="554" width="310" height="42" rx="8" stroke-width="0.5"/>
+    <text class="th" x="535" y="579" text-anchor="middle">Tool executes — file written to disk</text>
+  </g>
+  <line x1="535" y1="596" x2="535" y2="628" class="arr"/>
+
+  <!-- PostToolUse -->
+  <g class="c-amber">
+    <rect x="380" y="634" width="310" height="48" rx="8" stroke-width="0.5"/>
+    <text class="th" x="535" y="652" text-anchor="middle">PostToolUse: post-edit-lint.js</text>
+    <text class="ts" x="535" y="670" text-anchor="middle">ESLint runs → issues reported to Claude</text>
+  </g>
+  <line x1="535" y1="682" x2="535" y2="712" class="arr"/>
+
+  <!-- Loop or finish -->
+  <g class="c-gray">
+    <rect x="360" y="718" width="350" height="40" rx="20" stroke-width="0.5"/>
+    <text class="th" x="535" y="742" text-anchor="middle">More steps? → loop back    Done? → respond</text>
+  </g>
+  <path d="M360 738 L310 738 L310 304 L418 304" fill="none" stroke="#5f6577" stroke-width="1" stroke-dasharray="4 3" marker-end="url(#arrow)"/>
+  <text class="tl" x="297" y="520" text-anchor="end">loop</text>
+</svg>
+</div>
+
+<div class="insight"><strong>Key insight:</strong> Hooks are <strong>deterministic</strong> (Node.js scripts, not AI). Rules are <strong>probabilistic</strong> (instructions that shape behavior). Both work together — hooks enforce hard limits (100-line files, no uuid(), no rm -rf). Rules enforce soft guidelines (SOLID, naming). If Claude's rules drift over a long conversation, hooks still catch violations.</div>
+
+
+<!-- ============================================================ -->
+<!-- DIAGRAM 3: Agent Delegation Map -->
+<!-- ============================================================ -->
+<h2><span class="num">3</span>Agent Delegation Map</h2>
+<p class="description">Six specialized agents, each with a specific model, trigger condition, and capability. Sub-agents run in their own context — verbose output stays isolated from your main conversation.</p>
+
+<div class="diagram-card">
+<svg viewBox="0 0 900 480">
+  <!-- Main conversation -->
+  <g class="c-gray">
+    <rect x="310" y="15" width="280" height="42" rx="8" stroke-width="0.5"/>
+    <text class="th" x="450" y="40" text-anchor="middle">Main conversation</text>
+  </g>
+
+  <!-- Fan out lines -->
+  <line x1="350" y1="57" x2="118" y2="100" stroke="#5f6577" stroke-width="1"/>
+  <line x1="400" y1="57" x2="290" y2="100" stroke="#5f6577" stroke-width="1"/>
+  <line x1="450" y1="57" x2="462" y2="100" stroke="#5f6577" stroke-width="1"/>
+  <line x1="500" y1="57" x2="620" y2="100" stroke="#5f6577" stroke-width="1"/>
+  <line x1="530" y1="57" x2="118" y2="220" stroke="#5f6577" stroke-width="1"/>
+  <line x1="560" y1="57" x2="290" y2="220" stroke="#5f6577" stroke-width="1"/>
+
+  <!-- Row 1: architect, planner, code-reviewer, debugger -->
+  <g class="c-coral">
+    <rect x="35" y="106" width="166" height="90" rx="8" stroke-width="0.5"/>
+    <text class="th" x="118" y="130" text-anchor="middle">@architect</text>
+    <text class="ts" x="118" y="150" text-anchor="middle">opus + worktree</text>
+    <text class="ts" x="118" y="168" text-anchor="middle">"design", "structure"</text>
+    <text class="ts" x="118" y="184" text-anchor="middle">"new service"</text>
+  </g>
+  <g class="c-coral">
+    <rect x="215" y="106" width="152" height="90" rx="8" stroke-width="0.5"/>
+    <text class="th" x="291" y="130" text-anchor="middle">@planner</text>
+    <text class="ts" x="291" y="150" text-anchor="middle">sonnet</text>
+    <text class="ts" x="291" y="168" text-anchor="middle">"plan this"</text>
+    <text class="ts" x="291" y="184" text-anchor="middle">"break down", > 2 files</text>
+  </g>
+  <g class="c-coral">
+    <rect x="381" y="106" width="162" height="90" rx="8" stroke-width="0.5"/>
+    <text class="th" x="462" y="130" text-anchor="middle">@code-reviewer</text>
+    <text class="ts" x="462" y="150" text-anchor="middle">sonnet</text>
+    <text class="ts" x="462" y="168" text-anchor="middle">before every commit</text>
+    <text class="ts" x="462" y="184" text-anchor="middle">quality + patterns</text>
+  </g>
+  <g class="c-coral">
+    <rect x="557" y="106" width="152" height="90" rx="8" stroke-width="0.5"/>
+    <text class="th" x="633" y="130" text-anchor="middle">@debugger</text>
+    <text class="ts" x="633" y="150" text-anchor="middle">sonnet + worktree</text>
+    <text class="ts" x="633" y="168" text-anchor="middle">errors, stack traces</text>
+    <text class="ts" x="633" y="184" text-anchor="middle">test failures</text>
+  </g>
+
+  <!-- Row 2: security-reviewer, doc-updater -->
+  <g class="c-coral">
+    <rect x="35" y="226" width="166" height="90" rx="8" stroke-width="0.5"/>
+    <text class="th" x="118" y="250" text-anchor="middle">@security-reviewer</text>
+    <text class="ts" x="118" y="270" text-anchor="middle">opus (strongest)</text>
+    <text class="ts" x="118" y="288" text-anchor="middle">auth, public endpoints</text>
+    <text class="ts" x="118" y="304" text-anchor="middle">Ory Kratos/Hydra/Keto</text>
+  </g>
+  <g class="c-coral">
+    <rect x="215" y="226" width="152" height="90" rx="8" stroke-width="0.5"/>
+    <text class="th" x="291" y="250" text-anchor="middle">@doc-updater</text>
+    <text class="ts" x="291" y="270" text-anchor="middle">haiku (cheapest)</text>
+    <text class="ts" x="291" y="288" text-anchor="middle">after features land</text>
+    <text class="ts" x="291" y="304" text-anchor="middle">keeps docs in sync</text>
+  </g>
+
+  <!-- Model legend -->
+  <g class="c-gray">
+    <rect x="420" y="226" width="440" height="90" rx="10" stroke-width="0.5"/>
+    <text class="th" x="440" y="250">Model selection strategy</text>
+    <text class="ts" x="440" y="272">opus  — architecture + security (needs deepest reasoning)</text>
+    <text class="ts" x="440" y="290">sonnet — implementation + review (best speed/quality balance)</text>
+    <text class="ts" x="440" y="308">haiku  — documentation (simple task, save tokens)</text>
+  </g>
+
+  <!-- What each agent sees -->
+  <text class="th" x="450" y="360" text-anchor="middle">What each agent sees in its context</text>
+  <g class="c-purple">
+    <rect x="35" y="378" width="240" height="44" rx="6" stroke-width="0.5"/>
+    <text class="ts" x="155" y="394" text-anchor="middle">Tier 1 (always)</text>
+    <text class="ts" x="155" y="412" text-anchor="middle">CLAUDE.md + 7 rules — 548 lines</text>
+  </g>
+  <text class="th" x="292" y="404" text-anchor="middle">+</text>
+  <g class="c-teal">
+    <rect x="310" y="378" width="240" height="44" rx="6" stroke-width="0.5"/>
+    <text class="ts" x="430" y="394" text-anchor="middle">Tier 2 (per agent)</text>
+    <text class="ts" x="430" y="412" text-anchor="middle">SKILL.md index — 94 lines</text>
+  </g>
+  <text class="th" x="567" y="404" text-anchor="middle">+</text>
+  <g class="c-amber">
+    <rect x="585" y="378" width="240" height="44" rx="6" stroke-width="0.5"/>
+    <text class="ts" x="705" y="394" text-anchor="middle">Tier 3 (on demand)</text>
+    <text class="ts" x="705" y="412" text-anchor="middle">1 reference file when needed</text>
+  </g>
+
+  <!-- MCP access -->
+  <text class="ts" x="450" y="450" text-anchor="middle">+ all agents access: Context7 · Memory Keeper · GitHub · Context Mode · Code-Graph-RAG</text>
+</svg>
+</div>
+
+<div class="insight"><strong>Sub-agents protect the main context.</strong> When @debugger greps 50 files or @code-reviewer reads the full git diff, that output stays in the agent's context window. Your main conversation only sees the summary. This is why long sessions stay productive.</div>
+
+
+<!-- ============================================================ -->
+<!-- DIAGRAM 4: Hook Enforcement -->
+<!-- ============================================================ -->
+<h2><span class="num">4</span>Hook Enforcement Pipeline</h2>
+<p class="description">The deterministic safety net. These are Node.js scripts — not AI. They can't be persuaded, hallucinated, or prompt-injected. They run before and after every tool call.</p>
+
+<div class="diagram-card">
+<svg viewBox="0 0 900 440">
+  <!-- Write side -->
+  <g class="c-gray">
+    <rect x="30" y="20" width="380" height="38" rx="8" stroke-width="0.5"/>
+    <text class="th" x="220" y="43" text-anchor="middle">Claude calls Write / Edit tool</text>
+  </g>
+  <line x1="220" y1="58" x2="220" y2="88" class="arr"/>
+
+  <g class="c-amber">
+    <rect x="30" y="94" width="380" height="190" rx="10" stroke-width="0.5"/>
+    <text class="th" x="220" y="120" text-anchor="middle">validate-edit.js (PreToolUse)</text>
+  </g>
+  <g class="c-amber"><rect x="50" y="136" width="160" height="28" rx="4" stroke-width="0.5"/><text class="ts" x="130" y="154" text-anchor="middle">File > 100 lines?</text></g>
+  <g class="c-red"><rect x="225" y="136" width="70" height="28" rx="4" stroke-width="0.5"/><text class="ts" x="260" y="154" text-anchor="middle">BLOCK</text></g>
+  <line x1="210" y1="150" x2="223" y2="150" stroke="#dc2626" stroke-width="1"/>
+
+  <g class="c-amber"><rect x="50" y="172" width="160" height="28" rx="4" stroke-width="0.5"/><text class="ts" x="130" y="190" text-anchor="middle">Uses uuid()?</text></g>
+  <g class="c-amber"><rect x="225" y="172" width="70" height="28" rx="4" stroke-width="0.5"/><text class="ts" x="260" y="190" text-anchor="middle">WARN</text></g>
+
+  <g class="c-amber"><rect x="50" y="208" width="160" height="28" rx="4" stroke-width="0.5"/><text class="ts" x="130" y="226" text-anchor="middle">Uses any type?</text></g>
+  <g class="c-red"><rect x="225" y="208" width="70" height="28" rx="4" stroke-width="0.5"/><text class="ts" x="260" y="226" text-anchor="middle">BLOCK</text></g>
+  <line x1="210" y1="222" x2="223" y2="222" stroke="#dc2626" stroke-width="1"/>
+
+  <g class="c-amber"><rect x="50" y="244" width="160" height="28" rx="4" stroke-width="0.5"/><text class="ts" x="130" y="262" text-anchor="middle">Hardcoded secret?</text></g>
+  <g class="c-amber"><rect x="225" y="244" width="70" height="28" rx="4" stroke-width="0.5"/><text class="ts" x="260" y="262" text-anchor="middle">WARN</text></g>
+
+  <line x1="220" y1="284" x2="220" y2="310" class="arr"/>
+  <g class="c-teal">
+    <rect x="100" y="316" width="240" height="36" rx="8" stroke-width="0.5"/>
+    <text class="th" x="220" y="338" text-anchor="middle">Pass → file written to disk</text>
+  </g>
+  <line x1="220" y1="352" x2="220" y2="378" class="arr"/>
+  <g class="c-amber">
+    <rect x="60" y="384" width="320" height="42" rx="8" stroke-width="0.5"/>
+    <text class="th" x="220" y="400" text-anchor="middle">post-edit-lint.js (PostToolUse)</text>
+    <text class="ts" x="220" y="416" text-anchor="middle">ESLint runs → issues reported to Claude</text>
+  </g>
+
+  <!-- Bash side -->
+  <g class="c-gray">
+    <rect x="480" y="20" width="390" height="38" rx="8" stroke-width="0.5"/>
+    <text class="th" x="675" y="43" text-anchor="middle">Claude calls Bash tool</text>
+  </g>
+  <line x1="675" y1="58" x2="675" y2="88" class="arr"/>
+
+  <g class="c-amber">
+    <rect x="480" y="94" width="390" height="190" rx="10" stroke-width="0.5"/>
+    <text class="th" x="675" y="120" text-anchor="middle">validate-bash.js (PreToolUse)</text>
+  </g>
+  <g class="c-amber"><rect x="500" y="136" width="200" height="28" rx="4" stroke-width="0.5"/><text class="ts" x="600" y="154" text-anchor="middle">DROP / TRUNCATE / DELETE?</text></g>
+  <g class="c-red"><rect x="715" y="136" width="70" height="28" rx="4" stroke-width="0.5"/><text class="ts" x="750" y="154" text-anchor="middle">BLOCK</text></g>
+
+  <g class="c-amber"><rect x="500" y="172" width="200" height="28" rx="4" stroke-width="0.5"/><text class="ts" x="600" y="190" text-anchor="middle">git push main / --force?</text></g>
+  <g class="c-red"><rect x="715" y="172" width="70" height="28" rx="4" stroke-width="0.5"/><text class="ts" x="750" y="190" text-anchor="middle">BLOCK</text></g>
+
+  <g class="c-amber"><rect x="500" y="208" width="200" height="28" rx="4" stroke-width="0.5"/><text class="ts" x="600" y="226" text-anchor="middle">rm -rf / or ~ or src?</text></g>
+  <g class="c-red"><rect x="715" y="208" width="70" height="28" rx="4" stroke-width="0.5"/><text class="ts" x="750" y="226" text-anchor="middle">BLOCK</text></g>
+
+  <g class="c-amber"><rect x="500" y="244" width="200" height="28" rx="4" stroke-width="0.5"/><text class="ts" x="600" y="262" text-anchor="middle">npm install? (not pnpm)</text></g>
+  <g class="c-amber"><rect x="715" y="244" width="70" height="28" rx="4" stroke-width="0.5"/><text class="ts" x="750" y="262" text-anchor="middle">WARN</text></g>
+
+  <!-- Legend -->
+  <g class="c-red"><rect x="500" y="316" width="170" height="32" rx="6" stroke-width="0.5"/><text class="ts" x="585" y="336" text-anchor="middle">BLOCK = exit code 2</text></g>
+  <text class="ts" x="500" y="370">Claude sees the error, adjusts,</text>
+  <text class="ts" x="500" y="386">and tries again automatically.</text>
+  <text class="ts" x="500" y="410">WARN = message to stderr.</text>
+  <text class="ts" x="500" y="426">Claude sees it, should fix.</text>
+</svg>
+</div>
+
+<div class="insight"><strong>Why hooks matter:</strong> Even if Claude's rules drift after 50 messages, even if it "forgets" that files should be < 100 lines, the hook will still block the write. Hooks are the hard floor that never moves. They're your insurance policy against long-session drift.</div>
+
+
+<!-- ============================================================ -->
+<!-- DIAGRAM 5: Self-Improvement Loop -->
+<!-- ============================================================ -->
+<h2><span class="num">5</span>Self-Improvement Loop</h2>
+<p class="description">How tasks/lessons.md compounds over time. Most configs are static — same quality on day 1 and day 100. This one gets smarter every day because every correction becomes a permanent rule.</p>
+
+<div class="diagram-card">
+<svg viewBox="0 0 900 340">
+  <!-- Day 1 -->
+  <g class="c-gray">
+    <rect x="30" y="20" width="240" height="130" rx="10" stroke-width="0.5"/>
+    <text class="th" x="150" y="46" text-anchor="middle">Day 1</text>
+    <text class="ts" x="150" y="72" text-anchor="middle">tasks/lessons.md</text>
+    <text class="ts" x="150" y="96" text-anchor="middle">(empty)</text>
+    <text class="ts" x="150" y="130" text-anchor="middle">Claude makes mistakes freely</text>
+  </g>
+
+  <line x1="270" y1="85" x2="318" y2="85" class="arr"/>
+
+  <!-- Day 30 -->
+  <g class="c-teal">
+    <rect x="320" y="20" width="250" height="130" rx="10" stroke-width="0.5"/>
+    <text class="th" x="445" y="46" text-anchor="middle">Day 30</text>
+    <text class="ts" x="445" y="68" text-anchor="middle">15 rules accumulated:</text>
+    <text class="tl" x="340" y="86">- Always ulid(), never uuid()</text>
+    <text class="tl" x="340" y="100">- SideEffect via listeners only</text>
+    <text class="tl" x="340" y="114">- No @Cron() — use BullMQ</text>
+    <text class="tl" x="340" y="128">- Prisma 7 composition pattern</text>
+    <text class="ts" x="445" y="148" text-anchor="middle">Claude avoids these 15 mistakes</text>
+  </g>
+
+  <line x1="570" y1="85" x2="618" y2="85" class="arr"/>
+
+  <!-- Day 90 -->
+  <g class="c-green">
+    <rect x="620" y="20" width="250" height="130" rx="10" stroke-width="0.5"/>
+    <text class="th" x="745" y="46" text-anchor="middle">Day 90</text>
+    <text class="ts" x="745" y="68" text-anchor="middle">50+ rules accumulated:</text>
+    <text class="tl" x="640" y="86">- All Day 30 rules</text>
+    <text class="tl" x="640" y="100">- cursor-based paging > 1000</text>
+    <text class="tl" x="640" y="114">- tenant_id in every WHERE</text>
+    <text class="tl" x="640" y="128">- Use select() for lists</text>
+    <text class="ts" x="745" y="148" text-anchor="middle">Claude rarely repeats mistakes</text>
+  </g>
+
+  <!-- The feedback loop -->
+  <g class="c-purple">
+    <rect x="30" y="190" width="840" height="130" rx="12" stroke-width="0.5"/>
+    <text class="th" x="450" y="214" text-anchor="middle">The feedback loop (how it works)</text>
+  </g>
+
+  <g class="c-gray"><rect x="50" y="230" width="150" height="36" rx="6" stroke-width="0.5"/><text class="ts" x="125" y="252" text-anchor="middle">You spot a mistake</text></g>
+  <line x1="200" y1="248" x2="228" y2="248" class="arr"/>
+
+  <g class="c-coral"><rect x="230" y="230" width="150" height="36" rx="6" stroke-width="0.5"/><text class="ts" x="305" y="252" text-anchor="middle">You correct Claude</text></g>
+  <line x1="380" y1="248" x2="408" y2="248" class="arr"/>
+
+  <g class="c-teal"><rect x="410" y="230" width="150" height="36" rx="6" stroke-width="0.5"/><text class="ts" x="485" y="252" text-anchor="middle">Claude fixes the code</text></g>
+  <line x1="560" y1="248" x2="588" y2="248" class="arr"/>
+
+  <g class="c-green"><rect x="590" y="230" width="150" height="36" rx="6" stroke-width="0.5"/><text class="ts" x="665" y="252" text-anchor="middle">Added to lessons.md</text></g>
+
+  <text class="ts" x="450" y="296" text-anchor="middle">Next session: Claude reads lessons.md at startup → never makes that mistake again</text>
+</svg>
+</div>
+
+<div class="insight"><strong>The compound effect:</strong> Memory Keeper adds another layer — architectural decisions persist across sessions without cluttering lessons.md. Together, lessons.md (corrections) + Memory Keeper (decisions) mean every session starts smarter than the last.</div>
+
+
+<!-- ============================================================ -->
+<!-- DIAGRAM 6: Multi-Service Architecture -->
+<!-- ============================================================ -->
+<h2><span class="num">6</span>Multi-Microservice Architecture</h2>
+<p class="description">How the config works across all 9 services. Same config everywhere — only CLAUDE.md has a per-service section. The infrastructure repo runs all dependencies via Docker Compose.</p>
+
+<div class="diagram-card">
+<svg viewBox="0 0 900 500">
+  <!-- Infra repo -->
+  <g class="c-gray">
+    <rect x="30" y="15" width="840" height="100" rx="12" stroke-width="0.5"/>
+    <text class="th" x="450" y="38" text-anchor="middle">Infrastructure repo (referralai-infra/) — docker compose up -d</text>
+  </g>
+  <g class="c-gray"><rect x="50" y="52" width="100" height="24" rx="4" stroke-width="0.5"/><text class="tl" x="100" y="68" text-anchor="middle">PostgreSQL</text></g>
+  <g class="c-gray"><rect x="160" y="52" width="70" height="24" rx="4" stroke-width="0.5"/><text class="tl" x="195" y="68" text-anchor="middle">Redis</text></g>
+  <g class="c-gray"><rect x="240" y="52" width="90" height="24" rx="4" stroke-width="0.5"/><text class="tl" x="285" y="68" text-anchor="middle">LocalStack</text></g>
+  <g class="c-gray"><rect x="340" y="52" width="70" height="24" rx="4" stroke-width="0.5"/><text class="tl" x="375" y="68" text-anchor="middle">Hydra</text></g>
+  <g class="c-gray"><rect x="420" y="52" width="70" height="24" rx="4" stroke-width="0.5"/><text class="tl" x="455" y="68" text-anchor="middle">Kratos</text></g>
+  <g class="c-gray"><rect x="500" y="52" width="60" height="24" rx="4" stroke-width="0.5"/><text class="tl" x="530" y="68" text-anchor="middle">Keto</text></g>
+  <g class="c-gray"><rect x="570" y="52" width="80" height="24" rx="4" stroke-width="0.5"/><text class="tl" x="610" y="68" text-anchor="middle">Temporal</text></g>
+  <g class="c-gray"><rect x="660" y="52" width="90" height="24" rx="4" stroke-width="0.5"/><text class="tl" x="705" y="68" text-anchor="middle">Adminer</text></g>
+
+  <text class="ts" x="450" y="98" text-anchor="middle">NestJS services run natively (not in Docker) — connect to containers above</text>
+
+  <!-- 9 services -->
+  <text class="ts" x="450" y="140" text-anchor="middle">9 microservices — each has its own repo, its own .claude/ config, its own Claude Code session</text>
+
+  <g class="c-coral"><rect x="30" y="158" width="155" height="80" rx="8" stroke-width="0.5"/>
+    <text class="th" x="107" y="178" text-anchor="middle">tenant-svc</text>
+    <text class="tl" x="107" y="196" text-anchor="middle">tenant_db</text>
+    <text class="tl" x="107" y="210" text-anchor="middle">Ory stack</text>
+    <text class="tl" x="107" y="226" text-anchor="middle">CLAUDE.md + .claude/</text>
+  </g>
+  <g class="c-coral"><rect x="195" y="158" width="155" height="80" rx="8" stroke-width="0.5"/>
+    <text class="th" x="272" y="178" text-anchor="middle">campaign-svc</text>
+    <text class="tl" x="272" y="196" text-anchor="middle">campaign_db</text>
+    <text class="tl" x="272" y="210" text-anchor="middle">Programs, variants</text>
+    <text class="tl" x="272" y="226" text-anchor="middle">CLAUDE.md + .claude/</text>
+  </g>
+  <g class="c-coral"><rect x="360" y="158" width="155" height="80" rx="8" stroke-width="0.5"/>
+    <text class="th" x="437" y="178" text-anchor="middle">ingestion-svc</text>
+    <text class="tl" x="437" y="196" text-anchor="middle">Redis only</text>
+    <text class="tl" x="437" y="210" text-anchor="middle">Stateless gateway</text>
+    <text class="tl" x="437" y="226" text-anchor="middle">CLAUDE.md + .claude/</text>
+  </g>
+  <g class="c-coral"><rect x="525" y="158" width="155" height="80" rx="8" stroke-width="0.5"/>
+    <text class="th" x="602" y="178" text-anchor="middle">referral-svc</text>
+    <text class="tl" x="602" y="196" text-anchor="middle">referral_db</text>
+    <text class="tl" x="602" y="210" text-anchor="middle">Workflows, links</text>
+    <text class="tl" x="602" y="226" text-anchor="middle">CLAUDE.md + .claude/</text>
+  </g>
+  <g class="c-coral"><rect x="690" y="158" width="155" height="80" rx="8" stroke-width="0.5"/>
+    <text class="th" x="767" y="178" text-anchor="middle">reward-svc</text>
+    <text class="tl" x="767" y="196" text-anchor="middle">reward_db</text>
+    <text class="tl" x="767" y="210" text-anchor="middle">Payouts, caps</text>
+    <text class="tl" x="767" y="226" text-anchor="middle">CLAUDE.md + .claude/</text>
+  </g>
+
+  <!-- Row 2 -->
+  <g class="c-coral"><rect x="30" y="250" width="155" height="80" rx="8" stroke-width="0.5"/>
+    <text class="th" x="107" y="270" text-anchor="middle">segment-svc</text>
+    <text class="tl" x="107" y="288" text-anchor="middle">segmentation_db</text>
+    <text class="tl" x="107" y="302" text-anchor="middle">A/B, eligibility</text>
+    <text class="tl" x="107" y="318" text-anchor="middle">CLAUDE.md + .claude/</text>
+  </g>
+  <g class="c-coral"><rect x="195" y="250" width="155" height="80" rx="8" stroke-width="0.5"/>
+    <text class="th" x="272" y="270" text-anchor="middle">analytics-svc</text>
+    <text class="tl" x="272" y="288" text-anchor="middle">analytics_db + CH</text>
+    <text class="tl" x="272" y="302" text-anchor="middle">KPIs, funnels</text>
+    <text class="tl" x="272" y="318" text-anchor="middle">CLAUDE.md + .claude/</text>
+  </g>
+  <g class="c-coral"><rect x="360" y="250" width="155" height="80" rx="8" stroke-width="0.5"/>
+    <text class="th" x="437" y="270" text-anchor="middle">notification-svc</text>
+    <text class="tl" x="437" y="288" text-anchor="middle">notification_db</text>
+    <text class="tl" x="437" y="302" text-anchor="middle">Webhooks, email</text>
+    <text class="tl" x="437" y="318" text-anchor="middle">CLAUDE.md + .claude/</text>
+  </g>
+  <g class="c-coral"><rect x="525" y="250" width="155" height="80" rx="8" stroke-width="0.5"/>
+    <text class="th" x="602" y="270" text-anchor="middle">ai-svc</text>
+    <text class="tl" x="602" y="288" text-anchor="middle">ai_db</text>
+    <text class="tl" x="602" y="302" text-anchor="middle">LangChain agents</text>
+    <text class="tl" x="602" y="318" text-anchor="middle">CLAUDE.md + .claude/</text>
+  </g>
+
+  <!-- Same config note -->
+  <g class="c-green">
+    <rect x="30" y="355" width="840" height="44" rx="8" stroke-width="0.5"/>
+    <text class="th" x="450" y="374" text-anchor="middle">Same config in all 9 services</text>
+    <text class="ts" x="450" y="392" text-anchor="middle">Only CLAUDE.md has a per-service "This Service:" section at the top — everything else is identical</text>
+  </g>
+
+  <!-- Cross-service work -->
+  <g class="c-teal">
+    <rect x="30" y="420" width="840" height="70" rx="8" stroke-width="0.5"/>
+    <text class="th" x="450" y="444" text-anchor="middle">Cross-service work</text>
+    <text class="ts" x="450" y="464" text-anchor="middle">One WebStorm window per service → each with its own Claude Code session</text>
+    <text class="ts" x="450" y="480" text-anchor="middle">Both read the same docs/API-CONTRACTS.md for shared event schemas</text>
+  </g>
+</svg>
+</div>
+
+<div class="insight"><strong>Why identical configs work:</strong> Every service follows the same coding standards, the same patterns, the same testing rules. When a developer switches from reward-service to campaign-service, Claude Code behaves identically. The only difference is the "This Service:" section that tells Claude what this specific service owns, publishes, and consumes.</div>
+
+
+<!-- ============================================================ -->
+<!-- DIAGRAM 7: Supervised Workflow -->
+<!-- ============================================================ -->
+<h2><span class="num">7</span>Supervised Workflow (Phase Gates)</h2>
+<p class="description">The full feature development flow from user story to commit. Each phase is a gate — Claude stops and waits for your explicit approval before continuing.</p>
+
+<div class="diagram-card">
+<svg viewBox="0 0 900 700">
+  <!-- Phase boxes -->
+  <g class="c-gray">
+    <rect x="30" y="10" width="220" height="50" rx="8" stroke-width="0.5"/>
+    <text class="th" x="140" y="30" text-anchor="middle">User Story</text>
+    <text class="ts" x="140" y="48" text-anchor="middle">TICKET-456</text>
+  </g>
+  <line x1="140" y1="60" x2="140" y2="82" class="arr"/>
+
+  <g class="c-purple">
+    <rect x="30" y="88" width="220" height="50" rx="8" stroke-width="0.5"/>
+    <text class="th" x="140" y="108" text-anchor="middle">1. Clarify</text>
+    <text class="ts" x="140" y="126" text-anchor="middle">Claude asks questions</text>
+  </g>
+  <g class="c-gray"><rect x="280" y="93" width="280" height="38" rx="6" stroke-width="0.5"/><text class="ts" x="420" y="116" text-anchor="middle">You answer → ambiguity resolved</text></g>
+  <line x1="250" y1="113" x2="278" y2="113" class="arr"/>
+  <line x1="140" y1="138" x2="140" y2="160" class="arr"/>
+
+  <g class="c-coral">
+    <rect x="30" y="166" width="220" height="50" rx="8" stroke-width="0.5"/>
+    <text class="th" x="140" y="186" text-anchor="middle">2. @architect</text>
+    <text class="ts" x="140" y="204" text-anchor="middle">opus · worktree · design</text>
+  </g>
+  <g class="c-green"><rect x="280" y="171" width="280" height="38" rx="19" stroke-width="0.5"/><text class="ts" x="420" y="194" text-anchor="middle">GATE → "Approved" or "Change X"</text></g>
+  <line x1="250" y1="191" x2="278" y2="191" class="arr"/>
+  <line x1="140" y1="216" x2="140" y2="238" class="arr"/>
+
+  <g class="c-coral">
+    <rect x="30" y="244" width="220" height="50" rx="8" stroke-width="0.5"/>
+    <text class="th" x="140" y="264" text-anchor="middle">3. @planner</text>
+    <text class="ts" x="140" y="282" text-anchor="middle">sonnet · numbered steps</text>
+  </g>
+  <g class="c-green"><rect x="280" y="249" width="280" height="38" rx="19" stroke-width="0.5"/><text class="ts" x="420" y="272" text-anchor="middle">GATE → "Approved" or "Reorder"</text></g>
+  <line x1="250" y1="269" x2="278" y2="269" class="arr"/>
+  <line x1="140" y1="294" x2="140" y2="316" class="arr"/>
+
+  <g class="c-teal">
+    <rect x="30" y="322" width="220" height="66" rx="8" stroke-width="0.5"/>
+    <text class="th" x="140" y="342" text-anchor="middle">4. Implement</text>
+    <text class="ts" x="140" y="360" text-anchor="middle">Step by step</text>
+    <text class="ts" x="140" y="376" text-anchor="middle">Hooks enforce rules</text>
+  </g>
+  <g class="c-green"><rect x="280" y="327" width="280" height="54" rx="8" stroke-width="0.5"/>
+    <text class="ts" x="420" y="348" text-anchor="middle">GATE per step → "Continue" or "Fix X"</text>
+    <text class="ts" x="420" y="368" text-anchor="middle">validate-edit.js + post-edit-lint.js fire</text>
+  </g>
+  <line x1="250" y1="355" x2="278" y2="355" class="arr"/>
+  <line x1="140" y1="388" x2="140" y2="410" class="arr"/>
+
+  <g class="c-coral">
+    <rect x="30" y="416" width="220" height="50" rx="8" stroke-width="0.5"/>
+    <text class="th" x="140" y="436" text-anchor="middle">5. @code-reviewer</text>
+    <text class="ts" x="140" y="454" text-anchor="middle">sonnet · diff analysis</text>
+  </g>
+  <g class="c-gray"><rect x="280" y="421" width="280" height="38" rx="6" stroke-width="0.5"/><text class="ts" x="420" y="444" text-anchor="middle">Fix Critical + Warning findings</text></g>
+  <line x1="250" y1="441" x2="278" y2="441" class="arr"/>
+  <line x1="140" y1="466" x2="140" y2="488" class="arr"/>
+
+  <g class="c-coral">
+    <rect x="30" y="494" width="220" height="50" rx="8" stroke-width="0.5"/>
+    <text class="th" x="140" y="514" text-anchor="middle">6. @security-reviewer</text>
+    <text class="ts" x="140" y="532" text-anchor="middle">opus · if auth changed</text>
+  </g>
+  <g class="c-gray"><rect x="280" y="499" width="280" height="38" rx="6" stroke-width="0.5"/><text class="ts" x="420" y="522" text-anchor="middle">Ory checklist · optional phase</text></g>
+  <line x1="250" y1="519" x2="278" y2="519" class="arr"/>
+  <line x1="140" y1="544" x2="140" y2="566" class="arr"/>
+
+  <g class="c-blue">
+    <rect x="30" y="572" width="220" height="50" rx="8" stroke-width="0.5"/>
+    <text class="th" x="140" y="592" text-anchor="middle">7. Test</text>
+    <text class="ts" x="140" y="610" text-anchor="middle">Jest + Supertest · Docker infra</text>
+  </g>
+  <g class="c-gray"><rect x="280" y="577" width="280" height="38" rx="6" stroke-width="0.5"/><text class="ts" x="420" y="600" text-anchor="middle">pnpm test && pnpm test:e2e</text></g>
+  <line x1="250" y1="597" x2="278" y2="597" class="arr"/>
+  <line x1="140" y1="622" x2="140" y2="644" class="arr"/>
+
+  <g class="c-green">
+    <rect x="30" y="650" width="220" height="40" rx="8" stroke-width="0.5"/>
+    <text class="th" x="140" y="674" text-anchor="middle">8. Commit + Memory</text>
+  </g>
+  <g class="c-gray"><rect x="280" y="652" width="400" height="36" rx="6" stroke-width="0.5"/>
+    <text class="ts" x="480" y="674" text-anchor="middle">Conventional commit → save decisions to Memory Keeper → update lessons.md</text>
+  </g>
+  <line x1="250" y1="670" x2="278" y2="670" class="arr"/>
+
+  <!-- Skip note -->
+  <g class="c-gray">
+    <rect x="600" y="88" width="270" height="96" rx="8" stroke-width="0.5"/>
+    <text class="th" x="735" y="112" text-anchor="middle">Shortcuts</text>
+    <text class="ts" x="735" y="134" text-anchor="middle">Bug fix: skip phases 2, 6</text>
+    <text class="ts" x="735" y="152" text-anchor="middle">Small endpoint: skip phase 2</text>
+    <text class="ts" x="735" y="170" text-anchor="middle">Autonomous mode: no gates</text>
+  </g>
+</svg>
+</div>
+
+<div class="insight"><strong>Supervised vs Autonomous:</strong> Start every session with "Work in SUPERVISED mode." As you build trust with the config over days/weeks, relax specific gates. Eventually, for well-defined tasks, use "Work in AUTONOMOUS mode" — Claude runs all phases and presents the final diff. Hooks still enforce all rules regardless of mode.</div>
+
+</div>
+</body>
+</html>

@@ -1,0 +1,220 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.com/referral-event-schema-v1.json",
+  "title": "Referral Platform Event Schema v1",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "event": { "type": "string", "enum": [
+      "widget_appeared","widget_email_filled","widget_submitted","widget_closed",
+      "invitation_sent","invitation_delivered","invitation_clicked",
+      "referred_visited","referred_signed_up","referred_made_signup",
+      "referred_made_purchase","referrer_made_purchase","referral_reward_issued",
+      "subscription_renewed","account_reactivated","plan_upgraded",
+      "survey_shown","survey_started","survey_submitted","survey_abandoned",
+      "newsletter_subscribed","newsletter_unsubscribed","feedback_submitted",
+      "experiment_exposed","error_occurred",
+      "referred_made_reactivate_account","referred_made_adopt_new_features"
+    ]},
+    "event_id": { "type": "string", "maxLength": 64 },
+    "occurred_at": { "type": "string", "format": "date-time" },
+    "received_at": { "type": "string", "format": "date-time" },
+    "client_id": { "type": "string", "maxLength": 64 },
+    "campaign_id": { "type": "string", "maxLength": 64 },
+    "participant": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "participant_id": { "type": "string", "maxLength": 64 },
+        "external_user_id_hash": { "type": "string", "maxLength": 128 },
+        "anonymous_id": { "type": "string", "maxLength": 128 },
+        "session_id": { "type": "string", "maxLength": 128 }
+      }
+    },
+    "referral": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "referral_id": { "type": "string", "maxLength": 64 },
+        "invite_id": { "type": "string", "maxLength": 64 },
+        "visit_id": { "type": "string", "maxLength": 64 }
+      }
+    },
+    "sdk": { "type": "object" },
+    "app": { "type": "object" },
+    "device": { "type": "object" },
+    "locale": { "type": "object" },
+    "page": { "type": "object" },
+    "geo": { "type": "object" },
+    "marketing": { "type": "object" },
+    "experiments": { "type": "array", "items": { "type": "object" } },
+    "traits_inline_optional": { "type": "object" },
+    "ctx_participant": { "type": "object" },
+    "properties": { "type": "object" }
+  },
+  "required": ["event","event_id","occurred_at","client_id","campaign_id","properties"],
+  "$defs": {
+    "referralTokenOrId": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "referral_id": { "type": "string", "maxLength": 64 },
+        "referral_token": { "type": "string", "maxLength": 512 },
+        "invite_id": { "type": "string", "maxLength": 64 },
+        "invite_token": { "type": "string", "maxLength": 512 }
+      },
+      "oneOf": [
+        { "required": ["referral_id"] },
+        { "required": ["referral_token"] },
+        { "required": ["invite_id"] },
+        { "required": ["invite_token"] }
+      ]
+    },
+    "referredVisitedProps": {
+      "allOf": [
+        { "$ref": "#/$defs/referralTokenOrId" },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "visit_id": { "type": "string", "maxLength": 64 },
+            "landing_url": { "type": "string", "maxLength": 2048 },
+            "landing_path": { "type": "string", "maxLength": 512 },
+            "first_visit": { "type": "boolean" }
+          }
+        }
+      ]
+    },
+    "invitationClickedProps": {
+      "allOf": [
+        { "$ref": "#/$defs/referralTokenOrId" },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "visit_id": { "type": "string", "maxLength": 64 },
+            "landing_url": { "type": "string", "maxLength": 2048 },
+            "first_click": { "type": "boolean" }
+          }
+        }
+      ]
+    },
+    "referredSignupProps": {
+      "allOf": [
+        { "$ref": "#/$defs/referralTokenOrId" },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "signup_method": { "type": "string", "enum": ["email","oauth","sso","phone"] },
+            "is_new_account": { "type": "boolean" },
+            "plan": { "type": "string", "maxLength": 64 },
+            "country": { "type": "string", "maxLength": 2 },
+            "language": { "type": "string", "maxLength": 16 },
+            "marketing_opt_in": { "type": "boolean" },
+            "coupon_code": { "type": "string", "maxLength": 64 }
+          },
+          "required": ["signup_method","is_new_account"]
+        }
+      ]
+    },
+    "referredPurchaseProps": {
+      "allOf": [
+        { "$ref": "#/$defs/referralTokenOrId" },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "order_id": { "type": "string", "maxLength": 64 },
+            "amount": { "type": "number" },
+            "currency": { "type": "string", "maxLength": 3 },
+            "is_first_purchase": { "type": "boolean" },
+            "products": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "sku": { "type": "string", "maxLength": 64 },
+                  "qty": { "type": "integer", "minimum": 1 },
+                  "unit_price": { "type": "number" },
+                  "name": { "type": "string", "maxLength": 256 }
+                },
+                "required": ["sku","qty","unit_price"]
+              }
+            }
+          },
+          "required": ["order_id","amount","currency"]
+        }
+      ]
+    },
+    "referredReactivateProps": {
+      "allOf": [
+        { "$ref": "#/$defs/referralTokenOrId" },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "reason": { "type": "string", "enum": ["user_request","auto_billing_recovery","support_override","other"] },
+            "reactivation_path": { "type": "string", "enum": ["self_service","support","dunning"] },
+            "plan_at_reactivation": { "type": "string", "maxLength": 64 }
+          },
+          "required": ["reason"]
+        }
+      ]
+    },
+    "referredAdoptFeatureProps": {
+      "allOf": [
+        { "$ref": "#/$defs/referralTokenOrId" },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "feature_key": { "type": "string", "maxLength": 64 },
+            "adoption_criteria": { "type": "string", "maxLength": 64 },
+            "time_to_adoption_ms": { "type": "integer", "minimum": 0 }
+          },
+          "required": ["feature_key","adoption_criteria"]
+        }
+      ]
+    }
+  },
+  "allOf": [
+    {
+      "oneOf": [
+        { "allOf": [ { "properties": { "event": { "const": "invitation_clicked" } } }, { "properties": { "properties": { "$ref": "#/$defs/invitationClickedProps" } } } ] },
+        { "allOf": [ { "properties": { "event": { "const": "referred_visited" } } }, { "properties": { "properties": { "$ref": "#/$defs/referredVisitedProps" } } } ] },
+        { "allOf": [ { "properties": { "event": { "const": "referred_made_signup" } } }, { "properties": { "properties": { "$ref": "#/$defs/referredSignupProps" } } } ] },
+        { "allOf": [ { "properties": { "event": { "const": "referred_signed_up" } } }, { "properties": { "properties": { "$ref": "#/$defs/referredSignupProps" } } } ] },
+        { "allOf": [ { "properties": { "event": { "const": "referred_made_purchase" } } }, { "properties": { "properties": { "$ref": "#/$defs/referredPurchaseProps" } } } ] },
+        { "allOf": [ { "properties": { "event": { "const": "referred_made_reactivate_account" } } }, { "properties": { "properties": { "$ref": "#/$defs/referredReactivateProps" } } } ] },
+        { "allOf": [ { "properties": { "event": { "const": "referred_made_adopt_new_features" } } }, { "properties": { "properties": { "$ref": "#/$defs/referredAdoptFeatureProps" } } } ] },
+
+        { "allOf": [ { "properties": { "event": { "const": "widget_appeared" } } }, { "properties": { "properties": { "type": "object" } } } ] },
+        { "allOf": [ { "properties": { "event": { "const": "widget_email_filled" } } }, { "properties": { "properties": { "type": "object" } } } ] },
+        { "allOf": [ { "properties": { "event": { "const": "widget_submitted" } } }, { "properties": { "properties": { "type": "object" } } } ] },
+        { "allOf": [ { "properties": { "event": { "const": "widget_closed" } } }, { "properties": { "properties": { "type": "object" } } } ] },
+
+        { "allOf": [ { "properties": { "event": { "const": "invitation_sent" } } }, { "properties": { "properties": { "type": "object" } } } ] },
+        { "allOf": [ { "properties": { "event": { "const": "invitation_delivered" } } }, { "properties": { "properties": { "type": "object" } } } ] },
+
+        { "allOf": [ { "properties": { "event": { "const": "referrer_made_purchase" } } }, { "properties": { "properties": { "type": "object" } } } ] },
+        { "allOf": [ { "properties": { "event": { "const": "referral_reward_issued" } } }, { "properties": { "properties": { "type": "object" } } } ] },
+        { "allOf": [ { "properties": { "event": { "const": "subscription_renewed" } } }, { "properties": { "properties": { "type": "object" } } } ] },
+        { "allOf": [ { "properties": { "event": { "const": "account_reactivated" } } }, { "properties": { "properties": { "type": "object" } } } ] },
+        { "allOf": [ { "properties": { "event": { "const": "plan_upgraded" } } }, { "properties": { "properties": { "type": "object" } } } ] },
+
+        { "allOf": [ { "properties": { "event": { "const": "survey_shown" } } }, { "properties": { "properties": { "type": "object" } } } ] },
+        { "allOf": [ { "properties": { "event": { "const": "survey_started" } } }, { "properties": { "properties": { "type": "object" } } } ] },
+        { "allOf": [ { "properties": { "event": { "const": "survey_submitted" } } }, { "properties": { "properties": { "type": "object" } } } ] },
+        { "allOf": [ { "properties": { "event": { "const": "survey_abandoned" } } }, { "properties": { "properties": { "type": "object" } } } ] },
+
+        { "allOf": [ { "properties": { "event": { "const": "newsletter_subscribed" } } }, { "properties": { "properties": { "type": "object" } } } ] },
+        { "allOf": [ { "properties": { "event": { "const": "newsletter_unsubscribed" } } }, { "properties": { "properties": { "type": "object" } } } ] },
+        { "allOf": [ { "properties": { "event": { "const": "feedback_submitted" } } }, { "properties": { "properties": { "type": "object" } } } ] },
+        { "allOf": [ { "properties": { "event": { "const": "experiment_exposed" } } }, { "properties": { "properties": { "type": "object" } } } ] },
+        { "allOf": [ { "properties": { "event": { "const": "error_occurred" } } }, { "properties": { "properties": { "type": "object" } } } ] }
+      ]
+    }
+  ]
+}

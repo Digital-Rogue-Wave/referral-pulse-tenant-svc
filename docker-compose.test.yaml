@@ -1,0 +1,62 @@
+# Docker Compose for E2E Tests
+# Usage: docker compose -f docker-compose.test.yaml up -d
+#        pnpm test:e2e
+#        docker compose -f docker-compose.test.yaml down
+
+services:
+  # -----------------------------
+  # PostgreSQL for tests
+  # -----------------------------
+  postgres:
+    image: postgres:16-alpine
+    container_name: rp-test-postgres
+    environment:
+      POSTGRES_DB: referral_test
+      POSTGRES_USER: ory
+      POSTGRES_PASSWORD: orysecret
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata-test:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ory -d referral_test"]
+      interval: 5s
+      timeout: 3s
+      retries: 30
+
+  # -----------------------------
+  # Redis for tests
+  # -----------------------------
+  redis:
+    image: redis:7-alpine
+    container_name: rp-test-redis
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  # -----------------------------
+  # LocalStack (SQS, SNS, S3)
+  # -----------------------------
+  localstack:
+    image: localstack/localstack:3
+    container_name: rp-test-localstack
+    environment:
+      SERVICES: s3,sqs,sns
+      AWS_DEFAULT_REGION: eu-central-1
+      LS_LOG: warn
+    ports:
+      - "4566:4566"
+    volumes:
+      - ./deployment/local/localstack-init:/etc/localstack/init/ready.d
+    healthcheck:
+      test: ["CMD-SHELL", "awslocal sqs list-queues >/dev/null 2>&1 || exit 1"]
+      interval: 7s
+      timeout: 5s
+      retries: 30
+
+volumes:
+  pgdata-test:
