@@ -1,7 +1,8 @@
-import { HttpException, HttpStatus, Injectable } from '@nestjs/common';
+import { HttpStatus, Injectable } from '@nestjs/common';
 
 import type { IPrismaDelegate, ITenantReadOptions, ITenantScopedDelegate } from '@app/types';
 
+import { BaseException } from '@common/exceptions/base.exceptions';
 import { TenantContextService } from './tenant-context.service';
 
 /**
@@ -110,13 +111,7 @@ export class TenantAwareService {
     getRequiredTenantId(): string {
         const tenantId = this.tenantContext.getTenantId();
         if (!tenantId) {
-            throw new HttpException(
-                {
-                    message: 'Tenant context is required but not set',
-                    errorCode: 'TENANT_CONTEXT_REQUIRED'
-                },
-                HttpStatus.UNAUTHORIZED
-            );
+            throw new BaseException('tenant_context_required', 'Tenant context is required but not set', HttpStatus.UNAUTHORIZED);
         }
         return tenantId;
     }

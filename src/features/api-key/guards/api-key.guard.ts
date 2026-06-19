@@ -23,7 +23,7 @@ export class ApiKeyGuard implements CanActivate {
         const apiKey = await this.apiKeyService.validateKey(apiKeyHeader as string);
 
         if (!apiKey) {
-            throw new BaseException('INVALID_API_KEY' as ErrorCode, 'Invalid or expired API Key', HttpStatus.EXPECTATION_FAILED);
+            throw new BaseException('invalid_api_key', 'Invalid or expired API Key', HttpStatus.EXPECTATION_FAILED);
         }
 
         // Set context

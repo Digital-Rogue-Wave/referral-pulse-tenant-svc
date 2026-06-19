@@ -22,11 +22,11 @@ export class PaymentRequiredGuard implements CanActivate {
         const tenant = await this.tenantService.findOneById(tenantId);
 
         if (!tenant) {
-            throw new BaseException('TENANT_NOT_FOUND' as ErrorCode, 'Tenant not found', HttpStatus.NOT_FOUND);
+            throw new BaseException('tenant_not_found', 'Tenant not found', HttpStatus.NOT_FOUND);
         }
 
         if (tenant.paymentStatus === PaymentStatusEnum.LOCKED) {
-            throw new BaseException('PAYMENT_REQUIRED' as ErrorCode, 'Payment is required to access this resource.', HttpStatus.PAYMENT_REQUIRED);
+            throw new BaseException('payment_required', 'Payment is required to access this resource.', HttpStatus.PAYMENT_REQUIRED);
         }
 
         return true;

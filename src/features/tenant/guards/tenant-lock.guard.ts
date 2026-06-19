@@ -38,14 +38,15 @@ export class TenantLockGuard implements CanActivate {
         const tenant = await this.tenantService.findOneById(tenantId);
 
         if (!tenant) {
-            throw new BaseException('TENANT_NOT_FOUND' as ErrorCode, 'Tenant not found', HttpStatus.NOT_FOUND);
+            throw new BaseException('tenant_not_found', 'Tenant not found', HttpStatus.NOT_FOUND);
         }
 
         if (tenant.status === TenantStatus.LOCKED) {
             throw new BaseException(
-                'TENANT_LOCKED' as ErrorCode,
+                'tenant_locked',
                 'This account has been locked. Please unlock it using your password.',
                 HttpStatus.FORBIDDEN,
+                undefined,
                 { lockedAt: tenant.lockedAt, lockUntil: tenant.lockUntil, reason: tenant.lockReason }
             );
         }

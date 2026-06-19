@@ -199,6 +199,24 @@ this service defines its side of the contract (the workflow service must match i
   system of record; `/users` endpoints; Keto `user`).
 - Prisma migration baseline — **RESOLVED** (squashed baseline + reset; see the migration-baseline section above).
 
+## Error model standardized to the template/spec (was an old pattern)
+
+Reviewing the template `src/` (via a throwaway overlay + `git diff`) showed our service used the **old**
+error pattern. Adopted the canonical model per `referralai_api_contract` §error model:
+- **Envelope:** `{ error: { code, message, param?, requestId, correlationId?, details? } }` (was RFC9457
+  `{ type, title, status, detail, errorCode, instance, … }`).
+- **`code`** is lowercase snake_case (`tenant_suspended`, `not_found`, …) — was UPPER `errorCode`.
+- `BaseException` refactored to `(code: ErrorCode, message, status, param?, details?)` with `getCode()`;
+  global filter rewritten to the new envelope (+ `X-Request-Id` header); adopted the template's
+  validation/not-found/database/business/messaging exception classes.
+- `ErrorCode` union is the template's standard set **extended** with this service's tenant/billing codes
+  (`tenant_not_found`, `tenant_suspended`, `tenant_locked`, `tenant_context_required`, `payment_required`,
+  `plan_limit_exceeded`, `file_*`).
+- Updated all ~17 throw sites + the guard unit spec + the BDD error assertions to the new envelope.
+
+The rest of the template `src/` review confirmed our shared utilities are **aligned or ahead** (older
+baseline) — see below; only the error model was a genuine standard we were missing.
+
 ## Template structure mirror + shared-utility review
 
 Mirrored the missing top-level structure from the template (additive, non-breaking):

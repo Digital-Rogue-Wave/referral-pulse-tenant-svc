@@ -274,15 +274,33 @@ export interface IPaginatedResponse<T> {
 // ERROR RESPONSE INTERFACES
 // ============================================================================
 
-export interface IErrorResponse {
-    statusCode: number;
-    errorCode: string;
+export interface IValidationErrorDetail {
+    field: string;
     message: string;
-    details?: unknown;
-    timestamp: string;
-    path: string;
+    code?: string;
+}
+
+/**
+ * Error object per referralai_api_contract §error model.
+ */
+export interface IApiError {
+    /** Error code (e.g., 'validation_failed', 'resource_not_found') */
+    code: string;
+    /** Human-readable error message */
+    message: string;
+    /** Parameter/field that caused the error (for validation errors) */
+    param?: string;
+    /** Request ID for support/debugging — also returned as X-Request-Id header */
     requestId: string;
-    traceId?: string;
+    /** Correlation ID for distributed tracing across services */
+    correlationId?: string;
+    /** Per-field validation errors */
+    details?: IValidationErrorDetail[];
+}
+
+/** Standardized API error response: `{ error: {...} }`. */
+export interface IErrorResponse {
+    error: IApiError;
 }
 
 export interface IJwtPayload {

@@ -5,18 +5,9 @@ import { Request, Response } from 'express';
 import { BaseException } from '@common/exceptions/base.exceptions';
 import { AppLoggerService } from '@common/logging/app-logger.service';
 import { TenantContextService } from '@common/tenant-aware/tenant-context.service';
+import { PrismaClientKnownRequestError } from '@prisma/client/runtime/client';
 
-interface ProblemDetail {
-    type: string;
-    title: string;
-    status: number;
-    detail: string;
-    instance: string;
-    errorCode?: string;
-    correlationId?: string;
-    timestamp: string;
-    errors?: string[];
-}
+import type { IApiError, IErrorResponse, IValidationErrorDetail } from '@app/types';
 
 @Catch()
 export class GlobalExceptionsFilter implements ExceptionFilter {
@@ -30,197 +21,233 @@ export class GlobalExceptionsFilter implements ExceptionFilter {
     catch(exception: unknown, host: ArgumentsHost): void {
         const ctx = host.switchToHttp();
         const request = ctx.getRequest<Request>();
-        const reply = ctx.getResponse<Response>();
+        const response = ctx.getResponse<Response>();
 
-        const correlationId = this.tenantContext.getCorrelationId() ?? 'unknown';
-        const instance = request.url;
-        const timestamp = new Date().toISOString();
+        // Get IDs from ALS context
+        const requestId = this.tenantContext.getRequestId() ?? 'unknown';
+        const correlationId = this.tenantContext.getCorrelationId();
 
-        let problemDetail: ProblemDetail;
+        let status: HttpStatus;
+        let apiError: IApiError;
 
         // Handle custom BaseException
         if (exception instanceof BaseException) {
-            problemDetail = this.handleBaseException(exception, instance, correlationId, timestamp);
+            ({ status, apiError } = this.handleBaseException(exception, requestId, correlationId));
         }
         // Handle Prisma errors
-        /*else if (exception instanceof PrismaClientKnownRequestError) {
-      problemDetail = this.handlePrismaError(
-        exception,
-        instance,
-        correlationId,
-        timestamp,
-      );
-    }*/
+        else if (exception instanceof PrismaClientKnownRequestError) {
+            ({ status, apiError } = this.handlePrismaError(exception, requestId, correlationId));
+        }
         // Handle NestJS HttpException
         else if (exception instanceof HttpException) {
-            problemDetail = this.handleHttpException(exception, instance, correlationId, timestamp);
+            ({ status, apiError } = this.handleHttpException(exception, requestId, correlationId));
         }
         // Handle unknown errors
         else {
-            problemDetail = this.handleUnknownError(exception, instance, correlationId, timestamp);
+            ({ status, apiError } = this.handleUnknownError(requestId, correlationId));
         }
 
         // Log error
-        this.logError(request, problemDetail, exception);
+        this.logError(request, status, apiError, exception);
 
-        // Send response
-        reply.status(problemDetail.status).send(problemDetail);
+        // Build response
+        const errorResponse: IErrorResponse = { error: apiError };
+
+        // Send response with X-Request-Id header
+        response.setHeader('X-Request-Id', requestId).status(status).json(errorResponse);
     }
 
-    private handleBaseException(exception: BaseException, instance: string, correlationId: string, timestamp: string): ProblemDetail {
-        const response = exception.getResponse() as {
-            errorCode: string;
+    private handleBaseException(exception: BaseException, requestId: string, correlationId?: string): { status: HttpStatus; apiError: IApiError } {
+        const exceptionResponse = exception.getResponse() as {
+            code: string;
             message: string;
+            param?: string;
             details?: Record<string, unknown>;
         };
 
-        return {
-            type: 'about:blank',
-            title: this.getHttpStatusText(exception.getStatus()),
-            status: exception.getStatus(),
-            detail: response.message,
-            instance,
-            errorCode: response.errorCode,
-            correlationId,
-            timestamp,
-            ...(response.details?.errors ? { errors: response.details.errors as string[] } : {})
+        const apiError: IApiError = {
+            code: exceptionResponse.code,
+            message: exceptionResponse.message,
+            requestId,
+            correlationId
         };
-    }
 
-    /*
-  private handlePrismaError(
-    exception: PrismaClientKnownRequestError,
-    instance: string,
-    correlationId: string,
-    timestamp: string,
-  ): ProblemDetail {
-    let status: HttpStatus;
-    let errorCode: string;
-    let detail: string;
-
-    switch (exception.code) {
-      case 'P2002':
-        // Unique constraint violation
-        status = HttpStatus.CONFLICT;
-        errorCode = 'DUPLICATE_RECORD';
-        const field = (exception.meta?.target as string[])?.join(', ') ?? 'field';
-        detail = `A record with this ${field} already exists`;
-        break;
-
-      case 'P2025':
-        // Record not found
-        status = HttpStatus.NOT_FOUND;
-        errorCode = 'RECORD_NOT_FOUND';
-        detail = exception.meta?.cause as string ?? 'Record not found';
-        break;
-
-      case 'P2003':
-        // Foreign key constraint violation
-        status = HttpStatus.BAD_REQUEST;
-        errorCode = 'FOREIGN_KEY_VIOLATION';
-        detail = 'Referenced record does not exist';
-        break;
-
-      default:
-        status = HttpStatus.INTERNAL_SERVER_ERROR;
-        errorCode = 'DATABASE_ERROR';
-        detail = 'A database error occurred';
-    }
-
-    return {
-      type: 'about:blank',
-      title: this.getHttpStatusText(status),
-      status,
-      detail,
-      instance,
-      errorCode,
-      correlationId,
-      timestamp,
-    };
-  }
-
-  */
-    private handleHttpException(exception: HttpException, instance: string, correlationId: string, timestamp: string): ProblemDetail {
-        const status = exception.getStatus();
-        const response = exception.getResponse();
-
-        let detail: string;
-        let errors: string[] | undefined;
-
-        if (typeof response === 'string') {
-            detail = response;
-        } else if (typeof response === 'object' && response !== null) {
-            const responseObj = response as Record<string, unknown>;
-            detail = (responseObj.message as string) ?? exception.message;
-
-            // Handle class-validator errors
-            if (Array.isArray(responseObj.message)) {
-                errors = responseObj.message as string[];
-                detail = 'Validation failed';
-            }
-        } else {
-            detail = exception.message;
+        if (exceptionResponse.param) {
+            apiError.param = exceptionResponse.param;
         }
 
-        return {
-            type: 'about:blank',
-            title: this.getHttpStatusText(status),
-            status,
-            detail,
-            instance,
-            errorCode: 'HTTP_ERROR',
-            correlationId,
-            timestamp,
-            ...(errors && { errors })
-        };
+        // Handle validation details array
+        if (exceptionResponse.details?.errors && Array.isArray(exceptionResponse.details.errors)) {
+            apiError.details = exceptionResponse.details.errors as IValidationErrorDetail[];
+        }
+
+        return { status: exception.getStatus(), apiError };
     }
 
-    private handleUnknownError(_exception: unknown, instance: string, correlationId: string, timestamp: string): ProblemDetail {
-        return {
-            type: 'about:blank',
-            title: 'Internal Server Error',
-            status: HttpStatus.INTERNAL_SERVER_ERROR,
-            detail: 'An unexpected error occurred',
-            instance,
-            errorCode: 'INTERNAL_ERROR',
-            correlationId,
-            timestamp
+    private handlePrismaError(
+        exception: PrismaClientKnownRequestError,
+        requestId: string,
+        correlationId?: string
+    ): { status: HttpStatus; apiError: IApiError } {
+        let status: HttpStatus;
+        let code: string;
+        let message: string;
+        let param: string | undefined;
+
+        switch (exception.code) {
+            case 'P2002': {
+                // Unique constraint violation
+                status = HttpStatus.CONFLICT;
+                code = 'duplicate_resource';
+                const field = (exception.meta?.target as string[])?.join(', ') ?? 'field';
+                message = `A record with this ${field} already exists`;
+                param = field;
+                break;
+            }
+
+            case 'P2025':
+                // Record not found
+                status = HttpStatus.NOT_FOUND;
+                code = 'resource_not_found';
+                message = (exception.meta?.cause as string) ?? 'Record not found';
+                break;
+
+            case 'P2003': {
+                // Foreign key constraint violation
+                status = HttpStatus.BAD_REQUEST;
+                code = 'foreign_key_violation';
+                message = 'Referenced record does not exist';
+                const fkField = exception.meta?.field_name as string | undefined;
+                if (fkField) {
+                    param = fkField;
+                }
+                break;
+            }
+
+            default:
+                status = HttpStatus.INTERNAL_SERVER_ERROR;
+                code = 'database_error';
+                message = 'A database error occurred';
+        }
+
+        const apiError: IApiError = {
+            code,
+            message,
+            requestId,
+            correlationId
         };
+
+        if (param) {
+            apiError.param = param;
+        }
+
+        return { status, apiError };
     }
 
-    private logError(request: Request, problemDetail: ProblemDetail, exception: unknown): void {
+    private handleHttpException(exception: HttpException, requestId: string, correlationId?: string): { status: HttpStatus; apiError: IApiError } {
+        const status = exception.getStatus();
+        const exceptionResponse = exception.getResponse();
+
+        let message: string;
+        let code: string;
+        let details: IValidationErrorDetail[] | undefined;
+
+        if (typeof exceptionResponse === 'string') {
+            message = exceptionResponse;
+            code = this.statusToCode(status);
+        } else if (typeof exceptionResponse === 'object' && exceptionResponse !== null) {
+            const responseObj = exceptionResponse as Record<string, unknown>;
+            message = (responseObj.message as string) ?? exception.message;
+
+            // Handle class-validator errors (array of validation messages)
+            if (Array.isArray(responseObj.message)) {
+                code = 'validation_failed';
+                message = 'Validation failed';
+                details = (responseObj.message as string[]).map((msg) => ({
+                    field: this.extractFieldFromValidationMessage(msg),
+                    message: msg
+                }));
+            } else {
+                code = this.statusToCode(status);
+            }
+        } else {
+            message = exception.message;
+            code = this.statusToCode(status);
+        }
+
+        const apiError: IApiError = {
+            code,
+            message,
+            requestId,
+            correlationId
+        };
+
+        if (details) {
+            apiError.details = details;
+        }
+
+        return { status, apiError };
+    }
+
+    private handleUnknownError(requestId: string, correlationId?: string): { status: HttpStatus; apiError: IApiError } {
+        const apiError: IApiError = {
+            code: 'internal_error',
+            message: 'An unexpected error occurred',
+            requestId,
+            correlationId
+        };
+
+        return { status: HttpStatus.INTERNAL_SERVER_ERROR, apiError };
+    }
+
+    private logError(request: Request, status: HttpStatus, apiError: IApiError, exception: unknown): void {
         const logContext = {
             method: request.method,
             url: request.url,
-            correlationId: problemDetail.correlationId,
-            errorCode: problemDetail.errorCode,
-            status: problemDetail.status
+            requestId: apiError.requestId,
+            correlationId: apiError.correlationId,
+            code: apiError.code,
+            status,
+            tenantId: this.tenantContext.getTenantId(),
+            userId: this.tenantContext.getUserId()
         };
 
-        if (problemDetail.status >= 500) {
+        if (status >= 500) {
             this.logger.error(
-                `${request.method} ${request.url} ${problemDetail.status}`,
+                `${request.method} ${request.url} ${status} - ${apiError.message}`,
                 exception instanceof Error ? exception.stack : String(exception),
                 logContext
             );
         } else {
-            this.logger.warn(`${request.method} ${request.url} ${problemDetail.status} - ${problemDetail.detail}`, logContext);
+            this.logger.warn(`${request.method} ${request.url} ${status} - ${apiError.message}`, logContext);
         }
     }
 
-    private getHttpStatusText(status: number): string {
-        const statusTexts: Record<number, string> = {
-            400: 'Bad Request',
-            401: 'Unauthorized',
-            403: 'Forbidden',
-            404: 'Not Found',
-            409: 'Conflict',
-            422: 'Unprocessable Entity',
-            500: 'Internal Server Error',
-            502: 'Bad Gateway',
-            503: 'Service Unavailable'
+    /**
+     * Map HTTP status to error code
+     */
+    private statusToCode(status: HttpStatus): string {
+        const statusMap: Record<number, string> = {
+            [HttpStatus.BAD_REQUEST]: 'invalid_request',
+            [HttpStatus.UNAUTHORIZED]: 'authentication_error',
+            [HttpStatus.FORBIDDEN]: 'authorization_error',
+            [HttpStatus.NOT_FOUND]: 'not_found',
+            [HttpStatus.CONFLICT]: 'conflict',
+            [HttpStatus.UNPROCESSABLE_ENTITY]: 'invalid_request',
+            [HttpStatus.TOO_MANY_REQUESTS]: 'rate_limit_exceeded',
+            [HttpStatus.INTERNAL_SERVER_ERROR]: 'internal_error',
+            [HttpStatus.SERVICE_UNAVAILABLE]: 'service_unavailable'
         };
 
-        return statusTexts[status] ?? 'Error';
+        return statusMap[status] ?? 'internal_error';
+    }
+
+    /**
+     * Extract field name from class-validator error message
+     * Example: "email must be a valid email" -> "email"
+     */
+    private extractFieldFromValidationMessage(message: string): string {
+        const match = message.match(/^(\w+)\s/);
+        return match?.[1] ?? 'unknown';
     }
 }

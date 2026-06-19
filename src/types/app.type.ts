@@ -230,29 +230,56 @@ export type MinimalRequestContext = Pick<RequestContext, 'requestId' | 'tenantId
 // ERROR CODES
 // ============================================================================
 
+/**
+ * Error codes per referralai_api_contract §error model — lowercase snake_case.
+ * Standard platform codes followed by this service's tenant/billing-specific codes.
+ */
 export type ErrorCode =
-    | 'VALIDATION_ERROR'
-    | 'UNAUTHORIZED'
-    | 'FORBIDDEN'
-    | 'NOT_FOUND'
-    | 'CONFLICT'
-    | 'UNPROCESSABLE_ENTITY'
-    | 'TOO_MANY_REQUESTS'
-    | 'INTERNAL_ERROR'
-    | 'SERVICE_UNAVAILABLE'
-    | 'CIRCUIT_BREAKER_OPEN'
-    | 'DUPLICATE_RESOURCE'
-    | 'FOREIGN_KEY_VIOLATION'
-    | 'IDEMPOTENCY_CONFLICT'
-    | 'PLAN_LIMIT_EXCEEDED'
-    | 'TENANT_NOT_FOUND'
-    | 'PAYMENT_REQUIRED'
-    | 'TENANT_LOCKED'
-    | 'TENANT_SUSPENDED'
-    | 'INVALID_API_KEY'
-    | 'FILE_NOT_FOUND'
-    | 'FILE_UPLOAD_FAILED'
-    | 'INVALID_FILE_URL';
+    // 400 - Bad Request / Validation
+    | 'invalid_request'
+    | 'validation_failed'
+    | 'invalid_parameter'
+    | 'missing_required_field'
+    | 'invalid_format'
+    // 401 - Authentication
+    | 'authentication_error'
+    | 'invalid_api_key'
+    | 'expired_token'
+    | 'missing_authorization'
+    // 403 - Authorization
+    | 'authorization_error'
+    | 'insufficient_permissions'
+    | 'tenant_access_denied'
+    | 'resource_access_denied'
+    // 404 - Not Found
+    | 'not_found'
+    | 'resource_not_found'
+    | 'endpoint_not_found'
+    // 409 - Conflict
+    | 'conflict'
+    | 'duplicate_resource'
+    | 'state_conflict'
+    | 'idempotency_key_collision'
+    | 'foreign_key_violation'
+    | 'optimistic_lock_error'
+    // 429 - Rate Limit
+    | 'rate_limit_exceeded'
+    // 500 / 503
+    | 'internal_error'
+    | 'unexpected_error'
+    | 'database_error'
+    | 'service_unavailable'
+    | 'circuit_breaker_open'
+    // Tenant/billing-specific (this service)
+    | 'tenant_not_found'
+    | 'tenant_suspended'
+    | 'tenant_locked'
+    | 'tenant_context_required'
+    | 'payment_required'
+    | 'plan_limit_exceeded'
+    | 'file_not_found'
+    | 'file_upload_failed'
+    | 'invalid_file_url';
 
 // ============================================================================
 // EVENT TYPES - EVENTEMITTER2 (In-Process Events)

@@ -12,24 +12,24 @@ Feature: Tenant Status Guards
     Given I have a valid JWT for the current fixture tenant
     When I send a GET request to "/api/v1/billings/subscription" with that token
     Then the response status should be 403
-    And the response should contain errorCode "TENANT_SUSPENDED"
-    And the response should contain a "title" field with value "Forbidden"
+    And the response should contain errorCode "tenant_suspended"
+    And the response error should contain a "message" field
 
   @needs-locked-tenant
   Scenario: Locked tenant is blocked from billing endpoints
     Given I have a valid JWT for the current fixture tenant
     When I send a GET request to "/api/v1/billings/subscription" with that token
     Then the response status should be 403
-    And the response should contain errorCode "TENANT_LOCKED"
+    And the response should contain errorCode "tenant_locked"
 
   @needs-locked-tenant
   Scenario: Locked tenant error response has the correct shape
     Given I have a valid JWT for the current fixture tenant
     When I send a GET request to "/api/v1/billings/subscription" with that token
     Then the response status should be 403
-    And the response should contain a "title" field with value "Forbidden"
-    And the response should contain a "detail" field
-    And the response should contain a "errorCode" field
+    And the response error should contain a "code" field
+    And the response error should contain a "message" field
+    And the response error should contain a "requestId" field
 
   @needs-active-tenant
   Scenario: Active tenant passes the tenant status guard

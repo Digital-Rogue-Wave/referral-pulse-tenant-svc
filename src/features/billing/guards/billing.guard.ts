@@ -26,7 +26,7 @@ export class BillingGuard implements CanActivate {
         const tenant = await this.tenantService.findOneById(tenantId);
 
         if (!tenant) {
-            throw new BaseException('TENANT_NOT_FOUND' as ErrorCode, 'Tenant not found', HttpStatus.NOT_FOUND);
+            throw new BaseException('tenant_not_found', 'Tenant not found', HttpStatus.NOT_FOUND);
         }
 
         const options = this.reflector.getAllAndOverride<BillingGuardOptions | undefined>(BILLING_GUARD_KEY, [

@@ -33,7 +33,7 @@ export class FilesService {
             where: { ...where, deletedAt: null }
         });
         if (!file) {
-            throw new BaseException('FILE_NOT_FOUND' as ErrorCode, 'File not found', HttpStatus.NOT_FOUND);
+            throw new BaseException('file_not_found', 'File not found', HttpStatus.NOT_FOUND);
         }
         return file;
     }
@@ -41,7 +41,7 @@ export class FilesService {
     async uploadFile(file: Express.Multer.File | Express.MulterS3.File): Promise<File> {
         if (!file) {
             throw new BaseException(
-                'FILE_UPLOAD_FAILED' as ErrorCode,
+                'file_upload_failed',
                 this.i18n.t('file.failedUpload', { lang: I18nContext.current()?.lang }),
                 HttpStatus.PRECONDITION_FAILED
             );
@@ -57,7 +57,7 @@ export class FilesService {
     async uploadMultipleFiles(files: Array<Express.Multer.File | Express.MulterS3.File>): Promise<File[]> {
         if (!files) {
             throw new BaseException(
-                'FILE_UPLOAD_FAILED' as ErrorCode,
+                'file_upload_failed',
                 this.i18n.t('file.failedUpload', { lang: I18nContext.current()?.lang }),
                 HttpStatus.PRECONDITION_FAILED
             );
@@ -74,7 +74,7 @@ export class FilesService {
     async updateFile(id: string, file: Express.Multer.File | Express.MulterS3.File): Promise<File> {
         if (!file) {
             throw new BaseException(
-                'FILE_UPLOAD_FAILED' as ErrorCode,
+                'file_upload_failed',
                 this.i18n.t('file.failedUpload', { lang: I18nContext.current()?.lang }),
                 HttpStatus.PRECONDITION_FAILED
             );
@@ -127,7 +127,7 @@ export class FilesService {
         const urlParts = url.split('/');
         const key = urlParts[urlParts.length - 1];
         if (!key) {
-            throw new BaseException('INVALID_FILE_URL' as ErrorCode, 'Invalid file URL', HttpStatus.BAD_REQUEST);
+            throw new BaseException('invalid_file_url', 'Invalid file URL', HttpStatus.BAD_REQUEST);
         }
         return key;
     }
@@ -136,7 +136,7 @@ export class FilesService {
         const existingFile = await this.findOne({ path: url });
         if (existingFile) {
             throw new BaseException(
-                'CONFLICT' as ErrorCode,
+                'conflict',
                 this.i18n.t('file.fileExists', { lang: I18nContext.current()?.lang }),
                 HttpStatus.PRECONDITION_FAILED
             );

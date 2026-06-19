@@ -38,19 +38,15 @@ export class TenantStatusGuard implements CanActivate {
         const tenant = await this.tenantService.findOneById(tenantId);
 
         if (!tenant) {
-            throw new BaseException('TENANT_NOT_FOUND' as ErrorCode, 'Tenant not found', HttpStatus.NOT_FOUND);
+            throw new BaseException('tenant_not_found', 'Tenant not found', HttpStatus.NOT_FOUND);
         }
 
         if (tenant.status === TenantStatus.SUSPENDED) {
-            throw new BaseException(
-                'TENANT_SUSPENDED' as ErrorCode,
-                'This account has been suspended. Please contact support.',
-                HttpStatus.FORBIDDEN
-            );
+            throw new BaseException('tenant_suspended', 'This account has been suspended. Please contact support.', HttpStatus.FORBIDDEN);
         }
 
         if (tenant.status === TenantStatus.LOCKED) {
-            throw new BaseException('TENANT_LOCKED' as ErrorCode, 'This account has been locked due to security concerns.', HttpStatus.FORBIDDEN);
+            throw new BaseException('tenant_locked', 'This account has been locked due to security concerns.', HttpStatus.FORBIDDEN);
         }
 
         return true;

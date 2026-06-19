@@ -10,7 +10,7 @@ Feature: Authentication and Authorization
   Scenario: Request without Authorization header is rejected
     When I send a GET request to "/api/v1/billings/subscription" without any token
     Then the response status should be 401
-    And the response should contain a "title" field with value "Unauthorized"
+    And the response should contain errorCode "authentication_error"
 
   Scenario: Request with expired JWT is rejected
     Given I have an expired JWT for tenant "default-tenant"
@@ -26,7 +26,7 @@ Feature: Authentication and Authorization
     Given I have a valid JWT for tenant "bdd-nonexistent-tenant-xyz"
     When I send a GET request to "/api/v1/billings/subscription" with that token
     Then the response status should be 404
-    And the response should contain errorCode "TENANT_NOT_FOUND"
+    And the response should contain errorCode "tenant_not_found"
 
   Scenario: Active tenant with valid JWT can access the API
     Given I have a valid JWT for tenant "default-tenant"

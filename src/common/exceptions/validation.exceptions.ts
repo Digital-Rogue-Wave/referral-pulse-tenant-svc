@@ -1,12 +1,15 @@
 import { HttpStatus } from '@nestjs/common';
 
-import { BaseException } from '@common/exceptions/base.exceptions';
+import type { IValidationErrorDetail } from '@app/types';
 
+import { BaseException } from './base.exceptions';
+
+/**
+ * Validation exception for input validation failures.
+ * HTTP Status: 400 Bad Request
+ */
 export class ValidationException extends BaseException {
-    constructor(message: string, errors: string[] = [], details?: Record<string, unknown>) {
-        super('VALIDATION_ERROR', message, HttpStatus.BAD_REQUEST, {
-            ...details,
-            errors
-        });
+    constructor(message: string, errors: IValidationErrorDetail[] = [], param?: string) {
+        super('validation_failed', message, HttpStatus.BAD_REQUEST, param, { errors });
     }
 }

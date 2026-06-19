@@ -1,7 +1,6 @@
 import { HttpStatus } from '@nestjs/common';
 
 import { BaseException } from '@common/exceptions/base.exceptions';
-import { ErrorCode } from '@app/types/app.type';
 
 export interface LimitExceededDetails {
     metric: string;
@@ -17,9 +16,10 @@ export interface LimitExceededDetails {
 export class LimitExceededException extends BaseException {
     constructor(details: LimitExceededDetails) {
         super(
-            'PLAN_LIMIT_EXCEEDED' as ErrorCode,
+            'plan_limit_exceeded',
             'Plan limit exceeded for this resource.',
             HttpStatus.PAYMENT_REQUIRED,
+            undefined,
             details as unknown as Record<string, unknown>
         );
     }

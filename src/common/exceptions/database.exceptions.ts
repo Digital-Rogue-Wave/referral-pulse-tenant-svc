@@ -1,11 +1,13 @@
 import { HttpStatus } from '@nestjs/common';
 
-import { BaseException } from '@common/exceptions/base.exceptions';
+import { BaseException } from './base.exceptions';
 
+/**
+ * Database exception for database operation failures.
+ * HTTP Status: 503 Service Unavailable
+ */
 export class DatabaseException extends BaseException {
     constructor(message: string, cause?: Error) {
-        super('DATABASE_ERROR', message, HttpStatus.SERVICE_UNAVAILABLE, {
-            cause: cause?.message
-        });
+        super('database_error', message, HttpStatus.SERVICE_UNAVAILABLE, undefined, { cause: cause?.message });
     }
 }

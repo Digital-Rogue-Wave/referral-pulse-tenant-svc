@@ -91,7 +91,7 @@ describe('TenantStatusGuard', () => {
             await guard.canActivate(context);
         } catch (e: any) {
             expect(e.getStatus()).toBe(HttpStatus.FORBIDDEN);
-            expect(e.getResponse().errorCode).toBe('TENANT_SUSPENDED');
+            expect(e.getResponse().code).toBe('tenant_suspended');
         }
     });
 
@@ -110,7 +110,7 @@ describe('TenantStatusGuard', () => {
             await guard.canActivate(context);
         } catch (e: any) {
             expect(e.getStatus()).toBe(HttpStatus.FORBIDDEN);
-            expect(e.getResponse().errorCode).toBe('TENANT_LOCKED');
+            expect(e.getResponse().code).toBe('tenant_locked');
         }
     });
 
@@ -126,7 +126,7 @@ describe('TenantStatusGuard', () => {
             await guard.canActivate(context);
         } catch (e: any) {
             expect(e.getStatus()).toBe(HttpStatus.NOT_FOUND);
-            expect(e.getResponse().errorCode).toBe('TENANT_NOT_FOUND');
+            expect(e.getResponse().code).toBe('tenant_not_found');
         }
     });
 });
