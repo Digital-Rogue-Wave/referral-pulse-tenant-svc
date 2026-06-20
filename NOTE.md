@@ -130,8 +130,9 @@ so regeneration no longer breaks `pnpm lint:check`.
     (unverified→pending_review→verified→rejected, payout gate) from the responsibility contract is not
     present on the `tenants` table. Recorded for the Phase 4 audit / a separate task.
 - **Internal/identity endpoints (Phase 3c — DONE):**
-  - `GET /v1/internal/validate-token` (`@Public`) resolves an API key (`x-api-key`/`x-tenant-api-key`)
-    or an OAuth2 JWT (`Authorization: Bearer`) to `{ tenant_id, scopes, source, key_type, user_id }`
+  - `GET /internal/validate-token` (`@Public`, version-neutral) resolves an API key
+    (`x-api-key`/`x-tenant-api-key`) or an OAuth2 JWT (`Authorization: Bearer`) to
+    `{ tenant_id, scopes, source, key_type, key_id, user_id }`
     (`TokenResolverService` reuses `ApiKeyService.validateKey`; JWT verification mirrors `JwtStrategy`
     JWKS config — no duplicated dependency).
   - `GET /v1/users/me` returns the current user's profile + roles/scopes from the user projection
@@ -343,3 +344,14 @@ baseline with all later changes stashed). All now pass:
 - `oauth2_clients`/`sessions` delegated to Ory (no local tables).
 - `users` (+denormalized `role`) / `user_roles` are the system of record for membership; `team_members`
   was removed (consolidated per spec). Role assignment is the canonical `PUT /v1/users/:id/roles`.
+
+### Flagged for a later pass (out-of-scope template boilerplate)
+The events module ships cross-service **producer** listeners copied from the service template that push
+to *other* services' queues — work the identity/tenant service should not own:
+- **Removed (this pass):** `ReferralServiceListener` (referral signup / conversion / campaign tracking)
+  plus the unused `user.created/updated/deleted` domain events.
+- **Still present, recommend removing after sign-off:** `RewardServiceListener`, `TrackingServiceListener`,
+  `CampaignServiceListener` (and the now-only consumer of `@domains/referral`, `ReferralEvents`, used by
+  `RewardServiceListener`). `TenantServiceListener` is billing/quota-related — keep with billing until the
+  billing decision lands. `BroadcastEventListener`, `AuditTrailListener`, `EmailNotificationListener` are
+  in-scope and stay.

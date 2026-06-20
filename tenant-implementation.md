@@ -77,7 +77,7 @@ All routes are versioned (`/v1/...`) and tenant-scoped unless marked Public/Inte
 | POST/GET/GET:id/PUT:id/DELETE:id | `/v1/api-keys` | api-key | Create/list/get/update(label,scopes)/revoke; Keto-guarded; raw key shown once. DELETE = revoke (sets `revoked_at`, irreversible) |
 | GET | `/v1/users/me` | users | Current user profile + roles/scopes |
 | POST/GET/PUT/DELETE | `/v1/users`, `/v1/users/:id`, `/v1/users/:id/roles` | users | Membership + role; last-admin protection |
-| GET | `/v1/internal/validate-token` | users | **Public/internal** — resolve API key or JWT → claims |
+| GET | `/internal/validate-token` | users | **Public/internal**, version-neutral — resolve API key or JWT → `{tenant_id, scopes, source, key_type, key_id, user_id}` |
 | PATCH | `/v1/internal/tenants/:id/verification` | tenant | **Internal** — workflow svc verification decision callback |
 | POST/GET | `/v1/tenants` | tenant | Create (agnostic), current-tenant reads |
 | GET/PUT/DELETE | `/v1/admin/tenants`, `/v1/admin/tenants/:id` | tenant | Admin tenant management |

@@ -19,6 +19,7 @@ export interface ValidateTokenResult {
     scopes: string[];
     source: 'api_key' | 'oauth2_jwt';
     key_type: string | null;
+    key_id: string | null;
     user_id: string;
 }
 
@@ -59,6 +60,7 @@ export class TokenResolverService {
             scopes: Array.isArray(apiKey.scopes) ? (apiKey.scopes as string[]) : [],
             source: 'api_key',
             key_type: apiKey.keyType,
+            key_id: apiKey.id,
             user_id: apiKey.createdBy
         };
     }
@@ -87,6 +89,7 @@ export class TokenResolverService {
             scopes: payload.scp ?? [],
             source: 'oauth2_jwt',
             key_type: null,
+            key_id: null,
             user_id: payload.ext?.user_id ?? payload.sub
         };
     }

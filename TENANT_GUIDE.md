@@ -61,7 +61,7 @@ and a short prefix. Creating one announces `api_key.created`; revoking (deleting
 `api_key.revoked`. Keys have a `key_type` (`secret` or `publishable`) and a set of scopes.
 
 ### 4. Every API call, everywhere
-When any request hits the platform, the gateway/guard calls our **`GET /v1/internal/validate-token`**.
+When any request hits the platform, the gateway/guard calls our **`GET /internal/validate-token`**.
 We take the credential (an API key *or* an OAuth2 JWT), check it, and hand back a tidy answer:
 `{ tenant_id, scopes, source, key_type, user_id }`. That's how every other service knows who's calling.
 

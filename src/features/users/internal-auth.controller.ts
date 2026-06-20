@@ -1,4 +1,4 @@
-import { Controller, Get, Headers } from '@nestjs/common';
+import { Controller, Get, Headers, VERSION_NEUTRAL } from '@nestjs/common';
 import { ApiTags, ApiOkResponse, ApiOperation } from '@nestjs/swagger';
 
 import { Public } from '@common/auth/public.decorator';
@@ -6,12 +6,13 @@ import { Public } from '@common/auth/public.decorator';
 import { TokenResolverService, ValidateTokenResult } from './token-resolver.service';
 
 /**
- * Internal token-resolution endpoint (referralai_api_contract — /v1/internal/validate-token).
+ * Internal token-resolution endpoint (system_architecture — /internal/validate-token).
+ * Version-neutral: internal endpoints are unversioned in the spec (only public APIs carry /v1).
  * Called by the gateway / auth guard to resolve an API key or OAuth2 JWT to internal claims.
  * Public to our guards because it resolves the credential itself.
  */
 @ApiTags('Internal')
-@Controller({ path: 'internal', version: '1' })
+@Controller({ path: 'internal', version: VERSION_NEUTRAL })
 export class InternalAuthController {
     constructor(private readonly tokenResolver: TokenResolverService) {}
 
