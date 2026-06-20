@@ -1,5 +1,6 @@
 import { Injectable, NotFoundException, UnauthorizedException } from '@nestjs/common';
-import { randomBytes, createHash, timingSafeEqual } from 'crypto';
+import { randomBytes } from 'crypto';
+import * as bcrypt from 'bcryptjs';
 
 import { DatabaseService } from '@app/database/database.service';
 import { TenantAwareService } from '@common/tenant-aware/tenant-aware.service';
@@ -29,6 +30,9 @@ import { API_KEY_PAGINATE_CONFIG } from './api-key.pagination';
  */
 @Injectable()
 export class ApiKeyService {
+    /** bcrypt cost factor for hashing raw API keys at rest (key_hash, db_tables §api_keys). */
+    private readonly BCRYPT_ROUNDS = 12;
+
     constructor(
         private readonly prisma: DatabaseService,
         private readonly tenantAware: TenantAwareService,
@@ -51,7 +55,7 @@ export class ApiKeyService {
     async create(userId: string, dto: CreateApiKeyDto): Promise<ApiKeyWithRawKeyResponse> {
         const keyType = dto.keyType ?? ApiKeyType.SECRET;
         const rawKey = this.generateSecureApiKey(keyType);
-        const keyHash = this.hashApiKey(rawKey);
+        const keyHash = await this.hashApiKey(rawKey);
         const keyPrefix = this.extractApiKeyPrefix(rawKey);
 
         const saved = (await this.apiKey.create({
@@ -210,22 +214,18 @@ export class ApiKeyService {
     async validateKey(rawKey: string): Promise<ApiKeyProps | null> {
         const keyPrefix = this.extractApiKeyPrefix(rawKey);
 
-        // Query directly without tenant context (we're authenticating)
-        const apiKey = (await this.prisma.apiKey.findFirst({
+        // bcrypt hashes are salted, so we narrow by the (non-unique) last-4 prefix and
+        // bcrypt.compare each candidate. Query directly without tenant context (we're authenticating).
+        const candidates = (await this.prisma.apiKey.findMany({
             where: {
                 keyPrefix,
                 revokedAt: null,
                 deletedAt: null
             }
-        })) as ApiKeyProps | null;
+        })) as ApiKeyProps[];
 
+        const apiKey = await this.findMatchingKey(rawKey, candidates);
         if (!apiKey) {
-            return null;
-        }
-
-        // Verify the key hash
-        const isValid = this.compareApiKeys(rawKey, apiKey.keyHash);
-        if (!isValid) {
             return null;
         }
 
@@ -240,6 +240,17 @@ export class ApiKeyService {
         });
 
         return apiKey;
+    }
+
+    /** Find the candidate whose bcrypt hash matches the raw key. */
+    private async findMatchingKey(rawKey: string, candidates: ApiKeyProps[]): Promise<ApiKeyProps | null> {
+        for (const candidate of candidates) {
+            const isMatch = await this.compareApiKeys(rawKey, candidate.keyHash);
+            if (isMatch) {
+                return candidate;
+            }
+        }
+        return null;
     }
 
     /**
@@ -263,23 +274,16 @@ export class ApiKeyService {
         return `${prefix}${randomPart}`;
     }
 
-    private hashApiKey(rawKey: string): string {
-        return createHash('sha256').update(rawKey).digest('hex');
+    private hashApiKey(rawKey: string): Promise<string> {
+        return bcrypt.hash(rawKey, this.BCRYPT_ROUNDS);
     }
 
+    /** Last 4 chars of the raw key — display identifier and validation lookup narrowing (db_tables §api_keys). */
     private extractApiKeyPrefix(rawKey: string): string {
-        return rawKey.substring(0, 20);
+        return rawKey.slice(-4);
     }
 
-    private compareApiKeys(rawKey: string, storedHash: string): boolean {
-        const inputHash = this.hashApiKey(rawKey);
-        const inputBuffer = Buffer.from(inputHash, 'hex');
-        const storedBuffer = Buffer.from(storedHash, 'hex');
-
-        if (inputBuffer.length !== storedBuffer.length) {
-            return false;
-        }
-
-        return timingSafeEqual(inputBuffer, storedBuffer);
+    private compareApiKeys(rawKey: string, storedHash: string): Promise<boolean> {
+        return bcrypt.compare(rawKey, storedHash);
     }
 }

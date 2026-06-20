@@ -278,11 +278,17 @@ a stale reference copy** (bundled with the template's `project-docs/`); align al
 ### DIVERGENCES / DECISIONS (spec-owned items where code differs)
 1. **API key prefix — FIXED:** `generateSecureApiKey(keyType)` now emits `rai_pub_` (publishable) /
    `rai_live_` (secret) per api_contract §2.2 (was always `sk_live_`). The gateway routes on this prefix.
-2. **api_keys field naming — FIXED:** renamed `name`→`label` and replaced the `status` enum with
-   `revoked_at` (null = active) per db_tables; the status endpoint/event/enum were removed (revoke =
-   `DELETE /v1/api-keys/:id` sets `revoked_at`, per api_contract §2.2 "immediate, irreversible"). Still
-   accepted as impl choices: `key_hash` SHA-256 (spec says bcrypt — SHA-256 is standard for high-entropy
-   API keys) and lookup `key_prefix` first-20 (spec's "last 4" is a display concern).
+2. **api_keys — FIXED, now strictly per db_tables §api_keys:** `name`→`label`; `status` enum replaced
+   with `revoked_at` (null = active); status endpoint/event/enum removed (revoke = `DELETE
+   /v1/api-keys/:id` sets `revoked_at`, api_contract §2.2 "immediate, irreversible"); `key_hash` is now
+   **bcrypt** (cost 12) and `key_prefix` is the **last 4 chars** (display identifier + validation lookup
+   narrowing). Because bcrypt is salted, `validateKey` narrows candidates by the non-unique last-4
+   prefix and `bcrypt.compare`s each.
+
+   *Out-of-scope cleanup noted, not done (surgical):* `src/common/redis/redis-key.builder.ts` carries
+   unused, stale duplicate API-key helpers (`generateSecureApiKey`/`hashApiKey`/`compareApiKeys`/
+   `extractApiKeyPrefix`) with a wrong `sk_live_` prefix and first-20 logic. No callers — safe to remove
+   in a dedicated cleanup; left untouched here.
 3. **`user.role_changed`:** emitted by us but **not in event_model §4.12** — an extension (useful for
    consumers). Keep-as-extension or drop.
 4. **`/v1/users/me`, `/v1/users/:id/roles`:** not in api_contract v1.2 (our additions for dashboard

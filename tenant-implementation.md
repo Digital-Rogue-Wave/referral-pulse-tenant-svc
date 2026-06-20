@@ -130,7 +130,7 @@ billing extension:
 | `users` | `user.prisma` | Platform users (operators): membership + denormalized `role`, keyed by `(tenant_id, kratos_identity_id)` |
 | `roles` | `user.prisma` | Role definitions → scopes (seeded: OWNER/ADMIN/OPERATOR/VIEWER) |
 | `user_roles` | `user.prisma` | User↔role assignment per tenant |
-| `api_keys` | `api-key.prisma` | `label`, SHA-256 `key_hash`, `key_prefix`, `key_type` (secret/publishable), `scopes`, `revoked_at` (null = active). Raw key prefixed `rai_live_` (secret) / `rai_pub_` (publishable) per api_contract §2.2 |
+| `api_keys` | `api-key.prisma` | `label`, bcrypt `key_hash` (cost 12), `key_prefix` (last 4 chars), `key_type` (secret/publishable), `scopes`, `revoked_at` (null = active). Raw key prefixed `rai_live_` (secret) / `rai_pub_` (publishable) per api_contract §2.2. Validation narrows by last-4 prefix then `bcrypt.compare` |
 | `invitations` | `invitation.prisma` | Team invitations |
 | `tenant_settings`, `user_notification_preferences` | `tenant-setting.prisma` | Settings + prefs |
 | `reserved_subdomains` | `dns.prisma` | Subdomain reservations |
