@@ -2,9 +2,8 @@ import { Injectable, ExecutionContext, UnauthorizedException } from '@nestjs/com
 import { Reflector } from '@nestjs/core';
 import { AuthGuard } from '@nestjs/passport';
 
-import { Observable } from 'rxjs';
-
-import { IS_PUBLIC_KEY } from '@app/types';
+import { IS_PUBLIC_KEY, ALLOW_NO_TENANT_KEY } from '@app/types';
+import type { IAuthenticatedUser } from '@app/types';
 
 /**
  * JWT Authentication Guard.
@@ -17,16 +16,30 @@ export class JwtAuthGuard extends AuthGuard('jwt') {
         super();
     }
 
-    canActivate(context: ExecutionContext): boolean | Promise<boolean> | Observable<boolean> {
-        // Check if route is marked as public
+    async canActivate(context: ExecutionContext): Promise<boolean> {
+        // Public routes skip authentication entirely.
         const isPublic = this.reflector.getAllAndOverride<boolean>(IS_PUBLIC_KEY, [context.getHandler(), context.getClass()]);
-
         if (isPublic) {
             return true;
         }
 
-        // Call parent AuthGuard which uses JwtStrategy
-        return super.canActivate(context);
+        // Validate the JWT via JwtStrategy (sets request.user).
+        const activated = (await super.canActivate(context)) as boolean;
+        if (!activated) {
+            return false;
+        }
+
+        // Tenant is required on every human route unless explicitly opted out (@AllowNoTenant, e.g.
+        // invitation accept). Service tokens are tenant-optional by design (system/cross-tenant callers).
+        const allowNoTenant = this.reflector.getAllAndOverride<boolean>(ALLOW_NO_TENANT_KEY, [context.getHandler(), context.getClass()]);
+        if (!allowNoTenant) {
+            const user = context.switchToHttp().getRequest<{ user?: IAuthenticatedUser }>().user;
+            if (user && !user.isServiceToken && !user.tenantId) {
+                throw new UnauthorizedException('Tenant context required');
+            }
+        }
+
+        return true;
     }
 
     handleRequest<TUser = unknown>(err: Error | undefined, user: TUser | undefined, info: { message?: string } | undefined): TUser {

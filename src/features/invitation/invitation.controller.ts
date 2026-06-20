@@ -4,6 +4,7 @@ import { ApiTags, ApiBearerAuth, ApiBody, ApiCreatedResponse, ApiOkResponse, Api
 import { CurrentUser } from '@common/auth/current-user.decorator';
 import type { IAuthenticatedUser } from '@app/types';
 import { Public } from '@common/auth/public.decorator';
+import { AllowNoTenant } from '@common/auth/allow-no-tenant.decorator';
 import { RequirePermission } from '@common/auth/require-permission.decorator';
 import { KetoNamespace, KetoRelation, KetoResource } from '@common/auth/keto.constants';
 import { Paginate, PaginateQuery, Paginated, ApiPaginationQuery } from '@common/nestjs-prisma-pagination';
@@ -81,7 +82,8 @@ export class PublicInvitationController {
     }
 
     @ApiBearerAuth()
-    @ApiOperation({ summary: 'Accept an invitation with the authenticated Ory identity' })
+    @AllowNoTenant()
+    @ApiOperation({ summary: 'Accept an invitation with the authenticated Ory identity (tenant-optional token)' })
     @ApiOkResponse({ description: 'Invitation accepted; tenant membership created', type: UserResponse })
     @HttpCode(HttpStatus.OK)
     @Post(':token/accept')

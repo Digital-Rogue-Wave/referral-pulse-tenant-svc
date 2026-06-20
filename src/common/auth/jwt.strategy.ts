@@ -86,17 +86,14 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
     }
 
     private buildHumanUser(payload: IJwtPayload): IAuthenticatedUser {
+        // Tenant is normally required, but it is enforced in JwtAuthGuard (which has route context) so
+        // that tenant-optional onboarding routes (@AllowNoTenant, e.g. invitation accept) can pass.
         const tenantId = this.extractNestedClaim(payload, this.tenantClaimPath);
-
-        if (!tenantId) {
-            throw new Error('Tenant ID not found in token claims');
-        }
-
         const userId = payload.ext?.user_id ?? payload.sub;
 
         return {
             userId,
-            tenantId,
+            tenantId: tenantId ?? '',
             email: payload.email,
             roles: payload.ext?.roles,
             scopes: payload.scp,

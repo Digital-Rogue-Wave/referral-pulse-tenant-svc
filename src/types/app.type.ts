@@ -9,6 +9,14 @@
 
 export const IS_PUBLIC_KEY = 'isPublic';
 
+/**
+ * Marks a route as authenticated but tenant-optional: a valid (Ory-signed) human token is required,
+ * but it need not carry a tenant claim. Used by the invitation accept flow, where a freshly-registered
+ * invitee has an identity but no tenant membership yet. JwtAuthGuard enforces tenant presence on every
+ * other human route.
+ */
+export const ALLOW_NO_TENANT_KEY = 'allowNoTenant';
+
 // ============================================================================
 // EVENT TYPES
 // ============================================================================

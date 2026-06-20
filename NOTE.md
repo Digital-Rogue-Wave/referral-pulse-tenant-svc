@@ -387,6 +387,19 @@ primitives:
   requires the invitee's **own Ory-authenticated JWT** (email must match the invite) — Ory Kratos owns
   credential creation; accept calls `UsersService.provisionMember` → creates `users`/`user_roles` and
   emits `user.registered`. Statuses: PENDING→ACCEPTED/REVOKED/EXPIRED (expiry is lazy, 7-day TTL).
-- **Not built (intentional):** no Kratos `createIdentity` provisioning (invitee pre-authenticates via Ory);
+
+#### First-authentication for a brand-new invitee (the onboarding gap — fixed)
+A never-seen invitee has no tenant membership, so the OAuth2 token they obtain after registering carries
+no tenant claim. Previously `JwtStrategy` hard-rejected any human token without a tenant, so accept was
+unreachable for exactly the people it targets. **Upstream flow (Ory, unchanged):** the accept page sends an
+unauthenticated invitee through Ory's self-service registration/login for the invited email; Ory creates
+and verifies the credential and returns them authenticated. **Backend fix (this service):** authentication
+is now **tenant-optional on opt-in routes only** — `JwtStrategy.buildHumanUser` no longer throws on a
+missing tenant (the token is still fully validated: signature/issuer/audience/expiry), and `JwtAuthGuard`
+re-enforces "tenant required" for **every** human route *except* those marked `@AllowNoTenant()`. Only the
+accept endpoint carries `@AllowNoTenant()`; it derives identity (`sub`/email) from the token and the tenant
+from the invitation. Service tokens remain tenant-optional as before. No new Ory surface (no
+`createIdentity`); least-privilege, single opt-in route.
+- **Not built (intentional):** no Kratos `createIdentity` provisioning (Ory owns first-auth, per above);
   no `invitation.accepted/revoked` broadcast (no consumer); no expiry cron (lazy). Tests deferred per the
   "tests later" preference — follow-up.

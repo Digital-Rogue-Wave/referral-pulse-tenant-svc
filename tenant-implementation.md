@@ -83,7 +83,7 @@ All routes are versioned (`/v1/...`) and tenant-scoped unless marked Public/Inte
 | POST | `/v1/admin/tenants/:id/suspend`, `/v1/admin/tenants/:id/unsuspend` | tenant | **Platform-admin** — service token or Keto `tenant:update` (`allowServiceTokens`) |
 | GET (internal) | `/internal/tenants/:id/...` | billing/tenant | Internal billing/tenant status |
 | POST/GET/POST:id/resend/DELETE:id | `/v1/invitations` | invitation | Create/list/resend/revoke; Keto `tenant:user` perms; emits `invitation.created/resent` (email) |
-| GET / POST:token/accept | `/v1/invitations/public/:token` | invitation | **Public** token validate; accept requires invitee's Ory JWT (email must match) → provisions membership, emits `user.registered` |
+| GET / POST:token/accept | `/v1/invitations/public/:token` | invitation | **Public** token validate; accept requires invitee's Ory JWT (`@AllowNoTenant` — tenant-optional, email must match) → provisions membership, emits `user.registered` |
 | GET/PUT | `/v1/tenant-settings`, `/v1/me/notification-preferences` | tenant-setting | Settings + notification prefs |
 | GET/POST/PUT/DELETE | `/v1/billings`, `/v1/billings/plans`, `/v1/billings/admin/plans` | billing | Subscriptions, public + admin plans |
 | GET/POST/PUT | `/v1/files`, `/v1/currencies` | files/currency | Uploads; currency reference data |
