@@ -2,17 +2,7 @@ import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { IsString, IsOptional, IsEnum, IsEmail } from 'class-validator';
 
 import { BaseResponseMapper } from '@common/helper';
-
-// ============================================================
-// Enums — platform roles per db_tables_per_service / api_contract
-// ============================================================
-
-export enum UserRole {
-    OWNER = 'OWNER',
-    ADMIN = 'ADMIN',
-    OPERATOR = 'OPERATOR',
-    VIEWER = 'VIEWER'
-}
+import { RoleEnum } from '@common/enums/role.enum';
 
 // ============================================================
 // Props (shape of the Prisma `users` model)
@@ -40,9 +30,9 @@ export class AddUserDto {
     @IsString()
     kratosIdentityId!: string;
 
-    @ApiProperty({ enum: UserRole })
-    @IsEnum(UserRole)
-    role!: UserRole;
+    @ApiProperty({ enum: RoleEnum })
+    @IsEnum(RoleEnum)
+    role!: RoleEnum;
 
     @ApiPropertyOptional()
     @IsOptional()
@@ -56,9 +46,9 @@ export class AddUserDto {
 }
 
 export class UpdateUserRoleDto {
-    @ApiProperty({ enum: UserRole })
-    @IsEnum(UserRole)
-    role!: UserRole;
+    @ApiProperty({ enum: RoleEnum })
+    @IsEnum(RoleEnum)
+    role!: RoleEnum;
 }
 
 // ============================================================
@@ -78,7 +68,7 @@ export class UserResponse {
     @ApiPropertyOptional()
     name?: string | null;
 
-    @ApiProperty({ enum: UserRole })
+    @ApiProperty({ enum: RoleEnum })
     role!: string;
 
     @ApiProperty()

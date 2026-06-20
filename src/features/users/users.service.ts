@@ -5,18 +5,10 @@ import { TenantAwareService } from '@common/tenant-aware/tenant-aware.service';
 import { TransactionEventEmitterService } from '@common/events/transaction-event-emitter.service';
 import { AppLoggerService } from '@common/logging/app-logger.service';
 import { prismaPaginate, PaginateQuery, Paginated } from '@common/nestjs-prisma-pagination';
+import { RoleEnum } from '@common/enums/role.enum';
 import type { IAuthenticatedUser } from '@app/types';
 
-import {
-    AddUserDto,
-    UpdateUserRoleDto,
-    UserProps,
-    UserResponse,
-    UserRole,
-    userResponseMapper,
-    UserRegisteredEvent,
-    UserRoleChangedEvent
-} from '@domains/user';
+import { AddUserDto, UpdateUserRoleDto, UserProps, UserResponse, userResponseMapper, UserRegisteredEvent, UserRoleChangedEvent } from '@domains/user';
 
 import { USER_PAGINATE_CONFIG } from './users.pagination';
 
@@ -29,7 +21,7 @@ export interface UserMeResponse {
     scopes: string[];
 }
 
-const PRIVILEGED_ROLES: string[] = [UserRole.OWNER, UserRole.ADMIN];
+const PRIVILEGED_ROLES: string[] = [RoleEnum.OWNER, RoleEnum.ADMIN];
 
 /**
  * Platform users (operators) — the system of record for tenant membership + role,
