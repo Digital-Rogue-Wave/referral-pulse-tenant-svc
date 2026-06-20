@@ -2,7 +2,7 @@ model Invitation {
   id        String   @id @default(cuid())
   tenantId  String   @map("tenant_id") @db.VarChar(26)
   email     String   @db.VarChar(255)
-  role      String   @default("MEMBER") @db.VarChar(50)
+  role      String   @default("OPERATOR") @db.VarChar(50)
   status    String   @default("PENDING") @db.VarChar(50)
   token     String   @unique @db.VarChar(255)
   expiresAt DateTime @map("expires_at") @db.Timestamptz
