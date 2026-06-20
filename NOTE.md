@@ -285,10 +285,11 @@ a stale reference copy** (bundled with the template's `project-docs/`); align al
    narrowing). Because bcrypt is salted, `validateKey` narrows candidates by the non-unique last-4
    prefix and `bcrypt.compare`s each.
 
-   *Out-of-scope cleanup noted, not done (surgical):* `src/common/redis/redis-key.builder.ts` carries
-   unused, stale duplicate API-key helpers (`generateSecureApiKey`/`hashApiKey`/`compareApiKeys`/
-   `extractApiKeyPrefix`) with a wrong `sk_live_` prefix and first-20 logic. No callers — safe to remove
-   in a dedicated cleanup; left untouched here.
+   *Follow-up cleanup — DONE:* removed the unused, stale duplicate API-key helpers
+   (`generateSecureApiKey`/`hashApiKey`/`compareApiKeys`/`extractApiKeyPrefix`, plus the `sk_live_`
+   constant and the now-unused `crypto`/`bcryptjs` imports) from
+   `src/common/redis/redis-key.builder.ts`. Those had no callers; api-key hashing lives solely in
+   `ApiKeyService`.
 3. **`user.role_changed`:** emitted by us but **not in event_model §4.12** — an extension (useful for
    consumers). Keep-as-extension or drop.
 4. **`/v1/users/me`, `/v1/users/:id/roles`:** not in api_contract v1.2 (our additions for dashboard

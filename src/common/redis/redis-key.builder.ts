@@ -1,9 +1,5 @@
-import * as crypto from 'crypto';
-
 import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-
-import * as bcrypt from 'bcryptjs';
 
 import { TenantContextService } from '../tenant-aware/tenant-context.service';
 
@@ -237,51 +233,5 @@ export class RedisKeyBuilder {
         const parts = withoutPrefix.split(':');
 
         return parts.length >= 2 && parts.every((part) => part.length > 0);
-    }
-
-    // ============================================================================
-    // API Key Generation and Hashing Methods (moved from SharedService)
-    // ============================================================================
-
-    private readonly API_KEY_PREFIX = 'sk_live_';
-    private readonly API_KEY_LENGTH = 32;
-    private readonly BCRYPT_ROUNDS = 10;
-
-    /**
-     * Generate a secure API key
-     * @returns A secure random API key with prefix
-     */
-    generateSecureApiKey(): string {
-        const randomBytes = crypto.randomBytes(this.API_KEY_LENGTH);
-        const randomHex = randomBytes.toString('hex');
-        return `${this.API_KEY_PREFIX}${randomHex}`;
-    }
-
-    /**
-     * Hash an API key using bcrypt
-     * @param rawKey - The raw API key to hash
-     * @returns The hashed API key
-     */
-    async hashApiKey(rawKey: string): Promise<string> {
-        return await bcrypt.hash(rawKey, this.BCRYPT_ROUNDS);
-    }
-
-    /**
-     * Compare a raw API key with a hashed key
-     * @param rawKey - The raw API key
-     * @param hashedKey - The hashed API key to compare against
-     * @returns true if the keys match
-     */
-    async compareApiKeys(rawKey: string, hashedKey: string): Promise<boolean> {
-        return await bcrypt.compare(rawKey, hashedKey);
-    }
-
-    /**
-     * Extract the prefix from an API key (first 20 characters)
-     * @param rawKey - The raw API key
-     * @returns The prefix of the API key
-     */
-    extractApiKeyPrefix(rawKey: string): string {
-        return rawKey.substring(0, 20);
     }
 }
