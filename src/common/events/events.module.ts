@@ -3,11 +3,8 @@ import { EventEmitterModule } from '@nestjs/event-emitter';
 
 import { AuditTrailListener } from './listeners/audit-trail.listener';
 import { BroadcastEventListener } from './listeners/broadcast-event.listener';
-import { CampaignServiceListener } from './listeners/campaign-service.listener';
 import { EmailNotificationListener } from './listeners/email-notification.listener';
-import { RewardServiceListener } from './listeners/reward-service.listener';
 import { TenantServiceListener } from './listeners/tenant-service.listener';
-import { TrackingServiceListener } from './listeners/tracking-service.listener';
 import { TransactionEventEmitterService } from './transaction-event-emitter.service';
 
 /**
@@ -22,10 +19,7 @@ import { TransactionEventEmitterService } from './transaction-event-emitter.serv
  * - Hybrid approach: Critical ops use outbox, non-critical use direct SQS + events
  *
  * Service-Specific Listeners (Microservice Communication):
- * - TrackingServiceListener: Analytics/BI via SQS (async)
- * - CampaignServiceListener: Campaign triggers via SQS (async) + HTTP (sync)
  * - TenantServiceListener: Quota/usage tracking via SQS (async) + HTTP (sync)
- * - RewardServiceListener: Reward calculations via SQS (async)
  *
  * Infrastructure Listeners:
  * - AuditTrailListener: Send all events to audit service (SQS + DLQ)
@@ -62,10 +56,7 @@ import { TransactionEventEmitterService } from './transaction-event-emitter.serv
         TransactionEventEmitterService,
 
         // Service-specific listeners (microservice communication)
-        TrackingServiceListener, // Analytics/BI (async SQS)
-        CampaignServiceListener, // Campaign service (async SQS + sync HTTP)
         TenantServiceListener, // Tenant/quota service (async SQS + sync HTTP)
-        RewardServiceListener, // Reward service (async SQS)
 
         // Infrastructure listeners
         AuditTrailListener, // Audit trail service (async SQS)

@@ -345,13 +345,15 @@ baseline with all later changes stashed). All now pass:
 - `users` (+denormalized `role`) / `user_roles` are the system of record for membership; `team_members`
   was removed (consolidated per spec). Role assignment is the canonical `PUT /v1/users/:id/roles`.
 
-### Flagged for a later pass (out-of-scope template boilerplate)
-The events module ships cross-service **producer** listeners copied from the service template that push
-to *other* services' queues — work the identity/tenant service should not own:
-- **Removed (this pass):** `ReferralServiceListener` (referral signup / conversion / campaign tracking)
-  plus the unused `user.created/updated/deleted` domain events.
-- **Still present, recommend removing after sign-off:** `RewardServiceListener`, `TrackingServiceListener`,
-  `CampaignServiceListener` (and the now-only consumer of `@domains/referral`, `ReferralEvents`, used by
-  `RewardServiceListener`). `TenantServiceListener` is billing/quota-related — keep with billing until the
-  billing decision lands. `BroadcastEventListener`, `AuditTrailListener`, `EmailNotificationListener` are
-  in-scope and stay.
+### Out-of-scope template boilerplate (cleanup)
+The events module shipped cross-service **producer** listeners copied from the service template that
+pushed to *other* services' queues (most bound to placeholder `toto.*` / catch-all `**` events) — work
+the identity/tenant service should not own:
+- **Removed:** `ReferralServiceListener`, `RewardServiceListener`, `TrackingServiceListener`,
+  `CampaignServiceListener`, plus the unused `user.created/updated/deleted` domain events and the
+  now-orphaned `@domains/toto`, `@domains/referral`, `@domains/campaign`.
+- **Kept (in-scope):** `TenantServiceListener` (billing/quota — revisit with the billing decision);
+  `BroadcastEventListener` (SNS fan-out), `AuditTrailListener`, `EmailNotificationListener`.
+- **Still flagged:** `src/common/events/listeners/analytics.listener.ts` is **not registered** in
+  `EventsModule` (dead) — wire it up or remove. The `REWARD_SVC_FIFO` / `CAMPAIGN_SVC_FIFO` queue-name
+  constants in `app.type.ts` are now unused (left as a platform queue registry; remove if undesired).
