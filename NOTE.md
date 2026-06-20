@@ -134,11 +134,10 @@ so regeneration no longer breaks `pnpm lint:check`.
     or an OAuth2 JWT (`Authorization: Bearer`) to `{ tenant_id, scopes, source, key_type, user_id }`
     (`TokenResolverService` reuses `ApiKeyService.validateKey`; JWT verification mirrors `JwtStrategy`
     JWKS config — no duplicated dependency).
-  - `GET /v1/users/me` returns the current user's profile + roles/scopes from the user projection.
-  - **`PUT /users/:id/roles` (contract endpoint) intentionally NOT duplicated** — role assignment is
-    served by the existing `PUT /v1/team-members/:id`, which now projects `user_roles` and emits
-    `user.role_changed`. Documented to avoid two divergent role-update paths (KISS). Flag if a literal
-    `/users/:id/roles` path is required by a consumer.
+  - `GET /v1/users/me` returns the current user's profile + roles/scopes from the user projection
+    (canonical Sync API, system_architecture §"Sync APIs").
+  - `PUT /v1/users/:id/roles` updates a user's role (`user_roles`) and emits `user.role_changed`
+    (canonical Sync API, system_architecture §"Sync APIs"); last-admin protection enforced.
 ## Phase 4 — scope + cross-service contract audit
 
 Cross-checked owned tables, published/consumed events, and endpoints against the canonical specs and the
@@ -272,8 +271,9 @@ a stale reference copy** (bundled with the template's `project-docs/`); align al
 ### Endpoints (api_contract §2.2 + system_architecture) → code
 | Spec | In code |
 |---|---|
-| `POST /v1/api-keys`, `GET /v1/api-keys`, `DELETE /v1/api-keys/{id}` | ✅ (plus extra `GET/:id`, `PUT/:id`, `PUT/:id/status` — beyond contract) |
-| `GET /v1/internal/validate-token` (system_arch) | ✅ |
+| `POST /v1/api-keys`, `GET /v1/api-keys`, `DELETE /v1/api-keys/{id}` (revoke) | ✅ (plus extra `GET/:id`, `PUT/:id` for label/scopes — beyond contract) |
+| `GET /v1/users/me`, `PUT /v1/users/{id}/roles` (system_arch Sync APIs) | ✅ |
+| `GET /internal/validate-token` (system_arch) | ✅ |
 
 ### DIVERGENCES / DECISIONS (spec-owned items where code differs)
 1. **API key prefix — FIXED:** `generateSecureApiKey(keyType)` now emits `rai_pub_` (publishable) /
@@ -292,14 +292,17 @@ a stale reference copy** (bundled with the template's `project-docs/`); align al
    `ApiKeyService`.
 3. **`user.role_changed`:** emitted by us but **not in event_model §4.12** — an extension (useful for
    consumers). Keep-as-extension or drop.
-4. **`/v1/users/me`, `/v1/users/:id/roles`:** not in api_contract v1.2 (our additions for dashboard
-   user management) — extensions.
+4. **`/v1/users/me`, `/v1/users/:id/roles`:** canonical — system_architecture lists both under the
+   Tenant Service's §"Sync APIs" (absent from api_contract v1.2's table, but spec-mandated). Implemented
+   exactly. Only the extra user CRUD (`POST/GET /v1/users`, `GET/DELETE /v1/users/:id`) is a
+   dashboard-management extension.
 5. **Extra events/tables (features/billing extension):** tenant.* lifecycle, subscription.*, payment.*,
    verification.*, invitations, tenant_settings, dns, files — beyond the minimal identity spec; billing
    is the sanctioned extension, the rest are tenant-management features.
 
-All strict identity-spec items (tables, §4.12 events, api-key + validate-token endpoints) are present;
-the actionable gap is the API key prefix (#1).
+All strict identity-spec items (tables, §4.12 events, api-key/users/validate-token endpoints) are
+present and aligned; the once-open gaps (#1 api-key prefix, #2 api_keys fields + bcrypt/last-4) are
+resolved. Remaining items are sanctioned extensions (#3 `user.role_changed`, user CRUD, #5 billing).
 
 ## Verification
 
@@ -339,5 +342,4 @@ baseline with all later changes stashed). All now pass:
 - Billing subsystem retained (per decision) though the responsibility contract scopes it out.
 - `oauth2_clients`/`sessions` delegated to Ory (no local tables).
 - `users` (+denormalized `role`) / `user_roles` are the system of record for membership; `team_members`
-  was removed (consolidated per spec).
-- `PUT /users/:id/roles` served by `PUT /team-members/:id` rather than a duplicate path.
+  was removed (consolidated per spec). Role assignment is the canonical `PUT /v1/users/:id/roles`.

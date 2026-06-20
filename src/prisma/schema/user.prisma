@@ -1,7 +1,7 @@
 // Platform identity tables per referralai_db_tables_per_service.md (Tenant/Identity service).
 // Ory Kratos remains the credential authority; `users` is the local projection keyed by
-// kratos_identity_id. `team_members` is retained for the existing API surface — see NOTE.md
-// for the intentional users/user_roles vs team_members overlap and the consolidation follow-up.
+// kratos_identity_id. `users` (+denormalized `role`) / `user_roles` are the system of record for
+// membership and role assignment — the former `team_members` table was consolidated away (see NOTE.md).
 
 model User {
   id               String    @id @default(cuid())
