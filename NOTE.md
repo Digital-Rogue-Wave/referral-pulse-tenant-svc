@@ -350,10 +350,10 @@ The events module shipped cross-service **producer** listeners copied from the s
 pushed to *other* services' queues (most bound to placeholder `toto.*` / catch-all `**` events) — work
 the identity/tenant service should not own:
 - **Removed:** `ReferralServiceListener`, `RewardServiceListener`, `TrackingServiceListener`,
-  `CampaignServiceListener`, plus the unused `user.created/updated/deleted` domain events and the
-  now-orphaned `@domains/toto`, `@domains/referral`, `@domains/campaign`.
+  `CampaignServiceListener`, `AnalyticsListener` (was never registered in `EventsModule` — dead; also
+  carried a stray card-number-shaped comment), plus the unused `user.created/updated/deleted` domain
+  events and the now-orphaned `@domains/toto`, `@domains/referral`, `@domains/campaign`.
 - **Kept (in-scope):** `TenantServiceListener` (billing/quota — revisit with the billing decision);
   `BroadcastEventListener` (SNS fan-out), `AuditTrailListener`, `EmailNotificationListener`.
-- **Still flagged:** `src/common/events/listeners/analytics.listener.ts` is **not registered** in
-  `EventsModule` (dead) — wire it up or remove. The `REWARD_SVC_FIFO` / `CAMPAIGN_SVC_FIFO` queue-name
-  constants in `app.type.ts` are now unused (left as a platform queue registry; remove if undesired).
+- **Still flagged:** the `REWARD_SVC_FIFO` / `CAMPAIGN_SVC_FIFO` queue-name constants in `app.type.ts`
+  are now unused (left as a platform queue registry; remove if undesired).
