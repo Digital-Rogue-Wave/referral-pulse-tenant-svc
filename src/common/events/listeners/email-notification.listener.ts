@@ -133,7 +133,9 @@ export class EmailNotificationListener {
                     to: event.payload.email,
                     templateId: 'invitation-resent-email',
                     templateData: {
+                        invitationToken: event.payload.token,
                         tenantId: event.payload.tenantId,
+                        role: event.payload.role,
                         newExpiresAt: event.payload.newExpiresAt
                     },
                     metadata: {

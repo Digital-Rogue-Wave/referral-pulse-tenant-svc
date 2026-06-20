@@ -140,6 +140,44 @@ export class UsersService {
         };
     }
 
+    /**
+     * Provision a tenant membership with an explicit tenantId (no tenant context).
+     * Used by the invitation accept flow, where the invitee authenticates against their own
+     * Ory identity but is being added to the invitation's tenant. Ory Kratos owns the credential.
+     */
+    async provisionMember(input: {
+        tenantId: string;
+        kratosIdentityId: string;
+        email?: string | null;
+        name?: string | null;
+        role: string;
+        actingUserId?: string;
+    }): Promise<UserProps> {
+        const existing = await this.prisma.user.findUnique({
+            where: { tenantId_kratosIdentityId: { tenantId: input.tenantId, kratosIdentityId: input.kratosIdentityId } }
+        });
+        if (existing) {
+            throw new ConflictException(`User ${input.kratosIdentityId} is already a member of this tenant`);
+        }
+
+        const saved = (await this.prisma.user.create({
+            data: {
+                tenantId: input.tenantId,
+                kratosIdentityId: input.kratosIdentityId,
+                role: input.role,
+                email: input.email ?? null,
+                name: input.name ?? null
+            }
+        })) as UserProps;
+
+        await this.assignRole(saved.id, saved.tenantId, input.role, input.actingUserId);
+        this.txEventEmitter.emitAfterCommit('user.registered', new UserRegisteredEvent(saved.id, saved.tenantId, input.role, input.actingUserId));
+
+        this.logger.log(`Member provisioned: ${saved.id}`, { userId: saved.id, tenantId: saved.tenantId, role: saved.role });
+
+        return saved;
+    }
+
     /** Prevent removing/downgrading the last Owner/Admin in a tenant. */
     private async assertNotLastPrivilegedUser(): Promise<void> {
         const privilegedCount = await this.user.count({ where: { role: { in: PRIVILEGED_ROLES }, deletedAt: null } });

@@ -60,7 +60,7 @@ billing is **retained** here. This is the single knowing divergence — full rec
 | `tenant` | `src/features/tenant` | Tenant CRUD (agnostic/admin/aware), lifecycle (suspend/lock/delete), stats |
 | `users` | `src/features/users` | Platform users: membership + role (last-admin protection), `user.*` events, `/users` CRUD, `/users/me`, `/internal/validate-token` |
 | `api-key` | `src/features/api-key` | API key lifecycle (SHA-256 hash, prefix, scopes, key_type) |
-| `invitation` | `src/features/invitation` | Team invitations (send/accept/revoke), expiry job |
+| `invitation` | `src/features/invitation` | Team invitations — create/list/resend/revoke + public token validate/accept (**sanctioned extension**, not in the API contract). Expiry is lazy (checked on validate/accept) |
 | `tenant-setting` | `src/features/tenant-setting` | Tenant settings + user notification preferences |
 | `dns` | `src/features/dns` | Subdomain reservation + custom-domain provisioning/verification |
 | `files` | `src/features/files` | S3 upload/download |
@@ -82,7 +82,8 @@ All routes are versioned (`/v1/...`) and tenant-scoped unless marked Public/Inte
 | POST/GET | `/v1/tenants` | tenant | Create (agnostic), current-tenant reads |
 | POST | `/v1/admin/tenants/:id/suspend`, `/v1/admin/tenants/:id/unsuspend` | tenant | **Platform-admin** — service token or Keto `tenant:update` (`allowServiceTokens`) |
 | GET (internal) | `/internal/tenants/:id/...` | billing/tenant | Internal billing/tenant status |
-| GET/POST/PUT/DELETE | `/v1/invitations`, `/v1/invitations/public/...` | invitation | Send/accept/revoke; public accept |
+| POST/GET/POST:id/resend/DELETE:id | `/v1/invitations` | invitation | Create/list/resend/revoke; Keto `tenant:user` perms; emits `invitation.created/resent` (email) |
+| GET / POST:token/accept | `/v1/invitations/public/:token` | invitation | **Public** token validate; accept requires invitee's Ory JWT (email must match) → provisions membership, emits `user.registered` |
 | GET/PUT | `/v1/tenant-settings`, `/v1/me/notification-preferences` | tenant-setting | Settings + notification prefs |
 | GET/POST/PUT/DELETE | `/v1/billings`, `/v1/billings/plans`, `/v1/billings/admin/plans` | billing | Subscriptions, public + admin plans |
 | GET/POST/PUT | `/v1/files`, `/v1/currencies` | files/currency | Uploads; currency reference data |
@@ -152,7 +153,7 @@ billing extension:
 | Trial lifecycle | `trial-lifecycle.service.ts` | Trial reminders/expiry |
 | Plan ↔ Stripe sync | `plan-stripe-sync.service.ts` | Reconcile plans with Stripe |
 | Tenant deletion / unlock | `processors/tenant-deletion.processor.ts`, `tenant-unlock.processor.ts` | Scheduled lifecycle |
-| Invitation expiry | invitation module | Expire stale invitations |
+| Invitation expiry | invitation module | Lazy — stale invitations are marked `EXPIRED` on validate/accept (no cron) |
 
 ## Scope decisions & deviations
 

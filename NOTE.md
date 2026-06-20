@@ -374,3 +374,19 @@ billing-driven. Table + `verification_status` + isolation all conform to db_tabl
   one coordinated pass once contracts + the billing decision are settled.
 - **Flagged — duplicate `StripeService`:** `features/tenant/stripe.service.ts` duplicates
   `features/billing/stripe.service.ts` and appears unused; fold into the billing keep/move decision.
+
+### Invitation feature (sanctioned extension)
+Team/member invitations are **not in the canonical docs** — the only "invitation" there is the *referral
+email invitation* (a referee-tracking concept owned by the referral/notification services). Built here as
+a deliberate dashboard team-management extension (same category as the `/users` CRUD), to spec'd identity
+primitives:
+- **Admin (tenant-scoped, Keto `tenant:user` perms):** `POST/GET /v1/invitations`, `POST
+  /v1/invitations/:id/resend`, `DELETE /v1/invitations/:id`. `create`/`resend` emit
+  `invitation.created`/`invitation.resent` → `EmailNotificationListener` (resend issues a fresh token).
+- **Public:** `GET /v1/invitations/public/:token` (validate); `POST /v1/invitations/public/:token/accept`
+  requires the invitee's **own Ory-authenticated JWT** (email must match the invite) — Ory Kratos owns
+  credential creation; accept calls `UsersService.provisionMember` → creates `users`/`user_roles` and
+  emits `user.registered`. Statuses: PENDING→ACCEPTED/REVOKED/EXPIRED (expiry is lazy, 7-day TTL).
+- **Not built (intentional):** no Kratos `createIdentity` provisioning (invitee pre-authenticates via Ory);
+  no `invitation.accepted/revoked` broadcast (no consumer); no expiry cron (lazy). Tests deferred per the
+  "tests later" preference — follow-up.

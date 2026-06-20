@@ -16,6 +16,7 @@ import { UsersController } from './users.controller';
 @Module({
     imports: [ApiKeyModule],
     controllers: [InternalAuthController, UsersController],
-    providers: [TokenResolverService, UsersService]
+    providers: [TokenResolverService, UsersService],
+    exports: [UsersService]
 })
 export class UsersModule {}
