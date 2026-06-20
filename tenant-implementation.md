@@ -80,7 +80,7 @@ All routes are versioned (`/v1/...`) and tenant-scoped unless marked Public/Inte
 | GET | `/internal/validate-token` | users | **Public/internal**, version-neutral — resolve API key or JWT → `{tenant_id, scopes, source, key_type, key_id, user_id}` |
 | PATCH | `/v1/internal/tenants/:id/verification` | tenant | **Internal** — workflow svc verification decision callback |
 | POST/GET | `/v1/tenants` | tenant | Create (agnostic), current-tenant reads |
-| GET/PUT/DELETE | `/v1/admin/tenants`, `/v1/admin/tenants/:id` | tenant | Admin tenant management |
+| POST | `/v1/admin/tenants/:id/suspend`, `/v1/admin/tenants/:id/unsuspend` | tenant | **Platform-admin** — service token or Keto `tenant:update` (`allowServiceTokens`) |
 | GET (internal) | `/internal/tenants/:id/...` | billing/tenant | Internal billing/tenant status |
 | GET/POST/PUT/DELETE | `/v1/invitations`, `/v1/invitations/public/...` | invitation | Send/accept/revoke; public accept |
 | GET/PUT | `/v1/tenant-settings`, `/v1/me/notification-preferences` | tenant-setting | Settings + notification prefs |

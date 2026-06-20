@@ -3,13 +3,19 @@ import { ApiBearerAuth, ApiOkResponse, ApiOperation, ApiTags } from '@nestjs/swa
 
 import { TenantResponse, SuspendTenantDto } from '@domains/tenant';
 import { Idempotent, IdempotencyScope } from '@common/idempotency';
+import { RequirePermission } from '@common/auth/require-permission.decorator';
+import { KetoNamespace, KetoRelation } from '@common/auth/keto.constants';
 
 import { TenantService } from '../tenant.service';
 
+/**
+ * Platform-admin tenant operations (cross-tenant). Restricted to platform/system callers:
+ * a service token (client_credentials) or a principal holding the Keto tenant:update relation.
+ */
 @ApiTags('Admin - Tenants')
 @ApiBearerAuth()
+@RequirePermission({ namespace: KetoNamespace.TENANT, relation: KetoRelation.UPDATE, allowServiceTokens: true })
 @Controller({ path: 'admin/tenants', version: '1' })
-// TODO: Add admin guards: @UseGuards(JwtAuthGuard, AdminGuard)
 export class AdminTenantController {
     constructor(private readonly tenantService: TenantService) {}
 

@@ -357,3 +357,20 @@ the identity/tenant service should not own:
   `BroadcastEventListener` (SNS fan-out), `AuditTrailListener`, `EmailNotificationListener`.
 - **Still flagged:** the `REWARD_SVC_FIFO` / `CAMPAIGN_SVC_FIFO` queue-name constants in `app.type.ts`
   are now unused (left as a platform queue registry; remove if undesired).
+
+### Tenant feature audit
+The canonical docs mandate only the `tenants` table + isolation — there is **no `/v1/tenants`
+management API** in the contract, so the entire tenant controller surface (provision, profile, custom
+domain, ownership transfer, deletion scheduling, lock/suspend) is an **extension**, much of it
+billing-driven. Table + `verification_status` + isolation all conform to db_tables §1.
+- **FIXED (security):** `AdminTenantController` (`POST /v1/admin/tenants/:id/suspend|unsuspend`) was only
+  behind the global `JwtAuthGuard` with no authorization (`PermissionGuard` is a no-op without
+  `@RequirePermission`) — any authenticated user could suspend any tenant by id. Now guarded with
+  `@RequirePermission({ namespace: TENANT, relation: UPDATE, allowServiceTokens: true })` (class-level),
+  restricting it to service tokens / principals holding the Keto `tenant:update` relation.
+- **Deferred — internal endpoint versioning:** `PATCH /v1/internal/tenants/:id/verification` and billing's
+  `GET /v1/internal/tenants/:id/status` are `/v1/…`; spec writes internal endpoints unversioned (as done
+  for `/internal/validate-token`). Both are cross-service contracts (workflow svc; other svcs) — align in
+  one coordinated pass once contracts + the billing decision are settled.
+- **Flagged — duplicate `StripeService`:** `features/tenant/stripe.service.ts` duplicates
+  `features/billing/stripe.service.ts` and appears unused; fold into the billing keep/move decision.
