@@ -62,8 +62,8 @@ billing is **retained** here. This is the single knowing divergence — full rec
 | `api-key` | `src/features/api-key` | API key lifecycle (SHA-256 hash, prefix, scopes, key_type) |
 | `invitation` | `src/features/invitation` | Team invitations — create/list/resend/revoke + public token validate/accept (**sanctioned extension**, not in the API contract). Expiry is lazy (checked on validate/accept) |
 | `tenant-setting` | `src/features/tenant-setting` | Tenant settings + user notification preferences |
-| `dns` | `src/features/dns` | Subdomain reservation + custom-domain provisioning/verification |
-| `files` | `src/features/files` | S3 upload/download |
+| `dns` | `src/features/dns` | Subdomain reservation + custom-domain verification. **`domain-provisioning.service` is a placeholder** (AWS ACM/CloudFront TODOs — not yet wired) |
+| `files` | `src/features/files` | S3 upload/download (tenant-scoped by `tenantId`; multer size + MIME-type limits). **Note: no multer-S3 storage is configured yet — uploads are not fully wired** |
 | `billing` | `src/features/billing` | Plans, subscriptions, Stripe, usage metering, payment escalation |
 | `webhook` | `src/features/webhook` | Stripe webhook ingestion |
 | `i18n` | `src/features/i18n` | Localization middleware (ar/en/fr) |
@@ -84,9 +84,11 @@ All routes are versioned (`/v1/...`) and tenant-scoped unless marked Public/Inte
 | GET (internal) | `/internal/tenants/:id/...` | billing/tenant | Internal billing/tenant status |
 | POST/GET/POST:id/resend/DELETE:id | `/v1/invitations` | invitation | Create/list/resend/revoke; Keto `tenant:user` perms; emits `invitation.created/resent` (email) |
 | GET / POST:token/accept | `/v1/invitations/public/:token` | invitation | **Public** token validate; accept requires invitee's Ory JWT (`@AllowNoTenant` — tenant-optional, email must match) → provisions membership, emits `user.registered` |
-| GET/PUT | `/v1/tenant-settings`, `/v1/me/notification-preferences` | tenant-setting | Settings + notification prefs |
+| GET current / PUT | `/v1/tenant-settings/current`, `/v1/tenant-settings` | tenant-setting | Per-tenant singleton: read-current + upsert (no list/by-id/delete) |
+| GET/PUT/DELETE | `/v1/me/notification-preferences` | tenant-setting | Current user's notification prefs |
 | GET/POST/PUT/DELETE | `/v1/billings`, `/v1/billings/plans`, `/v1/billings/admin/plans` | billing | Subscriptions, public + admin plans |
-| GET/POST/PUT | `/v1/files`, `/v1/currencies` | files/currency | Uploads; currency reference data |
+| POST/GET:id/PUT:id/DELETE:id | `/v1/files` | files | Upload/get/update/delete; tenant-scoped by `tenantId`; 10 MB + MIME allowlist |
+| GET | `/v1/currencies` | currency | Currency reference data |
 | POST | `/v1/webhook/stripe`, `/webhooks/stripe` | webhook | Stripe webhook (version-neutral relay) |
 
 > `PUT /v1/users/:id/roles` updates the role and emits `user.role_changed`; `users`/`user_roles` is the
@@ -135,7 +137,7 @@ billing extension:
 | `invitations` | `invitation.prisma` | Team invitations |
 | `tenant_settings`, `user_notification_preferences` | `tenant-setting.prisma` | Settings + prefs |
 | `reserved_subdomains` | `dns.prisma` | Subdomain reservations |
-| `files` | `file.prisma` | File metadata |
+| `files` | `file.prisma` | File metadata (`tenant_id` owner for scoping) |
 | `currencies` | `currency.prisma` | Currency reference data |
 | `plans`, `billings`, `billing_events`, `tenant_usages` | `billing.prisma` | Billing extension |
 | `side_effect_outbox` | `side-effect-outbox.prisma` | Outbox pattern |

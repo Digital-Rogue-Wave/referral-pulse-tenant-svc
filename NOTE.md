@@ -403,3 +403,56 @@ from the invitation. Service tokens remain tenant-optional as before. No new Ory
 - **Not built (intentional):** no Kratos `createIdentity` provisioning (Ory owns first-auth, per above);
   no `invitation.accepted/revoked` broadcast (no consumer); no expiry cron (lazy). Tests deferred per the
   "tests later" preference — follow-up.
+
+### dns / files / tenant-setting audit (extensions — none in db_tables §1)
+- **dns:** subdomain + DNS-verification services backing the tenant custom-domain extension; clean.
+  `domain-provisioning.service.ts` is an **unimplemented placeholder** (AWS ACM/CloudFront TODOs) — left
+  as a stub; custom-domain provisioning isn't real yet.
+- **files — FIXED:** added `File.tenantId` (+ index, migration) and tenant-scoped the by-id endpoints
+  (`GET/PUT/DELETE /v1/files/:id` now filter by current tenant, defensively requiring tenant context) —
+  closes the IDOR where any authenticated user could read/overwrite/delete any file by id. Added multer
+  size (10 MB) + MIME-type allowlist; dropped redundant per-method `@UseGuards(AuthGuard('jwt'))`.
+  **Still flagged:** no multer-S3 storage is configured anywhere, so uploads aren't actually wired
+  (`file.location` is undefined) — the upload path needs a storage engine before it's functional.
+- **tenant-setting — FIXED:** `TenantSetting` is a per-tenant singleton, but the controller exposed full
+  CRUD (paginated `findAll`, `GET/DELETE /:id`). Trimmed to `GET /current` + `PUT` (upsert); removed the
+  list/by-id/delete endpoints, the unused service methods, `tenant-setting.pagination.ts`, the orphaned
+  `CreateTenantSettingDto`/`TenantSettingDeletedEvent`, and the misleading required `x-tenant-id` header.
+  `user-notification-preference` (`/v1/me/notification-preferences`) was already correct.
+
+## Billing — extraction-readiness scope (read-only pass, for the keep-or-move decision)
+
+Billing is a large but **mostly self-contained** subsystem: 4 tables (`plans`, `billings`,
+`billing_events`, `tenant_usages`), ~28 feature + 24 domain files, 7 controllers (~50 routes), Stripe
+integration, usage metering, trial lifecycle, and payment-status escalation. Its **guards/decorators
+(`PaymentRequiredGuard`, `BillingGuard`, `UsageCheck`) are used nowhere outside billing**, and no other
+feature imports billing services — so the outward surface is small.
+
+**Coupling to sever when moving billing to its own service/repo (in priority order):**
+1. **Direct tenant-table writes (hardest).** `payment-status-escalation.service` does
+   `prisma.tenant.update(...)` to set `payment_status` / `payment_status_changed_at` and drive
+   suspend/lock. Cross-domain write into tenant rows. → Replace with events: billing emits
+   `payment.failed` / `tenant.restricted` / `tenant.locked` and the tenant service updates its own table.
+2. **`billing.module` imports `TenantModule`.** Billing depends on the tenant feature directly. → Decouple
+   via events / a thin internal HTTP call.
+3. **Stripe webhook lives in the (mixed) `webhook` feature.** `POST /webhook/stripe` →
+   `BillingService.handleStripeWebhook`, but the same controller also has `POST /webhook/ory/signup`
+   (identity — stays). → The Stripe webhook moves with billing (canonical spec routes Stripe-webhook relay
+   to the Referral-Workflow service); the Ory signup webhook stays here.
+4. **`billing.*` SNS broadcasts** in `broadcast-event.listener` (`@domains/billing` event types) move with
+   billing. `TenantServiceListener` (quota/usage) is billing-adjacent and moves too.
+5. **Shared DB.** The 4 billing tables sit in `tenant_db`; the tenant table carries billing-driven columns
+   (`payment_status`, `trial_*`, payment-driven `lock_*`). On split → `billing_db`, and tenant
+   `payment_status` becomes an event-synced projection.
+6. **Cleanup already flagged:** `features/tenant/stripe.service.ts` is a dead duplicate of the billing
+   `StripeService` (uses `BillingPlanEnum`) — remove during/after extraction.
+
+**Independent flag (regardless of the decision):** `test-billing.controller.ts` exposes a `/test/*`
+surface (~30 routes: run jobs, Stripe-connection test, manual plan seeding, usage increment/decrement,
+read billing entity/events). This is dev scaffolding and should be excluded from production builds or
+removed — it is currently registered in `BillingModule`.
+
+**Verdict:** moderate effort, well-bounded. The blast radius is essentially items 1–2 (turn the two direct
+tenant writes/imports into events) plus moving the Stripe webhook + billing broadcasts + DB. Nothing in
+the identity/tenant core depends on billing internals, so the split is clean once those tendrils are
+event-driven. No code changed in this pass.
