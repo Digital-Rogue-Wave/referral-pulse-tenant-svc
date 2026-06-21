@@ -43,25 +43,6 @@ export interface UserNotificationPreferenceProps {
 // DTOs — TenantSetting
 // ============================================================
 
-export class CreateTenantSettingDto {
-    @ApiPropertyOptional()
-    @IsOptional()
-    branding?: Record<string, unknown>;
-
-    @ApiPropertyOptional()
-    @IsOptional()
-    notifications?: Record<string, unknown>;
-
-    @ApiPropertyOptional()
-    @IsOptional()
-    general?: Record<string, unknown>;
-
-    @ApiPropertyOptional()
-    @IsOptional()
-    @IsString()
-    currencyCode?: string;
-}
-
 export class UpdateTenantSettingDto {
     @ApiPropertyOptional()
     @IsOptional()
@@ -208,23 +189,6 @@ export class TenantSettingUpdatedEvent extends BaseDomainEvent {
             tenantId: string;
             changes: Record<string, { from: unknown; to: unknown }>;
             updatedAt: Date;
-        },
-        public readonly userId?: string
-    ) {
-        super();
-    }
-}
-
-export class TenantSettingDeletedEvent extends BaseDomainEvent {
-    readonly eventType = 'tenant-setting.deleted' as const;
-
-    constructor(
-        public readonly aggregateId: string,
-        public readonly tenantId: string,
-        public readonly payload: {
-            settingId: string;
-            tenantId: string;
-            deletedAt: Date;
         },
         public readonly userId?: string
     ) {
