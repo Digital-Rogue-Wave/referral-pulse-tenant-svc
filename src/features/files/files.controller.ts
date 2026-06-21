@@ -9,18 +9,33 @@ import {
     Put,
     UploadedFile,
     UploadedFiles,
-    UseGuards,
-    UseInterceptors
+    UseInterceptors,
+    BadRequestException
 } from '@nestjs/common';
 import { ApiBearerAuth, ApiBody, ApiConsumes, ApiOkResponse, ApiTags } from '@nestjs/swagger';
 import { Idempotent, IdempotencyScope } from '@common/idempotency';
-import { AuthGuard } from '@nestjs/passport';
 import type { File } from '@prisma-gen/generated/client';
 import type { NullableType } from '@app/types';
 import { FileDto, PresignedUrlResponseDto } from '@domains/files';
 
 import { FilesService } from './files.service';
 import { FileInterceptor, FilesInterceptor } from '@nestjs/platform-express';
+import type { MulterOptions } from '@nestjs/platform-express/multer/interfaces/multer-options.interface';
+
+/** Accepted upload types (logos/branding + documents) and size cap. */
+const ALLOWED_MIME_TYPES = ['image/png', 'image/jpeg', 'image/webp', 'image/gif', 'image/svg+xml', 'application/pdf'];
+const MAX_FILE_SIZE_BYTES = 10 * 1024 * 1024; // 10 MB
+
+const FILE_UPLOAD_OPTIONS: MulterOptions = {
+    limits: { fileSize: MAX_FILE_SIZE_BYTES },
+    fileFilter: (_req, file, cb) => {
+        if (!ALLOWED_MIME_TYPES.includes(file.mimetype)) {
+            cb(new BadRequestException(`Unsupported file type: ${file.mimetype}`), false);
+            return;
+        }
+        cb(null, true);
+    }
+};
 
 @ApiTags('Files')
 @ApiBearerAuth()
@@ -47,7 +62,7 @@ export class FilesController {
         }
     })
     @ApiOkResponse({ type: FileDto })
-    @UseInterceptors(FileInterceptor('file'))
+    @UseInterceptors(FileInterceptor('file', FILE_UPLOAD_OPTIONS))
     @HttpCode(HttpStatus.CREATED)
     async uploadFile(@UploadedFile() file: Express.Multer.File | Express.MulterS3.File): Promise<File> {
         return this.filesService.uploadFile(file);
@@ -71,7 +86,7 @@ export class FilesController {
         }
     })
     @ApiOkResponse({ type: FileDto, isArray: true })
-    @UseInterceptors(FilesInterceptor('files', 10))
+    @UseInterceptors(FilesInterceptor('files', 10, FILE_UPLOAD_OPTIONS))
     @HttpCode(HttpStatus.CREATED)
     async uploadMultipleFiles(@UploadedFiles() files: Array<Express.Multer.File | Express.MulterS3.File>): Promise<File[]> {
         return this.filesService.uploadMultipleFiles(files);
@@ -79,7 +94,6 @@ export class FilesController {
 
     @Get('presigned/:type')
     @ApiBearerAuth()
-    @UseGuards(AuthGuard('jwt'))
     @ApiOkResponse({ type: PresignedUrlResponseDto })
     async getPresignedUrl(@Param('type') type: string): Promise<PresignedUrlResponseDto> {
         return this.filesService.getPresignedUrl(type);
@@ -89,7 +103,7 @@ export class FilesController {
     @ApiOkResponse({ type: FileDto })
     @HttpCode(HttpStatus.OK)
     async findOne(@Param('id') id: string): Promise<NullableType<File>> {
-        return this.filesService.findOne({ id });
+        return this.filesService.findOneForTenant(id);
     }
 
     /**
@@ -113,8 +127,7 @@ export class FilesController {
         }
     })
     @ApiOkResponse({ type: FileDto })
-    @UseGuards(AuthGuard('jwt'))
-    @UseInterceptors(FileInterceptor('file'))
+    @UseInterceptors(FileInterceptor('file', FILE_UPLOAD_OPTIONS))
     @HttpCode(HttpStatus.OK)
     async updateFile(@Param('id') id: string, @UploadedFile() file: Express.Multer.File | Express.MulterS3.File): Promise<File> {
         return this.filesService.updateFile(id, file);
@@ -127,7 +140,6 @@ export class FilesController {
      */
     @Delete(':id')
     @Idempotent({ scope: IdempotencyScope.Tenant, ttl: 1800 })
-    @UseGuards(AuthGuard('jwt'))
     @ApiOkResponse({ type: FileDto })
     @HttpCode(HttpStatus.OK)
     async deleteFile(@Param('id') id: string): Promise<File> {

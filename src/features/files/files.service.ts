@@ -8,6 +8,7 @@ import type { ErrorCode } from '@app/types/app.type';
 import { DatabaseService } from '@app/database/database.service';
 import { S3Service } from '@common/storage/s3.service';
 import { AppLoggerService } from '@common/logging/app-logger.service';
+import { TenantContextService } from '@common/tenant-aware/tenant-context.service';
 import { BaseException } from '@common/exceptions/base.exceptions';
 import { PresignedUrlResponseDto, FileDto } from '@domains/files';
 
@@ -17,9 +18,24 @@ export class FilesService {
         private readonly prisma: DatabaseService,
         private readonly awsS3Service: S3Service,
         private readonly i18n: I18nService,
+        private readonly tenantContext: TenantContextService,
         private readonly logger: AppLoggerService
     ) {
         this.logger.setContext(FilesService.name);
+    }
+
+    /** Current tenant id, required — guards the by-id file endpoints against cross-tenant access. */
+    private requireTenantId(): string {
+        const tenantId = this.tenantContext.getTenantId();
+        if (!tenantId) {
+            throw new BaseException('tenant_context_required', 'Tenant context is required', HttpStatus.BAD_REQUEST);
+        }
+        return tenantId;
+    }
+
+    /** Look up a file by id scoped to the current tenant (controller-facing). */
+    async findOneForTenant(id: string): Promise<NullableType<File>> {
+        return this.findOne({ id, tenantId: this.requireTenantId() });
     }
 
     async findOne(where: Prisma.FileWhereInput): Promise<NullableType<File>> {
@@ -48,6 +64,7 @@ export class FilesService {
         }
         return this.prisma.file.create({
             data: {
+                tenantId: this.tenantContext.getTenantId() ?? null,
                 mimeType: file.mimetype,
                 path: (file as Express.MulterS3.File).location
             }
@@ -79,8 +96,8 @@ export class FilesService {
                 HttpStatus.PRECONDITION_FAILED
             );
         }
-        // Delete old file from S3
-        const fileToUpdate = await this.findOneOrFail({ id });
+        // Delete old file from S3 (scoped to the current tenant)
+        const fileToUpdate = await this.findOneOrFail({ id, tenantId: this.requireTenantId() });
         const fileKey = this.extractKeyFromUrl(fileToUpdate.path);
         await this.awsS3Service.delete(fileKey);
 
@@ -105,7 +122,7 @@ export class FilesService {
      * @param id
      */
     async deleteFile(id: string): Promise<File> {
-        const fileToDelete = await this.findOneOrFail({ id });
+        const fileToDelete = await this.findOneOrFail({ id, tenantId: this.requireTenantId() });
         const fileKey = this.extractKeyFromUrl(fileToDelete.path);
 
         // Delete from S3
@@ -160,6 +177,7 @@ export class FilesService {
                 files.map(async (file) => {
                     return tx.file.create({
                         data: {
+                            tenantId: this.tenantContext.getTenantId() ?? null,
                             mimeType: file.mimetype,
                             path: (file as Express.MulterS3.File).location
                         }

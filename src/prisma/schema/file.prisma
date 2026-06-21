@@ -1,7 +1,8 @@
 model File {
-  id       String @id @default(cuid())
-  path     String @db.VarChar(500)
-  mimeType String @map("mime_type") @db.VarChar(100)
+  id       String  @id @default(cuid())
+  tenantId String? @map("tenant_id") @db.VarChar(26)
+  path     String  @db.VarChar(500)
+  mimeType String  @map("mime_type") @db.VarChar(100)
 
   createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz
   updatedAt DateTime  @updatedAt @map("updated_at") @db.Timestamptz
@@ -10,5 +11,6 @@ model File {
   // Relations
   tenants Tenant[]
 
+  @@index([tenantId])
   @@map("files")
 }
