@@ -32,19 +32,6 @@ export interface DomainVerificationResult {
 }
 
 // ============================================================
-// Provisioning
-// ============================================================
-
-export const ProvisioningStatus = {
-    PENDING: 'PENDING',
-    IN_PROGRESS: 'IN_PROGRESS',
-    ACTIVE: 'ACTIVE',
-    FAILED: 'FAILED'
-} as const;
-
-export type ProvisioningStatusType = (typeof ProvisioningStatus)[keyof typeof ProvisioningStatus];
-
-// ============================================================
 // Domain Events
 // ============================================================
 

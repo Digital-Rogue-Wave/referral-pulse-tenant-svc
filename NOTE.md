@@ -406,8 +406,12 @@ from the invitation. Service tokens remain tenant-optional as before. No new Ory
 
 ### dns / files / tenant-setting audit (extensions — none in db_tables §1)
 - **dns:** subdomain + DNS-verification services backing the tenant custom-domain extension; clean.
-  `domain-provisioning.service.ts` is an **unimplemented placeholder** (AWS ACM/CloudFront TODOs) — left
-  as a stub; custom-domain provisioning isn't real yet.
+  `domain-provisioning.service.ts` is now an **explicit, honest placeholder**: `provisionDomain` logs a
+  single warning (was logging fake "Requesting ACM Certificate…" steps), and the dead
+  `checkProvisioningStatus`/`deprovisionDomain` methods + orphaned `ProvisioningStatus` enum were removed.
+  Real ACM cert + CloudFront alias provisioning is **deliberately deferred** — it needs new AWS SDK
+  clients, isn't testable on the local stack, and is an infra/IaC concern for a non-spec extension. A
+  verified custom domain is recorded but **not served** until that lands.
 - **files — FIXED:** added `File.tenantId` (+ index, migration) and tenant-scoped the by-id endpoints
   (`GET/PUT/DELETE /v1/files/:id` now filter by current tenant, defensively requiring tenant context) —
   closes the IDOR where any authenticated user could read/overwrite/delete any file by id. Added multer
