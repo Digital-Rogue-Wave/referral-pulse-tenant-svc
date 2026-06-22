@@ -54,10 +54,10 @@ export class CreateApiKeyDto {
     @IsEnum(ApiKeyType)
     keyType?: ApiKeyType;
 
-    @ApiPropertyOptional()
+    @ApiPropertyOptional({ description: 'ISO 8601 expiry timestamp; omit for a non-expiring key' })
     @IsOptional()
     @IsDateString()
-    expiresAt?: Date;
+    expiresAt?: string;
 }
 
 export class UpdateApiKeyDto {

@@ -66,7 +66,7 @@ export class ApiKeyService {
                 keyType,
                 scopes: dto.scopes,
                 createdBy: userId,
-                expiresAt: dto.expiresAt
+                expiresAt: dto.expiresAt ?? null
             }
         })) as ApiKeyProps;
 

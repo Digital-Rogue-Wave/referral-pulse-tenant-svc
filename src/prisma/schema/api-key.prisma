@@ -8,7 +8,7 @@ model ApiKey {
   scopes     Json      @default("[]")
   createdBy  String    @map("created_by") @db.VarChar(26)
   lastUsedAt DateTime? @map("last_used_at") @db.Timestamptz
-  expiresAt  DateTime  @map("expires_at") @db.Timestamptz
+  expiresAt  DateTime? @map("expires_at") @db.Timestamptz
   revokedAt  DateTime? @map("revoked_at") @db.Timestamptz
 
   createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz
