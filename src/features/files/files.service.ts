@@ -62,11 +62,14 @@ export class FilesService {
                 HttpStatus.PRECONDITION_FAILED
             );
         }
+        const key = this.buildFileKey(file);
+        const result = await this.awsS3Service.upload(key, (file as Express.Multer.File).buffer, { contentType: file.mimetype });
+
         return this.prisma.file.create({
             data: {
                 tenantId: this.tenantContext.getTenantId() ?? null,
                 mimeType: file.mimetype,
-                path: (file as Express.MulterS3.File).location
+                path: result.location
             }
         });
     }
@@ -96,18 +99,23 @@ export class FilesService {
                 HttpStatus.PRECONDITION_FAILED
             );
         }
-        // Delete old file from S3 (scoped to the current tenant)
         const fileToUpdate = await this.findOneOrFail({ id, tenantId: this.requireTenantId() });
-        const fileKey = this.extractKeyFromUrl(fileToUpdate.path);
-        await this.awsS3Service.delete(fileKey);
 
-        return this.prisma.file.update({
+        // Upload the replacement first, then repoint the record, then drop the old object.
+        const key = this.buildFileKey(file);
+        const result = await this.awsS3Service.upload(key, (file as Express.Multer.File).buffer, { contentType: file.mimetype });
+
+        const updated = await this.prisma.file.update({
             where: { id },
             data: {
                 mimeType: file.mimetype,
-                path: (file as Express.MulterS3.File).location
+                path: result.location
             }
         });
+
+        await this.awsS3Service.delete(this.extractKeyFromUrl(fileToUpdate.path));
+
+        return updated;
     }
 
     async deleteMultipleFiles(files: FileDto[]): Promise<void> {
@@ -172,18 +180,23 @@ export class FilesService {
     }
 
     private async handleMultipleFilesUpload(files: Array<Express.Multer.File | Express.MulterS3.File>): Promise<File[]> {
-        return this.prisma.$transaction(async (tx) => {
-            return Promise.all(
-                files.map(async (file) => {
-                    return tx.file.create({
-                        data: {
-                            tenantId: this.tenantContext.getTenantId() ?? null,
-                            mimeType: file.mimetype,
-                            path: (file as Express.MulterS3.File).location
-                        }
-                    });
-                })
-            );
-        });
+        const tenantId = this.tenantContext.getTenantId() ?? null;
+
+        // Upload to S3 first (outside the DB transaction), then persist the rows atomically.
+        const records = await Promise.all(
+            files.map(async (file) => {
+                const key = this.buildFileKey(file);
+                const result = await this.awsS3Service.upload(key, (file as Express.Multer.File).buffer, { contentType: file.mimetype });
+                return { tenantId, mimeType: file.mimetype, path: result.location };
+            })
+        );
+
+        return this.prisma.$transaction(records.map((data) => this.prisma.file.create({ data })));
+    }
+
+    /** Build a unique, tenant-agnostic object key; S3Service prefixes it with `tenants/{tenantId}/`. */
+    private buildFileKey(file: Express.Multer.File | Express.MulterS3.File): string {
+        const ext = file.mimetype?.split('/')[1]?.replace(/[^a-z0-9]/gi, '') || 'bin';
+        return `${randomUUID()}.${ext}`;
     }
 }

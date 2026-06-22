@@ -156,11 +156,12 @@ export class TenantService {
         const trialStartedAt = this.dateService.nowMoment().toDate();
         const trialEndsAt = this.dateService.nowMoment().add(TRIAL_PERIOD_DAYS, 'days').toDate();
 
-        // Handle optional logo upload
+        // Handle optional logo upload. The tenant row does not exist yet, but its id is known — run the
+        // upload under that tenant's context so the file is stored and scoped under the new tenant.
         let imageId: string | undefined;
         if (file) {
             try {
-                const uploaded = await this.filesService.uploadFile(file);
+                const uploaded = await this.tenantContext.runWithContext({ tenantId: id, userId: ownerId }, () => this.filesService.uploadFile(file));
                 imageId = uploaded.id;
             } catch (err) {
                 this.logger.warn('Failed to upload tenant logo, continuing without image', {

@@ -412,8 +412,11 @@ from the invitation. Service tokens remain tenant-optional as before. No new Ory
   (`GET/PUT/DELETE /v1/files/:id` now filter by current tenant, defensively requiring tenant context) —
   closes the IDOR where any authenticated user could read/overwrite/delete any file by id. Added multer
   size (10 MB) + MIME-type allowlist; dropped redundant per-method `@UseGuards(AuthGuard('jwt'))`.
-  **Still flagged:** no multer-S3 storage is configured anywhere, so uploads aren't actually wired
-  (`file.location` is undefined) — the upload path needs a storage engine before it's functional.
+  **Storage wired (follow-up DONE):** uploads now go through `S3Service.upload` (memory storage →
+  `file.buffer` → S3, keyed `tenants/{tenantId}/{uuid}.{ext}`); `path` stores the returned location.
+  Tenant-creation logo upload runs under the new tenant's context (`runWithContext({ tenantId })`) since
+  the row doesn't exist yet but its id is known. Verified by build/lint/unit; BDD has no file scenarios
+  and requires the Docker infra (Postgres/Redis/LocalStack) to be up.
 - **tenant-setting — FIXED:** `TenantSetting` is a per-tenant singleton, but the controller exposed full
   CRUD (paginated `findAll`, `GET/DELETE /:id`). Trimmed to `GET /current` + `PUT` (upsert); removed the
   list/by-id/delete endpoints, the unused service methods, `tenant-setting.pagination.ts`, the orphaned

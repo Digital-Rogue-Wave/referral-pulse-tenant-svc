@@ -63,7 +63,7 @@ billing is **retained** here. This is the single knowing divergence — full rec
 | `invitation` | `src/features/invitation` | Team invitations — create/list/resend/revoke + public token validate/accept (**sanctioned extension**, not in the API contract). Expiry is lazy (checked on validate/accept) |
 | `tenant-setting` | `src/features/tenant-setting` | Tenant settings + user notification preferences |
 | `dns` | `src/features/dns` | Subdomain reservation + custom-domain verification. **`domain-provisioning.service` is a placeholder** (AWS ACM/CloudFront TODOs — not yet wired) |
-| `files` | `src/features/files` | S3 upload/download (tenant-scoped by `tenantId`; multer size + MIME-type limits). **Note: no multer-S3 storage is configured yet — uploads are not fully wired** |
+| `files` | `src/features/files` | S3 upload/download via `S3Service` (memory storage → S3, key `tenants/{tenantId}/{uuid}.{ext}`); tenant-scoped by `tenantId`; multer size + MIME-type limits |
 | `billing` | `src/features/billing` | Plans, subscriptions, Stripe, usage metering, payment escalation |
 | `webhook` | `src/features/webhook` | Stripe webhook ingestion |
 | `i18n` | `src/features/i18n` | Localization middleware (ar/en/fr) |
