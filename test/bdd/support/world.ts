@@ -22,6 +22,10 @@ export interface BddWorldInterface extends IWorld {
     /** Tenant ID for fixture-backed scenarios — set by tagged Before hooks */
     currentTenantId: string | null;
 
+    /** Scratch state for multi-step flows (e.g. create-then-rotate an API key) */
+    lastApiKeyId: string | null;
+    lastRawKey: string | null;
+
     /** Build a supertest agent bound to the test app's HTTP server */
     agent(): supertest.SuperAgentTest;
 }
@@ -30,6 +34,8 @@ export class BddWorld implements BddWorldInterface {
     response: Response | null = null;
     currentToken: string | null = null;
     currentTenantId: string | null = null;
+    lastApiKeyId: string | null = null;
+    lastRawKey: string | null = null;
 
     constructor(options: IWorldOptions) {
         // IWorldOptions are available for future use (parameters, attach, etc.)

@@ -17,6 +17,7 @@ import {
     cleanupTenant,
     setActiveSubscription,
     clearSubscription,
+    clearInvitations,
     disconnectFixturesPrisma,
     FIXTURE_IDS
 } from './db.fixtures';
@@ -40,6 +41,12 @@ AfterAll(async function () {
     await teardownTestApp();
     teardownNock();
     await disconnectFixturesPrisma();
+});
+
+// ─── Fixture: clean invitations for the default tenant (idempotent re-runs) ──────
+
+Before({ tags: '@needs-clean-invitations' }, async function () {
+    await clearInvitations(DEFAULT_TENANT_ID);
 });
 
 // ─── Fixture: suspended tenant ────────────────────────────────────────────────

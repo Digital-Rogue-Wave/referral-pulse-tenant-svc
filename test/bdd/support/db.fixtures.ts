@@ -130,6 +130,10 @@ export async function clearSubscription(tenantId: string): Promise<void> {
         .catch(() => undefined);
 }
 
+export async function clearInvitations(tenantId: string): Promise<void> {
+    await fixturesPrisma.invitation.deleteMany({ where: { tenantId } }).catch(() => undefined);
+}
+
 export async function cleanupTenant(id: string): Promise<void> {
     // Delete billing first (FK constraint)
     await fixturesPrisma.billing.deleteMany({ where: { tenantId: id } }).catch(() => undefined);
