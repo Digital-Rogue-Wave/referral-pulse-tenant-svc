@@ -18,6 +18,8 @@ import {
     setActiveSubscription,
     clearSubscription,
     clearInvitations,
+    seedPendingInvitation,
+    cleanupInvitationFlow,
     disconnectFixturesPrisma,
     FIXTURE_IDS
 } from './db.fixtures';
@@ -47,6 +49,21 @@ AfterAll(async function () {
 
 Before({ tags: '@needs-clean-invitations' }, async function () {
     await clearInvitations(DEFAULT_TENANT_ID);
+});
+
+// ─── Fixture: a pending invitation for the accept flow ───────────────────────────
+// Token/email/kratos-id are shared with invitation.feature + the invitee-token step.
+const INVITE_TOKEN = 'bdd-invite-token';
+const INVITEE_EMAIL = 'invitee-bdd@acme.com';
+const INVITEE_KRATOS_ID = 'kratos-invitee-bdd';
+
+Before({ tags: '@needs-pending-invitation' }, async function () {
+    await cleanupInvitationFlow({ tenantId: DEFAULT_TENANT_ID, token: INVITE_TOKEN, kratosIdentityId: INVITEE_KRATOS_ID });
+    await seedPendingInvitation({ tenantId: DEFAULT_TENANT_ID, email: INVITEE_EMAIL, token: INVITE_TOKEN, role: 'OPERATOR' });
+});
+
+After({ tags: '@needs-pending-invitation' }, async function () {
+    await cleanupInvitationFlow({ tenantId: DEFAULT_TENANT_ID, token: INVITE_TOKEN, kratosIdentityId: INVITEE_KRATOS_ID });
 });
 
 // ─── Fixture: suspended tenant ────────────────────────────────────────────────

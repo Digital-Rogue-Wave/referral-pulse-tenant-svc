@@ -32,3 +32,24 @@ Feature: Team Invitations
   Scenario: Creating an invitation requires authentication
     When I send a POST request to "/api/v1/invitations" without any token
     Then the response status should be 401
+
+  @public-endpoint @needs-pending-invitation
+  Scenario: Validate a pending invitation token
+    When I send a GET request to "/api/v1/invitations/public/bdd-invite-token" without any token
+    Then the response status should be 200
+    And the response should contain a "email" field
+    And the response should contain a "role" field
+
+  @needs-pending-invitation
+  Scenario: Accept an invitation with the matching Ory identity provisions membership
+    Given I have an invitee token for email "invitee-bdd@acme.com"
+    When I send a POST request to "/api/v1/invitations/public/bdd-invite-token/accept" with that token
+    Then the response status should be 200
+    And the response should contain a "id" field
+    And the response should contain a "tenantId" field
+
+  @needs-pending-invitation
+  Scenario: Accepting with a non-matching email is forbidden
+    Given I have an invitee token for email "intruder-bdd@acme.com"
+    When I send a POST request to "/api/v1/invitations/public/bdd-invite-token/accept" with that token
+    Then the response status should be 403

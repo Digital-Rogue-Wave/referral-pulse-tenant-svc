@@ -89,6 +89,18 @@ export function makeActiveUserToken(tenantId: string, userId = 'user-bdd-001'): 
 }
 
 /**
+ * A token for an invitee accepting an invitation: carries an email and identity but NO tenant claim,
+ * exercising the @AllowNoTenant path on the accept endpoint.
+ */
+export function makeInviteeToken(email: string, kratosId = 'kratos-invitee-bdd'): string {
+    return sign({
+        sub: kratosId,
+        email,
+        ext: { user_id: kratosId }
+    });
+}
+
+/**
  * A token that has already expired.
  */
 export function makeExpiredToken(tenantId: string): string {

@@ -134,6 +134,28 @@ export async function clearInvitations(tenantId: string): Promise<void> {
     await fixturesPrisma.invitation.deleteMany({ where: { tenantId } }).catch(() => undefined);
 }
 
+export async function seedPendingInvitation(params: { tenantId: string; email: string; token: string; role: string }): Promise<void> {
+    const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000);
+    await fixturesPrisma.invitation.upsert({
+        where: { token: params.token },
+        update: { tenantId: params.tenantId, email: params.email, role: params.role, status: 'PENDING', expiresAt, deletedAt: null },
+        create: { tenantId: params.tenantId, email: params.email, role: params.role, status: 'PENDING', token: params.token, expiresAt }
+    });
+}
+
+/** Remove an invitation + any membership its acceptance created, so the accept flow re-runs cleanly. */
+export async function cleanupInvitationFlow(params: { tenantId: string; token: string; kratosIdentityId: string }): Promise<void> {
+    const users = await fixturesPrisma.user
+        .findMany({ where: { tenantId: params.tenantId, kratosIdentityId: params.kratosIdentityId } })
+        .catch(() => [] as { id: string }[]);
+    const ids = users.map((u) => u.id);
+    if (ids.length > 0) {
+        await fixturesPrisma.userRole.deleteMany({ where: { userId: { in: ids } } }).catch(() => undefined);
+        await fixturesPrisma.user.deleteMany({ where: { id: { in: ids } } }).catch(() => undefined);
+    }
+    await fixturesPrisma.invitation.deleteMany({ where: { token: params.token } }).catch(() => undefined);
+}
+
 export async function cleanupTenant(id: string): Promise<void> {
     // Delete billing first (FK constraint)
     await fixturesPrisma.billing.deleteMany({ where: { tenantId: id } }).catch(() => undefined);
