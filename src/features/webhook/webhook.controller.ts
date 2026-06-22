@@ -4,6 +4,9 @@ import { ConfigService } from '@nestjs/config';
 import { Public } from '@common/auth/public.decorator';
 import { BillingService } from '../billing/billing.service';
 import { Idempotent, IdempotencyScope } from '@common/idempotency';
+import { DatabaseService } from '@app/database/database.service';
+import { TransactionEventEmitterService } from '@common/events/transaction-event-emitter.service';
+import { UserLoggedInEvent } from '@domains/user';
 import { Request } from 'express';
 import { ApiTags } from '@nestjs/swagger';
 
@@ -14,7 +17,9 @@ export class WebhookController {
     constructor(
         private readonly tenantService: TenantService,
         private readonly configService: ConfigService,
-        private readonly billingService: BillingService
+        private readonly billingService: BillingService,
+        private readonly prisma: DatabaseService,
+        private readonly txEventEmitter: TransactionEventEmitterService
     ) {}
 
     @Post('ory/signup')
@@ -40,6 +45,29 @@ export class WebhookController {
             name: tenantName,
             ownerId: userId
         });
+
+        return { status: 'ok' };
+    }
+
+    @Post('ory/login')
+    async handleOryLogin(@Headers('x-ory-api-key') apiKey: string, @Body() body: Record<string, unknown>) {
+        const configuredApiKey = this.configService.getOrThrow<string>('ORY_WEBHOOK_API_KEY', { infer: true });
+        if (configuredApiKey && apiKey !== configuredApiKey) {
+            throw new UnauthorizedException('Invalid API key');
+        }
+
+        const identity = body.identity as Record<string, unknown> | undefined;
+        const kratosIdentityId = (identity ? identity.id : body.id) as string | undefined;
+        if (!kratosIdentityId) {
+            return { status: 'ok' };
+        }
+        const authMethod = (body.authentication_method as string) ?? 'password';
+
+        // Resolve the platform user to scope the event to its tenant; identities with no membership are ignored.
+        const user = await this.prisma.user.findFirst({ where: { kratosIdentityId, deletedAt: null } });
+        if (user) {
+            this.txEventEmitter.emitAfterCommit('user.logged_in', new UserLoggedInEvent(user.id, user.tenantId, authMethod, user.id));
+        }
 
         return { status: 'ok' };
     }

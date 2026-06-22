@@ -75,6 +75,17 @@ export class ApiKeyController {
         return this.apiKeyService.update(id, user.userId, dto);
     }
 
+    @ApiOkResponse({
+        description: 'API key rotated; a new secret is returned exactly once',
+        type: ApiKeyWithRawKeyResponse
+    })
+    @RequirePermission({ namespace: KetoNamespace.TENANT, object: KetoResource.API_KEY, relation: KetoRelation.UPDATE })
+    @HttpCode(HttpStatus.OK)
+    @Post(':id/rotate')
+    async rotate(@Param('id') id: string, @CurrentUser() user: IAuthenticatedUser): Promise<ApiKeyWithRawKeyResponse> {
+        return this.apiKeyService.rotate(id, user.userId);
+    }
+
     @ApiOkResponse({ description: 'API key revoked successfully' })
     @RequirePermission({ namespace: KetoNamespace.TENANT, object: KetoResource.API_KEY, relation: KetoRelation.DELETE })
     @HttpCode(HttpStatus.NO_CONTENT)

@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException, UnauthorizedException } from '@nestjs/common';
+import { Injectable, NotFoundException, UnauthorizedException, BadRequestException } from '@nestjs/common';
 import { randomBytes } from 'crypto';
 import * as bcrypt from 'bcryptjs';
 
@@ -169,6 +169,49 @@ export class ApiKeyService {
         this.logger.log(`API key updated: ${id}`, { apiKeyId: id, changes });
 
         return apiKeyResponseMapper.toResponse(updated);
+    }
+
+    /**
+     * Rotate an API key (api-key lifecycle — system_architecture §tenant-service).
+     * Issues a fresh secret for the same key id/label/scopes, invalidating the old secret immediately.
+     * The new raw key is returned exactly once.
+     */
+    async rotate(id: string, userId: string): Promise<ApiKeyWithRawKeyResponse> {
+        const existing = (await this.apiKey.findUnique({ where: { id } })) as ApiKeyProps | null;
+        if (!existing) {
+            throw new NotFoundException(`API key with ID ${id} not found`);
+        }
+        if (existing.revokedAt) {
+            throw new BadRequestException('Cannot rotate a revoked API key');
+        }
+
+        const rawKey = this.generateSecureApiKey(existing.keyType as ApiKeyType);
+        const keyHash = await this.hashApiKey(rawKey);
+        const keyPrefix = this.extractApiKeyPrefix(rawKey);
+
+        const updated = (await this.apiKey.update({
+            where: { id },
+            data: { keyHash, keyPrefix, lastUsedAt: null }
+        })) as ApiKeyProps;
+
+        const event = new ApiKeyUpdatedEvent(
+            id,
+            updated.tenantId,
+            {
+                apiKeyId: id,
+                tenantId: updated.tenantId,
+                changes: { keyPrefix: { from: existing.keyPrefix, to: keyPrefix } },
+                updatedBy: userId,
+                updatedAt: updated.updatedAt
+            },
+            userId
+        );
+        this.txEventEmitter.emitAfterCommit('api-key.updated', event);
+        this.txEventEmitter.emitAfterCommit('audit.api-key.updated', event);
+
+        this.logger.log(`API key rotated: ${id}`, { apiKeyId: id });
+
+        return apiKeyResponseMapper.toResponseWithRawKey(updated, rawKey);
     }
 
     /**

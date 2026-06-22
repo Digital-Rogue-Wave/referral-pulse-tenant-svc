@@ -65,7 +65,7 @@ billing is **retained** here. This is the single knowing divergence — full rec
 | `dns` | `src/features/dns` | Subdomain reservation + custom-domain verification. **`domain-provisioning.service` is a placeholder** (AWS ACM/CloudFront TODOs — not yet wired) |
 | `files` | `src/features/files` | S3 upload/download via `S3Service` (memory storage → S3, key `tenants/{tenantId}/{uuid}.{ext}`); tenant-scoped by `tenantId`; multer size + MIME-type limits |
 | `billing` | `src/features/billing` | Plans, subscriptions, Stripe, usage metering, payment escalation |
-| `webhook` | `src/features/webhook` | Stripe webhook ingestion |
+| `webhook` | `src/features/webhook` | Ory signup/login webhooks (`ory/signup` → tenant create; `ory/login` → `user.logged_in`) + Stripe webhook relay |
 | `i18n` | `src/features/i18n` | Localization middleware (ar/en/fr) |
 
 ## API endpoints
@@ -74,7 +74,7 @@ All routes are versioned (`/v1/...`) and tenant-scoped unless marked Public/Inte
 
 | Method(s) | Path | Module | Notes |
 |---|---|---|---|
-| POST/GET/GET:id/PUT:id/DELETE:id | `/v1/api-keys` | api-key | Create/list/get/update(label,scopes)/revoke; Keto-guarded; raw key shown once. DELETE = revoke (sets `revoked_at`, irreversible) |
+| POST/GET/GET:id/PUT:id/POST:id/rotate/DELETE:id | `/v1/api-keys` | api-key | Create/list/get/update(label,scopes)/**rotate**/revoke; Keto-guarded; raw key shown once. `POST :id/rotate` issues a fresh secret invalidating the old (system_arch §80); DELETE = revoke (`revoked_at`, irreversible) |
 | GET | `/v1/users/me` | users | Current user profile + roles/scopes |
 | POST/GET/PUT/DELETE | `/v1/users`, `/v1/users/:id`, `/v1/users/:id/roles` | users | Membership + role; last-admin protection |
 | GET | `/internal/validate-token` | users | **Public/internal**, version-neutral — resolve API key or JWT → `{tenant_id, scopes, source, key_type, key_id, user_id}` |
@@ -89,6 +89,7 @@ All routes are versioned (`/v1/...`) and tenant-scoped unless marked Public/Inte
 | GET/POST/PUT/DELETE | `/v1/billings`, `/v1/billings/plans`, `/v1/billings/admin/plans` | billing | Subscriptions, public + admin plans |
 | POST/GET:id/PUT:id/DELETE:id | `/v1/files` | files | Upload/get/update/delete; tenant-scoped by `tenantId`; 10 MB + MIME allowlist |
 | GET | `/v1/currencies` | currency | Currency reference data |
+| POST | `/v1/webhook/ory/signup`, `/v1/webhook/ory/login` | webhook | Ory hooks (`@Public`); login emits `user.logged_in {user_id, auth_method}` |
 | POST | `/v1/webhook/stripe`, `/webhooks/stripe` | webhook | Stripe webhook (version-neutral relay) |
 
 > `PUT /v1/users/:id/roles` updates the role and emits `user.role_changed`; `users`/`user_roles` is the

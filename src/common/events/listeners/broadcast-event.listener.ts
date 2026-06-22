@@ -21,7 +21,7 @@ import {
     BillingEvents
 } from '@domains/billing';
 import { ApiKeyCreatedEvent, ApiKeyDeletedEvent } from '@domains/api-key';
-import { UserRegisteredEvent, UserRoleChangedEvent } from '@domains/user';
+import { UserRegisteredEvent, UserRoleChangedEvent, UserLoggedInEvent } from '@domains/user';
 import { BILLING_EVENTS_TOPIC, USER_EVENTS_TOPIC, type BaseEventType, type SnsTopicName } from '@app/types';
 
 /**
@@ -255,6 +255,14 @@ export class BroadcastEventListener {
             tenant_id: event.tenantId,
             old_role: event.oldRole,
             new_role: event.newRole
+        });
+    }
+
+    @OnEvent('user.logged_in', { async: true })
+    async handleUserLoggedIn(event: UserLoggedInEvent): Promise<void> {
+        await this.broadcast('user', 'user.logged_in', event.tenantId, event.eventId, USER_EVENTS_TOPIC, {
+            user_id: event.aggregateId,
+            auth_method: event.authMethod
         });
     }
 

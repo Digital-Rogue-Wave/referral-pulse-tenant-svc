@@ -100,6 +100,7 @@ export type EventAction =
     | 'threshold_crossed'
     | 'registered'
     | 'role_changed'
+    | 'logged_in'
     | 'verification_requested'
     | 'verification_status_changed';
 

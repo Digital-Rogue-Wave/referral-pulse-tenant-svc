@@ -265,14 +265,15 @@ a stale reference copy** (bundled with the template's `project-docs/`); align al
 | Spec event | In code |
 |---|---|
 | `user.registered` `{user_id,tenant_id,role}` | ✅ |
-| `user.logged_in` `{user_id,auth_method}` | ⚠️ emitted at Ory/gateway, not here — correct per spec. |
+| `user.logged_in` `{user_id,auth_method}` | ✅ emitted from the Ory after-login webhook (`POST /webhook/ory/login`) → USER_EVENTS_TOPIC |
+| `user.role_changed` (system_architecture §85) | ✅ |
 | `api_key.created` `{key_id,key_type,tenant_id,created_by}` | ✅ |
 | `api_key.revoked` `{key_id,revoked_by,revocation_reason}` | ✅ |
 
 ### Endpoints (api_contract §2.2 + system_architecture) → code
 | Spec | In code |
 |---|---|
-| `POST /v1/api-keys`, `GET /v1/api-keys`, `DELETE /v1/api-keys/{id}` (revoke) | ✅ (plus extra `GET/:id`, `PUT/:id` for label/scopes — beyond contract) |
+| `POST /v1/api-keys`, `GET /v1/api-keys`, `DELETE /v1/api-keys/{id}` (revoke), rotate (system_arch §80) | ✅ incl. `POST /v1/api-keys/:id/rotate`; plus `GET/:id`, `PUT/:id` for label/scopes |
 | `GET /v1/users/me`, `PUT /v1/users/{id}/roles` (system_arch Sync APIs) | ✅ |
 | `GET /internal/validate-token` (system_arch) | ✅ |
 
@@ -291,8 +292,8 @@ a stale reference copy** (bundled with the template's `project-docs/`); align al
    constant and the now-unused `crypto`/`bcryptjs` imports) from
    `src/common/redis/redis-key.builder.ts`. Those had no callers; api-key hashing lives solely in
    `ApiKeyService`.
-3. **`user.role_changed`:** emitted by us but **not in event_model §4.12** — an extension (useful for
-   consumers). Keep-as-extension or drop.
+3. **`user.role_changed`:** **canonical** — listed in system_architecture §85 ("Publishes Events") for the
+   Tenant Service (absent from event_model §4.12's table, but spec-mandated). Emitted on role update.
 4. **`/v1/users/me`, `/v1/users/:id/roles`:** canonical — system_architecture lists both under the
    Tenant Service's §"Sync APIs" (absent from api_contract v1.2's table, but spec-mandated). Implemented
    exactly. Only the extra user CRUD (`POST/GET /v1/users`, `GET/DELETE /v1/users/:id`) is a
