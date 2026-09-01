@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Delete, Body, Param, HttpCode, HttpStatus, Put } from '@nestjs/common';
+import { Controller, Get, Post, Delete, Body, Param, HttpCode, HttpStatus, Put, UseGuards } from '@nestjs/common';
 import { ApiTags, ApiBearerAuth, ApiCreatedResponse, ApiBody, ApiOkResponse, ApiHeader } from '@nestjs/swagger';
 
 import { CurrentUser } from '@common/auth/current-user.decorator';
@@ -12,6 +12,7 @@ import { CreateApiKeyDto, UpdateApiKeyDto, ApiKeyResponse, ApiKeyWithRawKeyRespo
 
 import { ApiKeyService } from './api-key.service';
 import { API_KEY_PAGINATE_CONFIG } from './api-key.pagination';
+import { PaymentRequiredGuard } from '@app/features/billing/guards/payment-required.guard';
 
 @ApiTags('API Keys')
 @ApiHeader({
@@ -20,6 +21,7 @@ import { API_KEY_PAGINATE_CONFIG } from './api-key.pagination';
     description: 'Tenant ID header',
     schema: { type: 'string' }
 })
+@UseGuards(PaymentRequiredGuard)
 @Controller({ path: 'api-keys', version: '1' })
 @ApiBearerAuth()
 export class ApiKeyController {

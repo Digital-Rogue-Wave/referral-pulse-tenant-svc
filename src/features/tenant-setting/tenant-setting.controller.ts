@@ -1,4 +1,4 @@
-import { Controller, Get, Put, Body, HttpCode, HttpStatus } from '@nestjs/common';
+import { Controller, Get, Put, Body, HttpCode, HttpStatus, UseGuards } from '@nestjs/common';
 import { ApiTags, ApiBearerAuth, ApiOkResponse, ApiBody } from '@nestjs/swagger';
 
 import { RequirePermission } from '@common/auth/require-permission.decorator';
@@ -8,6 +8,7 @@ import { Idempotent, IdempotencyScope } from '@common/idempotency';
 import { UpdateTenantSettingDto, TenantSettingResponse } from '@domains/tenant-setting';
 
 import { TenantSettingService } from './tenant-setting.service';
+import { PaymentRequiredGuard } from '@app/features/billing/guards/payment-required.guard';
 
 /**
  * Tenant settings — a per-tenant singleton, so the surface is read-current + upsert (no list/by-id/delete).
@@ -15,6 +16,7 @@ import { TenantSettingService } from './tenant-setting.service';
  */
 @ApiTags('Tenant Settings')
 @ApiBearerAuth()
+@UseGuards(PaymentRequiredGuard)
 @Controller({ path: 'tenant-settings', version: '1' })
 export class TenantSettingController {
     constructor(private readonly tenantSettingService: TenantSettingService) {}

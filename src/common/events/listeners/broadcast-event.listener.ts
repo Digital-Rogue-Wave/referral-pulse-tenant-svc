@@ -18,6 +18,8 @@ import {
     TenantPaymentStatusChangedEvent,
     TrialExpiredEvent,
     TrialReminderEvent,
+    UsageThresholdCrossedEvent,
+    UsageMonthlySummaryEvent,
     BillingEvents
 } from '@domains/billing';
 import { ApiKeyCreatedEvent, ApiKeyDeletedEvent } from '@domains/api-key';
@@ -212,6 +214,38 @@ export class BroadcastEventListener {
             await this.broadcast('billing', BillingEvents.PAYMENT_RESTORED, event.tenantId, event.eventId, BILLING_EVENTS_TOPIC, statusData);
             await this.broadcast('billing', BillingEvents.TENANT_RESTORED, event.tenantId, event.eventId, BILLING_EVENTS_TOPIC, statusData);
         }
+    }
+
+    // ── Usage broadcasts ───────────────────────────────────────────────
+    // `usage.threshold_crossed` and `usage.monthly_summary` were emitted by
+    // DailyUsageCalculator / MonthlyUsageReset but had no listener, so they were
+    // raised in-process and dropped — no consumer could ever be notified.
+
+    @OnEvent('usage.threshold_crossed', { async: true })
+    async handleUsageThresholdCrossed(event: UsageThresholdCrossedEvent): Promise<void> {
+        await this.broadcast('billing', event.eventType, event.tenantId, event.eventId, BILLING_EVENTS_TOPIC, {
+            metric: event.metric,
+            threshold: event.threshold,
+            usage: event.usage,
+            limit: event.limit,
+            percentage: event.percentage,
+            periodDate: event.periodDate,
+            triggeredAt: event.triggeredAt,
+            tenantId: event.tenantId
+        });
+    }
+
+    @OnEvent('usage.monthly_summary', { async: true })
+    async handleUsageMonthlySummary(event: UsageMonthlySummaryEvent): Promise<void> {
+        await this.broadcast('billing', event.eventType, event.tenantId, event.eventId, BILLING_EVENTS_TOPIC, {
+            metric: event.metric,
+            month: event.month,
+            usage: event.usage,
+            limit: event.limit,
+            periodDate: event.periodDate,
+            triggeredAt: event.triggeredAt,
+            tenantId: event.tenantId
+        });
     }
 
     // ── Identity broadcasts (api_key.*) ────────────────────────────────

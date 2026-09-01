@@ -10,7 +10,8 @@ import {
     UploadedFile,
     UploadedFiles,
     UseInterceptors,
-    BadRequestException
+    BadRequestException,
+    UseGuards
 } from '@nestjs/common';
 import { ApiBearerAuth, ApiBody, ApiConsumes, ApiOkResponse, ApiTags } from '@nestjs/swagger';
 import { Idempotent, IdempotencyScope } from '@common/idempotency';
@@ -21,6 +22,7 @@ import { FileDto, PresignedUrlResponseDto } from '@domains/files';
 import { FilesService } from './files.service';
 import { FileInterceptor, FilesInterceptor } from '@nestjs/platform-express';
 import type { MulterOptions } from '@nestjs/platform-express/multer/interfaces/multer-options.interface';
+import { PaymentRequiredGuard } from '@app/features/billing/guards/payment-required.guard';
 
 /** Accepted upload types (logos/branding + documents) and size cap. */
 const ALLOWED_MIME_TYPES = ['image/png', 'image/jpeg', 'image/webp', 'image/gif', 'image/svg+xml', 'application/pdf'];
@@ -39,6 +41,7 @@ const FILE_UPLOAD_OPTIONS: MulterOptions = {
 
 @ApiTags('Files')
 @ApiBearerAuth()
+@UseGuards(PaymentRequiredGuard)
 @Controller({
     path: 'files',
     version: '1'

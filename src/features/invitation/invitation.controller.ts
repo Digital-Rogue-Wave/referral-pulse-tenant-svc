@@ -1,4 +1,4 @@
-import { Body, Controller, Delete, Get, HttpCode, HttpStatus, Param, Post } from '@nestjs/common';
+import { Body, Controller, Delete, Get, HttpCode, HttpStatus, Param, Post, UseGuards } from '@nestjs/common';
 import { ApiTags, ApiBearerAuth, ApiBody, ApiCreatedResponse, ApiOkResponse, ApiOperation } from '@nestjs/swagger';
 
 import { CurrentUser } from '@common/auth/current-user.decorator';
@@ -15,6 +15,7 @@ import { UserResponse } from '@domains/user';
 
 import { InvitationService } from './invitation.service';
 import { INVITATION_PAGINATE_CONFIG } from './invitation.pagination';
+import { PaymentRequiredGuard } from '@app/features/billing/guards/payment-required.guard';
 
 /**
  * Tenant member invitations (tenant-aware, Keto-guarded). Sanctioned extension — not in the
@@ -22,6 +23,7 @@ import { INVITATION_PAGINATE_CONFIG } from './invitation.pagination';
  */
 @ApiTags('Invitations')
 @ApiBearerAuth()
+@UseGuards(PaymentRequiredGuard)
 @Controller({ path: 'invitations', version: '1' })
 export class InvitationController {
     constructor(private readonly invitationService: InvitationService) {}
