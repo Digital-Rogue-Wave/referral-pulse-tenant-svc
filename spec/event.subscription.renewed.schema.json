@@ -1,0 +1,39 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://referralai.dev/schemas/event.subscription.renewed.schema.json",
+  "title": "subscription.renewed properties schema",
+  "type": "object",
+  "allOf": [
+    {
+      "$ref": "event._defs.schema.json#/$defs/identity"
+    },
+    {
+      "$ref": "event._defs.schema.json#/$defs/revenue"
+    }
+  ],
+  "properties": {
+    "referral_code": {
+      "type": "string",
+      "description": "If known."
+    },
+    "renewal_number": {
+      "type": "integer",
+      "minimum": 1,
+      "description": "Times renewed (1 for first renewal)."
+    },
+    "previous_plan_id": {
+      "type": "string",
+      "description": "Plan before renewal, if changed."
+    },
+    "new_plan_id": {
+      "type": "string",
+      "description": "Plan after renewal."
+    },
+    "retention_days": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "Days continuously active."
+    }
+  },
+  "unevaluatedProperties": false
+}

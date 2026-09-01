@@ -1,0 +1,41 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://referralai.dev/schemas/event.link.shared.schema.json",
+  "title": "link.shared properties schema",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "referral_code": {
+      "type": "string",
+      "description": "The code that was shared."
+    },
+    "share_channel": {
+      "type": "string",
+      "enum": [
+        "email",
+        "twitter",
+        "linkedin",
+        "facebook",
+        "whatsapp",
+        "copy_link",
+        "sms",
+        "custom"
+      ],
+      "description": "Channel through which the link was shared."
+    },
+    "share_url": {
+      "type": "string",
+      "format": "uri",
+      "description": "Full URL shared, if it differs from the canonical link."
+    },
+    "recipient_count": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "Number of recipients, if determinable."
+    }
+  },
+  "required": [
+    "referral_code",
+    "share_channel"
+  ]
+}

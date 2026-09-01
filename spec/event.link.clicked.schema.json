@@ -1,0 +1,64 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://referralai.dev/schemas/event.link.clicked.schema.json",
+  "title": "link.clicked properties schema",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "referral_code": {
+      "type": "string",
+      "description": "Code embedded in the link; resolves to a Participant and Campaign."
+    },
+    "link_url": {
+      "type": "string",
+      "format": "uri",
+      "description": "Full referral link URL that was clicked."
+    },
+    "landing_url": {
+      "type": "string",
+      "format": "uri",
+      "description": "Destination URL after redirect."
+    },
+    "channel": {
+      "type": "string",
+      "enum": [
+        "organic_link",
+        "email",
+        "social_share",
+        "widget",
+        "qr_code",
+        "api"
+      ],
+      "default": "organic_link",
+      "description": "Acquisition channel of the click."
+    },
+    "utm_source": {
+      "type": "string",
+      "description": "UTM source parameter, if present."
+    },
+    "utm_medium": {
+      "type": "string",
+      "description": "UTM medium parameter, if present."
+    },
+    "utm_campaign": {
+      "type": "string",
+      "description": "UTM campaign parameter, if present."
+    },
+    "utm_content": {
+      "type": "string",
+      "description": "UTM content parameter, if present."
+    },
+    "utm_term": {
+      "type": "string",
+      "description": "UTM term parameter, if present."
+    },
+    "is_repeat_visit": {
+      "type": "boolean",
+      "description": "Whether the Referee clicked this code before."
+    }
+  },
+  "required": [
+    "referral_code",
+    "link_url"
+  ]
+}

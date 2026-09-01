@@ -1,0 +1,30 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://referralai.dev/schemas/event.email.opened.schema.json",
+  "title": "email.opened properties schema",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "referral_code": {
+      "type": "string",
+      "description": "Code associated with the invitation."
+    },
+    "invitation_id": {
+      "type": "string",
+      "description": "Platform identifier for the specific invitation."
+    },
+    "email_template_id": {
+      "type": "string",
+      "description": "The template used."
+    },
+    "open_count": {
+      "type": "integer",
+      "minimum": 1,
+      "description": "Cumulative open count; only the first open is attribution-significant."
+    }
+  },
+  "required": [
+    "referral_code",
+    "invitation_id"
+  ]
+}

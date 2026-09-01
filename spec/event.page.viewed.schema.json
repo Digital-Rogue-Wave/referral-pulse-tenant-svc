@@ -1,0 +1,31 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://referralai.dev/schemas/event.page.viewed.schema.json",
+  "title": "page.viewed properties schema",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "referral_code": {
+      "type": "string",
+      "description": "Code from the active referral session cookie."
+    },
+    "page_url": {
+      "type": "string",
+      "format": "uri",
+      "description": "The URL viewed."
+    },
+    "page_title": {
+      "type": "string",
+      "description": "The HTML page title."
+    },
+    "time_on_page_ms": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "Milliseconds on the previous page, set on navigation away."
+    }
+  },
+  "required": [
+    "referral_code",
+    "page_url"
+  ]
+}

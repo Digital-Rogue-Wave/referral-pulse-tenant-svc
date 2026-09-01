@@ -1,0 +1,42 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://referralai.dev/schemas/event.signup.completed.schema.json",
+  "title": "signup.completed properties schema",
+  "type": "object",
+  "allOf": [
+    {
+      "$ref": "event._defs.schema.json#/$defs/identity"
+    }
+  ],
+  "properties": {
+    "referral_code": {
+      "type": "string",
+      "description": "If known, enables direct attribution."
+    },
+    "signup_method": {
+      "type": "string",
+      "enum": [
+        "email",
+        "google_oauth",
+        "saml_sso",
+        "github",
+        "custom"
+      ],
+      "description": "How the Referee signed up."
+    },
+    "plan_type": {
+      "type": "string",
+      "description": "Plan or tier signed up for."
+    },
+    "account_type": {
+      "type": "string",
+      "enum": [
+        "individual",
+        "team",
+        "enterprise"
+      ],
+      "description": "Account type."
+    }
+  },
+  "unevaluatedProperties": false
+}

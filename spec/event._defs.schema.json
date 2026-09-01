@@ -1,0 +1,91 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://referralai.dev/schemas/event._defs.schema.json",
+  "title": "Shared event property definitions",
+  "$defs": {
+    "identity": {
+      "type": "object",
+      "properties": {
+        "referee_email": {
+          "type": "string",
+          "format": "email",
+          "description": "Referee email. Required unless referee_external_id is provided."
+        },
+        "referee_external_id": {
+          "type": "string",
+          "description": "Client identifier for the Referee. Required unless referee_email is provided."
+        }
+      },
+      "anyOf": [
+        {
+          "required": [
+            "referee_email"
+          ]
+        },
+        {
+          "required": [
+            "referee_external_id"
+          ]
+        }
+      ]
+    },
+    "revenue": {
+      "type": "object",
+      "properties": {
+        "revenue_amount": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Payment amount in minor currency units (cents)."
+        },
+        "revenue_currency": {
+          "type": "string",
+          "pattern": "^[A-Z]{3}$",
+          "description": "ISO 4217 three-letter currency code."
+        },
+        "revenue_type": {
+          "type": "string",
+          "enum": [
+            "one_time",
+            "recurring"
+          ],
+          "description": "Whether the payment is one-time or recurring."
+        },
+        "revenue_mrr": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Monthly recurring revenue in minor units. Required when revenue_type is recurring."
+        },
+        "revenue_arr": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Annual recurring revenue in minor units."
+        },
+        "revenue_ltv_estimate": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Client-provided lifetime-value estimate in minor units."
+        }
+      },
+      "required": [
+        "revenue_amount",
+        "revenue_currency",
+        "revenue_type"
+      ],
+      "if": {
+        "properties": {
+          "revenue_type": {
+            "const": "recurring"
+          }
+        },
+        "required": [
+          "revenue_type"
+        ]
+      },
+      "then": {
+        "required": [
+          "revenue_mrr"
+        ]
+      }
+    }
+  }
+}

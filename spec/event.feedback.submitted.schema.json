@@ -1,0 +1,62 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://referralai.dev/schemas/event.feedback.submitted.schema.json",
+  "title": "feedback.submitted properties schema",
+  "type": "object",
+  "allOf": [
+    {
+      "$ref": "event._defs.schema.json#/$defs/identity"
+    },
+    {
+      "dependentRequired": {
+        "rating_value": [
+          "rating_scale_max"
+        ]
+      }
+    }
+  ],
+  "properties": {
+    "feedback_type": {
+      "type": "string",
+      "enum": [
+        "review",
+        "rating",
+        "nps",
+        "testimonial",
+        "survey",
+        "custom"
+      ],
+      "description": "Type of feedback submitted."
+    },
+    "rating_value": {
+      "type": "number",
+      "description": "Numeric rating."
+    },
+    "rating_scale_max": {
+      "type": "number",
+      "description": "Maximum rating scale value. Required when rating_value is present."
+    },
+    "nps_score": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 10,
+      "description": "NPS score; present only for feedback_type nps."
+    },
+    "feedback_platform": {
+      "type": "string",
+      "description": "Where the feedback was submitted."
+    },
+    "has_text_content": {
+      "type": "boolean",
+      "description": "Whether feedback includes written text."
+    },
+    "is_verified_purchase": {
+      "type": "boolean",
+      "description": "Whether the reviewer is a verified customer."
+    }
+  },
+  "required": [
+    "feedback_type"
+  ],
+  "unevaluatedProperties": false
+}

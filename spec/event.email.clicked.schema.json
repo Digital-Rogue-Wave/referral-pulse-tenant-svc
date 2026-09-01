@@ -1,0 +1,32 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://referralai.dev/schemas/event.email.clicked.schema.json",
+  "title": "email.clicked properties schema",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "referral_code": {
+      "type": "string",
+      "description": "Code associated with the invitation."
+    },
+    "invitation_id": {
+      "type": "string",
+      "description": "Platform identifier for the invitation."
+    },
+    "link_id": {
+      "type": "string",
+      "description": "Identifier for the specific link within the email."
+    },
+    "destination_url": {
+      "type": "string",
+      "format": "uri",
+      "description": "The URL the link resolved to."
+    }
+  },
+  "required": [
+    "referral_code",
+    "invitation_id",
+    "link_id",
+    "destination_url"
+  ]
+}
