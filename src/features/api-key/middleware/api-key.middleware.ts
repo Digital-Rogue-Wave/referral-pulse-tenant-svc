@@ -1,5 +1,5 @@
 import { Injectable, NestMiddleware, UnauthorizedException } from '@nestjs/common';
-import { Request, Response, NextFunction } from 'express';
+import type { Request, Response, NextFunction } from 'express';
 
 import { TenantContextService } from '@common/tenant-aware/tenant-context.service';
 import { ApiKeyService } from '../api-key.service';

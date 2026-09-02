@@ -1,7 +1,7 @@
 import { Injectable, NestInterceptor, ExecutionContext, CallHandler, BadRequestException } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
 
-import { Request, Response } from 'express';
+import type { Request, Response } from 'express';
 import { Observable, from, lastValueFrom } from 'rxjs';
 import { switchMap } from 'rxjs/operators';
 

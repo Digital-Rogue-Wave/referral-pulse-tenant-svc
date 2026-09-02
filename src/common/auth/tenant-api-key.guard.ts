@@ -2,7 +2,7 @@ import { Injectable, CanActivate, ExecutionContext, UnauthorizedException, Logge
 import { ConfigService } from '@nestjs/config';
 import { Reflector } from '@nestjs/core';
 
-import { Request } from 'express';
+import type { Request } from 'express';
 
 import type { AllConfigType } from '@app/config/config.type';
 
