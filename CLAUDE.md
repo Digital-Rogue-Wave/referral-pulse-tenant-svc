@@ -328,8 +328,14 @@ service knowingly diverges from the responsibility contract — see `NOTE.md` fo
 
 - **ORM is Prisma** (schemas in `src/prisma/schema/*.prisma`, one file per aggregate). Migrations under
   `src/prisma/migrations/`. There is no TypeORM here.
-- **IDs:** `ulid()`. Prisma string ids in older models use `cuid()` — match the surrounding model when
-  editing existing schemas; use `ulid()` for new application-generated ids.
+- **IDs:** `ulid()` everywhere — `@id @default(ulid()) @db.VarChar(26)`. Per the platform ruling
+  (2026-09-02), every microservice uses ULID and no longer cuid, so the fleet has one id format on
+  the wire. All 13 `cuid()` primary keys in this service were migrated in
+  `20260903003657_ulid_id_harmonize`; the PK columns are pinned to `VarChar(26)` to match the
+  foreign-key columns that already declared that width. **The previous "match the surrounding model
+  when editing existing schemas" carve-out is superseded — there are no cuid models left.** Existing
+  rows keep their old 25-char cuid values, which remain valid under `VarChar(26)`; only new rows get
+  ULIDs, since `ulid()` is a Prisma client-side default and emits no DDL.
 - **Tests:** Jest unit (`pnpm test`) + Cucumber BDD (`pnpm test:bdd`, `:auth`, `:billing`, `:guards`),
   config in `cucumber.cjs`, docs in `bdd-features.md`. BDD uses real JWT/guards with mocked JWKS/Keto/Stripe.
 
