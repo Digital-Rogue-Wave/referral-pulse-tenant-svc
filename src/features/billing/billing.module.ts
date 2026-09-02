@@ -34,13 +34,26 @@ import { BillingGuard } from './guards/billing.guard';
 import { BillingUsageProcessor } from './processors/billing-usage.processor';
 import { BillingConsumer } from './billing.consumer';
 
+/**
+ * `TestBillingController` is dev scaffolding: ~24 routes under `/test/*` behind
+ * bare JWT with no `@RequirePermission`, including usage increment/decrement,
+ * subscription cancel/reactivate/upgrade/downgrade, manual plan seeding and
+ * direct triggers for all four scheduled billing jobs. It was registered
+ * unconditionally, so it shipped to production.
+ *
+ * Kept for local demos and manual testing, but never registered in production.
+ * Module metadata is evaluated at import time, so this reads `process.env`
+ * directly rather than ConfigService.
+ */
+const DEV_ONLY_CONTROLLERS = process.env.NODE_ENV === 'production' ? [] : [TestBillingController];
+
 @Module({
     imports: [TenantModule, EventsModule],
     controllers: [
         BillingController,
         PlanAdminController,
         PlanPublicController,
-        TestBillingController,
+        ...DEV_ONLY_CONTROLLERS,
         UsageInternalController,
         InternalTenantStatusController,
         StripeRedirectController

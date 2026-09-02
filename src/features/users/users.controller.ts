@@ -1,4 +1,4 @@
-import { Body, Controller, Delete, Get, HttpCode, HttpStatus, Param, Post, Put } from '@nestjs/common';
+import { Body, Controller, Delete, Get, HttpCode, HttpStatus, Param, Post, Put, UseGuards } from '@nestjs/common';
 import { ApiTags, ApiBearerAuth, ApiBody, ApiCreatedResponse, ApiOkResponse, ApiOperation } from '@nestjs/swagger';
 
 import { CurrentUser } from '@common/auth/current-user.decorator';
@@ -12,6 +12,7 @@ import { AddUserDto, UpdateUserRoleDto, UserResponse } from '@domains/user';
 
 import { UsersService, UserMeResponse } from './users.service';
 import { USER_PAGINATE_CONFIG } from './users.pagination';
+import { PaymentRequiredGuard } from '@app/features/billing/guards/payment-required.guard';
 
 /**
  * Platform users (operators) — tenant membership + role per referralai_api_contract.
@@ -19,6 +20,7 @@ import { USER_PAGINATE_CONFIG } from './users.pagination';
  */
 @ApiTags('Users')
 @ApiBearerAuth()
+@UseGuards(PaymentRequiredGuard)
 @Controller({ path: 'users', version: '1' })
 export class UsersController {
     constructor(private readonly usersService: UsersService) {}

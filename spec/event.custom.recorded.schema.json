@@ -1,0 +1,46 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://referralai.dev/schemas/event.custom.recorded.schema.json",
+  "title": "custom.recorded properties schema",
+  "type": "object",
+  "description": "Generic behavioral event. event_name is mandatory; additional client-defined flat keys are permitted alongside the named fields.",
+  "properties": {
+    "event_name": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9_]*(\\.[a-z][a-z0-9_]*){1,3}$",
+      "description": "Client-defined dot-notation behavioral name."
+    },
+    "actor_email": {
+      "type": "string",
+      "format": "email",
+      "description": "Email of the user who performed the action."
+    },
+    "actor_external_id": {
+      "type": "string",
+      "description": "Client identifier for the actor."
+    }
+  },
+  "required": [
+    "event_name"
+  ],
+  "additionalProperties": {
+    "description": "Client-defined flat value: a JSON primitive or a flat array of primitives. No nested objects.",
+    "type": [
+      "string",
+      "number",
+      "integer",
+      "boolean",
+      "null",
+      "array"
+    ],
+    "items": {
+      "type": [
+        "string",
+        "number",
+        "integer",
+        "boolean",
+        "null"
+      ]
+    }
+  }
+}

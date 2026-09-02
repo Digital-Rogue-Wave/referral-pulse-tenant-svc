@@ -1,10 +1,27 @@
 import { Body, Controller, HttpCode, HttpStatus, Param, Post } from '@nestjs/common';
+import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
+
 import { UsageUpdateDto } from '@domains/billing';
+
+import { RequirePermission } from '@common/auth/require-permission.decorator';
+import { KetoNamespace, KetoRelation } from '@common/auth/keto.constants';
 
 import { UsageTrackerService } from './usage-tracker.service';
 import { TenantContextService } from '@common/tenant-aware/tenant-context.service';
 import { PlanLimitService } from './plan-limit.service';
 
+/**
+ * Internal service-to-service usage metering.
+ *
+ * Both routes take the target tenant from the path and write to that tenant's
+ * billing counters, so the permission check is bound to that same path param via
+ * `objectParam` — a caller must hold `tenants:<tenantId>#update`, not merely
+ * `update` on some tenant. Without `objectParam` the guard falls back to the
+ * caller's own tenant context, which would authorize a caller for a tenant it
+ * has no rights over. Service tokens (the intended callers) bypass Keto.
+ */
+@ApiTags('Internal')
+@ApiBearerAuth()
 @Controller('internal/tenants')
 export class UsageInternalController {
     constructor(
@@ -13,6 +30,12 @@ export class UsageInternalController {
         private readonly tenantContext: TenantContextService
     ) {}
 
+    @RequirePermission({
+        namespace: KetoNamespace.TENANT,
+        relation: KetoRelation.UPDATE,
+        objectParam: 'tenantId',
+        allowServiceTokens: true
+    })
     @HttpCode(HttpStatus.OK)
     @Post(':tenantId/usage/increment')
     async incrementUsage(
@@ -26,6 +49,12 @@ export class UsageInternalController {
         return { metric: dto.metric, currentUsage: current, periodDate };
     }
 
+    @RequirePermission({
+        namespace: KetoNamespace.TENANT,
+        relation: KetoRelation.UPDATE,
+        objectParam: 'tenantId',
+        allowServiceTokens: true
+    })
     @HttpCode(HttpStatus.OK)
     @Post(':tenantId/usage/decrement')
     async decrementUsage(

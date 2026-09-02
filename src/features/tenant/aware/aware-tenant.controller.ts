@@ -28,6 +28,7 @@ import { TenantService } from '../tenant.service';
 import { TenantStatsService } from './tenant-stats.service';
 import { TenantStatusGuard } from '../guards/tenant-status.guard';
 import { TenantLockGuard } from '../guards/tenant-lock.guard';
+import { PaymentRequiredGuard } from '@app/features/billing/guards/payment-required.guard';
 
 @ApiTags('Aware Tenants')
 @ApiHeader({
@@ -37,7 +38,7 @@ import { TenantLockGuard } from '../guards/tenant-lock.guard';
     schema: { type: 'string' }
 })
 @ApiBearerAuth()
-@UseGuards(TenantStatusGuard, TenantLockGuard)
+@UseGuards(TenantStatusGuard, TenantLockGuard, PaymentRequiredGuard)
 @Controller({ path: 'tenants', version: '1' })
 export class AwareTenantController {
     constructor(
