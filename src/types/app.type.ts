@@ -512,6 +512,17 @@ export const REFERRAL_EVENTS_TOPIC = 'referral-events-topic' as const;
 export const USER_EVENTS_TOPIC = 'user-events-topic' as const;
 export const BILLING_EVENTS_TOPIC = 'billing-events-topic' as const;
 export const SYSTEM_NOTIFICATIONS_TOPIC = 'system-notifications-topic' as const;
+/**
+ * Tenant lifecycle events (created/updated/suspended/locked/deleted/…).
+ *
+ * Note the name breaks the `{domain}-{purpose}-topic` convention above — it is
+ * `tenant-events`, not `tenant-events-topic`. That is the name already published
+ * to, so it is preserved here rather than renamed; renaming would silently orphan
+ * any existing subscription. It was previously a private string literal inside
+ * `TenantListener`, which kept it out of this union and therefore out of both
+ * type-checking and whatever provisions topics from `SnsTopicName`.
+ */
+export const TENANT_EVENTS_TOPIC = 'tenant-events' as const;
 
 export type SnsTopicName =
     | typeof TOTO_EVENTS_TOPIC
@@ -519,7 +530,8 @@ export type SnsTopicName =
     | typeof REFERRAL_EVENTS_TOPIC
     | typeof USER_EVENTS_TOPIC
     | typeof BILLING_EVENTS_TOPIC
-    | typeof SYSTEM_NOTIFICATIONS_TOPIC;
+    | typeof SYSTEM_NOTIFICATIONS_TOPIC
+    | typeof TENANT_EVENTS_TOPIC;
 
 /**
  * Combined event type for all messaging (SQS/SNS/EventEmitter)

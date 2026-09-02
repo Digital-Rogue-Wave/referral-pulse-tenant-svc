@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 
 import { HttpClientService } from '@common/http/http-client.service';
+import { AppLoggerService } from '@common/logging/app-logger.service';
 
 import type { OryConfig } from '@config/ory.config';
 
@@ -13,8 +14,10 @@ export class KratosService {
 
     constructor(
         private readonly http: HttpClientService,
-        private readonly config: ConfigService
+        private readonly config: ConfigService,
+        private readonly logger: AppLoggerService
     ) {
+        this.logger.setContext(KratosService.name);
         const oryCfg = this.config.getOrThrow<OryConfig>('oryConfig');
         this.adminUrl = oryCfg.kratos?.adminUrl || 'http://kratos:4434';
     }
@@ -64,8 +67,13 @@ export class KratosService {
 
             return response.data?.valid === true;
         } catch (error) {
-            // If verification fails or endpoint returns error, password is invalid
-            console.error(error);
+            // Treat any failure as "not verified" — never as verified. The raw Ory
+            // error can carry the identity's email and session detail, so log only
+            // the message: this path is now load-bearing for a destructive action.
+            this.logger.warn('Kratos password verification failed', {
+                identityId,
+                reason: error instanceof Error ? error.message : 'unknown'
+            });
             return false;
         }
     }

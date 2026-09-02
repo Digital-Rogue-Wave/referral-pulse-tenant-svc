@@ -1,5 +1,5 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { IsString, IsOptional, IsEnum, IsDateString, IsInt, Min } from 'class-validator';
+import { IsString, IsOptional, IsEnum, IsDateString, IsInt, Min, IsNotEmpty } from 'class-validator';
 
 import { BaseResponseMapper } from '@common/helper';
 
@@ -100,6 +100,16 @@ export class LockTenantDto {
     @IsString()
     reason!: string;
 
+    /**
+     * The acting user's own password, re-confirmed via Ory Kratos. Locking a
+     * tenant is destructive and not self-service reversible, so a valid session
+     * alone is not sufficient authority — see REFER-353.
+     */
+    @ApiProperty({ description: "The acting user's password, re-confirmed before a destructive action" })
+    @IsString()
+    @IsNotEmpty()
+    password!: string;
+
     @ApiPropertyOptional()
     @IsOptional()
     @IsDateString()
@@ -111,6 +121,12 @@ export class UnlockTenantDto {
     @IsOptional()
     @IsString()
     reason?: string;
+
+    /** Re-confirmed for the same reason as locking — see {@link LockTenantDto.password}. */
+    @ApiProperty({ description: "The acting user's password, re-confirmed before a destructive action" })
+    @IsString()
+    @IsNotEmpty()
+    password!: string;
 }
 
 export class SuspendTenantDto {
