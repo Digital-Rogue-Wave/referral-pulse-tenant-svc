@@ -100,13 +100,14 @@ Then('the response should contain a {string} field with value {string}', functio
 
 Then('the response should contain errorCode {string}', function (this: BddWorldInterface, expectedCode: string) {
     assert.ok(this.response, 'No HTTP response');
-    const body = this.response.body as { error?: Record<string, unknown> };
-    const code = body.error?.['code'];
-    assert.strictEqual(code, expectedCode, `Expected error.code "${expectedCode}" but got "${String(code)}". Body: ${JSON.stringify(body)}`);
+    const body = this.response.body as Record<string, unknown>;
+    // RFC 9457: `code` is a top-level extension member, not nested under `error`.
+    const code = body['code'];
+    assert.strictEqual(code, expectedCode, `Expected problem code "${expectedCode}" but got "${String(code)}". Body: ${JSON.stringify(body)}`);
 });
 
 Then('the response error should contain a {string} field', function (this: BddWorldInterface, field: string) {
     assert.ok(this.response, 'No HTTP response');
-    const body = this.response.body as { error?: Record<string, unknown> };
-    assert.ok(body.error && field in body.error, `Expected error to contain field "${field}". Body: ${JSON.stringify(body)}`);
+    const body = this.response.body as Record<string, unknown>;
+    assert.ok(field in body, `Expected problem detail to contain field "${field}". Body: ${JSON.stringify(body)}`);
 });

@@ -7,7 +7,7 @@ import { AppLoggerService } from '@common/logging/app-logger.service';
 import { TenantContextService } from '@common/tenant-aware/tenant-context.service';
 import { PrismaClientKnownRequestError } from '@prisma/client/runtime/client';
 
-import type { IApiError, IErrorResponse, IValidationErrorDetail } from '@app/types';
+import type { IApiError, IProblemDetail, IValidationErrorDetail } from '@app/types';
 
 @Catch()
 export class GlobalExceptionsFilter implements ExceptionFilter {
@@ -50,11 +50,57 @@ export class GlobalExceptionsFilter implements ExceptionFilter {
         // Log error
         this.logError(request, status, apiError, exception);
 
-        // Build response
-        const errorResponse: IErrorResponse = { error: apiError };
+        response
+            .setHeader('X-Request-Id', requestId)
+            .status(status)
+            .type('application/problem+json')
+            .json(this.toProblemDetail(apiError, status, request.originalUrl || request.url));
+    }
 
-        // Send response with X-Request-Id header
-        response.setHeader('X-Request-Id', requestId).status(status).json(errorResponse);
+    /**
+     * Map the filter's internal error shape onto RFC 9457 Problem Details.
+     *
+     * Kept as a single mapping step at the boundary so the four handlers below
+     * continue to produce codes and messages exactly as before — only the wire
+     * format changes.
+     */
+    private toProblemDetail(apiError: IApiError, status: HttpStatus, instance: string): IProblemDetail {
+        const problem: IProblemDetail = {
+            type: `/errors/${apiError.code}`,
+            title: this.titleFor(status),
+            status,
+            detail: apiError.message,
+            instance,
+            code: apiError.code,
+            requestId: apiError.requestId
+        };
+
+        if (apiError.correlationId) {
+            problem.correlationId = apiError.correlationId;
+        }
+        if (apiError.param) {
+            problem.param = apiError.param;
+        }
+        if (apiError.details?.length) {
+            problem.errors = apiError.details;
+        }
+
+        return problem;
+    }
+
+    /** HTTP status phrase, e.g. 422 -> "Unprocessable Entity". */
+    private titleFor(status: HttpStatus): string {
+        const name = HttpStatus[status] as string | undefined;
+
+        if (!name) {
+            return 'Error';
+        }
+
+        return name
+            .toLowerCase()
+            .split('_')
+            .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+            .join(' ');
     }
 
     private handleBaseException(exception: BaseException, requestId: string, correlationId?: string): { status: HttpStatus; apiError: IApiError } {
