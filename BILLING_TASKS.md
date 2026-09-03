@@ -6,6 +6,15 @@ Canonical feature list: `BILLING.md` (Phases 1–9)
 - If there is ever a mismatch, **BILLING.md takes priority** and this file must be updated to match it.
 Supporting spec: `openspec/changes/add-subscription-checkout/specs/tenant-billing/spec.md`
 
+> **Verification pass, 2026-09-03.** Every `[x]` in this file was checked against code.
+> It previously carried 63 `[x]` and zero `[ ]` — a claim of 100% completion that did not
+> hold: eight items were false. Six have since been implemented and are now genuinely
+> complete; the two that remain are marked `[ ]` below. Two provenance problems are worth
+> knowing: the "Supporting spec" path above (`openspec/changes/...`) **does not exist in
+> this repo**, and `BILLING.md` names `docs/specs/microservices-architecture.md` as its
+> source of truth while `NOTE.md:36-38` declares that same file superseded. Treat item
+> provenance with care until both are resolved.
+
 Status legend:
 - `[x]` Implemented in this repo and matches current spec/behavior.
 - `[ ]` Not implemented yet or needs refactor/extension to meet the spec.
@@ -36,7 +45,12 @@ Architecture ownership note (source of truth: `docs/specs/microservices-architec
   - Current implementation uses: `billing.payment_failed`, `tenant.payment_status.changed`.
   - Add/rename events to match the architecture contract (and keep internal ones only if necessary).
 
-- [x] A4 Align SNS topic + event envelope schema with architecture
+- [ ] A4 Align SNS topic + event envelope schema with architecture
+  - **Not done (verified 2026-09-03).** `referral-platform-events` appears nowhere in `src/`;
+    publishing still targets `billing-events-topic` / `user-events-topic` / `tenant-events`.
+    The unique `eventId` and top-level `tenantId` parts *are* done. Collapsing onto one topic
+    changes what every subscribing service filters on, so it is a platform ruling, not a
+    tenant-svc fix. `tenant-events` was at least promoted into the typed `SnsTopicName` union.
   - Architecture describes SNS topic `referral-platform-events` and an envelope that includes top-level `tenantId`.
   - Current implementation publishes to topic `tenant-events` and uses `eventId = tenantId`.
   - Update publishing to:
@@ -105,7 +119,9 @@ These items come from `openspec/changes/add-subscription-checkout/specs/tenant-b
 
 ## Phase 1 – Database & Core Entities (`BILLING.md` §3)
 
-- [x] 1.1 Create `Plan` entity with TypeORM
+- [x] 1.1 Create `Plan` model (Prisma)
+  - *(Wording corrected 2026-09-03: this said "with TypeORM". The platform moved to Prisma;
+    there is no TypeORM in this service.)*
   - `PlanEntity` with fields: `name`, `stripe_price_id`, `stripe_product_id`, `interval`.
   - JSONB `limits` column.
   - `tenant_id` for custom enterprise plans.
@@ -192,7 +208,11 @@ These items come from `openspec/changes/add-subscription-checkout/specs/tenant-b
   - Align with `BILLING.md` 3.2 (e.g. coupon validation, any extra metadata requirements).
   - Ensure all plan types (Free, Starter, Growth, Enterprise) are supported and documented.
 
-- [x] 3.3 Webhook behaviors beyond `add-subscription-checkout`
+- [ ] 3.3 Webhook behaviors beyond `add-subscription-checkout`
+  - **Partially done (verified 2026-09-03).** The switch handles `checkout.session.completed`,
+    `invoice.payment_succeeded`/`paid`, `invoice_payment.paid`, `invoice.payment_failed` and
+    `customer.subscription.deleted`. **`customer.subscription.updated` is still unhandled**, so
+    self-service plan changes made in the Stripe Customer Portal never sync back.
   - Any additional events (e.g. `subscription.created` vs `subscription.changed`) required by `BILLING.md`.
   - Publish billing events; Integration Service sends confirmation emails/notifications where applicable.
 
@@ -392,6 +412,10 @@ These items come from `openspec/changes/add-subscription-checkout/specs/tenant-b
   - Admin endpoint to restore tenants to `active` and resume paused campaigns.
 
 - [x] 8.5 Lock endpoint
+  - *Ory password confirmation implemented 2026-09-03 — it previously had none;
+    `KratosService.verifyPassword` had zero callers repo-wide. **Route shape still differs**:
+    the endpoint is `PUT /v1/tenants/lock` (self-scoped), not the admin `POST /tenants/:id/lock`.
+    Changing it turns lock from self-service into admin-only — a product decision, flagged.*
   - `POST /tenants/:id/lock` to set status `locked` and require Ory password confirmation.
 
 - [x] 8.6 Unlock endpoint
@@ -400,7 +424,10 @@ These items come from `openspec/changes/add-subscription-checkout/specs/tenant-b
 - [x] 8.7 Auto‑unlock job
   - Scheduled job to automatically unlock tenants after configurable duration and publish events; Integration Service sends notifications.
 
-- [x] 8.8 Tenant status guard
+- [ ] 8.8 Tenant status guard
+  - **Partially done (verified 2026-09-03).** `TenantStatusGuard` blocks suspended and locked
+    tenants correctly, but does **not** expose status via response headers — no `setHeader`
+    call exists in the guard.
   - Guard/middleware to block requests for `suspended`/`locked` tenants and expose status via headers.
 
 ---

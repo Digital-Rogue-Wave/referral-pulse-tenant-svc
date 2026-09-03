@@ -22,7 +22,12 @@ async function bootstrap(): Promise<void> {
     // Determine app mode from environment variable
     const appMode = (process.env.APP_MODE?.toLowerCase() || 'web') as AppMode;
 
-    const app = await NestFactory.create(AppModule, { bufferLogs: true });
+    // `rawBody` is required for Stripe webhook signature verification: the signature
+    // is computed over the exact bytes Stripe sent, so the parsed JSON body cannot
+    // reproduce it. Without this, `req.rawBody` is always undefined and both webhook
+    // controllers fall back to `req.body`, which fails verification on every real
+    // Stripe webhook — silently, and fail-closed, so billing simply never syncs.
+    const app = await NestFactory.create(AppModule, { bufferLogs: true, rawBody: true });
     const configService = app.get(ConfigService<AllConfigType>);
 
     const nodeEnv = configService.getOrThrow('app.nodeEnv', { infer: true });

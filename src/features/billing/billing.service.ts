@@ -1124,14 +1124,37 @@ export class BillingService {
 
         const effectiveDate = subscription.ended_at ? this.dateService.fromUnix(subscription.ended_at).toDate() : new Date();
 
+        const cancellationEffectiveAt = billing.cancellationEffectiveAt ?? effectiveDate;
+
+        // Reset the plan, not just the status. Plan limits resolve from `billing.plan`
+        // (see PlanLimitService) and the payment guard only blocks on an explicit
+        // LOCKED payment status, which cancellation never sets — so leaving the paid
+        // plan in place meant a cancelled tenant kept full paid entitlements forever,
+        // with no alert anywhere. Dropping to Free is the correct end state: access
+        // continues at the free tier rather than being cut off, which is what a
+        // cancelled subscription means.
         await this.prisma.billing.update({
             where: { id: billing.id },
             data: {
+                plan: BillingPlanEnum.FREE,
                 status: SubscriptionStatusEnum.CANCELED,
-                cancellationEffectiveAt: billing.cancellationEffectiveAt ?? effectiveDate,
+                cancellationEffectiveAt,
                 stripeSubscriptionId: null
             }
         });
+
+        this.txEventEmitter.emitAfterCommit(
+            BillingEvents.SUBSCRIPTION_CANCELLED,
+            new SubscriptionCancelledEvent(
+                billing.id,
+                billing.tenantId,
+                this.dateService.toISO(effectiveDate),
+                this.dateService.toISO(cancellationEffectiveAt),
+                subscriptionId,
+                BillingPlanEnum.FREE,
+                'stripe_subscription_deleted'
+            )
+        );
 
         this.logger.log(
             `Processed customer.subscription.deleted from Stripe: eventId=${event.id}, subscriptionId=${subscriptionId}, tenantId=${billing.tenantId}`
