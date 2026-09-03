@@ -299,8 +299,47 @@ export interface IApiError {
 }
 
 /** Standardized API error response: `{ error: {...} }`. */
-export interface IErrorResponse {
-    error: IApiError;
+/**
+ * RFC 9457 Problem Details — the wire format for every error response.
+ *
+ * `IApiError` above stays as the filter's internal shape; this is what actually
+ * goes out, served as `application/problem+json`. The service previously returned
+ * a bespoke `{ error: { code, message, … } }` envelope, which contradicted the
+ * project's own stated rule (`BaseException → GlobalExceptionsFilter → RFC 9457
+ * ProblemDetail`) and differed from every sibling service.
+ *
+ * The four registered members below are RFC 9457 §3.1; everything after them is an
+ * extension member, which §3.2 explicitly permits. The machine-readable `code` is
+ * kept as an extension because RFC 9457 has no registered field for it — `type` is
+ * a URI, not an enum, so consumers that switch on a code need this.
+ */
+export interface IProblemDetail {
+    /**
+     * URI reference identifying the problem type. Deliberately a *relative*
+     * reference (`/errors/{code}`) — RFC 9457 §3.1.1 allows this, and it avoids
+     * inventing a hostname the platform does not own.
+     */
+    type: string;
+    /** Short, human-readable summary of the problem type. Stable per status. */
+    title: string;
+    /** HTTP status code, duplicated into the body per RFC 9457 §3.1.2. */
+    status: number;
+    /** Human-readable explanation specific to this occurrence. */
+    detail: string;
+    /** URI reference identifying this specific occurrence — the request path. */
+    instance?: string;
+
+    // ── Extension members ────────────────────────────────────────────────────
+    /** Machine-readable error code (e.g. 'validation_failed'). */
+    code: string;
+    /** Request ID for support/debugging — also returned as X-Request-Id. */
+    requestId: string;
+    /** Correlation ID for distributed tracing across services. */
+    correlationId?: string;
+    /** Parameter/field that caused the error. */
+    param?: string;
+    /** Per-field validation errors. */
+    errors?: IValidationErrorDetail[];
 }
 
 export interface IJwtPayload {

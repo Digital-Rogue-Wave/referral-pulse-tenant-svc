@@ -1,4 +1,4 @@
-import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, HttpStatus, Injectable, NotFoundException } from '@nestjs/common';
 import { ulid } from 'ulid';
 import type { Tenant } from '@prisma-gen/generated/client';
 
@@ -9,6 +9,8 @@ import { TenantContextService } from '@common/tenant-aware/tenant-context.servic
 import { TransactionEventEmitterService } from '@common/events/transaction-event-emitter.service';
 import { AppLoggerService } from '@common/logging/app-logger.service';
 import { DateService } from '@common/helper/date.service';
+import { KratosService } from '@common/auth/kratos.service';
+import { BaseException } from '@common/exceptions/base.exceptions';
 
 import { SubdomainService } from '../dns/subdomain.service';
 import { DnsVerificationService } from '../dns/dns-verification.service';
@@ -65,7 +67,8 @@ export class TenantService {
         private readonly dateService: DateService,
         private readonly subdomainService: SubdomainService,
         private readonly dnsVerificationService: DnsVerificationService,
-        private readonly filesService: FilesService
+        private readonly filesService: FilesService,
+        private readonly kratos: KratosService
     ) {
         this.logger.setContext(TenantService.name);
     }
@@ -428,6 +431,8 @@ export class TenantService {
     async lock(dto: LockTenantDto, user: IAuthenticatedUser): Promise<TenantResponse> {
         const tenantId = this.tenantContext.getTenantId()!;
 
+        await this.assertPasswordConfirmed(user, tenantId, dto.password);
+
         const lockUntil = dto.lockUntil ? new Date(dto.lockUntil) : null;
 
         const updated = await this.prisma.tenant.update({
@@ -455,9 +460,38 @@ export class TenantService {
     /**
      * Unlock the current tenant (aware endpoint).
      */
-    async unlock(_dto: UnlockTenantDto, user: IAuthenticatedUser): Promise<TenantResponse> {
+    async unlock(dto: UnlockTenantDto, user: IAuthenticatedUser): Promise<TenantResponse> {
         const tenantId = this.tenantContext.getTenantId()!;
+
+        await this.assertPasswordConfirmed(user, tenantId, dto.password);
+
         return this.performUnlock(tenantId, user.userId);
+    }
+
+    /**
+     * Re-confirm the acting user's own password through Ory Kratos before a
+     * destructive tenant action (REFER-353). A valid session proves the user is
+     * signed in; it does not prove the person at the keyboard is them.
+     *
+     * The JWT carries the application user id, not the Kratos identity id, so the
+     * identity has to be resolved from `users.kratos_identity_id` first.
+     */
+    private async assertPasswordConfirmed(user: IAuthenticatedUser, tenantId: string, password: string): Promise<void> {
+        const record = await this.prisma.user.findFirst({
+            where: { id: user.userId, tenantId, deletedAt: null },
+            select: { kratosIdentityId: true }
+        });
+
+        if (!record?.kratosIdentityId) {
+            throw new BaseException('authentication_error', 'Unable to confirm your identity for this action.', HttpStatus.UNAUTHORIZED);
+        }
+
+        const confirmed = await this.kratos.verifyPassword(record.kratosIdentityId, password);
+
+        if (!confirmed) {
+            this.logger.warn('Password confirmation failed for a destructive tenant action', { tenantId, userId: user.userId });
+            throw new BaseException('authentication_error', 'Password confirmation failed.', HttpStatus.UNAUTHORIZED);
+        }
     }
 
     /**

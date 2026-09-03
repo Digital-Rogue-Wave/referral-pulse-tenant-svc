@@ -7,7 +7,7 @@ import { Idempotent, IdempotencyScope } from '@common/idempotency';
 import { DatabaseService } from '@app/database/database.service';
 import { TransactionEventEmitterService } from '@common/events/transaction-event-emitter.service';
 import { UserLoggedInEvent } from '@domains/user';
-import { Request } from 'express';
+import type { Request } from 'express';
 import { ApiTags } from '@nestjs/swagger';
 
 @ApiTags('Webhooks')

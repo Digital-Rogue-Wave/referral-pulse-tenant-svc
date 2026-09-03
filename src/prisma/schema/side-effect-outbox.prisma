@@ -6,7 +6,7 @@ enum EffectType {
 }
 
 model SideEffectOutbox {
-  id             String    @id @default(cuid())
+  id             String    @id @default(ulid()) @db.VarChar(26)
   tenantId       String    @map("tenant_id") @db.VarChar(26)
   effectType     EffectType @map("effect_type")
   status         String    @default("pending") @db.VarChar(50)

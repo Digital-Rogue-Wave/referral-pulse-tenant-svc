@@ -1,5 +1,5 @@
 model Plan {
-  id              String  @id @default(cuid())
+  id              String  @id @default(ulid()) @db.VarChar(26)
   name            String  @db.VarChar(255)
   stripePriceId   String? @map("stripe_price_id") @db.VarChar(255)
   stripeProductId String? @map("stripe_product_id") @db.VarChar(255)
@@ -18,7 +18,7 @@ model Plan {
 }
 
 model Billing {
-  id                      String    @id @default(cuid())
+  id                      String    @id @default(ulid()) @db.VarChar(26)
   tenantId                String    @unique @map("tenant_id") @db.VarChar(26)
   plan                    String    @default("Free") @db.VarChar(50)
   status                  String    @default("none") @db.VarChar(50)
@@ -42,7 +42,7 @@ model Billing {
 }
 
 model BillingEvent {
-  id         String    @id @default(cuid())
+  id         String    @id @default(ulid()) @db.VarChar(26)
   tenantId   String    @map("tenant_id") @db.VarChar(26)
   eventType  String    @map("event_type") @db.VarChar(100)
   metricName String?   @map("metric_name") @db.VarChar(100)
@@ -62,7 +62,7 @@ model BillingEvent {
 }
 
 model TenantUsage {
-  id           String  @id @default(cuid())
+  id           String  @id @default(ulid()) @db.VarChar(26)
   tenantId     String  @map("tenant_id") @db.VarChar(26)
   metricName   String  @map("metric_name") @db.VarChar(100)
   periodDate   String  @map("period_date") @db.VarChar(10)

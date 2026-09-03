@@ -1,5 +1,5 @@
 model Tenant {
-  id                       String    @id @default(cuid())
+  id                       String    @id @default(ulid()) @db.VarChar(26)
   name                     String    @db.VarChar(255)
   slug                     String    @unique @db.VarChar(255)
   imageId                  String?   @map("image_id")

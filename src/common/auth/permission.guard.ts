@@ -1,7 +1,7 @@
 import { CanActivate, ExecutionContext, HttpException, HttpStatus, Inject, Injectable, Logger } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
 
-import { Request } from 'express';
+import type { Request } from 'express';
 
 import type { IAuthenticatedUser, KetoPermission } from '@app/types';
 import { IS_PUBLIC_KEY } from '@app/types';

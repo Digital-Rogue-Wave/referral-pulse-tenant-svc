@@ -10,7 +10,7 @@ import { AppLoggerService } from '@common/logging/app-logger.service';
 import { DateService } from '@common/helper/date.service';
 import { BullJobsService } from '@common/bulljobs';
 import oryConfig from '@config/ory.config';
-import { TENANT_DELETION_QUEUE, TenantDeletionJobData } from '@app/types';
+import { TENANT_DELETION_QUEUE, TENANT_EVENTS_TOPIC, TenantDeletionJobData } from '@app/types';
 
 import { DomainProvisioningService } from '../../dns/domain-provisioning.service';
 
@@ -33,7 +33,6 @@ import {
 
 @Injectable()
 export class TenantListener {
-    private static readonly TENANT_EVENTS_TOPIC = 'tenant-events';
     private readonly ketoReadUrl: string;
 
     constructor(
@@ -61,7 +60,7 @@ export class TenantListener {
 
         // Publish SNS Event for other services
         await this.sns.publish(
-            TenantListener.TENANT_EVENTS_TOPIC,
+            TENANT_EVENTS_TOPIC,
             event.eventType,
             {
                 eventId: event.eventId,
@@ -91,7 +90,7 @@ export class TenantListener {
 
         // Publish SNS Event
         await this.sns.publish(
-            TenantListener.TENANT_EVENTS_TOPIC,
+            TENANT_EVENTS_TOPIC,
             event.eventType,
             {
                 eventId: event.eventId,
@@ -113,7 +112,7 @@ export class TenantListener {
         this.logger.log(`Handling tenant.verification_requested event`, { tenantId: event.tenantId });
 
         await this.sns.publish(
-            TenantListener.TENANT_EVENTS_TOPIC,
+            TENANT_EVENTS_TOPIC,
             event.eventType,
             {
                 eventId: event.eventId,
@@ -139,7 +138,7 @@ export class TenantListener {
         });
 
         await this.sns.publish(
-            TenantListener.TENANT_EVENTS_TOPIC,
+            TENANT_EVENTS_TOPIC,
             event.eventType,
             {
                 eventId: event.eventId,
@@ -167,7 +166,7 @@ export class TenantListener {
 
         // Publish SNS Event (Campaign service, etc. will pause campaigns)
         await this.sns.publish(
-            TenantListener.TENANT_EVENTS_TOPIC,
+            TENANT_EVENTS_TOPIC,
             event.eventType,
             {
                 eventId: event.eventId,
@@ -193,7 +192,7 @@ export class TenantListener {
 
         // Publish SNS Event
         await this.sns.publish(
-            TenantListener.TENANT_EVENTS_TOPIC,
+            TENANT_EVENTS_TOPIC,
             event.eventType,
             {
                 eventId: event.eventId,
@@ -219,7 +218,7 @@ export class TenantListener {
 
         // Publish SNS Event
         await this.sns.publish(
-            TenantListener.TENANT_EVENTS_TOPIC,
+            TENANT_EVENTS_TOPIC,
             event.eventType,
             {
                 eventId: event.eventId,
@@ -247,7 +246,7 @@ export class TenantListener {
 
         // Publish SNS Event
         await this.sns.publish(
-            TenantListener.TENANT_EVENTS_TOPIC,
+            TENANT_EVENTS_TOPIC,
             event.eventType,
             {
                 eventId: event.eventId,
@@ -275,7 +274,7 @@ export class TenantListener {
 
         // Publish SNS Event
         await this.sns.publish(
-            TenantListener.TENANT_EVENTS_TOPIC,
+            TENANT_EVENTS_TOPIC,
             event.eventType,
             {
                 eventId: event.eventId,
@@ -318,7 +317,7 @@ export class TenantListener {
 
         // Publish SNS Event
         await this.sns.publish(
-            TenantListener.TENANT_EVENTS_TOPIC,
+            TENANT_EVENTS_TOPIC,
             event.eventType,
             {
                 eventId: event.eventId,
@@ -350,7 +349,7 @@ export class TenantListener {
 
         // Publish SNS Event for cleanup by other services
         await this.sns.publish(
-            TenantListener.TENANT_EVENTS_TOPIC,
+            TENANT_EVENTS_TOPIC,
             event.eventType,
             {
                 eventId: event.eventId,
@@ -387,7 +386,7 @@ export class TenantListener {
 
         // Publish SNS Event
         await this.sns.publish(
-            TenantListener.TENANT_EVENTS_TOPIC,
+            TENANT_EVENTS_TOPIC,
             event.eventType,
             {
                 eventId: event.eventId,
@@ -418,7 +417,7 @@ export class TenantListener {
 
         // Publish SNS Event
         await this.sns.publish(
-            TenantListener.TENANT_EVENTS_TOPIC,
+            TENANT_EVENTS_TOPIC,
             event.eventType,
             {
                 eventId: event.eventId,

@@ -1,5 +1,5 @@
 model TenantSetting {
-  id            String  @id @default(cuid())
+  id            String  @id @default(ulid()) @db.VarChar(26)
   tenantId      String  @unique @map("tenant_id") @db.VarChar(26)
   branding      Json
   notifications Json
@@ -18,7 +18,7 @@ model TenantSetting {
 }
 
 model UserNotificationPreference {
-  id        String @id @default(cuid())
+  id        String @id @default(ulid()) @db.VarChar(26)
   userId    String @map("user_id") @db.VarChar(26)
   tenantId  String @map("tenant_id") @db.VarChar(26)
   overrides Json   @default("{}")

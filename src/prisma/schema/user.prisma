@@ -4,7 +4,7 @@
 // membership and role assignment — the former `team_members` table was consolidated away (see NOTE.md).
 
 model User {
-  id               String    @id @default(cuid())
+  id               String    @id @default(ulid()) @db.VarChar(26)
   tenantId         String    @map("tenant_id") @db.VarChar(26)
   email            String?   @db.VarChar(320)
   name             String?   @db.VarChar(255)
@@ -26,7 +26,7 @@ model User {
 }
 
 model Role {
-  id          String  @id @default(cuid())
+  id          String  @id @default(ulid()) @db.VarChar(26)
   name        String  @unique @db.VarChar(50)
   scopes      Json    @default("[]")
   description String? @db.VarChar(255)
@@ -41,8 +41,8 @@ model Role {
 }
 
 model UserRole {
-  userId     String   @map("user_id")
-  roleId     String   @map("role_id")
+  userId     String   @map("user_id") @db.VarChar(26)
+  roleId     String   @map("role_id") @db.VarChar(26)
   tenantId   String   @map("tenant_id") @db.VarChar(26)
   assignedAt DateTime @default(now()) @map("assigned_at") @db.Timestamptz
   assignedBy String?  @map("assigned_by") @db.VarChar(26)

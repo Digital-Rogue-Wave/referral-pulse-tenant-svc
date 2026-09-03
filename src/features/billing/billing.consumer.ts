@@ -2,7 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { SqsMessageHandler } from '@ssut/nestjs-sqs';
 import type { Message } from '@aws-sdk/client-sqs';
 
-import { ANALYTICS_SVC_FIFO } from '@app/types';
+import { TENANT_SVC_FIFO } from '@app/types';
 
 import { DatabaseService } from '@app/database/database.service';
 import { AppLoggerService } from '@common/logging/app-logger.service';
@@ -23,8 +23,8 @@ export class BillingConsumer {
         this.logger.setContext(BillingConsumer.name);
     }
 
-    @SqsConsumer({ queueName: ANALYTICS_SVC_FIFO })
-    @SqsMessageHandler(ANALYTICS_SVC_FIFO, false)
+    @SqsConsumer({ queueName: TENANT_SVC_FIFO })
+    @SqsMessageHandler(TENANT_SVC_FIFO, false)
     async handleReferralUsageEvent(message: Message): Promise<void> {
         await this.messageProcessor.process<ReferralUsageEvent>(
             message,
@@ -64,7 +64,7 @@ export class BillingConsumer {
 
                 this.logger.log(`Processed referral usage event`, { tenantId, metric, delta });
             },
-            { queueName: ANALYTICS_SVC_FIFO }
+            { queueName: TENANT_SVC_FIFO }
         );
     }
 }

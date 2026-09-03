@@ -1,5 +1,5 @@
 model ApiKey {
-  id         String    @id @default(cuid())
+  id         String    @id @default(ulid()) @db.VarChar(26)
   tenantId   String    @map("tenant_id") @db.VarChar(26)
   label      String    @db.VarChar(255)
   keyHash    String    @map("key_hash") @db.VarChar(255)

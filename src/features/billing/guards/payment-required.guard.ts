@@ -1,5 +1,5 @@
 import { CanActivate, ExecutionContext, HttpStatus, Injectable } from '@nestjs/common';
-import { Request } from 'express';
+import type { Request } from 'express';
 
 import { TenantContextService } from '@common/tenant-aware/tenant-context.service';
 import { DatabaseService } from '@app/database/database.service';

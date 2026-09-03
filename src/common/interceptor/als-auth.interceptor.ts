@@ -1,6 +1,6 @@
 import { Injectable, NestInterceptor, ExecutionContext, CallHandler } from '@nestjs/common';
 
-import { Request } from 'express';
+import type { Request } from 'express';
 import { Observable, from } from 'rxjs';
 import { switchMap } from 'rxjs/operators';
 import { ulid } from 'ulid';
