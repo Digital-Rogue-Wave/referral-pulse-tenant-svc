@@ -50,6 +50,7 @@ describe('TenantService — password confirmation on destructive actions', () =>
         (prisma as unknown as { user: unknown }).user = { findFirst: jest.fn() };
         (prisma as unknown as { tenant: unknown }).tenant = { update: jest.fn().mockResolvedValue({ id: 'ten_1', lockedAt: new Date() }) };
 
+        (prisma as unknown as { $transaction: jest.Mock }).$transaction = jest.fn(async (fn: (tx: unknown) => Promise<unknown>) => fn(prisma));
         kratos = mock<KratosService>();
         tenantContext = mock<TenantContextService>();
         tenantContext.getTenantId.mockReturnValue('ten_1');

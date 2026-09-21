@@ -22,7 +22,6 @@ export * from './dto/usage-update.dto';
 
 // Events
 export * from './events/billing.events';
-export * from './events/referral-usage.event';
 
 // Responses
 export * from './responses/billing.responses';

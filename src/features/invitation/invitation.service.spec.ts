@@ -23,7 +23,7 @@ describe('InvitationService', () => {
     let txEventEmitter: MockProxy<TransactionEventEmitterService>;
     let usersService: MockProxy<UsersService>;
     let delegate: { findFirst: jest.Mock; findUnique: jest.Mock; create: jest.Mock; update: jest.Mock };
-    let tx: { invitation: { updateMany: jest.Mock } };
+    let tx: { invitation: { updateMany: jest.Mock; create: jest.Mock } };
 
     const tenantId = 'tenant-123';
     const TOKEN = 'tok-1';
@@ -48,8 +48,9 @@ describe('InvitationService', () => {
         usersService = mock<UsersService>();
 
         delegate = { findFirst: jest.fn(), findUnique: jest.fn(), create: jest.fn(), update: jest.fn() };
-        tx = { invitation: { updateMany: jest.fn().mockResolvedValue({ count: 1 }) } };
+        tx = { invitation: { updateMany: jest.fn().mockResolvedValue({ count: 1 }), create: jest.fn() } };
         tenantAware.forModel.mockReturnValue(delegate as never);
+        tx.invitation.create = delegate.create;
         tenantAware.withTenantFilter.mockImplementation((w) => ({ ...w, tenantId }) as never);
         prisma.invitation = { findUnique: jest.fn(), update: jest.fn() } as never;
         (prisma as unknown as { $transaction: jest.Mock }).$transaction = jest.fn(async (fn: (client: unknown) => Promise<unknown>) => fn(tx));

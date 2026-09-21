@@ -67,21 +67,30 @@ export class InvitationService {
         const token = this.generateToken();
         const expiresAt = this.expiry();
 
-        const saved = (await this.invitation.create({
-            data: { email: dto.email, role: dto.role, status: InvitationStatusEnum.PENDING, tokenHash: sha256Hex(token), expiresAt }
-        })) as InvitationProps;
-
-        this.txEventEmitter.emitAfterCommit(
-            'invitation.created',
-            new InvitationCreatedEvent(
-                saved.id,
-                saved.tenantId,
-                { invitationId: saved.id, tenantId: saved.tenantId, email: saved.email, role: saved.role, token, expiresAt },
-                actingUserId
-            )
-        );
-
-        this.txEventEmitter.emitAfterCommit('user.invited', new UserInvitedEvent(saved.id, saved.tenantId, saved.role, actingUserId));
+        const saved = await this.prisma.$transaction(async (tx) => {
+            const created = (await tx.invitation.create({
+                data: {
+                    tenantId: actor.tenantId,
+                    email: dto.email,
+                    role: dto.role,
+                    status: InvitationStatusEnum.PENDING,
+                    tokenHash: sha256Hex(token),
+                    expiresAt
+                }
+            })) as InvitationProps;
+            // The invitation email needs the raw token, so this in-process event carries it; it is never published.
+            this.txEventEmitter.emitAfterCommit(
+                'invitation.created',
+                new InvitationCreatedEvent(
+                    created.id,
+                    created.tenantId,
+                    { invitationId: created.id, tenantId: created.tenantId, email: created.email, role: created.role, token, expiresAt },
+                    actingUserId
+                )
+            );
+            this.txEventEmitter.emitAfterCommit('user.invited', new UserInvitedEvent(created.id, created.tenantId, created.role, actingUserId));
+            return created;
+        });
 
         this.logger.log(`Invitation created: ${saved.id}`, { invitationId: saved.id });
         return invitationResponseMapper.toResponse(saved);

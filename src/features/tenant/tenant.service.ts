@@ -1,6 +1,7 @@
 import { BadRequestException, HttpStatus, Injectable, NotFoundException } from '@nestjs/common';
 import { ulid } from 'ulid';
-import type { Tenant } from '@prisma-gen/generated/client';
+import type { Prisma, Tenant } from '@prisma-gen/generated/client';
+import type { BaseDomainEvent } from '@domains/common/events';
 
 import type { IAuthenticatedUser } from '@app/types';
 
@@ -239,15 +240,10 @@ export class TenantService {
             throw new NotFoundException(`Tenant with ID ${tenantId} not found`);
         }
 
-        const updated = await this.prisma.tenant.update({
-            where: { id: tenantId },
-            data: { verificationStatus: status }
-        });
-
-        this.txEventEmitter.emitAfterCommit(
+        const updated = await this.applyChange(tenantId, { verificationStatus: status }, () => [
             TenantEvents.VERIFICATION_STATUS_CHANGED,
             new TenantVerificationStatusChangedEvent(tenantId, tenantId, existing.verificationStatus, status, reason, reviewedBy)
-        );
+        ]);
 
         this.logger.log(`Tenant verification status changed: ${tenantId}`, {
             tenantId,
@@ -300,12 +296,10 @@ export class TenantService {
             return tenantResponseMapper.toResponse(tenant);
         }
 
-        const updated = await this.prisma.tenant.update({
-            where: { id: tenantId },
-            data: updateData
-        });
-
-        this.txEventEmitter.emitAfterCommit(TenantEvents.UPDATED, new TenantUpdatedEvent(updated.id, updated.id, changes, user.userId));
+        const updated = await this.applyChange(tenantId, updateData, (row) => [
+            TenantEvents.UPDATED,
+            new TenantUpdatedEvent(row.id, row.id, changes, user.userId)
+        ]);
 
         this.logger.log(`Tenant updated: ${tenantId}`, { tenantId, changes: Object.keys(changes) });
 
@@ -331,17 +325,12 @@ export class TenantService {
 
         const newStatus = result.verified ? 'verified' : 'failed';
 
-        const updated = await this.prisma.tenant.update({
-            where: { id: tenantId },
-            data: { domainVerificationStatus: newStatus }
-        });
-
-        if (result.verified) {
-            this.txEventEmitter.emitAfterCommit(
-                TenantEvents.DOMAIN_VERIFIED,
-                new TenantDomainVerifiedEvent(updated.id, updated.id, tenant.customDomain, this.dateService.nowMoment().toDate())
-            );
-        }
+        const domain = tenant.customDomain;
+        const updated = await this.applyChange(tenantId, { domainVerificationStatus: newStatus }, (row) =>
+            result.verified
+                ? [TenantEvents.DOMAIN_VERIFIED, new TenantDomainVerifiedEvent(row.id, row.id, domain, this.dateService.nowMoment().toDate())]
+                : null
+        );
 
         return tenantResponseMapper.toResponse(updated);
     }
@@ -350,12 +339,7 @@ export class TenantService {
      * Transfer ownership of the current tenant to another member (membership change lives in UsersService).
      */
     async transferOwnership(dto: TransferOwnershipDto, user: IAuthenticatedUser): Promise<void> {
-        const tenantId = this.tenantContext.getTenantId()!;
         await this.usersService.transferOwnership(user, dto.newOwnerId);
-        this.txEventEmitter.emitAfterCommit(
-            TenantEvents.OWNERSHIP_TRANSFERRED,
-            new TenantOwnershipTransferredEvent(tenantId, tenantId, user.userId, dto.newOwnerId, this.dateService.nowMoment().toDate(), user.userId)
-        );
     }
 
     // =========================================================
@@ -374,18 +358,10 @@ export class TenantService {
         const executionDate = this.dateService.nowMoment().add(days, 'days').toDate();
         const reason = dto.reason ?? 'User requested deletion';
 
-        const updated = await this.prisma.tenant.update({
-            where: { id: tenantId },
-            data: {
-                deletionScheduledAt,
-                deletionReason: reason
-            }
-        });
-
-        this.txEventEmitter.emitAfterCommit(
+        const updated = await this.applyChange(tenantId, { deletionScheduledAt, deletionReason: reason }, () => [
             TenantEvents.DELETION_SCHEDULED,
             new TenantDeletionScheduledEvent(tenantId, tenantId, deletionScheduledAt, executionDate, reason, user.userId)
-        );
+        ]);
 
         this.logger.log(`Tenant deletion scheduled: ${tenantId}`, { tenantId, executionDate });
 
@@ -403,18 +379,10 @@ export class TenantService {
         const tenantId = this.tenantContext.getTenantId()!;
         await this.findOneOrFail(tenantId);
 
-        await this.prisma.tenant.update({
-            where: { id: tenantId },
-            data: {
-                deletionScheduledAt: null,
-                deletionReason: null
-            }
-        });
-
-        this.txEventEmitter.emitAfterCommit(
+        await this.applyChange(tenantId, { deletionScheduledAt: null, deletionReason: null }, () => [
             TenantEvents.DELETION_CANCELLED,
             new TenantDeletionCancelledEvent(tenantId, tenantId, this.dateService.nowMoment().toDate(), user.userId)
-        );
+        ]);
 
         this.logger.log(`Tenant deletion cancelled: ${tenantId}`, { tenantId });
     }
@@ -425,15 +393,10 @@ export class TenantService {
     async executeDeletion(tenantId: string): Promise<void> {
         const tenant = await this.findOneOrFail(tenantId);
 
-        await this.prisma.tenant.update({
-            where: { id: tenantId },
-            data: {
-                status: TenantStatus.DELETED,
-                deletedAt: new Date()
-            }
-        });
-
-        this.txEventEmitter.emitAfterCommit(TenantEvents.DELETED, new TenantDeletedEvent(tenantId, tenantId, tenant.name, tenant.slug));
+        await this.applyChange(tenantId, { status: TenantStatus.DELETED, deletedAt: new Date() }, () => [
+            TenantEvents.DELETED,
+            new TenantDeletedEvent(tenantId, tenantId, tenant.name, tenant.slug)
+        ]);
 
         this.logger.log(`Tenant deleted: ${tenantId}`, { tenantId });
     }
@@ -452,21 +415,10 @@ export class TenantService {
 
         const lockUntil = dto.lockUntil ? new Date(dto.lockUntil) : null;
 
-        const updated = await this.prisma.tenant.update({
-            where: { id: tenantId },
-            data: {
-                status: TenantStatus.LOCKED,
-                lockedAt: new Date(),
-                lockUntil,
-                lockReason: dto.reason
-            }
-        });
-
-        const lockedAt = updated.lockedAt!;
-
-        this.txEventEmitter.emitAfterCommit(
-            TenantEvents.LOCKED,
-            new TenantLockedEvent(tenantId, tenantId, dto.reason, lockedAt, lockUntil ?? undefined, user.userId)
+        const updated = await this.applyChange(
+            tenantId,
+            { status: TenantStatus.LOCKED, lockedAt: new Date(), lockUntil, lockReason: dto.reason },
+            (row) => [TenantEvents.LOCKED, new TenantLockedEvent(tenantId, tenantId, dto.reason, row.lockedAt!, lockUntil ?? undefined, user.userId)]
         );
 
         this.logger.log(`Tenant locked: ${tenantId}`, { tenantId, reason: dto.reason });
@@ -532,15 +484,10 @@ export class TenantService {
             throw new BadRequestException(`Tenant ${id} is already suspended`);
         }
 
-        const updated = await this.prisma.tenant.update({
-            where: { id },
-            data: {
-                status: TenantStatus.SUSPENDED,
-                suspendedAt: new Date()
-            }
-        });
-
-        this.txEventEmitter.emitAfterCommit(TenantEvents.SUSPENDED, new TenantSuspendedEvent(id, id, reason, updated.suspendedAt!));
+        const updated = await this.applyChange(id, { status: TenantStatus.SUSPENDED, suspendedAt: new Date() }, (row) => [
+            TenantEvents.SUSPENDED,
+            new TenantSuspendedEvent(id, id, reason, row.suspendedAt!)
+        ]);
 
         this.logger.log(`Tenant suspended: ${id}`, { tenantId: id, reason });
 
@@ -557,15 +504,10 @@ export class TenantService {
             throw new BadRequestException(`Tenant ${id} is not suspended`);
         }
 
-        const updated = await this.prisma.tenant.update({
-            where: { id },
-            data: {
-                status: TenantStatus.ACTIVE,
-                suspendedAt: null
-            }
-        });
-
-        this.txEventEmitter.emitAfterCommit(TenantEvents.UNSUSPENDED, new TenantUnsuspendedEvent(id, id, this.dateService.nowMoment().toDate()));
+        const updated = await this.applyChange(id, { status: TenantStatus.ACTIVE, suspendedAt: null }, () => [
+            TenantEvents.UNSUSPENDED,
+            new TenantUnsuspendedEvent(id, id, this.dateService.nowMoment().toDate())
+        ]);
 
         this.logger.log(`Tenant unsuspended: ${id}`, { tenantId: id });
 
@@ -576,21 +518,30 @@ export class TenantService {
     // Private helpers
     // =========================================================
 
-    private async performUnlock(tenantId: string, userId?: string): Promise<TenantResponse> {
-        const updated = await this.prisma.tenant.update({
-            where: { id: tenantId },
-            data: {
-                status: TenantStatus.ACTIVE,
-                lockedAt: null,
-                lockUntil: null,
-                lockReason: null
+    /**
+     * Applies a tenant change and emits its event in one transaction: the published event is written to the
+     * outbox before commit, so it exists exactly when the change does.
+     */
+    private async applyChange(
+        tenantId: string,
+        data: Prisma.TenantUpdateInput,
+        toEvent: (updated: Tenant) => [string, BaseDomainEvent] | null
+    ): Promise<Tenant> {
+        return this.prisma.$transaction(async (tx) => {
+            const updated = await tx.tenant.update({ where: { id: tenantId }, data });
+            const event = toEvent(updated);
+            if (event) {
+                this.txEventEmitter.emitAfterCommit(event[0], event[1]);
             }
+            return updated;
         });
+    }
 
-        this.txEventEmitter.emitAfterCommit(
+    private async performUnlock(tenantId: string, userId?: string): Promise<TenantResponse> {
+        const updated = await this.applyChange(tenantId, { status: TenantStatus.ACTIVE, lockedAt: null, lockUntil: null, lockReason: null }, () => [
             TenantEvents.UNLOCKED,
             new TenantUnlockedEvent(tenantId, tenantId, userId ?? 'system', this.dateService.nowMoment().toDate(), userId)
-        );
+        ]);
 
         this.logger.log(`Tenant unlocked: ${tenantId}`, { tenantId, unlockedBy: userId ?? 'system' });
 

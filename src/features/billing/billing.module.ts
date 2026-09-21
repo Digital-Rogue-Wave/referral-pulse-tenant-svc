@@ -31,7 +31,6 @@ import { BillingGuard } from './guards/billing.guard';
 
 // Processors
 import { BillingUsageProcessor } from './processors/billing-usage.processor';
-import { BillingConsumer } from './billing.consumer';
 
 /**
  * `TestBillingController` is dev scaffolding: ~24 routes under `/test/*` behind
@@ -70,7 +69,6 @@ const DEV_ONLY_CONTROLLERS = process.env.ENABLE_TEST_ROUTES === 'true' ? [TestBi
         BillingUsageQueueService,
         BillingUsageProcessor,
         DailyUsageCalculator,
-        BillingConsumer,
         MonthlyUsageResetService,
         PaymentStatusEscalationService,
         TrialLifecycleService
@@ -83,7 +81,6 @@ const DEV_ONLY_CONTROLLERS = process.env.ENABLE_TEST_ROUTES === 'true' ? [TestBi
         PlanLimitService,
         BillingGuard,
         DailyUsageCalculator,
-        BillingConsumer,
         MonthlyUsageResetService,
         PaymentStatusEscalationService,
         TrialLifecycleService

@@ -1,127 +1,58 @@
-import { Test, TestingModule } from '@nestjs/testing';
-import { ConfigService } from '@nestjs/config';
 import { mock, MockProxy } from 'jest-mock-extended';
 
-import { SnsPublisherService } from '@common/messaging/sns-publisher.service';
-import { KetoService } from '@common/auth/keto.service';
-import { HttpClientService } from '@common/http/http-client.service';
 import { AppLoggerService } from '@common/logging/app-logger.service';
 import { BullJobsService } from '@common/bulljobs';
 import { DateService } from '@common/helper/date.service';
+import { TENANT_DELETION_QUEUE } from '@app/types';
 import { DomainProvisioningService } from '../../dns/domain-provisioning.service';
 
 import { TenantListener } from './tenant.listener';
-import { TenantCreatedEvent, TenantDeletionScheduledEvent, TenantDeletionCancelledEvent } from '@domains/tenant/events/tenant.events';
+import { TenantDeletionScheduledEvent, TenantDeletionCancelledEvent, TenantDomainVerifiedEvent } from '@domains/tenant/events/tenant.events';
 
-describe('TenantListener', () => {
+describe('TenantListener — in-process side effects of tenant lifecycle events', () => {
     let listener: TenantListener;
-    let bullJobsService: MockProxy<BullJobsService>;
-    let snsPublisher: MockProxy<SnsPublisherService>;
-    let ketoService: MockProxy<KetoService>;
-    let httpClient: MockProxy<HttpClientService>;
-    let configService: MockProxy<ConfigService>;
-    let domainProvisioningService: MockProxy<DomainProvisioningService>;
-    let logger: MockProxy<AppLoggerService>;
-    let dateService: MockProxy<DateService>;
-
+    let bullJobs: MockProxy<BullJobsService>;
+    let domains: MockProxy<DomainProvisioningService>;
+    let dates: MockProxy<DateService>;
     const tenantId = 'tenant-123';
 
-    beforeEach(async () => {
-        bullJobsService = mock<BullJobsService>();
-        snsPublisher = mock<SnsPublisherService>();
-        ketoService = mock<KetoService>();
-        httpClient = mock<HttpClientService>();
-        configService = mock<ConfigService>();
-        domainProvisioningService = mock<DomainProvisioningService>();
-        logger = mock<AppLoggerService>();
-        dateService = mock<DateService>();
-
-        configService.getOrThrow.mockReturnValue({
-            keto: {
-                writeUrl: 'http://keto-write',
-                readUrl: 'http://keto-read'
-            }
-        });
-
-        const module: TestingModule = await Test.createTestingModule({
-            providers: [
-                TenantListener,
-                { provide: SnsPublisherService, useValue: snsPublisher },
-                { provide: KetoService, useValue: ketoService },
-                { provide: BullJobsService, useValue: bullJobsService },
-                { provide: HttpClientService, useValue: httpClient },
-                { provide: ConfigService, useValue: configService },
-                {
-                    provide: DomainProvisioningService,
-                    useValue: domainProvisioningService
-                },
-                { provide: AppLoggerService, useValue: logger },
-                { provide: DateService, useValue: dateService }
-            ]
-        }).compile();
-
-        listener = module.get<TenantListener>(TenantListener);
+    beforeEach(() => {
+        bullJobs = mock<BullJobsService>();
+        domains = mock<DomainProvisioningService>();
+        dates = mock<DateService>();
+        listener = new TenantListener(bullJobs, domains, mock<AppLoggerService>(), dates);
     });
 
-    it('should be defined', () => {
-        expect(listener).toBeDefined();
+    it('schedules the deletion job for the execution date, keyed on the tenant so it can be cancelled', async () => {
+        dates.diff.mockReturnValue(86_400_000);
+        const scheduledAt = new Date();
+
+        await listener.handleTenantDeletionScheduledEvent(
+            new TenantDeletionScheduledEvent(tenantId, tenantId, scheduledAt, new Date(Date.now() + 86_400_000), 'closing')
+        );
+
+        expect(bullJobs.addDelayedJob).toHaveBeenCalledWith(
+            TENANT_DELETION_QUEUE,
+            'execute-deletion',
+            { tenantId, scheduledAt, reason: 'closing' },
+            86_400_000,
+            { jobId: `deletion-${tenantId}` }
+        );
     });
 
-    describe('handleTenantCreatedEvent', () => {
-        it('should publish SNS event on tenant creation', async () => {
-            const event = new TenantCreatedEvent(tenantId, tenantId, 'Test Tenant', 'test-tenant', 'owner-123', new Date(), new Date(), 'user-123');
-
-            await listener.handleTenantCreatedEvent(event);
-
-            expect(snsPublisher.publish).toHaveBeenCalledWith(
-                'tenant-events',
-                'tenant.created',
-                expect.objectContaining({
-                    data: expect.objectContaining({
-                        tenantId,
-                        name: 'Test Tenant',
-                        slug: 'test-tenant'
-                    })
-                }),
-                expect.objectContaining({
-                    messageGroupId: tenantId
-                })
-            );
-        });
+    it('never schedules in the past', async () => {
+        dates.diff.mockReturnValue(-5000);
+        await listener.handleTenantDeletionScheduledEvent(new TenantDeletionScheduledEvent(tenantId, tenantId, new Date(), new Date(), 'x'));
+        expect(bullJobs.addDelayedJob.mock.calls[0]![3]).toBe(0);
     });
 
-    describe('handleTenantDeletionScheduledEvent', () => {
-        it('should schedule a deletion job', async () => {
-            const scheduledAt = new Date();
-            const executionDate = new Date(Date.now() + 1000 * 60 * 60 * 24 * 30);
-            const event = new TenantDeletionScheduledEvent(tenantId, tenantId, scheduledAt, executionDate, 'Test reason', 'user-123');
-
-            await listener.handleTenantDeletionScheduledEvent(event);
-
-            expect(snsPublisher.publish).toHaveBeenCalled();
-            expect(bullJobsService.addDelayedJob).toHaveBeenCalledWith(
-                expect.any(String),
-                'execute-deletion',
-                expect.objectContaining({
-                    tenantId,
-                    reason: 'Test reason'
-                }),
-                expect.any(Number),
-                expect.objectContaining({
-                    jobId: `deletion-${tenantId}`
-                })
-            );
-        });
+    it('removes the deletion job when the deletion is cancelled', async () => {
+        await listener.handleTenantDeletionCancelledEvent(new TenantDeletionCancelledEvent(tenantId, tenantId, new Date()));
+        expect(bullJobs.removeJob).toHaveBeenCalledWith(TENANT_DELETION_QUEUE, `deletion-${tenantId}`);
     });
 
-    describe('handleTenantDeletionCancelledEvent', () => {
-        it('should remove the deletion job', async () => {
-            const event = new TenantDeletionCancelledEvent(tenantId, tenantId, new Date(), 'user-123');
-
-            await listener.handleTenantDeletionCancelledEvent(event);
-
-            expect(snsPublisher.publish).toHaveBeenCalled();
-            expect(bullJobsService.removeJob).toHaveBeenCalledWith(expect.any(String), `deletion-${tenantId}`);
-        });
+    it('provisions a custom domain once it is verified', () => {
+        listener.handleTenantDomainVerifiedEvent(new TenantDomainVerifiedEvent(tenantId, tenantId, 'refer.acme.io', new Date()));
+        expect(domains.provisionDomain).toHaveBeenCalledWith(tenantId, 'refer.acme.io');
     });
 });

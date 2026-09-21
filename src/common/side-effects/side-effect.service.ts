@@ -410,7 +410,7 @@ export class SideEffectService {
      *   'toto',
      *   toto.id,
      *   'toto.created',
-     *   TOTO_EVENTS_TOPIC,
+     *   TENANT_EVENTS_TOPIC,
      *   { totoId: toto.id, name: toto.name, tenantId: toto.tenantId }
      * );
      * ```

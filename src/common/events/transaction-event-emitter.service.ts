@@ -9,6 +9,10 @@ import { TenantContextService } from '@common/tenant-aware/tenant-context.servic
 /** Type for native Prisma $transaction method to avoid ESLint no-unsafe-function-type */
 type NativePrismaTransaction = PrismaClient['$transaction'];
 
+/** Queued in-process events, handed to before-commit hooks with the transaction client. */
+export type QueuedTransactionEvent = { event: string; payload: unknown };
+export type BeforeCommitHook = (tx: Prisma.TransactionClient, events: QueuedTransactionEvent[]) => Promise<void>;
+
 /**
  * Transaction-aware event emitter that delays event emission until after commit
  *
@@ -43,10 +47,20 @@ type NativePrismaTransaction = PrismaClient['$transaction'];
  */
 @Injectable()
 export class TransactionEventEmitterService {
+    private readonly beforeCommitHooks: BeforeCommitHook[] = [];
+
     constructor(
         private readonly eventEmitter: EventEmitter2,
         private readonly tenantContext: TenantContextService
     ) {}
+
+    /**
+     * Runs inside every interactive transaction, after the caller's work and before commit, with the events
+     * it queued — e.g. to write them to the transactional outbox in the same transaction.
+     */
+    registerBeforeCommitHook(hook: BeforeCommitHook): void {
+        this.beforeCommitHooks.push(hook);
+    }
 
     /**
      * Emit event after current transaction commits
@@ -178,7 +192,14 @@ export class TransactionEventEmitterService {
                 transactionEvents: []
             },
             async () => {
-                const result = await prisma.$transaction(fn, options);
+                const result = await prisma.$transaction(async (tx) => {
+                    const value = await fn(tx);
+                    const queued = (this.tenantContext.get('transactionEvents') || []) as QueuedTransactionEvent[];
+                    for (const hook of this.beforeCommitHooks) {
+                        await hook(tx, queued);
+                    }
+                    return value;
+                }, options);
                 this.emitTransactionEvents();
                 return result;
             }

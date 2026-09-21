@@ -73,8 +73,10 @@ export class WebhookController {
         // Resolve the platform user to scope the event to its tenant; identities with no membership are ignored.
         const user = await this.prisma.user.findFirst({ where: { kratosIdentityId, deletedAt: null }, select: { id: true, tenantId: true } });
         if (user) {
-            await this.prisma.user.update({ where: { id: user.id }, data: { lastLoginAt: new Date() } });
-            this.txEventEmitter.emitAfterCommit('user.logged_in', new UserLoggedInEvent(user.id, user.tenantId, authMethod, user.id));
+            await this.prisma.$transaction(async (tx) => {
+                await tx.user.update({ where: { id: user.id }, data: { lastLoginAt: new Date() } });
+                this.txEventEmitter.emitAfterCommit('user.logged_in', new UserLoggedInEvent(user.id, user.tenantId, authMethod, user.id));
+            });
         }
 
         return { status: 'ok' };

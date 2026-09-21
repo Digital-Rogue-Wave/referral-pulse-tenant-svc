@@ -2,10 +2,10 @@ import { Module, Global } from '@nestjs/common';
 import { EventEmitterModule } from '@nestjs/event-emitter';
 
 import { AuditTrailListener } from './listeners/audit-trail.listener';
-import { BroadcastEventListener } from './listeners/broadcast-event.listener';
 import { EmailNotificationListener } from './listeners/email-notification.listener';
 import { KetoSyncListener } from './listeners/keto-sync.listener';
-import { TenantServiceListener } from './listeners/tenant-service.listener';
+import { EventOutboxRelayWorker } from './outbox/event-outbox-relay.worker';
+import { EventOutboxWriter } from './outbox/event-outbox.writer';
 import { TransactionEventEmitterService } from './transaction-event-emitter.service';
 
 /**
@@ -19,8 +19,8 @@ import { TransactionEventEmitterService } from './transaction-event-emitter.serv
  * - Event listeners: Handle all side effects (cross-service, analytics, audit)
  * - Hybrid approach: Critical ops use outbox, non-critical use direct SQS + events
  *
- * Service-Specific Listeners (Microservice Communication):
- * - TenantServiceListener: Quota/usage tracking via SQS (async) + HTTP (sync)
+ * Published events: EventOutboxWriter records them in `event_outbox` (inside the state change's
+ * transaction); EventOutboxRelayWorker publishes them to SNS `tenant-events`.
  *
  * Infrastructure Listeners:
  * - AuditTrailListener: Send all events to audit service (SQS + DLQ)
@@ -56,12 +56,12 @@ import { TransactionEventEmitterService } from './transaction-event-emitter.serv
     providers: [
         TransactionEventEmitterService,
 
-        // Service-specific listeners (microservice communication)
-        TenantServiceListener, // Tenant/quota service (async SQS + sync HTTP)
+        // Domain events → event_outbox (in the state change's transaction) → SNS tenant-events
+        EventOutboxWriter,
+        EventOutboxRelayWorker,
 
         // Infrastructure listeners
         AuditTrailListener, // Audit trail service (async SQS)
-        BroadcastEventListener, // Cross-service broadcast (fire-and-forget + DLQ)
         EmailNotificationListener, // Email service (critical SQS + marketing HTTP)
         KetoSyncListener // Membership → Ory Keto, through the outbox
     ],

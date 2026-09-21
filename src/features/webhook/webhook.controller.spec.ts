@@ -24,6 +24,7 @@ describe('Ory web hooks', () => {
         txEventEmitter = mock<TransactionEventEmitterService>();
         prisma.user = { findFirst: jest.fn(), update: jest.fn() } as never;
         prisma.invitation = { findFirst: jest.fn() } as never;
+        (prisma as unknown as { $transaction: jest.Mock }).$transaction = jest.fn(async (fn: (tx: unknown) => Promise<unknown>) => fn(prisma));
 
         const module: TestingModule = await Test.createTestingModule({
             providers: [

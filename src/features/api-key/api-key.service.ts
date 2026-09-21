@@ -72,29 +72,33 @@ export class ApiKeyService {
     /** Issues a new key; the raw key is in the response and nowhere else. */
     async create(userId: string, dto: CreateApiKeyDto): Promise<ApiKeyWithRawKeyResponse> {
         const keyType = dto.keyType ?? ApiKeyType.SECRET;
-        const { saved, rawKey } = await this.withFreshKey(
-            keyType,
-            (secret) =>
-                this.apiKey.create({
-                    data: { label: dto.label, ...secret, keyType, createdBy: userId, expiresAt: dto.expiresAt ?? null }
-                }) as Promise<ApiKeyProps>
+        const tenantId = this.tenantAware.getRequiredTenantId();
+        // The key row and its `api_key.created` outbox row commit together.
+        const { saved, rawKey } = await this.withFreshKey(keyType, (secret) =>
+            this.prisma.$transaction(async (tx) => {
+                const created = (await tx.apiKey.create({
+                    data: { tenantId, label: dto.label, ...secret, keyType, createdBy: userId, expiresAt: dto.expiresAt ?? null }
+                })) as ApiKeyProps;
+                this.txEventEmitter.emitAfterCommit(
+                    'api-key.created',
+                    new ApiKeyCreatedEvent(
+                        created.id,
+                        created.tenantId,
+                        {
+                            apiKeyId: created.id,
+                            tenantId: created.tenantId,
+                            label: created.label,
+                            keyPrefix: created.keyPrefix,
+                            keyType: created.keyType,
+                            createdBy: userId,
+                            createdAt: created.createdAt
+                        },
+                        userId
+                    )
+                );
+                return created;
+            })
         );
-
-        const event = new ApiKeyCreatedEvent(
-            saved.id,
-            saved.tenantId,
-            {
-                apiKeyId: saved.id,
-                tenantId: saved.tenantId,
-                label: saved.label,
-                keyPrefix: saved.keyPrefix,
-                keyType: saved.keyType,
-                createdBy: userId,
-                createdAt: saved.createdAt
-            },
-            userId
-        );
-        this.txEventEmitter.emitAfterCommit('api-key.created', event);
 
         this.logger.log('API key created', { apiKeyId: saved.id, keyType });
         return apiKeyResponseMapper.toResponseWithRawKey(saved, rawKey);
@@ -143,21 +147,28 @@ export class ApiKeyService {
             throw new BaseException('state_conflict', 'A revoked API key cannot be rotated', HttpStatus.CONFLICT);
         }
 
-        const { saved, rawKey } = await this.withFreshKey(
-            existing.keyType as ApiKeyType,
-            (secret) => this.apiKey.update({ where: { id }, data: { ...secret, lastUsedAt: null } }) as Promise<ApiKeyProps>
+        const { saved, rawKey } = await this.withFreshKey(existing.keyType as ApiKeyType, (secret) =>
+            this.prisma.$transaction(async (tx) => {
+                const rotated = (await tx.apiKey.update({ where: { id }, data: { ...secret, lastUsedAt: null } })) as ApiKeyProps;
+                this.txEventEmitter.emitAfterCommit(
+                    'api-key.rotated',
+                    new ApiKeyRotatedEvent(
+                        id,
+                        rotated.tenantId,
+                        {
+                            apiKeyId: id,
+                            keyType: rotated.keyType,
+                            oldKeyPrefix: existing.keyPrefix,
+                            newKeyPrefix: rotated.keyPrefix,
+                            rotatedBy: userId
+                        },
+                        userId
+                    )
+                );
+                return rotated;
+            })
         );
         await this.forget(existing);
-
-        this.txEventEmitter.emitAfterCommit(
-            'api-key.rotated',
-            new ApiKeyRotatedEvent(
-                id,
-                saved.tenantId,
-                { apiKeyId: id, keyType: saved.keyType, oldKeyPrefix: existing.keyPrefix, newKeyPrefix: saved.keyPrefix, rotatedBy: userId },
-                userId
-            )
-        );
         this.logger.log('API key rotated', { apiKeyId: id });
         return apiKeyResponseMapper.toResponseWithRawKey(saved, rawKey);
     }
@@ -166,24 +177,27 @@ export class ApiKeyService {
     async delete(id: string, userId: string, reason?: string): Promise<void> {
         const existing = await this.findLive(id);
         const revokedAt = new Date();
-        await this.apiKey.update({ where: { id }, data: { revokedAt, deletedAt: revokedAt } });
+        await this.prisma.$transaction(async (tx) => {
+            await tx.apiKey.update({ where: { id }, data: { revokedAt, deletedAt: revokedAt } });
+            this.txEventEmitter.emitAfterCommit(
+                'api-key.deleted',
+                new ApiKeyDeletedEvent(
+                    id,
+                    existing.tenantId,
+                    {
+                        apiKeyId: id,
+                        tenantId: existing.tenantId,
+                        keyLabel: existing.label,
+                        keyPrefix: existing.keyPrefix,
+                        deletedBy: userId,
+                        deletedAt: revokedAt,
+                        reason: reason ?? null
+                    },
+                    userId
+                )
+            );
+        });
         await this.forget(existing);
-
-        const event = new ApiKeyDeletedEvent(
-            id,
-            existing.tenantId,
-            {
-                apiKeyId: id,
-                tenantId: existing.tenantId,
-                keyLabel: existing.label,
-                keyPrefix: existing.keyPrefix,
-                deletedBy: userId,
-                deletedAt: revokedAt,
-                reason: reason ?? null
-            },
-            userId
-        );
-        this.txEventEmitter.emitAfterCommit('api-key.deleted', event);
         this.logger.log('API key revoked', { apiKeyId: id });
     }
 

@@ -23,6 +23,8 @@ import {
     UserRoleChangedEvent
 } from '@domains/user';
 
+import { TenantEvents, TenantOwnershipTransferredEvent } from '@domains/tenant/events/tenant.events';
+
 import { RoleGrantPolicy } from './role-grant.policy';
 
 export interface UserMeResponse {
@@ -186,6 +188,10 @@ export class UsersService {
             this.txEventEmitter.emitAfterCommit(
                 'user.role_changed',
                 new UserRoleChangedEvent(demoted.id, demoted.tenantId, RoleEnum.OWNER, RoleEnum.ADMIN, actor.userId)
+            );
+            this.txEventEmitter.emitAfterCommit(
+                TenantEvents.OWNERSHIP_TRANSFERRED,
+                new TenantOwnershipTransferredEvent(actor.tenantId, actor.tenantId, actor.userId, promoted.id, new Date(), actor.userId)
             );
         });
         this.logger.log('Tenant ownership transferred', { tenantId: actor.tenantId, from: actor.userId, to: target.id });

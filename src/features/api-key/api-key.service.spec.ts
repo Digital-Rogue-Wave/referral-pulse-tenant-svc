@@ -54,7 +54,11 @@ describe('ApiKeyService', () => {
         };
         const tenantAware = mock<TenantAwareService>();
         tenantAware.forModel.mockReturnValue(delegate as never);
+        tenantAware.getRequiredTenantId.mockReturnValue(tenantId);
         (prisma as unknown as { apiKey: unknown }).apiKey = { findUnique: jest.fn(), update: jest.fn().mockResolvedValue({}) };
+        (prisma as unknown as { $transaction: jest.Mock }).$transaction = jest.fn(async (fn: (tx: unknown) => Promise<unknown>) =>
+            fn({ apiKey: { create: delegate.create, update: delegate.update } })
+        );
         redis.get.mockImplementation(async (key: string) => cache.get(key) as never);
         redis.set.mockImplementation(async (key: string, value: unknown) => {
             cache.set(key, value);
