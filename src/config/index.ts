@@ -11,6 +11,7 @@ import resilienceConfig from './resilience.config';
 import servicesConfig from './services.config';
 import stripeConfig from './stripe.config';
 import temporalConfig from './temporal.config';
+import tokenIssuerConfig from './token-issuer.config';
 import tracingConfig from './tracing.config';
 
 export type { AllConfigType } from './config.type';
@@ -28,6 +29,7 @@ export type { ClickHouseConfig } from './clickhouse.config';
 export type { TemporalConfig } from './temporal.config';
 export type { BillingConfig } from './billing.config';
 export type { StripeConfig } from './stripe.config';
+export type { TokenIssuerConfig } from './token-issuer.config';
 
 export const configLoaders = [
     appConfig,
@@ -43,7 +45,8 @@ export const configLoaders = [
     clickhouseConfig,
     temporalConfig,
     billingConfig,
-    stripeConfig
+    stripeConfig,
+    tokenIssuerConfig
 ];
 
 export {
@@ -60,5 +63,6 @@ export {
     clickhouseConfig,
     temporalConfig,
     billingConfig,
-    stripeConfig
+    stripeConfig,
+    tokenIssuerConfig
 };

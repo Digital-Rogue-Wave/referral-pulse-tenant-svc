@@ -6,10 +6,13 @@
 model User {
   id               String    @id @default(ulid()) @db.VarChar(26)
   tenantId         String    @map("tenant_id") @db.VarChar(26)
-  email            String?   @db.VarChar(320)
+  email            String    @db.VarChar(320)
+  // SHA-256 of the lower-cased email — lets other services and logs reference an operator without the address.
+  emailHash        String    @map("email_hash") @db.Char(64)
   name             String?   @db.VarChar(255)
   role             String    @default("OPERATOR") @db.VarChar(50)
-  kratosIdentityId String    @map("kratos_identity_id") @db.VarChar(64)
+  // One Ory identity belongs to exactly one tenant (DB Model v2 §3 `users` UNIQUE(kratos_identity_id)).
+  kratosIdentityId String    @unique @map("kratos_identity_id") @db.VarChar(64)
   lastLoginAt      DateTime? @map("last_login_at") @db.Timestamptz
 
   createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz
@@ -20,7 +23,7 @@ model User {
   tenant    Tenant     @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   userRoles UserRole[]
 
-  @@unique([tenantId, kratosIdentityId])
+  @@unique([tenantId, email])
   @@index([tenantId])
   @@map("users")
 }

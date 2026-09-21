@@ -1,4 +1,4 @@
-import { Injectable, Inject, Optional } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
 import { ulid } from 'ulid';
 import { Prisma, SideEffectOutbox as SideEffectOutboxModel } from '@prisma-gen/generated/client';
 
@@ -9,6 +9,7 @@ import type {
     ISnsSideEffectPayload,
     IEmailSideEffectPayload,
     IAuditSideEffectPayload,
+    IKetoSideEffectPayload,
     IEmailAttachment,
     IOutboxJobData,
     IPublishOptions,
@@ -25,8 +26,6 @@ import { SnsPublisherService } from '@common/messaging/sns-publisher.service';
 import { SqsProducerService } from '@common/messaging/sqs-producer.service';
 
 import { DatabaseService } from '@app/database/database.service';
-
-export const BULLJOBS_SERVICE = 'BULLJOBS_SERVICE';
 
 /**
  * Options for side effect delivery
@@ -74,6 +73,12 @@ export interface ISideEffectOptions {
      * Additional metadata to store with the side effect
      */
     metadata?: Record<string, unknown>;
+
+    /**
+     * Tenant the side effect belongs to, for writes that happen outside a request's tenant context
+     * (e.g. provisioning a brand-new tenant at signup). Defaults to the context tenant.
+     */
+    tenantId?: string;
 }
 
 /**
@@ -102,9 +107,9 @@ export class SideEffectService {
         private readonly logger: AppLoggerService,
         private readonly sqsProducer: SqsProducerService,
         private readonly snsPublisher: SnsPublisherService,
-        @Optional()
-        @Inject(BULLJOBS_SERVICE)
-        private readonly bullJobsService?: BullJobsService
+        // Injected by class: the former optional string token was never provided anywhere, so critical
+        // side effects were written to the outbox and never enqueued.
+        private readonly bullJobsService: BullJobsService
     ) {
         this.logger.setContext(SideEffectService.name);
     }
@@ -135,7 +140,7 @@ export class SideEffectService {
         tx?: Prisma.TransactionClient,
         options: ISideEffectOptions = {}
     ): Promise<SideEffectOutboxModel> {
-        const tenantId = this.tenantContext.getTenantId();
+        const tenantId = options.tenantId ?? this.tenantContext.getTenantId();
         const correlationId = this.tenantContext.getCorrelationId();
 
         if (!tenantId) {
@@ -218,11 +223,6 @@ export class SideEffectService {
      * Enqueue a side effect for processing via BullMQ
      */
     private async enqueueJob(sideEffect: SideEffectOutboxModel, scheduledAt?: Date): Promise<void> {
-        if (!this.bullJobsService) {
-            this.logger.debug('BullJobs service not available, side effect will be processed by cron fallback');
-            return;
-        }
-
         try {
             if (!sideEffect.effectType || !sideEffect.aggregateType || !sideEffect.aggregateId) {
                 throw new Error(`Invalid side effect: missing required fields for ${sideEffect.id}`);
@@ -256,6 +256,7 @@ export class SideEffectService {
 
             this.logger.debug(`Enqueued side effect job: ${sideEffect.id}`, { delay });
         } catch (error) {
+            // The row is committed with the caller's transaction; OutboxSweeperService re-enqueues it within a minute.
             this.logger.warn(`Failed to enqueue side effect job: ${sideEffect.id}`, { error: error instanceof Error ? error.message : 'Unknown' });
         }
     }
@@ -369,6 +370,24 @@ export class SideEffectService {
             { ...options, critical: true } // Always critical
         );
 
+        return result as SideEffectOutboxModel;
+    }
+
+    /**
+     * Keto authorization sync (always through the outbox — permissions must not be lost).
+     * Pass the membership transaction as `options.prisma` so the tuple change commits with it.
+     */
+    async createKetoSideEffect(payload: IKetoSideEffectPayload, options: Omit<ISideEffectOptions, 'critical'> = {}): Promise<SideEffectOutboxModel> {
+        const result = await this.createSideEffect(
+            {
+                effectType: 'keto',
+                aggregateType: payload.userId ? 'user' : 'tenant',
+                aggregateId: payload.userId ?? payload.tenantId,
+                eventType: `keto.${payload.operation}`,
+                payload
+            },
+            { ...options, tenantId: options.tenantId ?? payload.tenantId, critical: true, maxRetries: options.maxRetries ?? 10 }
+        );
         return result as SideEffectOutboxModel;
     }
 

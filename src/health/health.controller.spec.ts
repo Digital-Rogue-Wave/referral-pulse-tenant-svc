@@ -1,11 +1,8 @@
 import { Reflector } from '@nestjs/core';
 
 import { HealthController } from './health.module';
-import { PERMISSIONS_KEY } from '@common/auth/require-permission.decorator';
-import { KetoNamespace, KetoRelation } from '@common/auth/keto.constants';
+import { PLATFORM_ADMIN_KEY } from '@common/auth/require-permission.decorator';
 import { IS_PUBLIC_KEY } from '@app/types';
-
-import type { KetoPermission } from '@app/types';
 
 type Handler = 'liveness' | 'readiness' | 'check' | 'getCircuitBreakers' | 'getCircuitBreaker' | 'resetCircuitBreaker';
 
@@ -29,8 +26,8 @@ describe('HealthController', () => {
     const isPublic = (handler: Handler): boolean =>
         reflector.getAllAndOverride<boolean>(IS_PUBLIC_KEY, [HealthController.prototype[handler], HealthController]) === true;
 
-    const permissions = (handler: Handler): KetoPermission[] | undefined =>
-        reflector.get<KetoPermission[]>(PERMISSIONS_KEY, HealthController.prototype[handler]);
+    const isPlatformAdminOnly = (handler: Handler): boolean =>
+        reflector.get<boolean>(PLATFORM_ADMIN_KEY, HealthController.prototype[handler]) === true;
 
     it('keeps the three probes public for the load balancer', () => {
         expect(isPublic('liveness')).toBe(true);
@@ -42,23 +39,16 @@ describe('HealthController', () => {
         expect(reflector.get<boolean>(IS_PUBLIC_KEY, HealthController)).toBeUndefined();
     });
 
-    it('requires a read permission to inspect circuit-breaker state', () => {
+    it('restricts circuit-breaker inspection to platform administrators — breaker state is platform topology, not tenant data', () => {
         for (const handler of ['getCircuitBreakers', 'getCircuitBreaker'] as const) {
             expect(isPublic(handler)).toBe(false);
-            expect(permissions(handler)).toHaveLength(1);
-            expect(permissions(handler)![0]).toMatchObject({
-                namespace: KetoNamespace.TENANT,
-                relation: KetoRelation.READ
-            });
+            expect(isPlatformAdminOnly(handler)).toBe(true);
         }
     });
 
-    it('requires an update permission to reset a circuit breaker, since it mutates runtime state', () => {
+    it('restricts resetting a circuit breaker to platform administrators, since it mutates runtime state for every tenant', () => {
         expect(isPublic('resetCircuitBreaker')).toBe(false);
-        expect(permissions('resetCircuitBreaker')![0]).toMatchObject({
-            namespace: KetoNamespace.TENANT,
-            relation: KetoRelation.UPDATE
-        });
+        expect(isPlatformAdminOnly('resetCircuitBreaker')).toBe(true);
     });
 
     it('uses the Prisma database indicator, not the TypeORM one', () => {

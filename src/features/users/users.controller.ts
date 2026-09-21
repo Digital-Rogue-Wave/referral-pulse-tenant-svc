@@ -1,10 +1,9 @@
-import { Body, Controller, Delete, Get, HttpCode, HttpStatus, Param, Post, Put, UseGuards } from '@nestjs/common';
+import { Body, Controller, Delete, Get, HttpCode, HttpStatus, Param, Post, Put } from '@nestjs/common';
 import { ApiTags, ApiBearerAuth, ApiBody, ApiCreatedResponse, ApiOkResponse, ApiOperation } from '@nestjs/swagger';
 
 import { CurrentUser } from '@common/auth/current-user.decorator';
 import type { IAuthenticatedUser } from '@app/types';
 import { RequirePermission } from '@common/auth/require-permission.decorator';
-import { KetoNamespace, KetoRelation, KetoResource } from '@common/auth/keto.constants';
 import { Paginate, PaginateQuery, Paginated, ApiPaginationQuery } from '@common/nestjs-prisma-pagination';
 import { Idempotent, IdempotencyScope } from '@common/idempotency';
 
@@ -12,7 +11,6 @@ import { AddUserDto, UpdateUserRoleDto, UserResponse } from '@domains/user';
 
 import { UsersService, UserMeResponse } from './users.service';
 import { USER_PAGINATE_CONFIG } from './users.pagination';
-import { PaymentRequiredGuard } from '@app/features/billing/guards/payment-required.guard';
 
 /**
  * Platform users (operators) — tenant membership + role per referralai_api_contract.
@@ -20,13 +18,12 @@ import { PaymentRequiredGuard } from '@app/features/billing/guards/payment-requi
  */
 @ApiTags('Users')
 @ApiBearerAuth()
-@UseGuards(PaymentRequiredGuard)
 @Controller({ path: 'users', version: '1' })
 export class UsersController {
     constructor(private readonly usersService: UsersService) {}
 
     @Get('me')
-    @ApiOperation({ summary: 'Get the current user profile, roles and scopes' })
+    @ApiOperation({ summary: 'Get the current user profile, role and permissions' })
     @ApiOkResponse({ description: 'The authenticated user profile' })
     async getMe(@CurrentUser() user: IAuthenticatedUser): Promise<UserMeResponse> {
         return this.usersService.getMe(user);
@@ -34,17 +31,17 @@ export class UsersController {
 
     @ApiBody({ type: AddUserDto })
     @ApiCreatedResponse({ description: 'User added to the tenant', type: UserResponse })
-    @RequirePermission({ namespace: KetoNamespace.TENANT, object: KetoResource.USER, relation: KetoRelation.CREATE })
+    @RequirePermission('users:write')
     @HttpCode(HttpStatus.CREATED)
     @Post()
     @Idempotent({ scope: IdempotencyScope.Tenant, ttl: 3600 })
     async add(@Body() dto: AddUserDto, @CurrentUser() user: IAuthenticatedUser): Promise<UserResponse> {
-        return this.usersService.addUser(user.userId, dto);
+        return this.usersService.addUser(user, dto);
     }
 
     @ApiPaginationQuery(USER_PAGINATE_CONFIG)
     @ApiOkResponse({ description: 'List of platform users', type: UserResponse, isArray: true })
-    @RequirePermission({ namespace: KetoNamespace.TENANT, object: KetoResource.USER, relation: KetoRelation.READ })
+    @RequirePermission('users:read')
     @HttpCode(HttpStatus.OK)
     @Get()
     async findAll(@Paginate() query: PaginateQuery): Promise<Paginated<UserResponse>> {
@@ -52,7 +49,7 @@ export class UsersController {
     }
 
     @ApiOkResponse({ description: 'User details', type: UserResponse })
-    @RequirePermission({ namespace: KetoNamespace.TENANT, object: KetoResource.USER, relation: KetoRelation.READ })
+    @RequirePermission('users:read')
     @HttpCode(HttpStatus.OK)
     @Get(':id')
     async findOne(@Param('id') id: string): Promise<UserResponse> {
@@ -61,20 +58,20 @@ export class UsersController {
 
     @ApiBody({ type: UpdateUserRoleDto })
     @ApiOkResponse({ description: 'User role updated', type: UserResponse })
-    @RequirePermission({ namespace: KetoNamespace.TENANT, object: KetoResource.USER, relation: KetoRelation.UPDATE })
+    @RequirePermission('users:write')
     @HttpCode(HttpStatus.OK)
     @Put(':id/roles')
     @Idempotent({ scope: IdempotencyScope.Tenant, ttl: 1800 })
     async updateRole(@Param('id') id: string, @Body() dto: UpdateUserRoleDto, @CurrentUser() user: IAuthenticatedUser): Promise<UserResponse> {
-        return this.usersService.updateRole(id, user.userId, dto);
+        return this.usersService.updateRole(user, id, dto);
     }
 
     @ApiOkResponse({ description: 'User removed from the tenant' })
-    @RequirePermission({ namespace: KetoNamespace.TENANT, object: KetoResource.USER, relation: KetoRelation.DELETE })
+    @RequirePermission('users:write')
     @HttpCode(HttpStatus.NO_CONTENT)
     @Delete(':id')
     @Idempotent({ scope: IdempotencyScope.Tenant, ttl: 1800 })
     async remove(@Param('id') id: string, @CurrentUser() user: IAuthenticatedUser): Promise<void> {
-        await this.usersService.remove(id, user.userId);
+        await this.usersService.remove(user, id);
     }
 }

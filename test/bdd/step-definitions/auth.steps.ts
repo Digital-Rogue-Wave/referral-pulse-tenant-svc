@@ -23,5 +23,7 @@ Given('I have a malformed token {string}', function (this: BddWorldInterface, ra
 });
 
 Given('I have a service token for tenant {string}', function (this: BddWorldInterface, tenantId: string) {
-    this.currentToken = makeServiceToken(tenantId);
+    // Service tokens are tenant-less client-credentials tokens; the tenant is in the path, not the token.
+    void tenantId;
+    this.currentToken = makeServiceToken();
 });

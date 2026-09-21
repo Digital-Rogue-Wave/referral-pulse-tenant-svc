@@ -101,6 +101,8 @@ export type EventAction =
     | 'registered'
     | 'role_changed'
     | 'logged_in'
+    | 'removed'
+    | 'invited'
     | 'verification_requested'
     | 'verification_status_changed';
 
@@ -323,7 +325,9 @@ export type UserEventType =
     | 'user.deactivated'
     | 'user.deleted'
     | 'user.registered'
-    | 'user.role_changed';
+    | 'user.role_changed'
+    | 'user.removed'
+    | 'user.invited';
 
 // API Key domain events
 export type ApiKeyEventType = 'api-key.created' | 'api-key.updated' | 'api-key.deleted';
@@ -557,7 +561,7 @@ export type SqsMessageHandlerMeta = {
  * Side effect types for outbox pattern
  * Defines the type of side effect to execute
  */
-export type SideEffectType = 'sqs' | 'sns' | 'email' | 'audit';
+export type SideEffectType = 'sqs' | 'sns' | 'email' | 'audit' | 'keto';
 
 /**
  * Side effect processing status

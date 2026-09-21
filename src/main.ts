@@ -73,7 +73,7 @@ async function bootstrap(): Promise<void> {
         });
 
         app.setGlobalPrefix(apiPrefix, {
-            exclude: ['/health', '/health/ready', '/health/live', '/metrics']
+            exclude: ['/health', '/health/ready', '/health/live', '/metrics', '/.well-known/jwks.json', '/internal/validate-token']
         });
         app.enableVersioning({ type: VersioningType.URI, defaultVersion: '1' });
 

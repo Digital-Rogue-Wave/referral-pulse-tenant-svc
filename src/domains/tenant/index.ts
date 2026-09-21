@@ -50,11 +50,6 @@ export class CreateTenantDto {
     @ApiProperty()
     @IsString()
     slug!: string;
-
-    @ApiPropertyOptional()
-    @IsOptional()
-    @IsString()
-    ownerId?: string;
 }
 
 export class UpdateTenantDto {

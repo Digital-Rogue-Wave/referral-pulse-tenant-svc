@@ -1,6 +1,8 @@
 import { Controller, Get, Post, Body, HttpCode, HttpStatus, Param, Put } from '@nestjs/common';
 import { ApiTags, ApiOkResponse, ApiCreatedResponse, ApiBody } from '@nestjs/swagger';
 
+import { PlatformAdmin } from '@common/auth/require-permission.decorator';
+
 import { CurrencyService } from './currency.service';
 import { Currency as CurrencyModel } from '@prisma-gen/generated/client';
 import {
@@ -75,6 +77,8 @@ export class CurrencyController {
         return this.currencyService.listUnpaginated();
     }
 
+    // The currency table is platform-wide reference data: no tenant may change it.
+    @PlatformAdmin()
     @ApiCreatedResponse({ type: CurrencyDto })
     @HttpCode(HttpStatus.CREATED)
     @Post()
@@ -82,6 +86,7 @@ export class CurrencyController {
         return this.currencyService.create(currencyDto);
     }
 
+    @PlatformAdmin()
     @ApiBody({ type: UpdateCurrencyDto })
     @ApiOkResponse({ type: CurrencyDto })
     @HttpCode(HttpStatus.OK)

@@ -1,5 +1,9 @@
-import { Injectable, NotFoundException, ConflictException, ForbiddenException, BadRequestException } from '@nestjs/common';
+import { HttpStatus, Injectable, NotFoundException, ConflictException, BadRequestException } from '@nestjs/common';
 import { randomBytes } from 'crypto';
+
+import { BaseException } from '@common/exceptions/base.exceptions';
+import { sha256Hex } from '@common/helper/hashing';
+import { RoleEnum } from '@common/enums/role.enum';
 
 import { DatabaseService } from '@app/database/database.service';
 import { TenantAwareService } from '@common/tenant-aware/tenant-aware.service';
@@ -19,15 +23,20 @@ import {
     InvitationCreatedEvent,
     InvitationResentEvent
 } from '@domains/invitation';
-import { UserResponse, userResponseMapper } from '@domains/user';
+import { UserInvitedEvent, UserResponse, userResponseMapper } from '@domains/user';
 
 import { UsersService } from '@app/features/users/users.service';
+import { RoleGrantPolicy } from '@app/features/users/role-grant.policy';
 import { INVITATION_PAGINATE_CONFIG } from './invitation.pagination';
 
 /**
  * Tenant member invitations (sanctioned extension — not in the canonical API contract; see NOTE.md).
  * Admin side is tenant-scoped (create/list/resend/revoke); acceptance is token-based and reuses the
  * invitee's own Ory identity (Kratos owns credentials) to provision the membership.
+ *
+ * Only a SHA-256 of the token is stored; the token itself exists only in the invitee's email link.
+ * The inviter's rank bounds the role they can invite at (RoleGrantPolicy), and acceptance is atomic: the
+ * invitation is claimed PENDING→ACCEPTED in the same transaction that creates the membership.
  */
 @Injectable()
 export class InvitationService {
@@ -48,7 +57,9 @@ export class InvitationService {
         return this.tenantAware.forModel(this.prisma.invitation);
     }
 
-    async create(actingUserId: string, dto: CreateInvitationDto): Promise<InvitationResponse> {
+    async create(actor: IAuthenticatedUser, dto: CreateInvitationDto): Promise<InvitationResponse> {
+        RoleGrantPolicy.assertCanGrant(await this.usersService.roleOf(actor), dto.role);
+        const actingUserId = actor.userId;
         const existing = await this.invitation.findFirst({ where: { email: dto.email, status: InvitationStatusEnum.PENDING } });
         if (existing) {
             throw new ConflictException(`A pending invitation already exists for ${dto.email}`);
@@ -58,7 +69,7 @@ export class InvitationService {
         const expiresAt = this.expiry();
 
         const saved = (await this.invitation.create({
-            data: { email: dto.email, role: dto.role, status: InvitationStatusEnum.PENDING, token, expiresAt }
+            data: { email: dto.email, role: dto.role, status: InvitationStatusEnum.PENDING, tokenHash: sha256Hex(token), expiresAt }
         })) as InvitationProps;
 
         this.txEventEmitter.emitAfterCommit(
@@ -71,7 +82,9 @@ export class InvitationService {
             )
         );
 
-        this.logger.log(`Invitation created: ${saved.id}`, { invitationId: saved.id, email: saved.email });
+        this.txEventEmitter.emitAfterCommit('user.invited', new UserInvitedEvent(saved.id, saved.tenantId, saved.role, actingUserId));
+
+        this.logger.log(`Invitation created: ${saved.id}`, { invitationId: saved.id });
         return invitationResponseMapper.toResponse(saved);
     }
 
@@ -96,7 +109,10 @@ export class InvitationService {
 
         const token = this.generateToken();
         const newExpiresAt = this.expiry();
-        const updated = (await this.invitation.update({ where: { id }, data: { token, expiresAt: newExpiresAt } })) as InvitationProps;
+        const updated = (await this.invitation.update({
+            where: { id },
+            data: { tokenHash: sha256Hex(token), expiresAt: newExpiresAt }
+        })) as InvitationProps;
 
         this.txEventEmitter.emitAfterCommit(
             'invitation.resent',
@@ -116,7 +132,7 @@ export class InvitationService {
             )
         );
 
-        this.logger.log(`Invitation resent: ${id}`, { invitationId: id, email: updated.email });
+        this.logger.log(`Invitation resent: ${id}`, { invitationId: id });
         return invitationResponseMapper.toResponse(updated);
     }
 
@@ -135,30 +151,39 @@ export class InvitationService {
         return publicInvitationResponseMapper.toResponse(invitation);
     }
 
+    /**
+     * Accepts an invitation for the signed-in identity. The address is taken from Ory (the credential
+     * authority) and must match the invitation; the claim and the membership commit together, so the same
+     * invitation can never be redeemed twice.
+     */
     async accept(token: string, authUser: IAuthenticatedUser): Promise<UserResponse> {
         const invitation = await this.resolveRedeemable(token);
-
-        if (!authUser.email || authUser.email.toLowerCase() !== invitation.email.toLowerCase()) {
-            throw new ForbiddenException('This invitation was issued to a different email address');
+        if (!authUser.identityId) {
+            throw new BaseException('authentication_error', 'A signed-in user is required', HttpStatus.UNAUTHORIZED);
+        }
+        const identity = await this.usersService.identityOf(authUser.identityId);
+        if (identity.email.toLowerCase() !== invitation.email.toLowerCase()) {
+            throw new BaseException('authorization_error', 'This invitation was issued to a different email address', HttpStatus.FORBIDDEN);
         }
 
-        const member = await this.usersService.provisionMember({
-            tenantId: invitation.tenantId,
-            kratosIdentityId: authUser.userId,
-            email: invitation.email,
-            role: invitation.role,
-            actingUserId: authUser.userId
+        const member = await this.prisma.$transaction(async (tx) => {
+            const claimed = await tx.invitation.updateMany({
+                where: { id: invitation.id, status: InvitationStatusEnum.PENDING },
+                data: { status: InvitationStatusEnum.ACCEPTED }
+            });
+            if (claimed.count === 0) {
+                throw new BaseException('state_conflict', 'This invitation has already been used', HttpStatus.CONFLICT);
+            }
+            return this.usersService.joinByInvitation(tx, invitation.tenantId, identity, invitation.role as RoleEnum, null);
         });
 
-        await this.prisma.invitation.update({ where: { id: invitation.id }, data: { status: InvitationStatusEnum.ACCEPTED } });
         this.logger.log(`Invitation accepted: ${invitation.id}`, { invitationId: invitation.id, userId: member.id, tenantId: invitation.tenantId });
-
         return userResponseMapper.toResponse(member);
     }
 
     /** Load a PENDING, non-expired invitation by token (no tenant context); marks it EXPIRED on lapse. */
     private async resolveRedeemable(token: string): Promise<InvitationProps> {
-        const invitation = (await this.prisma.invitation.findUnique({ where: { token } })) as InvitationProps | null;
+        const invitation = (await this.prisma.invitation.findUnique({ where: { tokenHash: sha256Hex(token) } })) as InvitationProps | null;
         if (!invitation || invitation.deletedAt) {
             throw new NotFoundException('Invitation not found');
         }

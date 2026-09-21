@@ -212,7 +212,8 @@ export class S3Service implements OnModuleInit {
         const command = new PutObjectCommand({
             Bucket: this.bucketName,
             Key: fullKey,
-            ContentType: options?.contentType
+            ContentType: options?.contentType,
+            ContentLength: options?.contentLength
         });
         return getSignedUrl(this.client, command, {
             expiresIn: options?.expiresIn || this.presignedUrlExpiry

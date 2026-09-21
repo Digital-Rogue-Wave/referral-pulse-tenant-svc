@@ -57,9 +57,10 @@ export class AlsAuthInterceptor implements NestInterceptor {
         const ctx: RequestContext = {
             requestId,
             correlationId,
-            tenantId: user?.tenantId || this.getHeader(request, 'x-tenant-id') || request.tenantId || '',
-            userId: user?.userId || this.getHeader(request, 'x-user-id') || request.userId || '',
-            idempotencyKey: this.getHeader(request, 'x-idempotency-key') || request.idempotencyKey,
+            // Tenant and user come only from the verified token — a header can never select a tenant.
+            tenantId: user?.tenantId ?? '',
+            userId: user?.userId ?? '',
+            idempotencyKey: this.getHeader(request, 'idempotency-key') || request.idempotencyKey,
             ip: this.extractIp(request),
             userAgent: request.headers['user-agent'],
             route: request.route?.path || request.path,
@@ -88,21 +89,12 @@ export class AlsAuthInterceptor implements NestInterceptor {
             ctx.metadata = { ...ctx.metadata, authHeader };
         }
 
-        if (user.metadata) {
-            ctx.metadata = { ...ctx.metadata, ...user.metadata };
-        }
-
-        if (user.roles) {
-            ctx.metadata = { ...ctx.metadata, roles: user.roles };
-        }
-
-        if (user.permissions) {
-            ctx.metadata = { ...ctx.metadata, permissions: user.permissions };
-        }
-
-        if (user.email) {
-            ctx.metadata = { ...ctx.metadata, email: user.email };
-        }
+        ctx.metadata = {
+            ...ctx.metadata,
+            source: user.source,
+            ...(user.identityId ? { identityId: user.identityId } : {}),
+            ...(user.clientId ? { clientId: user.clientId } : {})
+        };
     }
 
     /**

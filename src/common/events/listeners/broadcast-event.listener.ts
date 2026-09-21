@@ -23,7 +23,7 @@ import {
     BillingEvents
 } from '@domains/billing';
 import { ApiKeyCreatedEvent, ApiKeyDeletedEvent } from '@domains/api-key';
-import { UserRegisteredEvent, UserRoleChangedEvent, UserLoggedInEvent } from '@domains/user';
+import { UserRegisteredEvent, UserRoleChangedEvent, UserLoggedInEvent, UserRemovedEvent, UserInvitedEvent } from '@domains/user';
 import { BILLING_EVENTS_TOPIC, USER_EVENTS_TOPIC, type BaseEventType, type SnsTopicName } from '@app/types';
 
 /**
@@ -289,6 +289,24 @@ export class BroadcastEventListener {
             tenant_id: event.tenantId,
             old_role: event.oldRole,
             new_role: event.newRole
+        });
+    }
+
+    @OnEvent('user.removed', { async: true })
+    async handleUserRemoved(event: UserRemovedEvent): Promise<void> {
+        await this.broadcast('user', 'user.removed', event.tenantId, event.eventId, USER_EVENTS_TOPIC, {
+            user_id: event.aggregateId,
+            tenant_id: event.tenantId,
+            role: event.role
+        });
+    }
+
+    @OnEvent('user.invited', { async: true })
+    async handleUserInvited(event: UserInvitedEvent): Promise<void> {
+        await this.broadcast('user', 'user.invited', event.tenantId, event.eventId, USER_EVENTS_TOPIC, {
+            invitation_id: event.aggregateId,
+            tenant_id: event.tenantId,
+            role: event.role
         });
     }
 

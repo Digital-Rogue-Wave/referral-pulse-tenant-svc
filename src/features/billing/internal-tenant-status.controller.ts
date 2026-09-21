@@ -1,8 +1,8 @@
 import { Controller, Get, HttpCode, HttpStatus, NotFoundException, Param } from '@nestjs/common';
 import { ApiBearerAuth, ApiOkResponse, ApiTags } from '@nestjs/swagger';
 
-import { RequirePermission } from '@common/auth/require-permission.decorator';
-import { KetoNamespace, KetoRelation } from '@common/auth/keto.constants';
+import { AllowServices } from '@common/auth/require-permission.decorator';
+import { ServiceCapability } from '@common/auth/authz/keto-tuples';
 import { BillingPlanEnum, PaymentStatusEnum, SubscriptionStatusEnum } from '@common/enums/billing.enum';
 import { TenantStatusEnum } from '@common/enums/tenant.enum';
 
@@ -16,7 +16,7 @@ export class InternalTenantStatusController {
     constructor(private readonly prisma: DatabaseService) {}
 
     @ApiOkResponse({ type: InternalTenantBillingStatusDto })
-    @RequirePermission({ namespace: KetoNamespace.TENANT, relation: KetoRelation.READ, allowServiceTokens: true })
+    @AllowServices(ServiceCapability.TENANT_STATUS_READ)
     @HttpCode(HttpStatus.OK)
     @Get(':id/status')
     async getTenantStatus(@Param('id') tenantId: string): Promise<InternalTenantBillingStatusDto> {

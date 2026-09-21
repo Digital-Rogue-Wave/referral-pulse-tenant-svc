@@ -10,8 +10,8 @@ import {
     UploadedFile,
     UploadedFiles,
     UseInterceptors,
-    BadRequestException,
-    UseGuards
+    ParseIntPipe,
+    Query
 } from '@nestjs/common';
 import { ApiBearerAuth, ApiBody, ApiConsumes, ApiOkResponse, ApiTags } from '@nestjs/swagger';
 import { Idempotent, IdempotencyScope } from '@common/idempotency';
@@ -21,27 +21,12 @@ import { FileDto, PresignedUrlResponseDto } from '@domains/files';
 
 import { FilesService } from './files.service';
 import { FileInterceptor, FilesInterceptor } from '@nestjs/platform-express';
-import type { MulterOptions } from '@nestjs/platform-express/multer/interfaces/multer-options.interface';
-import { PaymentRequiredGuard } from '@app/features/billing/guards/payment-required.guard';
+import { RequirePermission } from '@common/auth/require-permission.decorator';
 
-/** Accepted upload types (logos/branding + documents) and size cap. */
-const ALLOWED_MIME_TYPES = ['image/png', 'image/jpeg', 'image/webp', 'image/gif', 'image/svg+xml', 'application/pdf'];
-const MAX_FILE_SIZE_BYTES = 10 * 1024 * 1024; // 10 MB
-
-const FILE_UPLOAD_OPTIONS: MulterOptions = {
-    limits: { fileSize: MAX_FILE_SIZE_BYTES },
-    fileFilter: (_req, file, cb) => {
-        if (!ALLOWED_MIME_TYPES.includes(file.mimetype)) {
-            cb(new BadRequestException(`Unsupported file type: ${file.mimetype}`), false);
-            return;
-        }
-        cb(null, true);
-    }
-};
+import { FILE_UPLOAD_OPTIONS } from './file-upload.policy';
 
 @ApiTags('Files')
 @ApiBearerAuth()
-@UseGuards(PaymentRequiredGuard)
 @Controller({
     path: 'files',
     version: '1'
@@ -49,6 +34,7 @@ const FILE_UPLOAD_OPTIONS: MulterOptions = {
 export class FilesController {
     constructor(private readonly filesService: FilesService) {}
 
+    @RequirePermission('tenants:write')
     @Post('upload')
     @Idempotent({ scope: IdempotencyScope.Tenant, ttl: 3600 })
     @ApiBearerAuth()
@@ -71,6 +57,7 @@ export class FilesController {
         return this.filesService.uploadFile(file);
     }
 
+    @RequirePermission('tenants:write')
     @Post('upload-multiple')
     @Idempotent({ scope: IdempotencyScope.Tenant, ttl: 3600 })
     @ApiConsumes('multipart/form-data')
@@ -95,13 +82,15 @@ export class FilesController {
         return this.filesService.uploadMultipleFiles(files);
     }
 
+    @RequirePermission('tenants:write')
     @Get('presigned/:type')
     @ApiBearerAuth()
     @ApiOkResponse({ type: PresignedUrlResponseDto })
-    async getPresignedUrl(@Param('type') type: string): Promise<PresignedUrlResponseDto> {
-        return this.filesService.getPresignedUrl(type);
+    async getPresignedUrl(@Param('type') type: string, @Query('size', ParseIntPipe) size: number): Promise<PresignedUrlResponseDto> {
+        return this.filesService.getPresignedUrl(type, size);
     }
 
+    @RequirePermission('tenants:read')
     @Get(':id')
     @ApiOkResponse({ type: FileDto })
     @HttpCode(HttpStatus.OK)
@@ -115,6 +104,7 @@ export class FilesController {
      * @param id
      * @param file {Express.Multer.File | Express.MulterS3.File} file to update
      */
+    @RequirePermission('tenants:write')
     @Put(':id')
     @Idempotent({ scope: IdempotencyScope.Tenant, ttl: 1800 })
     @ApiConsumes('multipart/form-data')
@@ -141,6 +131,7 @@ export class FilesController {
      * @returns {Promise<File>} deleted file
      * @param id file id
      */
+    @RequirePermission('tenants:write')
     @Delete(':id')
     @Idempotent({ scope: IdempotencyScope.Tenant, ttl: 1800 })
     @ApiOkResponse({ type: FileDto })

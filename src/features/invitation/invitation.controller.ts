@@ -1,4 +1,4 @@
-import { Body, Controller, Delete, Get, HttpCode, HttpStatus, Param, Post, UseGuards } from '@nestjs/common';
+import { Body, Controller, Delete, Get, HttpCode, HttpStatus, Param, Post } from '@nestjs/common';
 import { ApiTags, ApiBearerAuth, ApiBody, ApiCreatedResponse, ApiOkResponse, ApiOperation } from '@nestjs/swagger';
 
 import { CurrentUser } from '@common/auth/current-user.decorator';
@@ -6,7 +6,6 @@ import type { IAuthenticatedUser } from '@app/types';
 import { Public } from '@common/auth/public.decorator';
 import { AllowNoTenant } from '@common/auth/allow-no-tenant.decorator';
 import { RequirePermission } from '@common/auth/require-permission.decorator';
-import { KetoNamespace, KetoRelation, KetoResource } from '@common/auth/keto.constants';
 import { Paginate, PaginateQuery, Paginated, ApiPaginationQuery } from '@common/nestjs-prisma-pagination';
 import { Idempotent, IdempotencyScope } from '@common/idempotency';
 
@@ -15,7 +14,6 @@ import { UserResponse } from '@domains/user';
 
 import { InvitationService } from './invitation.service';
 import { INVITATION_PAGINATE_CONFIG } from './invitation.pagination';
-import { PaymentRequiredGuard } from '@app/features/billing/guards/payment-required.guard';
 
 /**
  * Tenant member invitations (tenant-aware, Keto-guarded). Sanctioned extension — not in the
@@ -23,24 +21,23 @@ import { PaymentRequiredGuard } from '@app/features/billing/guards/payment-requi
  */
 @ApiTags('Invitations')
 @ApiBearerAuth()
-@UseGuards(PaymentRequiredGuard)
 @Controller({ path: 'invitations', version: '1' })
 export class InvitationController {
     constructor(private readonly invitationService: InvitationService) {}
 
     @ApiBody({ type: CreateInvitationDto })
     @ApiCreatedResponse({ description: 'Invitation created and email queued', type: InvitationResponse })
-    @RequirePermission({ namespace: KetoNamespace.TENANT, object: KetoResource.USER, relation: KetoRelation.CREATE })
+    @RequirePermission('users:write')
     @HttpCode(HttpStatus.CREATED)
     @Post()
     @Idempotent({ scope: IdempotencyScope.Tenant, ttl: 3600 })
     async create(@Body() dto: CreateInvitationDto, @CurrentUser() user: IAuthenticatedUser): Promise<InvitationResponse> {
-        return this.invitationService.create(user.userId, dto);
+        return this.invitationService.create(user, dto);
     }
 
     @ApiPaginationQuery(INVITATION_PAGINATE_CONFIG)
     @ApiOkResponse({ description: 'List of tenant invitations', type: InvitationResponse, isArray: true })
-    @RequirePermission({ namespace: KetoNamespace.TENANT, object: KetoResource.USER, relation: KetoRelation.READ })
+    @RequirePermission('users:read')
     @HttpCode(HttpStatus.OK)
     @Get()
     async findAll(@Paginate() query: PaginateQuery): Promise<Paginated<InvitationResponse>> {
@@ -48,7 +45,7 @@ export class InvitationController {
     }
 
     @ApiOkResponse({ description: 'Invitation re-issued with a fresh token', type: InvitationResponse })
-    @RequirePermission({ namespace: KetoNamespace.TENANT, object: KetoResource.USER, relation: KetoRelation.UPDATE })
+    @RequirePermission('users:write')
     @HttpCode(HttpStatus.OK)
     @Post(':id/resend')
     @Idempotent({ scope: IdempotencyScope.Tenant, ttl: 1800 })
@@ -57,7 +54,7 @@ export class InvitationController {
     }
 
     @ApiOkResponse({ description: 'Invitation revoked' })
-    @RequirePermission({ namespace: KetoNamespace.TENANT, object: KetoResource.USER, relation: KetoRelation.DELETE })
+    @RequirePermission('users:write')
     @HttpCode(HttpStatus.NO_CONTENT)
     @Delete(':id')
     async revoke(@Param('id') id: string, @CurrentUser() user: IAuthenticatedUser): Promise<void> {

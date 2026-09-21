@@ -17,6 +17,7 @@ import { BillingModule } from '@app/features/billing/billing.module';
 
 import { DnsModule } from '@app/features/dns/dns.module';
 import { FilesModule } from '@app/features/files/files.module';
+import { IdentityGatewayModule } from '@app/features/identity-gateway/identity-gateway.module';
 import { InvitationModule } from '@app/features/invitation/invitation.module';
 import { UsersModule } from '@app/features/users/users.module';
 import { TenantModule } from '@app/features/tenant/tenant.module';
@@ -54,6 +55,7 @@ import { GlobalExceptionsFilter } from '@common/exceptions/global-exceptions.fil
         BillingModule,
         DnsModule,
         FilesModule,
+        IdentityGatewayModule,
         InvitationModule,
         UsersModule,
         TenantModule,

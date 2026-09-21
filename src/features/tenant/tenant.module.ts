@@ -18,14 +18,11 @@ import { TenantStatsService } from './aware/tenant-stats.service';
 
 // Listeners
 import { TenantListener } from './listeners/tenant.listener';
+import { UsersModule } from '../users/users.module';
 
 // Processors
 import { TenantDeletionProcessor } from './processors/tenant-deletion.processor';
 import { TenantUnlockProcessor } from './processors/tenant-unlock.processor';
-
-// Guards
-import { TenantStatusGuard } from './guards/tenant-status.guard';
-import { TenantLockGuard } from './guards/tenant-lock.guard';
 
 @Module({
     imports: [
@@ -33,7 +30,8 @@ import { TenantLockGuard } from './guards/tenant-lock.guard';
         FilesModule,
         HttpModule,
         TenantSettingModule,
-        DnsModule
+        DnsModule,
+        UsersModule
 
         // BullJobsModule is @Global() - no need to import
     ],
@@ -48,12 +46,8 @@ import { TenantLockGuard } from './guards/tenant-lock.guard';
 
         // Background Processors
         TenantDeletionProcessor,
-        TenantUnlockProcessor,
-
-        // Guards
-        TenantStatusGuard,
-        TenantLockGuard
+        TenantUnlockProcessor
     ],
-    exports: [TenantService, TenantStatsService, TenantStatusGuard, TenantLockGuard, DnsModule]
+    exports: [TenantService, TenantStatsService, DnsModule]
 })
 export class TenantModule {}

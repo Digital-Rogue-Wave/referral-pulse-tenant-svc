@@ -3,18 +3,20 @@ import { ApiBearerAuth, ApiOkResponse, ApiOperation, ApiTags } from '@nestjs/swa
 
 import { TenantResponse, SuspendTenantDto } from '@domains/tenant';
 import { Idempotent, IdempotencyScope } from '@common/idempotency';
-import { RequirePermission } from '@common/auth/require-permission.decorator';
-import { KetoNamespace, KetoRelation } from '@common/auth/keto.constants';
+import { AllowServices, PlatformAdmin } from '@common/auth/require-permission.decorator';
+import { ServiceCapability } from '@common/auth/authz/keto-tuples';
 
 import { TenantService } from '../tenant.service';
 
 /**
- * Platform-admin tenant operations (cross-tenant). Restricted to platform/system callers:
- * a service token (client_credentials) or a principal holding the Keto tenant:update relation.
+ * Platform-admin tenant operations (cross-tenant — they act on the `:id` in the path, not the caller's
+ * tenant). Only a platform administrator (`platform:referralai#admin`) or a service granted the
+ * `tenant.suspend` capability may call them; no tenant role, however high, reaches another tenant.
  */
 @ApiTags('Admin - Tenants')
 @ApiBearerAuth()
-@RequirePermission({ namespace: KetoNamespace.TENANT, relation: KetoRelation.UPDATE, allowServiceTokens: true })
+@PlatformAdmin()
+@AllowServices(ServiceCapability.TENANT_SUSPEND)
 @Controller({ path: 'admin/tenants', version: '1' })
 export class AdminTenantController {
     constructor(private readonly tenantService: TenantService) {}

@@ -15,6 +15,7 @@ import { BaseException } from '@common/exceptions/base.exceptions';
 import { SubdomainService } from '../dns/subdomain.service';
 import { DnsVerificationService } from '../dns/dns-verification.service';
 import { FilesService } from '../files/files.service';
+import { UsersService, MemberIdentity } from '../users/users.service';
 
 import {
     CreateTenantDto,
@@ -68,7 +69,8 @@ export class TenantService {
         private readonly subdomainService: SubdomainService,
         private readonly dnsVerificationService: DnsVerificationService,
         private readonly filesService: FilesService,
-        private readonly kratos: KratosService
+        private readonly kratos: KratosService,
+        private readonly usersService: UsersService
     ) {
         this.logger.setContext(TenantService.name);
     }
@@ -139,68 +141,91 @@ export class TenantService {
     // =========================================================
 
     /**
-     * Create a new tenant.
-     * Called by the Ory signup webhook and the agnostic controller.
+     * Onboards a new tenant: the tenant, its Owner membership and the role projection are created in one
+     * transaction, so a tenant can never exist without an Owner. Keto grants follow from the
+     * `tenant.created` / `user.registered` events.
+     *
+     * Deduplicated on the Ory identity (one identity, one tenant): a replayed Kratos web hook gets the
+     * existing tenant back (`onExisting: 'return'`); a user who already has a tenant and asks for another
+     * gets a 409 (`'conflict'`).
      */
     async create(
-        data: CreateTenantDto | { name: string; ownerId: string; slug?: string },
-        file?: Express.Multer.File | Express.MulterS3.File
+        data: Pick<CreateTenantDto, 'name'> & { slug?: string },
+        owner: MemberIdentity,
+        options: { file?: Express.Multer.File | Express.MulterS3.File; onExisting: 'return' | 'conflict' }
     ): Promise<TenantResponse> {
-        const id = ulid();
-        const slug = (data as CreateTenantDto).slug ? (data as CreateTenantDto).slug! : this.generateSlug((data as { name: string }).name, id);
-        const ownerId = (data as { ownerId?: string }).ownerId ?? 'system';
+        const existing = await this.prisma.user.findUnique({
+            where: { kratosIdentityId: owner.identityId },
+            select: { tenantId: true, deletedAt: true }
+        });
+        if (existing && !existing.deletedAt) {
+            if (options.onExisting === 'conflict') {
+                throw new BaseException('duplicate_resource', 'You already belong to a tenant', HttpStatus.CONFLICT);
+            }
+            return tenantResponseMapper.toResponse(await this.findOneOrFail(existing.tenantId));
+        }
 
-        // Validate slug uniqueness
-        const slugTaken = await this.prisma.tenant.count({ where: { slug } });
-        if (slugTaken > 0) {
-            throw new BadRequestException(`Slug "${slug}" is already in use`);
+        const id = ulid();
+        const slug = data.slug ?? this.generateSlug(data.name, id);
+        if ((await this.prisma.tenant.count({ where: { slug } })) > 0) {
+            throw new BaseException('duplicate_resource', `Slug "${slug}" is already in use`, HttpStatus.CONFLICT, 'slug');
         }
 
         const trialStartedAt = this.dateService.nowMoment().toDate();
         const trialEndsAt = this.dateService.nowMoment().add(TRIAL_PERIOD_DAYS, 'days').toDate();
+        const imageId = options.file ? await this.uploadLogo(id, options.file) : undefined;
 
-        // Handle optional logo upload. The tenant row does not exist yet, but its id is known — run the
-        // upload under that tenant's context so the file is stored and scoped under the new tenant.
-        let imageId: string | undefined;
-        if (file) {
-            try {
-                const uploaded = await this.tenantContext.runWithContext({ tenantId: id, userId: ownerId }, () => this.filesService.uploadFile(file));
-                imageId = uploaded.id;
-            } catch (err) {
-                this.logger.warn('Failed to upload tenant logo, continuing without image', {
-                    error: err instanceof Error ? err.message : String(err)
-                });
-            }
-        }
-
-        const tenant = await this.prisma.tenant.create({
-            data: {
-                id,
-                name: data.name,
-                slug,
-                imageId: imageId ?? null,
-                status: TenantStatus.ACTIVE,
-                paymentStatus: 'active',
-                trialStartedAt,
-                trialEndsAt
-            }
+        const { tenant, ownerUser } = await this.prisma.$transaction(async (tx) => {
+            const created = await tx.tenant.create({
+                data: {
+                    id,
+                    name: data.name,
+                    slug,
+                    imageId: imageId ?? null,
+                    status: TenantStatus.ACTIVE,
+                    paymentStatus: 'active',
+                    trialStartedAt,
+                    trialEndsAt
+                }
+            });
+            // Emitted before the owner's user.registered so the tenant's Keto grants are queued first.
+            this.txEventEmitter.emitAfterCommit(
+                TenantEvents.CREATED,
+                new TenantCreatedEvent(created.id, created.id, created.name, created.slug, owner.identityId, trialStartedAt, trialEndsAt)
+            );
+            const createdOwner = await this.usersService.createOwner(tx, created.id, owner);
+            return { tenant: created, ownerUser: createdOwner };
         });
 
-        this.txEventEmitter.emitAfterCommit(
-            TenantEvents.CREATED,
-            new TenantCreatedEvent(tenant.id, tenant.id, tenant.name, tenant.slug, ownerId, trialStartedAt, trialEndsAt)
-        );
-
-        // Company verification at signup (referralai_system_architecture_v1.md §Company Verification):
-        // request verification so the workflow service can run the account_verification workflow.
+        // Company verification at signup: the workflow service runs the account_verification workflow.
         this.txEventEmitter.emitAfterCommit(
             TenantEvents.VERIFICATION_REQUESTED,
-            new TenantVerificationRequestedEvent(tenant.id, tenant.id, tenant.name, ownerId)
+            new TenantVerificationRequestedEvent(tenant.id, tenant.id, tenant.name, ownerUser.id)
         );
 
-        this.logger.log(`Tenant created: ${tenant.id}`, { tenantId: tenant.id, slug: tenant.slug });
-
+        this.logger.log('Tenant created', { tenantId: tenant.id, slug: tenant.slug, ownerUserId: ownerUser.id });
         return tenantResponseMapper.toResponse(tenant);
+    }
+
+    /** Self-service tenant creation by a signed-in identity that has no tenant yet. */
+    async createForIdentity(
+        identityId: string,
+        data: Pick<CreateTenantDto, 'name' | 'slug'>,
+        file?: Express.Multer.File | Express.MulterS3.File
+    ): Promise<TenantResponse> {
+        const owner = await this.usersService.identityOf(identityId);
+        return this.create(data, owner, { file, onExisting: 'conflict' });
+    }
+
+    /** The tenant row does not exist yet, but its id is known — upload under that tenant so the file is scoped to it. */
+    private async uploadLogo(tenantId: string, file: Express.Multer.File | Express.MulterS3.File): Promise<string | undefined> {
+        try {
+            const uploaded = await this.tenantContext.runWithContext({ tenantId, userId: 'system' }, () => this.filesService.uploadFile(file));
+            return uploaded.id;
+        } catch (err) {
+            this.logger.warn('Failed to upload tenant logo, continuing without image', { error: err instanceof Error ? err.message : String(err) });
+            return undefined;
+        }
     }
 
     /**
@@ -322,23 +347,15 @@ export class TenantService {
     }
 
     /**
-     * Transfer ownership of the current tenant to another user.
+     * Transfer ownership of the current tenant to another member (membership change lives in UsersService).
      */
     async transferOwnership(dto: TransferOwnershipDto, user: IAuthenticatedUser): Promise<void> {
         const tenantId = this.tenantContext.getTenantId()!;
-        await this.findOneOrFail(tenantId);
-
-        // NOTE: actual Keto permission re-assignment happens in TenantListener
+        await this.usersService.transferOwnership(user, dto.newOwnerId);
         this.txEventEmitter.emitAfterCommit(
             TenantEvents.OWNERSHIP_TRANSFERRED,
             new TenantOwnershipTransferredEvent(tenantId, tenantId, user.userId, dto.newOwnerId, this.dateService.nowMoment().toDate(), user.userId)
         );
-
-        this.logger.log(`Tenant ownership transferred: ${tenantId}`, {
-            tenantId,
-            from: user.userId,
-            to: dto.newOwnerId
-        });
     }
 
     // =========================================================

@@ -188,6 +188,8 @@ export interface IS3UploadOptions {
 export interface IPresignedUrlOptions {
     expiresIn?: number;
     contentType?: string;
+    /** Exact byte length the upload must have — signed into the URL, so S3 rejects any other size. */
+    contentLength?: number;
     contentDisposition?: string;
 }
 
@@ -370,14 +372,36 @@ export interface IJwtPayload {
     [key: string]: unknown; // Additional claims
 }
 
+/** Where a principal's credential came from (API Contract v1.3 §2 internal JWT `source`). */
+export type PrincipalSource = 'dashboard' | 'api_key' | 'client_credentials';
+
+/**
+ * Claims of the internal JWT minted by /internal/validate-token (API §2 "OAuth2 JWT", Architecture §13.1).
+ * `user_id` is the platform user ULID (null for an Ory identity that has not joined a tenant yet, e.g.
+ * an invitee); `identity_id` is the Ory Kratos identity behind it.
+ */
+export interface IInternalTokenClaims {
+    tenant_id: string | null;
+    user_id: string | null;
+    identity_id: string | null;
+    email: string | null;
+    source: PrincipalSource;
+    key_type: 'secret' | 'publishable' | null;
+    key_id: string | null;
+    perms: string[];
+}
+
 export interface IAuthenticatedUser {
+    /** Platform user ULID; empty for identities without a membership and for service principals. */
     userId: string;
     tenantId: string;
+    identityId?: string;
     email?: string;
-    roles?: string[];
-    permissions?: string[];
-    scopes?: string[];
-    metadata?: Record<string, unknown>;
+    source: PrincipalSource;
+    keyType?: 'secret' | 'publishable' | null;
+    keyId?: string | null;
+    /** Resolved permission snapshot (API §2) — authorizes coarse checks without a Keto round-trip. */
+    perms?: string[];
 
     // M2M (client_credentials) tokens
     isServiceToken?: boolean;
@@ -613,9 +637,26 @@ export interface IAuditSideEffectPayload {
 }
 
 /**
+ * Payload for a Keto authorization sync. Written in the same transaction as the membership change it
+ * mirrors, so a Keto outage can delay permissions but never lose them. Every operation is idempotent.
+ */
+export interface IKetoSideEffectPayload {
+    [key: string]: unknown;
+    operation: 'grant_tenant' | 'assign_role' | 'remove_member' | 'revoke_tenant';
+    tenantId: string;
+    userId?: string;
+    role?: string;
+}
+
+/**
  * Union type for all side effect payloads
  */
-export type SideEffectPayload = ISqsSideEffectPayload | ISnsSideEffectPayload | IEmailSideEffectPayload | IAuditSideEffectPayload;
+export type SideEffectPayload =
+    | ISqsSideEffectPayload
+    | ISnsSideEffectPayload
+    | IEmailSideEffectPayload
+    | IAuditSideEffectPayload
+    | IKetoSideEffectPayload;
 
 /**
  * DTO for creating a side effect in the outbox pattern

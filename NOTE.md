@@ -9,12 +9,77 @@ Date of pass: 2026-06-17.
 
 ## Source of truth
 
-The canonical specs now live (verbatim) in `docs/`:
+**Superseded 2026-09-21:** the authoritative specs are the newer suite in `spec/` — API Contract v1.3,
+Event Model v3, DB Model v2, Product Spec v4, System & Application Architecture, Failure & Observability
+v3, Responsibility Contract v3. The `docs/` set below is kept read-only for history only.
+
+The canonical specs previously lived (verbatim) in `docs/`:
 `referralai_system_architecture_v1.md`, `referralai_db_tables_per_service.md`,
 `referralai_event_model_v2.1.md`, `referralai_api_contract_v1.2.md`,
 `referral_platform_product_spec.md`, `referralai_responsibility_contract_v2.md`,
 `referralai_failure_observability_model_v2.md`, `docker-compose.yml`.
 `docs/` and `docs/specs/` are READ-ONLY.
+
+---
+
+## Decisions — batch 2 (2026-09-21)
+
+Ahmed's rule for this batch: where a ruling is open, implement the recommended production-grade option
+and record it here, rather than wait. Every item below can be revisited; each names what was rejected.
+
+### Authorization model (API Contract v1.3 §2) — tenant-service owns Ory Keto
+
+| # | Decision | Why | Rejected |
+|---|---|---|---|
+| A1 | **The permission catalog is code** (`src/common/auth/authz/permission-catalog.ts`): the spec's 11 namespaces plus tenant-service's own `tenants` (read/write/delete), `users` (read/write), `billing` (read/write), `audit` (read). The Keto namespace config (`deployment/ory/keto/`) mirrors it and a spec fails on drift. | One definition drives tuples, the `perms` snapshot and the guards, so they cannot disagree. The spec table covers the other domains only. | Hand-maintained namespace list in infra. |
+| A2 | **Role objects are tenant-scoped:** `role:{tenant_id}:{role}#member@user:{user_id}`; grants are subject sets `campaigns:{tenant_id}#write@(role:{tenant_id}:operator#member)`. | The spec example `role:operator#member` is global — an operator of tenant A would satisfy tenant B's grant. Verified on the running Keto that subject-set grants resolve transitively and deny outsiders. | Global role objects (spec example taken literally). |
+| A3 | **Role matrix = API §2:** Owner all; Admin all except `billing:*` **and `tenants:delete`**; Operator and Viewer as specified **plus `tenants:read`**. | Deleting a tenant cancels the subscription and is irreversible — Owner-only. Every dashboard page reads the tenant profile. | Admin may delete the tenant. |
+| A4 | **Live-check set** (never trusted from the JWT): the spec's `rewards:approve/reject/clawback`, `payouts:write/confirm`, `api_keys:manage`, plus `users:write`, `billing:write`, `tenants:delete`. Decisions cached 45 s in Redis (`keto:decision:*`, DB Model §3). | A stale token must not win on money, keys, membership or deletion. | Live Keto on every request. |
+| A5 | **Keto subject = platform user ULID** (`user:{users.id}`); the Kratos identity id stays internal to credential resolution. | API §2 actor table (`user:{id}`), and `users.id` is the id on the wire. | Kratos identity id as subject. |
+| A6 | **Platform scope:** `platform:referralai#admin@user:{id}` for staff routes (tenant suspend/unsuspend, plan catalog, currencies, circuit breakers). **Services:** `services:{capability}#call@service:{client_id}` for internal routes (`tenant_status.read`, `tenant_entitlements.read`, `tenant_contacts.read`, `tenant_verification.write`, `tenant.suspend`, `usage.write`). A route that lists only service capabilities is service-only — human tokens are refused. | Fixes #3 (a tenant Owner could suspend any tenant), #13/#14 (platform tables writable by tenants) and #4 (service tokens bypassed Keto). | The `allowServiceTokens` bypass. |
+| A7 | **Internal JWT minted by tenant-service** at `GET /internal/validate-token` (Architecture §13.1). The gateway (Traefik forwardAuth, `authResponseHeaders: [Authorization]`) exchanges an API key or a Hydra user token for an ES256 JWT `{tenant_id, user_id, identity_id, source, key_type, key_id, perms}`, TTL 5 min (API key: 60 s). JWKS at `/.well-known/jwks.json`, `kid` = RFC 7638 thumbprint. The gateway authenticates with `X-Gateway-Secret`. Closed tenants are refused here. | The spec's design; `perms` is resolved once per token, not per request. | A Hydra token hook — it would put tenant logic inside Hydra's issuance and still leave API keys unsolved. |
+| A8 | **Every service accepts two token kinds:** the internal JWT, and Hydra **client-credentials** tokens for mesh calls. A Hydra token for a human is rejected — dashboard traffic must pass the gateway. The tenant comes only from the verified token; the `x-tenant-id` header fallback is removed everywhere. | #4, #7. | Header-selected tenant. |
+| A9 | **Membership is the write model, Keto is kept in sync:** `users` + `user_roles` change in a transaction; `tenant.created`, `user.registered`, `user.role_changed`, `user.removed` and `tenant.deleted` feed `KetoSyncListener`, which writes `keto` outbox side effects (idempotent tuple patches). A nightly `KetoReconcilerWorker` rewrites every live tenant's grants and memberships from the database. | Follows this repo's rule that services never call SideEffectService directly (`architecture.md`); the reconciler covers the crash window between commit and listener, and repairs drift. | Writing Keto inline (a Keto outage would fail signups). |
+
+### Identity lifecycle
+
+| # | Decision | Why |
+|---|---|---|
+| L1 | **One Ory identity belongs to exactly one tenant** — `users.kratos_identity_id` is globally unique (DB Model v2 §3). | Spec; makes token-time tenant resolution unambiguous. |
+| L2 | **Onboarding** (Kratos after-registration hook `POST /v1/webhook/ory/signup`, or `POST /v1/tenants` for a signed-in identity with no tenant) creates the tenant, its Owner user and the role projection in **one transaction**. A replayed hook returns the existing tenant; a second tenant request gets 409. An address with a pending invitation gets **no** tenant — it joins through the invitation. | #8: signup used to create an ownerless tenant, and duplicates on retry. |
+| L3 | **Role grants:** nobody grants `OWNER` directly (only ownership transfer, by the Owner); nobody grants above their own rank; nobody manages a peer or superior (except the Owner) or themselves; the last Owner/Admin cannot be removed or downgraded. | #5 role escalation. |
+| L4 | **Removal** soft-deletes the member, clears the projection, revokes the Keto membership and ends every Ory session; emits `user.removed`. A removed identity may later join another tenant (the old row is replaced). | #6. |
+| L5 | **Ownership transfer** promotes the target to Owner and demotes the previous Owner to Admin atomically. | #50: it only emitted an event before. |
+| L6 | **Invitations** store only `sha256(token)`; the inviter's rank bounds the invited role; acceptance reads the invitee's email **from Kratos** (never from the token) and claims PENDING→ACCEPTED in the same transaction as the membership; emits `user.invited` (id and role only). | #33. |
+| L7 | **Password confirmation** (lock/unlock) runs a Kratos native login flow and revokes the session it creates, with no retries and outside the circuit breaker. | Batch 1 called `/admin/identities/{id}/credentials/password/verify`, **which does not exist** (404 on the running Kratos) — lock/unlock could never succeed. |
+| L8 | **Ory web hooks** authenticate with a mandatory ≥32-char `ORY_WEBHOOK_API_KEY`, compared in constant time. | #53: an empty value disabled the check. |
+
+### Access tiers, uploads, test routes, outbox
+
+| # | Decision | Why |
+|---|---|---|
+| G1 | **One global `TenantAccessGuard`** (one tenant read per request): suspended → 403 everywhere; self-locked → 403 except `@AllowLockedTenant` (unlock); payment-locked → 402 except `@AllowUnpaidTenant` (billing); restricted → read-only. | The per-controller guards read the tenant from request context, which is **empty while guards run** — the payment tiers never applied over HTTP. Also fixes #11 (unlock unreachable) and #12. |
+| G2 | **One upload policy** for multipart and presigned uploads: png/jpeg/webp/gif/pdf, 10 MB; **SVG removed** (it can carry script). Presigned URLs sign the content type and exact byte size; ULID keys under the tenant prefix. File routes require `tenants:read/write`. | #49. |
+| G3 | **`/test/*` billing routes register only with `ENABLE_TEST_ROUTES=true`.** | #46: they were live on staging. |
+| G4 | **Outbox:** the queue client is injected by class; the worker claims rows atomically and retries a row not yet visible; `OutboxSweeperService` re-enqueues lost or stuck rows every minute; `effect_type` is `text` + CHECK (DB Model §0.3). | `SideEffectService` took its queue client through a string token **no module provided** — every critical side effect was written and never enqueued. Found during live verification. |
+
+### Superseded rules (flagged for the lead, not rewritten)
+
+- `CLAUDE.md` / `.claude/rules/security.md` say errors are "RFC 9457 ProblemDetail". Per decision X-2 the
+  platform adopts the API Contract v1.3 `{error:{type,code,message,param,request_id,doc_url}}` body; the
+  switch lands with the HTTP-conventions phase.
+- `CLAUDE.md` "Consumes: …usage consumer on ANALYTICS_SVC_FIFO" and its Keto description are superseded by
+  the model above.
+
+### For the colleague's services
+
+Full, step-by-step list: `D:\Projects\Work\REFERRAL\my-docs\cross-service-requirements.md`. In short:
+
+- Accept the internal JWT (issuer `referralai-tenant-svc`, audience `referralai-internal`, JWKS at
+  tenant-service `/.well-known/jwks.json`) and read `perms`; call Keto live only for the high-risk set.
+- Check permissions as `{namespace}:{tenant_id}#{relation}` with subject `user:{user_id}`.
+- Service-to-service calls into tenant-service use a Hydra client-credentials token whose client is granted
+  the capability in Keto.
 
 ---
 

@@ -4,6 +4,7 @@ import { EventEmitterModule } from '@nestjs/event-emitter';
 import { AuditTrailListener } from './listeners/audit-trail.listener';
 import { BroadcastEventListener } from './listeners/broadcast-event.listener';
 import { EmailNotificationListener } from './listeners/email-notification.listener';
+import { KetoSyncListener } from './listeners/keto-sync.listener';
 import { TenantServiceListener } from './listeners/tenant-service.listener';
 import { TransactionEventEmitterService } from './transaction-event-emitter.service';
 
@@ -61,7 +62,8 @@ import { TransactionEventEmitterService } from './transaction-event-emitter.serv
         // Infrastructure listeners
         AuditTrailListener, // Audit trail service (async SQS)
         BroadcastEventListener, // Cross-service broadcast (fire-and-forget + DLQ)
-        EmailNotificationListener // Email service (critical SQS + marketing HTTP)
+        EmailNotificationListener, // Email service (critical SQS + marketing HTTP)
+        KetoSyncListener // Membership → Ory Keto, through the outbox
     ],
     exports: [EventEmitterModule, TransactionEventEmitterService]
 })

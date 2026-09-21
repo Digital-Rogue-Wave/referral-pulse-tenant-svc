@@ -1,8 +1,7 @@
-import { Body, Controller, Delete, Get, HttpCode, HttpStatus, Param, Post, UseGuards } from '@nestjs/common';
+import { Body, Controller, Delete, Get, HttpCode, HttpStatus, Param, Post } from '@nestjs/common';
 import { ApiBearerAuth, ApiHeader, ApiOkResponse, ApiTags } from '@nestjs/swagger';
 import { RequirePermission } from '@common/auth/require-permission.decorator';
-import { TenantStatusGuard } from '@app/features/tenant/guards/tenant-status.guard';
-import { KetoNamespace, KetoRelation, KetoResource } from '@common/auth/keto.constants';
+import { AllowUnpaidTenant } from '@common/auth/tenant-access.guard';
 import { Idempotent, IdempotencyScope } from '@common/idempotency';
 import { AppLoggerService } from '@common/logging/app-logger.service';
 
@@ -31,7 +30,7 @@ import { BillingService } from './billing.service';
     description: 'Tenant-Id header',
     schema: { type: 'string' }
 })
-@UseGuards(TenantStatusGuard)
+@AllowUnpaidTenant()
 @Controller({ path: 'billings', version: '1' })
 export class BillingController {
     constructor(
@@ -42,11 +41,7 @@ export class BillingController {
     }
 
     @ApiOkResponse({ type: SubscriptionStatusDto })
-    @RequirePermission({
-        namespace: KetoNamespace.TENANT,
-        object: KetoResource.BILLING,
-        relation: KetoRelation.READ
-    })
+    @RequirePermission('billing:read')
     @HttpCode(HttpStatus.OK)
     @Get('subscription')
     async getCurrentSubscription(): Promise<SubscriptionStatusDto> {
@@ -54,11 +49,7 @@ export class BillingController {
     }
 
     @ApiOkResponse({ type: SubscriptionCheckoutResponseDto })
-    @RequirePermission({
-        namespace: KetoNamespace.TENANT,
-        object: KetoResource.BILLING,
-        relation: KetoRelation.CREATE
-    })
+    @RequirePermission('billing:write')
     @Idempotent({ scope: IdempotencyScope.Tenant, ttl: 3600 })
     @HttpCode(HttpStatus.OK)
     @Post('subscription/checkout')
@@ -67,11 +58,7 @@ export class BillingController {
     }
 
     @ApiOkResponse({ type: SubscriptionUpgradePreviewResponseDto })
-    @RequirePermission({
-        namespace: KetoNamespace.TENANT,
-        object: KetoResource.BILLING,
-        relation: KetoRelation.READ
-    })
+    @RequirePermission('billing:read')
     @Idempotent({ scope: IdempotencyScope.Tenant, ttl: 300 })
     @HttpCode(HttpStatus.OK)
     @Post('subscription/upgrade/preview')
@@ -80,11 +67,7 @@ export class BillingController {
     }
 
     @ApiOkResponse({ type: SubscriptionStatusDto })
-    @RequirePermission({
-        namespace: KetoNamespace.TENANT,
-        object: KetoResource.BILLING,
-        relation: KetoRelation.UPDATE
-    })
+    @RequirePermission('billing:write')
     @Idempotent({ scope: IdempotencyScope.Tenant, ttl: 3600 })
     @HttpCode(HttpStatus.OK)
     @Post('subscription/upgrade')
@@ -93,11 +76,7 @@ export class BillingController {
     }
 
     @ApiOkResponse({ type: SubscriptionStatusDto })
-    @RequirePermission({
-        namespace: KetoNamespace.TENANT,
-        object: KetoResource.BILLING,
-        relation: KetoRelation.UPDATE
-    })
+    @RequirePermission('billing:write')
     @Idempotent({ scope: IdempotencyScope.Tenant, ttl: 3600 })
     @HttpCode(HttpStatus.OK)
     @Post('subscription/downgrade')
@@ -106,11 +85,7 @@ export class BillingController {
     }
 
     @ApiOkResponse({ type: SubscriptionStatusDto })
-    @RequirePermission({
-        namespace: KetoNamespace.TENANT,
-        object: KetoResource.BILLING,
-        relation: KetoRelation.UPDATE
-    })
+    @RequirePermission('billing:write')
     @Idempotent({ scope: IdempotencyScope.Tenant, ttl: 1800 })
     @HttpCode(HttpStatus.OK)
     @Post('subscription/downgrade/cancel')
@@ -119,11 +94,7 @@ export class BillingController {
     }
 
     @ApiOkResponse({ type: SubscriptionStatusDto })
-    @RequirePermission({
-        namespace: KetoNamespace.TENANT,
-        object: KetoResource.BILLING,
-        relation: KetoRelation.DELETE
-    })
+    @RequirePermission('billing:write')
     @Idempotent({ scope: IdempotencyScope.Tenant, ttl: 3600 })
     @HttpCode(HttpStatus.OK)
     @Post('subscription/cancel')
@@ -132,11 +103,7 @@ export class BillingController {
     }
 
     @ApiOkResponse({ type: SubscriptionStatusDto })
-    @RequirePermission({
-        namespace: KetoNamespace.TENANT,
-        object: KetoResource.BILLING,
-        relation: KetoRelation.UPDATE
-    })
+    @RequirePermission('billing:write')
     @Idempotent({ scope: IdempotencyScope.Tenant, ttl: 3600 })
     @HttpCode(HttpStatus.OK)
     @Post('subscription/reactivate')
@@ -145,11 +112,7 @@ export class BillingController {
     }
 
     @ApiOkResponse({ type: PaymentMethodSetupResponseDto })
-    @RequirePermission({
-        namespace: KetoNamespace.TENANT,
-        object: KetoResource.BILLING,
-        relation: KetoRelation.CREATE
-    })
+    @RequirePermission('billing:write')
     @Idempotent({ scope: IdempotencyScope.Tenant, ttl: 3600 })
     @HttpCode(HttpStatus.OK)
     @Post('payment-methods')
@@ -158,22 +121,14 @@ export class BillingController {
     }
 
     @ApiOkResponse({ type: PaymentMethodDto, isArray: true })
-    @RequirePermission({
-        namespace: KetoNamespace.TENANT,
-        object: KetoResource.BILLING,
-        relation: KetoRelation.READ
-    })
+    @RequirePermission('billing:read')
     @HttpCode(HttpStatus.OK)
     @Get('payment-methods')
     async listPaymentMethods(): Promise<PaymentMethodDto[]> {
         return await this.billingService.listPaymentMethods();
     }
 
-    @RequirePermission({
-        namespace: KetoNamespace.TENANT,
-        object: KetoResource.BILLING,
-        relation: KetoRelation.DELETE
-    })
+    @RequirePermission('billing:write')
     @Idempotent({ scope: IdempotencyScope.Tenant, ttl: 1800 })
     @HttpCode(HttpStatus.NO_CONTENT)
     @Delete('payment-methods/:id')
@@ -181,11 +136,7 @@ export class BillingController {
         await this.billingService.deletePaymentMethod(id);
     }
 
-    @RequirePermission({
-        namespace: KetoNamespace.TENANT,
-        object: KetoResource.BILLING,
-        relation: KetoRelation.UPDATE
-    })
+    @RequirePermission('billing:write')
     @Idempotent({ scope: IdempotencyScope.Tenant, ttl: 1800 })
     @HttpCode(HttpStatus.NO_CONTENT)
     @Post('payment-methods/:id/default')
@@ -194,11 +145,7 @@ export class BillingController {
     }
 
     @ApiOkResponse({ type: InvoiceDto, isArray: true })
-    @RequirePermission({
-        namespace: KetoNamespace.TENANT,
-        object: KetoResource.BILLING,
-        relation: KetoRelation.READ
-    })
+    @RequirePermission('billing:read')
     @HttpCode(HttpStatus.OK)
     @Get('invoices')
     async listInvoices(): Promise<InvoiceDto[]> {
@@ -206,11 +153,7 @@ export class BillingController {
     }
 
     @ApiOkResponse({ type: UpcomingInvoiceDto })
-    @RequirePermission({
-        namespace: KetoNamespace.TENANT,
-        object: KetoResource.BILLING,
-        relation: KetoRelation.READ
-    })
+    @RequirePermission('billing:read')
     @HttpCode(HttpStatus.OK)
     @Get('invoices/upcoming')
     async getUpcomingInvoice(): Promise<UpcomingInvoiceDto> {
@@ -218,11 +161,7 @@ export class BillingController {
     }
 
     @ApiOkResponse({ type: UsageSummaryDto })
-    @RequirePermission({
-        namespace: KetoNamespace.TENANT,
-        object: KetoResource.BILLING,
-        relation: KetoRelation.READ
-    })
+    @RequirePermission('billing:read')
     @HttpCode(HttpStatus.OK)
     @Get('usage')
     async getUsageSummary(): Promise<UsageSummaryDto> {

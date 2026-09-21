@@ -5,8 +5,7 @@ import { TerminusModule, HealthCheckService, HealthCheck, PrismaHealthIndicator,
 import type { CircuitBreakerInfo } from '@app/types';
 
 import { Public } from '@common/auth/public.decorator';
-import { RequirePermission } from '@common/auth/require-permission.decorator';
-import { KetoNamespace, KetoRelation } from '@common/auth/keto.constants';
+import { PlatformAdmin } from '@common/auth/require-permission.decorator';
 import { HttpClientService } from '@common/http/http-client.service';
 import { HttpModule } from '@common/http/http.module';
 import { RedisHealthIndicator } from '@common/redis/redis-health.indicator';
@@ -63,14 +62,14 @@ export class HealthController {
         ]);
     }
 
-    @RequirePermission({ namespace: KetoNamespace.TENANT, relation: KetoRelation.READ })
+    @PlatformAdmin()
     @Get('circuit-breakers')
     @ApiOperation({ summary: 'Get all circuit breaker states' })
     getCircuitBreakers(): CircuitBreakerInfo[] {
         return this.httpClient.getAllCircuitBreakerStates();
     }
 
-    @RequirePermission({ namespace: KetoNamespace.TENANT, relation: KetoRelation.READ })
+    @PlatformAdmin()
     @Get('circuit-breakers/:serviceName')
     @ApiOperation({ summary: 'Get circuit breaker state for a specific service' })
     getCircuitBreaker(@Param('serviceName') serviceName: string): CircuitBreakerInfo | { error: string } {
@@ -78,7 +77,7 @@ export class HealthController {
         return state ?? { error: 'Circuit breaker not found for service' };
     }
 
-    @RequirePermission({ namespace: KetoNamespace.TENANT, relation: KetoRelation.UPDATE })
+    @PlatformAdmin()
     @Post('circuit-breakers/:serviceName/reset')
     @HttpCode(HttpStatus.NO_CONTENT)
     @ApiOperation({ summary: 'Manually reset a circuit breaker' })

@@ -11,6 +11,7 @@ import type { KratosIdentity } from '@app/types';
 @Injectable()
 export class KratosService {
     private readonly adminUrl: string;
+    private readonly publicUrl: string;
 
     constructor(
         private readonly http: HttpClientService,
@@ -19,7 +20,8 @@ export class KratosService {
     ) {
         this.logger.setContext(KratosService.name);
         const oryCfg = this.config.getOrThrow<OryConfig>('oryConfig');
-        this.adminUrl = oryCfg.kratos?.adminUrl || 'http://kratos:4434';
+        this.adminUrl = oryCfg.kratos.adminUrl;
+        this.publicUrl = oryCfg.kratos.publicUrl;
     }
 
     async getIdentity(identityId: string): Promise<KratosIdentity> {
@@ -44,38 +46,44 @@ export class KratosService {
     }
 
     /**
-     * Verify user password by attempting to create a session
-     * @param identityId - The Kratos identity ID
-     * @param password - The password to verify
-     * @returns true if password is correct, false otherwise
+     * Confirms an identity's password — the step-up check in front of destructive tenant actions.
+     *
+     * Kratos has no admin "verify password" endpoint, so this runs a native (API) login flow for the
+     * identity's email and immediately revokes the session it creates. Verified against the running
+     * Kratos: a correct password answers 200 with a session, a wrong one 400.
+     *
+     * The login POST runs with no retries and outside the circuit breaker: a wrong password is an
+     * expected 4xx, and retrying it would multiply failed attempts while tripping the breaker would
+     * take Kratos offline for every caller.
      */
     async verifyPassword(identityId: string, password: string): Promise<boolean> {
-        try {
-            // Get identity to extract email/username
-            const identity = await this.getIdentity(identityId);
-            const email = identity.traits?.email;
-
-            if (!email) {
-                return false;
-            }
-
-            // Use Kratos native API to verify credentials
-            // This endpoint validates password without creating a session
-            const response = await this.http.post<{ valid: boolean }>(`${this.adminUrl}/admin/identities/${identityId}/credentials/password/verify`, {
-                password
-            });
-
-            return response.data?.valid === true;
-        } catch (error) {
-            // Treat any failure as "not verified" — never as verified. The raw Ory
-            // error can carry the identity's email and session detail, so log only
-            // the message: this path is now load-bearing for a destructive action.
-            this.logger.warn('Kratos password verification failed', {
-                identityId,
-                reason: error instanceof Error ? error.message : 'unknown'
-            });
+        const identity = await this.getIdentity(identityId);
+        const email = identity.traits?.email;
+        if (!email) {
             return false;
         }
+
+        const flow = await this.http.get<{ id: string }>(`${this.publicUrl}/self-service/login/api`);
+        let sessionId: string | undefined;
+        try {
+            const login = await this.http.post<{ session?: { id?: string } }>(
+                `${this.publicUrl}/self-service/login`,
+                { method: 'password', identifier: email, password },
+                { params: { flow: flow.data.id }, retries: 0, skipCircuitBreaker: true }
+            );
+            sessionId = login.data.session?.id;
+        } catch {
+            // A rejected credential. The Ory error body can carry identity details, so nothing is logged from it.
+            this.logger.warn('Password confirmation rejected', { identityId });
+            return false;
+        }
+
+        if (sessionId) {
+            await this.http.delete(`${this.adminUrl}/admin/sessions/${sessionId}`).catch(() => {
+                this.logger.warn('Could not revoke the verification session', { identityId });
+            });
+        }
+        return true;
     }
 
     async updateIdentityMetadata(

@@ -12,10 +12,13 @@ import type {
     ISqsSideEffectPayload,
     ISnsSideEffectPayload,
     IEmailSideEffectPayload,
-    IAuditSideEffectPayload
+    IAuditSideEffectPayload,
+    IKetoSideEffectPayload
 } from '@app/types';
 
+import { KetoProvisioningService } from '@common/auth/authz/keto-provisioning.service';
 import { BaseWorkerService, BullJobsConnectionFactory } from '@common/bulljobs';
+import { RoleEnum } from '@common/enums/role.enum';
 import { DateService } from '@common/helper/date.service';
 import { AppLoggerService } from '@common/logging/app-logger.service';
 import { SnsPublisherService } from '@common/messaging/sns-publisher.service';
@@ -50,7 +53,8 @@ export class OutboxWorkerService extends BaseWorkerService<IOutboxJobData> {
         dateService: DateService,
         private readonly prisma: DatabaseService,
         private readonly sqsProducer: SqsProducerService,
-        private readonly snsPublisher: SnsPublisherService
+        private readonly snsPublisher: SnsPublisherService,
+        private readonly ketoProvisioning: KetoProvisioningService
     ) {
         super('outbox-processor', connectionFactory, configService, logger, metricsService, tracingService, tenantContext, dateService);
     }
@@ -82,27 +86,22 @@ export class OutboxWorkerService extends BaseWorkerService<IOutboxJobData> {
             eventType
         });
 
-        // Fetch the side effect record
-        const sideEffect = await this.prisma.sideEffectOutbox.findUnique({
-            where: { id: sideEffectId }
-        });
-
-        if (!sideEffect) {
-            this.logger.warn(`Side effect not found: ${sideEffectId}`);
-            return { success: true, data: { skipped: true, reason: 'not_found' } };
-        }
-
-        // Skip if already completed
-        if (sideEffect.status === 'completed') {
-            this.logger.debug(`Side effect already completed: ${sideEffectId}`);
-            return { success: true, data: { skipped: true, reason: 'already_completed' } };
-        }
-
-        // Mark as processing
-        await this.prisma.sideEffectOutbox.update({
-            where: { id: sideEffectId },
+        // Claim the row atomically so a sweeper re-enqueue and the original job never both run it.
+        const claimed = await this.prisma.sideEffectOutbox.updateMany({
+            where: { id: sideEffectId, status: 'pending' },
             data: { status: 'processing' }
         });
+        const sideEffect = await this.prisma.sideEffectOutbox.findUnique({ where: { id: sideEffectId } });
+
+        if (!sideEffect) {
+            // The job is enqueued inside the producer's transaction, so it can arrive before the commit.
+            // Retrying (BullMQ backoff) lets the row become visible; a rolled-back row simply exhausts retries.
+            throw new Error(`Outbox row ${sideEffectId} is not visible yet`);
+        }
+        if (claimed.count === 0) {
+            this.logger.debug(`Side effect ${sideEffectId} is ${sideEffect.status} — nothing to do`);
+            return { success: true, data: { skipped: true, reason: sideEffect.status } };
+        }
 
         try {
             // Execute based on effect type
@@ -118,6 +117,9 @@ export class OutboxWorkerService extends BaseWorkerService<IOutboxJobData> {
                     break;
                 case 'audit':
                     await this.processAuditEffect(sideEffect);
+                    break;
+                case 'keto':
+                    await this.processKetoEffect(sideEffect);
                     break;
                 default:
                     throw new Error(`Unsupported effect type: ${sideEffect.effectType}`);
@@ -228,6 +230,29 @@ export class OutboxWorkerService extends BaseWorkerService<IOutboxJobData> {
         // await this.auditService.log({ ...payload, tenantId: sideEffect.tenantId });
 
         this.logger.log(`[PLACEHOLDER] Would create audit log for ${sideEffect.aggregateType}:${sideEffect.aggregateId} - action: ${action}`);
+    }
+
+    /** Mirror a membership change into Keto (idempotent — safe to replay). */
+    private async processKetoEffect(sideEffect: SideEffectOutboxModel): Promise<void> {
+        const { operation, tenantId, userId, role } = sideEffect.payload as unknown as IKetoSideEffectPayload;
+        switch (operation) {
+            case 'grant_tenant':
+                return this.ketoProvisioning.grantTenant(tenantId);
+            case 'revoke_tenant':
+                return this.ketoProvisioning.revokeTenant(tenantId);
+            case 'assign_role':
+                if (!userId || !role) {
+                    throw new Error('Invalid keto payload: missing required userId/role');
+                }
+                return this.ketoProvisioning.assignRole(tenantId, userId, role as RoleEnum);
+            case 'remove_member':
+                if (!userId) {
+                    throw new Error('Invalid keto payload: missing required userId');
+                }
+                return this.ketoProvisioning.removeMember(tenantId, userId);
+            default:
+                throw new Error(`Invalid keto payload: unknown operation ${String(operation)}`);
+        }
     }
 
     /**

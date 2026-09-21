@@ -13,7 +13,6 @@ import { PlanService } from './plan.service';
 import { PlanLimitService } from './plan-limit.service';
 import { BillingGuardConfig } from './decorators/billing-guard.decorator';
 import { BillingGuard } from './guards/billing.guard';
-import { PaymentRequiredGuard } from './guards/payment-required.guard';
 import { DailyUsageCalculator } from './daily-usage-calculator.service';
 import { MonthlyUsageResetService } from './monthly-usage-reset.service';
 import { UsageTrackerService } from './usage-tracker.service';
@@ -76,14 +75,14 @@ export class TestBillingController {
         return { tenantId, ...status };
     }
 
+    // The global TenantAccessGuard applies here like on any tenant route.
     @Get('protected/payment-required')
-    @UseGuards(PaymentRequiredGuard)
     async paymentRequiredGuardProbe(@Req() req: Request) {
         const tenantId = this.requireTenantId();
         return {
             tenantId,
             ok: true,
-            message: 'PaymentRequiredGuard allowed the request.'
+            message: 'TenantAccessGuard allowed the request.'
         };
     }
 

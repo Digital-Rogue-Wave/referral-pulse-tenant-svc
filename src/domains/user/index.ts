@@ -1,5 +1,5 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { IsString, IsOptional, IsEnum, IsEmail } from 'class-validator';
+import { IsString, IsEnum } from 'class-validator';
 
 import { BaseResponseMapper } from '@common/helper';
 import { RoleEnum } from '@common/enums/role.enum';
@@ -11,7 +11,8 @@ import { RoleEnum } from '@common/enums/role.enum';
 export interface UserProps {
     id: string;
     tenantId: string;
-    email?: string | null;
+    email: string;
+    emailHash: string;
     name?: string | null;
     role: string;
     kratosIdentityId: string;
@@ -30,19 +31,10 @@ export class AddUserDto {
     @IsString()
     kratosIdentityId!: string;
 
+    /** The email and name are read from the Ory identity, never trusted from the request. */
     @ApiProperty({ enum: RoleEnum })
     @IsEnum(RoleEnum)
     role!: RoleEnum;
-
-    @ApiPropertyOptional()
-    @IsOptional()
-    @IsEmail()
-    email?: string;
-
-    @ApiPropertyOptional()
-    @IsOptional()
-    @IsString()
-    name?: string;
 }
 
 export class UpdateUserRoleDto {
@@ -62,8 +54,8 @@ export class UserResponse {
     @ApiProperty()
     tenantId!: string;
 
-    @ApiPropertyOptional()
-    email?: string | null;
+    @ApiProperty()
+    email!: string;
 
     @ApiPropertyOptional()
     name?: string | null;
@@ -90,6 +82,12 @@ export class UserResponse {
 class UserResponseMapper extends BaseResponseMapper<UserProps, UserResponse> {
     constructor() {
         super(UserResponse);
+    }
+
+    /** The email hash is an internal lookup key, not part of the API. */
+    override toResponse(entity: UserProps): UserResponse {
+        const { emailHash: _emailHash, ...visible } = entity;
+        return super.toResponse(visible as UserProps);
     }
 }
 

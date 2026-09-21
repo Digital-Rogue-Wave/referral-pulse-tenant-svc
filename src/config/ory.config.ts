@@ -12,13 +12,13 @@ const schema = z.object({
         readUrl: z.string().url(),
         writeUrl: z.string().url()
     }),
-    kratos: z
-        .object({
-            adminUrl: z.string().optional(),
-            publicUrl: z.string().optional()
-        })
-        .optional(),
-    audience: z.string()
+    kratos: z.object({
+        adminUrl: z.string().url(),
+        publicUrl: z.string().url()
+    }),
+    audience: z.string(),
+    /** Shared secret Kratos sends as `X-Ory-Api-Key` on its web hooks. Required — an empty value used to disable the check. */
+    webhookApiKey: z.string().min(32)
 });
 
 export type OryConfig = z.infer<typeof schema>;
@@ -41,7 +41,8 @@ export default registerAs('oryConfig', (): OryConfig => {
             adminUrl: process.env.ORY_KRATOS_ADMIN_URL,
             publicUrl: process.env.ORY_KRATOS_PUBLIC_URL
         },
-        audience: process.env.JWT_AUDIENCE
+        audience: process.env.JWT_AUDIENCE,
+        webhookApiKey: process.env.ORY_WEBHOOK_API_KEY
     });
 
     if (!result.success) {

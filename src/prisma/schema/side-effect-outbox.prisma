@@ -1,14 +1,8 @@
-enum EffectType {
-  sqs
-  sns
-  email
-  audit
-}
-
 model SideEffectOutbox {
   id             String    @id @default(ulid()) @db.VarChar(26)
   tenantId       String    @map("tenant_id") @db.VarChar(26)
-  effectType     EffectType @map("effect_type")
+  // text + CHECK (DB Model v2 §0.3): sqs | sns | email | audit | keto
+  effectType     String    @map("effect_type") @db.VarChar(20)
   status         String    @default("pending") @db.VarChar(50)
   aggregateType  String    @map("aggregate_type") @db.VarChar(100)
   aggregateId    String    @map("aggregate_id") @db.VarChar(26)

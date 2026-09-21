@@ -11,6 +11,7 @@ import type { ResilienceConfig } from './resilience.config';
 import type { ServicesConfig } from './services.config';
 import type { StripeConfig } from './stripe.config';
 import type { TemporalConfig } from './temporal.config';
+import type { TokenIssuerConfig } from './token-issuer.config';
 import type { TracingConfig } from './tracing.config';
 
 /**
@@ -34,4 +35,5 @@ export interface AllConfigType {
     temporal: TemporalConfig;
     billingConfig: BillingConfig;
     stripeConfig: StripeConfig;
+    tokenIssuer: TokenIssuerConfig;
 }

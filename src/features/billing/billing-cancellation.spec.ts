@@ -19,7 +19,7 @@ import { BillingEvents } from '@domains/billing';
 /**
  * `customer.subscription.deleted` set `status = CANCELED` and nothing else — it
  * left `billing.plan` on the paid tier. Plan limits resolve from `billing.plan`
- * (PlanLimitService) and PaymentRequiredGuard only blocks on an explicit LOCKED
+ * (PlanLimitService) and TenantAccessGuard only blocks on an explicit LOCKED
  * payment status, which cancellation never sets. A cancelled tenant therefore kept
  * full paid entitlements indefinitely, with no alert anywhere — a silent, ongoing
  * revenue leak. `BILLING_TASKS.md` marked this flow complete (3.6).

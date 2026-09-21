@@ -5,29 +5,51 @@ import { HttpClientService } from '@common/http/http-client.service';
 
 import type { OryConfig } from '@config/ory.config';
 
+export interface KetoSubjectSet {
+    namespace: string;
+    object: string;
+    relation: string;
+}
+
 export interface KetoRelationTuple {
     namespace: string;
     object: string;
     relation: string;
     subject_id?: string;
-    subject_set?: {
-        namespace: string;
-        object: string;
-        relation: string;
-    };
+    subject_set?: KetoSubjectSet;
 }
 
-export interface KetoCheckRequest {
+/** Filter for list / delete-by-query. Every field is optional; Keto ANDs the given ones. */
+export interface KetoTupleQuery {
     namespace: string;
-    object: string;
-    relation: string;
-    subject_id: string;
+    object?: string;
+    relation?: string;
+    subject_id?: string;
 }
 
-export interface KetoCheckResponse {
+export type KetoPatchAction = 'insert' | 'delete';
+
+export interface KetoTuplePatch {
+    action: KetoPatchAction;
+    relation_tuple: KetoRelationTuple;
+}
+
+interface KetoCheckResponse {
     allowed: boolean;
 }
 
+interface KetoListResponse {
+    relation_tuples: KetoRelationTuple[];
+    next_page_token: string;
+}
+
+/**
+ * Thin Ory Keto REST client. Verified against the running Keto:
+ * - `POST /relation-tuples/check/openapi` always answers 200 `{allowed}` (the plain `/check` answers 403 on deny).
+ * - `PATCH /admin/relation-tuples` applies a batch of insert/delete atomically; inserting an existing
+ *   tuple or deleting a missing one is a no-op, so replaying a patch is safe.
+ * - `DELETE /admin/relation-tuples?…` deletes every tuple matching the query.
+ */
 @Injectable()
 export class KetoService {
     private readonly readUrl: string;
@@ -42,61 +64,47 @@ export class KetoService {
         this.writeUrl = oryCfg.keto.writeUrl;
     }
 
-    /**
-     * Check if subject has permission
-     * Example: check('campaigns', 'campaign-123', 'view', 'user-456')
-     */
+    /** Does `subjectId` hold `relation` on `namespace:object`, directly or through a subject set? */
     async check(namespace: string, object: string, relation: string, subjectId: string): Promise<boolean> {
-        try {
-            const response = await this.http.post<KetoCheckResponse>(`${this.readUrl}/relation-tuples/check`, {
-                namespace,
-                object,
-                relation,
-                subject_id: subjectId
-            } as KetoCheckRequest);
-
-            return response.data.allowed;
-        } catch (error) {
-            // Keto returns 403 if not allowed, treat as false
-            if ((error as { status?: number })?.status === 403) {
-                return false;
-            }
-            throw error;
-        }
-    }
-
-    /**
-     * Batch check multiple permissions
-     */
-    async checkBatch(checks: Array<{ namespace: string; object: string; relation: string }>, subjectId: string): Promise<Record<string, boolean>> {
-        const results = await Promise.all(
-            checks.map(async ({ namespace, object, relation }) => {
-                const allowed = await this.check(namespace, object, relation, subjectId);
-                return { key: `${namespace}:${object}#${relation}`, allowed };
-            })
-        );
-
-        return Object.fromEntries(results.map((r) => [r.key, r.allowed]));
-    }
-
-    /**
-     * Create a relation tuple (grant permission)
-     */
-    async createTuple(tuple: KetoRelationTuple): Promise<void> {
-        await this.http.put(`${this.writeUrl}/admin/relation-tuples`, tuple);
-    }
-
-    /**
-     * Delete a relation tuple (revoke permission)
-     */
-    async deleteTuple(tuple: KetoRelationTuple): Promise<void> {
-        await this.http.delete(`${this.writeUrl}/admin/relation-tuples`, {
-            params: {
-                namespace: tuple.namespace,
-                object: tuple.object,
-                relation: tuple.relation,
-                subject_id: tuple.subject_id as string
-            }
+        const response = await this.http.post<KetoCheckResponse>(`${this.readUrl}/relation-tuples/check/openapi`, {
+            namespace,
+            object,
+            relation,
+            subject_id: subjectId
         });
+        return response.data.allowed;
+    }
+
+    async patchTuples(patches: KetoTuplePatch[]): Promise<void> {
+        if (patches.length === 0) {
+            return;
+        }
+        await this.http.patch(`${this.writeUrl}/admin/relation-tuples`, patches);
+    }
+
+    async createTuple(tuple: KetoRelationTuple): Promise<void> {
+        await this.patchTuples([{ action: 'insert', relation_tuple: tuple }]);
+    }
+
+    async deleteTuple(tuple: KetoRelationTuple): Promise<void> {
+        await this.patchTuples([{ action: 'delete', relation_tuple: tuple }]);
+    }
+
+    async deleteTuples(query: KetoTupleQuery): Promise<void> {
+        await this.http.delete(`${this.writeUrl}/admin/relation-tuples`, { params: { ...query } });
+    }
+
+    /** Every tuple matching the query, following Keto's page tokens. */
+    async listTuples(query: KetoTupleQuery): Promise<KetoRelationTuple[]> {
+        const tuples: KetoRelationTuple[] = [];
+        let pageToken = '';
+        do {
+            const response = await this.http.get<KetoListResponse>(`${this.readUrl}/relation-tuples`, {
+                params: { ...query, page_size: 500, ...(pageToken ? { page_token: pageToken } : {}) }
+            });
+            tuples.push(...response.data.relation_tuples);
+            pageToken = response.data.next_page_token;
+        } while (pageToken);
+        return tuples;
     }
 }

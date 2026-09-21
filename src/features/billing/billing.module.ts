@@ -26,7 +26,6 @@ import { PaymentStatusEscalationService } from './payment-status-escalation.serv
 import { TrialLifecycleService } from './trial-lifecycle.service';
 
 // Guards
-import { PaymentRequiredGuard } from './guards/payment-required.guard';
 import { UsageCheckGuard } from './guards/usage-check.guard';
 import { BillingGuard } from './guards/billing.guard';
 
@@ -41,11 +40,12 @@ import { BillingConsumer } from './billing.consumer';
  * direct triggers for all four scheduled billing jobs. It was registered
  * unconditionally, so it shipped to production.
  *
- * Kept for local demos and manual testing, but never registered in production.
- * Module metadata is evaluated at import time, so this reads `process.env`
- * directly rather than ConfigService.
+ * Kept for local demos and manual testing. Registered only when ENABLE_TEST_ROUTES=true is set
+ * explicitly — keying off NODE_ENV left them exposed on staging and any mis-set environment.
+ * Module metadata is evaluated at import time, so this reads `process.env` directly rather than
+ * ConfigService.
  */
-const DEV_ONLY_CONTROLLERS = process.env.NODE_ENV === 'production' ? [] : [TestBillingController];
+const DEV_ONLY_CONTROLLERS = process.env.ENABLE_TEST_ROUTES === 'true' ? [TestBillingController] : [];
 
 @Module({
     imports: [TenantModule, EventsModule],
@@ -63,7 +63,6 @@ const DEV_ONLY_CONTROLLERS = process.env.NODE_ENV === 'production' ? [] : [TestB
         StripeService,
         PlanService,
         PlanStripeSyncService,
-        PaymentRequiredGuard,
         UsageTrackerService,
         UsageCheckGuard,
         PlanLimitService,
@@ -79,7 +78,6 @@ const DEV_ONLY_CONTROLLERS = process.env.NODE_ENV === 'production' ? [] : [TestB
     exports: [
         BillingService,
         PlanService,
-        PaymentRequiredGuard,
         UsageTrackerService,
         UsageCheckGuard,
         PlanLimitService,

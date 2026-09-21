@@ -1,15 +1,10 @@
 import { Injectable } from '@nestjs/common';
 import { OnEvent } from '@nestjs/event-emitter';
-import { ConfigService, ConfigType } from '@nestjs/config';
 
 import { SnsPublisherService } from '@common/messaging/sns-publisher.service';
-import { HttpClientService } from '@common/http/http-client.service';
-import { KetoService } from '@common/auth/keto.service';
-import { KetoNamespace } from '@common/auth/keto.constants';
 import { AppLoggerService } from '@common/logging/app-logger.service';
 import { DateService } from '@common/helper/date.service';
 import { BullJobsService } from '@common/bulljobs';
-import oryConfig from '@config/ory.config';
 import { TENANT_DELETION_QUEUE, TENANT_EVENTS_TOPIC, TenantDeletionJobData } from '@app/types';
 
 import { DomainProvisioningService } from '../../dns/domain-provisioning.service';
@@ -33,22 +28,14 @@ import {
 
 @Injectable()
 export class TenantListener {
-    private readonly ketoReadUrl: string;
-
     constructor(
         private readonly sns: SnsPublisherService,
-        private readonly ketoService: KetoService,
         private readonly bullJobsService: BullJobsService,
-        private readonly httpClient: HttpClientService,
-        private readonly configService: ConfigService,
         private readonly domainProvisioningService: DomainProvisioningService,
         private readonly logger: AppLoggerService,
         private readonly dateService: DateService
     ) {
         this.logger.setContext(TenantListener.name);
-
-        const oryCfg = this.configService.getOrThrow<ConfigType<typeof oryConfig>>('oryConfig', { infer: true });
-        this.ketoReadUrl = oryCfg.keto.readUrl;
     }
 
     @OnEvent(TenantEvents.CREATED)
@@ -366,14 +353,7 @@ export class TenantListener {
             }
         );
 
-        // Cleanup Keto relations
-        const ketoRelations = await this.queryKetoRelationsForTenant(event.tenantId);
-        for (const relation of ketoRelations) {
-            await this.ketoService.deleteTuple(relation);
-        }
-        this.logger.log(`Cleaned up ${ketoRelations.length} Keto relations`, {
-            tenantId: event.tenantId
-        });
+        // Keto grants and memberships are revoked by KetoSyncListener (through the outbox).
     }
 
     @OnEvent(TenantEvents.OWNERSHIP_TRANSFERRED)
@@ -433,33 +413,5 @@ export class TenantListener {
                 messageDeduplicationId: event.eventId
             }
         );
-    }
-
-    /**
-     * Query all Keto relations for a tenant
-     */
-    private async queryKetoRelationsForTenant(tenantId: string): Promise<
-        Array<{
-            namespace: string;
-            object: string;
-            relation: string;
-            subject_id?: string;
-        }>
-    > {
-        const { data } = await this.httpClient.get<{
-            relation_tuples?: Array<{
-                namespace: string;
-                object: string;
-                relation: string;
-                subject_id?: string;
-            }>;
-        }>(`${this.ketoReadUrl}/relation-tuples`, {
-            params: {
-                namespace: KetoNamespace.TENANT,
-                object: tenantId
-            }
-        });
-
-        return data.relation_tuples || [];
     }
 }
