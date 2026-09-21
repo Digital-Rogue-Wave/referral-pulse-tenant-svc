@@ -63,6 +63,17 @@ and record it here, rather than wait. Every item below can be revisited; each na
 | G3 | **`/test/*` billing routes register only with `ENABLE_TEST_ROUTES=true`.** | #46: they were live on staging. |
 | G4 | **Outbox:** the queue client is injected by class; the worker claims rows atomically and retries a row not yet visible; `OutboxSweeperService` re-enqueues lost or stuck rows every minute; `effect_type` is `text` + CHECK (DB Model §0.3). | `SideEffectService` took its queue client through a string token **no module provided** — every critical side effect was written and never enqueued. Found during live verification. |
 
+### API keys (API §2, DB Model v2 §3 `api_keys`)
+
+| # | Decision | Why |
+|---|---|---|
+| K1 | **`key_hash` = HMAC-SHA256(`API_KEY_HASH_PEPPER`, raw key)**, unique; `key_prefix` = last 4 characters (`char(4)`, unique per tenant, regenerated on the rare clash). | The spec's Redis key `apikey:{key_prefix}:{key_hash8}` and `UNIQUE(key_hash)` need a deterministic hash. A 256-bit random key needs no slow hash; bcrypt forced comparing every key sharing a 4-char suffix (a CPU-DoS vector). The pepper keeps a database leak alone useless. |
+| K2 | **Keys issued before 2026-09-21 were revoked** by migration `20260921210000_api_key_hmac_hash`. | Their raw values are unknown, so they cannot be re-hashed; no production keys existed. |
+| K3 | **Validation cache** `apikey:{prefix}:{hash8}` for 300 s; revoke and rotate delete it, so a revoked key stops at once. The gateway exchange no longer caches API keys separately. | DB Model §3 Redis; #10. |
+| K4 | **`scopes` removed** from keys, DTOs, responses and events. Keys are gated by type only and never carry permissions. | #21, API §2 "keys are never Keto subjects". |
+| K5 | **`api_key.rotated`** is published on rotation; **`api_key.revoked`** carries the optional `?reason=` of the DELETE. `last_used_at` is written at most once a minute per key. | #27, #20, #10. |
+| K6 | Responses list their fields explicitly — the key hash was being returned by create/rotate. | Found during live verification. |
+
 ### Superseded rules (flagged for the lead, not rewritten)
 
 - `CLAUDE.md` / `.claude/rules/security.md` say errors are "RFC 9457 ProblemDetail". Per decision X-2 the

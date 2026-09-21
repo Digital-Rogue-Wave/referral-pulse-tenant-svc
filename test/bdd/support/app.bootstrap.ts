@@ -28,6 +28,7 @@ process.env['AUTH_AUDIENCE'] = 'test-audience';
 process.env['INTERNAL_JWT_PRIVATE_KEY'] = internalPrivateKeyBase64;
 process.env['GATEWAY_SHARED_SECRET'] = randomBytes(32).toString('hex');
 process.env['ORY_WEBHOOK_API_KEY'] = randomBytes(32).toString('hex');
+process.env['API_KEY_HASH_PEPPER'] = randomBytes(32).toString('hex');
 
 import { AppModule } from '../../../src/app.module';
 import { StripeService } from '../../../src/features/billing/stripe.service';

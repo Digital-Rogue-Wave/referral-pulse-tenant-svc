@@ -58,10 +58,7 @@ export function denyNextKetoCheck(): void {
 
 /** Make Kratos (the credential authority) know an identity with this email. */
 export function stubKratosIdentity(identityId: string, email: string): void {
-    nock(KRATOS_ADMIN_BASE)
-        .persist()
-        .get(`/admin/identities/${identityId}`)
-        .reply(200, { id: identityId, schema_id: 'default', traits: { email } });
+    nock(KRATOS_ADMIN_BASE).persist().get(`/admin/identities/${identityId}`).reply(200, { id: identityId, schema_id: 'default', traits: { email } });
 }
 
 export { jwksScope, ketoScope };

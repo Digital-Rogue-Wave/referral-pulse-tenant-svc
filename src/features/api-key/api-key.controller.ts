@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Delete, Body, Param, HttpCode, HttpStatus, Put } from '@nestjs/common';
+import { Controller, Get, Post, Delete, Body, Param, HttpCode, HttpStatus, Put, Query } from '@nestjs/common';
 import { ApiTags, ApiBearerAuth, ApiCreatedResponse, ApiBody, ApiOkResponse, ApiHeader } from '@nestjs/swagger';
 
 import { CurrentUser } from '@common/auth/current-user.decorator';
@@ -7,7 +7,7 @@ import { RequirePermission } from '@common/auth/require-permission.decorator';
 import { Paginate, PaginateQuery, Paginated, ApiPaginationQuery } from '@common/nestjs-prisma-pagination';
 import { Idempotent, IdempotencyScope } from '@common/idempotency';
 
-import { CreateApiKeyDto, UpdateApiKeyDto, ApiKeyResponse, ApiKeyWithRawKeyResponse } from '@domains/api-key';
+import { CreateApiKeyDto, UpdateApiKeyDto, ApiKeyResponse, ApiKeyWithRawKeyResponse, RevokeApiKeyQueryDto } from '@domains/api-key';
 
 import { ApiKeyService } from './api-key.service';
 import { API_KEY_PAGINATE_CONFIG } from './api-key.pagination';
@@ -90,7 +90,7 @@ export class ApiKeyController {
     @HttpCode(HttpStatus.NO_CONTENT)
     @Delete(':id')
     @Idempotent({ scope: IdempotencyScope.Tenant, ttl: 1800 })
-    async delete(@Param('id') id: string, @CurrentUser() user: IAuthenticatedUser): Promise<void> {
-        await this.apiKeyService.delete(id, user.userId);
+    async delete(@Param('id') id: string, @Query() query: RevokeApiKeyQueryDto, @CurrentUser() user: IAuthenticatedUser): Promise<void> {
+        await this.apiKeyService.delete(id, user.userId, query.reason);
     }
 }

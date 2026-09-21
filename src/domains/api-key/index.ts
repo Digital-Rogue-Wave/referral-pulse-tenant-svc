@@ -1,5 +1,5 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { IsString, IsArray, IsOptional, IsDateString, IsEnum } from 'class-validator';
+import { IsString, IsOptional, IsDateString, IsEnum } from 'class-validator';
 
 import { BaseResponseMapper } from '@common/helper';
 import { BaseDomainEvent } from '@domains/common/events';
@@ -25,7 +25,6 @@ export interface ApiKeyProps {
     keyHash: string;
     keyPrefix: string;
     keyType: string;
-    scopes: unknown;
     createdBy: string;
     lastUsedAt?: Date | null;
     expiresAt?: Date | null;
@@ -44,11 +43,6 @@ export class CreateApiKeyDto {
     @IsString()
     label!: string;
 
-    @ApiProperty({ type: [String] })
-    @IsArray()
-    @IsString({ each: true })
-    scopes!: string[];
-
     @ApiPropertyOptional({ enum: ApiKeyType, default: ApiKeyType.SECRET })
     @IsOptional()
     @IsEnum(ApiKeyType)
@@ -65,12 +59,14 @@ export class UpdateApiKeyDto {
     @IsOptional()
     @IsString()
     label?: string;
+}
 
-    @ApiPropertyOptional({ type: [String] })
+/** Optional reason recorded on revocation and carried on `api_key.revoked`. */
+export class RevokeApiKeyQueryDto {
+    @ApiPropertyOptional({ maxLength: 500 })
     @IsOptional()
-    @IsArray()
-    @IsString({ each: true })
-    scopes?: string[];
+    @IsString()
+    reason?: string;
 }
 
 // ============================================================
@@ -92,9 +88,6 @@ export class ApiKeyResponse {
 
     @ApiProperty({ enum: ApiKeyType })
     keyType!: string;
-
-    @ApiProperty({ type: [String] })
-    scopes!: unknown;
 
     @ApiProperty()
     createdBy!: string;
@@ -132,6 +125,24 @@ class ApiKeyResponseMapper extends BaseResponseMapper<ApiKeyProps, ApiKeyRespons
         super(ApiKeyResponse);
     }
 
+    /** Explicit field list: the key hash is never part of a response. */
+    override toResponse(entity: ApiKeyProps): ApiKeyResponse {
+        return Object.assign(new ApiKeyResponse(), {
+            id: entity.id,
+            tenantId: entity.tenantId,
+            label: entity.label,
+            keyPrefix: entity.keyPrefix,
+            keyType: entity.keyType,
+            createdBy: entity.createdBy,
+            lastUsedAt: entity.lastUsedAt ?? null,
+            expiresAt: entity.expiresAt ?? null,
+            revokedAt: entity.revokedAt ?? null,
+            createdAt: entity.createdAt,
+            updatedAt: entity.updatedAt,
+            deletedAt: entity.deletedAt ?? null
+        });
+    }
+
     toResponseWithRawKey(entity: ApiKeyProps, rawKey: string): ApiKeyWithRawKeyResponse {
         const base = this.toResponse(entity);
         return Object.assign(new ApiKeyWithRawKeyResponse(), base, { rawKey });
@@ -156,7 +167,6 @@ export class ApiKeyCreatedEvent extends BaseDomainEvent {
             label: string;
             keyPrefix: string;
             keyType: string;
-            scopes: string[];
             createdBy: string;
             createdAt: Date;
         },
@@ -198,7 +208,22 @@ export class ApiKeyDeletedEvent extends BaseDomainEvent {
             keyPrefix: string;
             deletedBy: string;
             deletedAt: Date;
+            reason: string | null;
         },
+        public readonly userId?: string
+    ) {
+        super();
+    }
+}
+
+/** A key's secret was replaced; downstream caches must drop the old one (event `api_key.rotated`). */
+export class ApiKeyRotatedEvent extends BaseDomainEvent {
+    readonly eventType = 'api-key.rotated' as const;
+
+    constructor(
+        public readonly aggregateId: string,
+        public readonly tenantId: string,
+        public readonly payload: { apiKeyId: string; keyType: string; oldKeyPrefix: string; newKeyPrefix: string; rotatedBy: string },
         public readonly userId?: string
     ) {
         super();
@@ -208,5 +233,6 @@ export class ApiKeyDeletedEvent extends BaseDomainEvent {
 export const ApiKeyEvents = {
     CREATED: 'api-key.created',
     UPDATED: 'api-key.updated',
-    DELETED: 'api-key.deleted'
+    DELETED: 'api-key.deleted',
+    ROTATED: 'api-key.rotated'
 } as const;

@@ -193,15 +193,23 @@ describe('CredentialResolverService', () => {
         });
     });
 
-    it('serves a repeated exchange from cache without re-resolving', async () => {
+    it('serves a repeated user-token exchange from cache without re-resolving', async () => {
         const cached = { token: 't', expiresAt: new Date(Date.now() + 120_000).toISOString(), claims: claims() };
         redis.get.mockResolvedValue(cached as never);
 
-        const resolved = await resolver.resolve('rai_live_abc');
+        const resolved = await resolver.resolve('hydra.jwt.token');
 
         expect(resolved.token).toBe('t');
         expect(resolved.expiresAt).toBeInstanceOf(Date);
-        expect(apiKeys.validateKey).not.toHaveBeenCalled();
+        expect(findUser).not.toHaveBeenCalled();
+    });
+
+    it('never serves an API key from the exchange cache — its own cache is what revocation clears', async () => {
+        redis.get.mockResolvedValue({ token: 'stale', expiresAt: new Date(Date.now() + 120_000).toISOString(), claims: claims() } as never);
+        apiKeys.validateKey.mockResolvedValue(null);
+
+        await expect(resolver.resolve('rai_live_revoked')).rejects.toBeInstanceOf(BaseException);
+        expect(apiKeys.validateKey).toHaveBeenCalledWith('rai_live_revoked');
     });
 });
 

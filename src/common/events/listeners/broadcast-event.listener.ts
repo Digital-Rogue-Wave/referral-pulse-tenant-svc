@@ -22,7 +22,7 @@ import {
     UsageMonthlySummaryEvent,
     BillingEvents
 } from '@domains/billing';
-import { ApiKeyCreatedEvent, ApiKeyDeletedEvent } from '@domains/api-key';
+import { ApiKeyCreatedEvent, ApiKeyDeletedEvent, ApiKeyRotatedEvent } from '@domains/api-key';
 import { UserRegisteredEvent, UserRoleChangedEvent, UserLoggedInEvent, UserRemovedEvent, UserInvitedEvent } from '@domains/user';
 import { BILLING_EVENTS_TOPIC, USER_EVENTS_TOPIC, type BaseEventType, type SnsTopicName } from '@app/types';
 
@@ -268,8 +268,17 @@ export class BroadcastEventListener {
         await this.broadcast('api_key', 'api_key.revoked', event.tenantId, event.eventId, USER_EVENTS_TOPIC, {
             key_id: event.payload.apiKeyId,
             revoked_by: event.payload.deletedBy,
-            // DELETE carries no reason body today — emitted as null until a reason is captured (see NOTE.md)
-            revocation_reason: null
+            revocation_reason: event.payload.reason
+        });
+    }
+
+    @OnEvent('api-key.rotated', { async: true })
+    async handleApiKeyRotated(event: ApiKeyRotatedEvent): Promise<void> {
+        await this.broadcast('api_key', 'api_key.rotated', event.tenantId, event.eventId, USER_EVENTS_TOPIC, {
+            key_id: event.payload.apiKeyId,
+            key_type: event.payload.keyType,
+            tenant_id: event.tenantId,
+            rotated_by: event.payload.rotatedBy
         });
     }
 

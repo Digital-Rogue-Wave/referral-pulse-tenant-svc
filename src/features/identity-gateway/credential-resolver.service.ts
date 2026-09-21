@@ -37,7 +37,7 @@ export interface ResolvedCredential extends IssuedToken {
  *   tenant, usable only on tenant-optional routes.
  *
  * Closed tenants and disabled users are refused here, once, instead of in every service.
- * Each exchange is cached by credential hash until shortly before the minted token would expire.
+ * User-token exchanges are cached by credential hash until shortly before the minted token would expire.
  */
 @Injectable()
 export class CredentialResolverService {
@@ -63,13 +63,18 @@ export class CredentialResolverService {
     }
 
     async resolve(credential: string): Promise<ResolvedCredential> {
+        // API keys are resolved through their own cache, which revocation and rotation clear immediately.
+        if (this.isApiKey(credential)) {
+            return this.resolveApiKey(credential);
+        }
+
         const cacheKey = `authn:exchange:${createHash('sha256').update(credential).digest('hex')}`;
         const cached = await this.redis.get<ResolvedCredential>(cacheKey, { tenantScoped: false });
         if (cached && new Date(cached.expiresAt).getTime() - Date.now() > 30_000) {
             return { ...cached, expiresAt: new Date(cached.expiresAt) };
         }
 
-        const resolved = this.isApiKey(credential) ? await this.resolveApiKey(credential) : await this.resolveUserToken(credential);
+        const resolved = await this.resolveUserToken(credential);
         const ttl = Math.floor((resolved.expiresAt.getTime() - Date.now()) / 1000) - 30;
         if (ttl > 0) {
             await this.redis.set(cacheKey, resolved, { tenantScoped: false, ttl });

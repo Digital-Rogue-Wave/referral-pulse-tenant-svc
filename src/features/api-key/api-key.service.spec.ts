@@ -1,134 +1,187 @@
-import { Test, TestingModule } from '@nestjs/testing';
+import { HttpStatus } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { mock, MockProxy } from 'jest-mock-extended';
-import { NotFoundException, BadRequestException, UnauthorizedException } from '@nestjs/common';
-import * as bcrypt from 'bcryptjs';
+import { createHmac } from 'crypto';
+import { Prisma } from '@prisma-gen/generated/client';
 
 import { DatabaseService } from '@app/database/database.service';
 import { TenantAwareService } from '@common/tenant-aware/tenant-aware.service';
-import { TenantContextService } from '@common/tenant-aware/tenant-context.service';
 import { TransactionEventEmitterService } from '@common/events/transaction-event-emitter.service';
 import { AppLoggerService } from '@common/logging/app-logger.service';
+import { BaseException } from '@common/exceptions/base.exceptions';
+import { RedisService } from '@common/redis/redis.service';
 
 import { ApiKeyType } from '@domains/api-key';
 
 import { ApiKeyService } from './api-key.service';
 
+const PEPPER = 'p'.repeat(40);
+const hmac = (raw: string): string => createHmac('sha256', PEPPER).update(raw).digest('hex');
+
 describe('ApiKeyService', () => {
     let service: ApiKeyService;
     let prisma: MockProxy<DatabaseService>;
-    let tenantAware: MockProxy<TenantAwareService>;
-    let txEventEmitter: MockProxy<TransactionEventEmitterService>;
-    let delegate: { findUnique: jest.Mock; findFirst: jest.Mock; findMany: jest.Mock; create: jest.Mock; update: jest.Mock; delete: jest.Mock };
+    let redis: MockProxy<RedisService>;
+    let events: MockProxy<TransactionEventEmitterService>;
+    let delegate: { findFirst: jest.Mock; create: jest.Mock; update: jest.Mock };
+    let cache: Map<string, unknown>;
 
     const tenantId = 'tenant-123';
-    const existingKey = {
+    const existing = {
         id: 'key-1',
         tenantId,
         label: 'CI key',
-        keyHash: 'oldhash',
-        keyPrefix: 'old1',
+        keyHash: hmac('rai_live_old-secret-aaaa'),
+        keyPrefix: 'aaaa',
         keyType: ApiKeyType.SECRET,
-        scopes: ['tenant:read'],
         createdBy: 'user-1',
         revokedAt: null,
-        expiresAt: new Date(Date.now() + 86_400_000),
+        deletedAt: null,
+        expiresAt: null,
+        createdAt: new Date(),
         updatedAt: new Date()
     };
 
-    beforeEach(async () => {
+    beforeEach(() => {
         prisma = mock<DatabaseService>();
-        tenantAware = mock<TenantAwareService>();
-        txEventEmitter = mock<TransactionEventEmitterService>();
-
+        redis = mock<RedisService>();
+        events = mock<TransactionEventEmitterService>();
+        cache = new Map();
         delegate = {
-            findUnique: jest.fn(),
-            findFirst: jest.fn(),
-            findMany: jest.fn(),
-            create: jest.fn(),
-            update: jest.fn(),
-            delete: jest.fn()
+            findFirst: jest.fn().mockResolvedValue(existing),
+            create: jest.fn(async ({ data }: { data: object }) => ({ ...existing, id: 'key-new', ...data })),
+            update: jest.fn(async ({ data }: { data: object }) => ({ ...existing, ...data }))
         };
+        const tenantAware = mock<TenantAwareService>();
         tenantAware.forModel.mockReturnValue(delegate as never);
-        prisma.apiKey = { findMany: jest.fn(), update: jest.fn() } as never;
+        (prisma as unknown as { apiKey: unknown }).apiKey = { findUnique: jest.fn(), update: jest.fn().mockResolvedValue({}) };
+        redis.get.mockImplementation(async (key: string) => cache.get(key) as never);
+        redis.set.mockImplementation(async (key: string, value: unknown) => {
+            cache.set(key, value);
+        });
+        redis.del.mockImplementation(async (key: string) => cache.delete(key));
+        redis.setNx.mockResolvedValue(true);
+        const config = { getOrThrow: () => PEPPER } as unknown as ConfigService;
 
-        const module: TestingModule = await Test.createTestingModule({
-            providers: [
-                ApiKeyService,
-                { provide: DatabaseService, useValue: prisma },
-                { provide: TenantAwareService, useValue: tenantAware },
-                { provide: TenantContextService, useValue: mock<TenantContextService>() },
-                { provide: TransactionEventEmitterService, useValue: txEventEmitter },
-                { provide: AppLoggerService, useValue: mock<AppLoggerService>() }
-            ]
-        }).compile();
-
-        service = module.get(ApiKeyService);
+        service = new ApiKeyService(prisma, tenantAware, events, redis, mock<AppLoggerService>(), config);
     });
 
-    describe('rotate', () => {
-        it('issues a new secret, invalidates the old hash, and returns the raw key once', async () => {
-            delegate.findUnique.mockResolvedValue(existingKey);
-            delegate.update.mockImplementation(({ data }: { data: Record<string, unknown> }) => Promise.resolve({ ...existingKey, ...data }));
+    describe('when a key is created', () => {
+        it('then it stores only an HMAC of the key and its last four characters, and returns the raw key once', async () => {
+            const created = await service.create('user-1', { label: 'CI', keyType: ApiKeyType.PUBLISHABLE });
 
-            const result = await service.rotate('key-1', 'user-1');
-
-            expect(result.rawKey).toMatch(/^rai_live_/);
-            const updateArg = delegate.update.mock.calls[0][0];
-            expect(updateArg.where).toEqual({ id: 'key-1' });
-            expect(updateArg.data.keyHash).toBeDefined();
-            expect(updateArg.data.keyHash).not.toBe('oldhash');
-            expect(updateArg.data.keyPrefix).toBe(result.rawKey.slice(-4));
-            expect(updateArg.data.lastUsedAt).toBeNull();
-            expect(txEventEmitter.emitAfterCommit).toHaveBeenCalledWith('api-key.updated', expect.anything());
+            expect(created.rawKey).toMatch(/^rai_pub_[A-Za-z0-9_-]{43}$/);
+            const { data } = delegate.create.mock.calls[0][0] as { data: { keyHash: string; keyPrefix: string } };
+            expect(data.keyHash).toBe(hmac(created.rawKey));
+            expect(data.keyPrefix).toBe(created.rawKey.slice(-4));
+            expect(created).not.toHaveProperty('keyHash');
+            expect(events.emitAfterCommit).toHaveBeenCalledWith('api-key.created', expect.anything());
         });
 
-        it('emits a publishable prefix for publishable keys', async () => {
-            delegate.findUnique.mockResolvedValue({ ...existingKey, keyType: ApiKeyType.PUBLISHABLE });
-            delegate.update.mockImplementation(({ data }: { data: Record<string, unknown> }) => Promise.resolve({ ...existingKey, ...data }));
+        it('then a clash on the tenant’s 4-char display suffix is regenerated rather than surfaced', async () => {
+            const clash = new Prisma.PrismaClientKnownRequestError('unique', { code: 'P2002', clientVersion: '7' });
+            delegate.create.mockRejectedValueOnce(clash);
 
-            const result = await service.rotate('key-1', 'user-1');
+            await service.create('user-1', { label: 'CI' });
 
-            expect(result.rawKey).toMatch(/^rai_pub_/);
-        });
-
-        it('rejects rotating a revoked key', async () => {
-            delegate.findUnique.mockResolvedValue({ ...existingKey, revokedAt: new Date() });
-            await expect(service.rotate('key-1', 'user-1')).rejects.toBeInstanceOf(BadRequestException);
-        });
-
-        it('throws NotFound when the key does not exist', async () => {
-            delegate.findUnique.mockResolvedValue(null);
-            await expect(service.rotate('missing', 'user-1')).rejects.toBeInstanceOf(NotFoundException);
+            expect(delegate.create).toHaveBeenCalledTimes(2);
         });
     });
 
-    describe('validateKey', () => {
-        const rawKey = 'rai_live_abcdefghijklmnopqrstuvwxyz0123';
+    describe('when a presented key is validated', () => {
+        const raw = 'rai_live_old-secret-aaaa';
 
-        it('returns the active key whose bcrypt hash matches', async () => {
-            const keyHash = await bcrypt.hash(rawKey, 4);
-            (prisma.apiKey.findMany as jest.Mock).mockResolvedValue([{ ...existingKey, keyHash, keyPrefix: rawKey.slice(-4) }]);
+        it('then it is one indexed lookup by hash, cached for the next request', async () => {
+            (prisma.apiKey.findUnique as jest.Mock).mockResolvedValue({
+                id: 'key-1',
+                tenantId,
+                keyType: 'secret',
+                expiresAt: null,
+                revokedAt: null,
+                deletedAt: null
+            });
 
-            const result = await service.validateKey(rawKey);
+            expect(await service.validateKey(raw)).toEqual({ id: 'key-1', tenantId, keyType: 'secret' });
+            expect(await service.validateKey(raw)).toEqual({ id: 'key-1', tenantId, keyType: 'secret' });
 
-            expect(result?.id).toBe('key-1');
-            expect(prisma.apiKey.findMany).toHaveBeenCalledWith({ where: { keyPrefix: rawKey.slice(-4), revokedAt: null, deletedAt: null } });
+            expect(prisma.apiKey.findUnique).toHaveBeenCalledTimes(1);
+            expect(prisma.apiKey.findUnique).toHaveBeenCalledWith(expect.objectContaining({ where: { keyHash: hmac(raw) } }));
+            expect([...cache.keys()]).toEqual([`apikey:aaaa:${hmac(raw).slice(0, 8)}`]);
         });
 
-        it('returns null when no candidate hash matches', async () => {
-            const keyHash = await bcrypt.hash('rai_live_some_other_key_value_000000', 4);
-            (prisma.apiKey.findMany as jest.Mock).mockResolvedValue([{ ...existingKey, keyHash, keyPrefix: rawKey.slice(-4) }]);
-
-            expect(await service.validateKey(rawKey)).toBeNull();
+        it.each([
+            ['unknown', null],
+            ['revoked', { id: 'k', tenantId, keyType: 'secret', expiresAt: null, revokedAt: new Date(), deletedAt: new Date() }],
+            ['expired', { id: 'k', tenantId, keyType: 'secret', expiresAt: new Date(Date.now() - 1000), revokedAt: null, deletedAt: null }]
+        ])('then an %s key is rejected', async (_case, row) => {
+            (prisma.apiKey.findUnique as jest.Mock).mockResolvedValue(row);
+            expect(await service.validateKey(raw)).toBeNull();
         });
 
-        it('throws when the matched key is expired', async () => {
-            const keyHash = await bcrypt.hash(rawKey, 4);
-            (prisma.apiKey.findMany as jest.Mock).mockResolvedValue([
-                { ...existingKey, keyHash, keyPrefix: rawKey.slice(-4), expiresAt: new Date(Date.now() - 1000) }
-            ]);
+        it('then last_used_at is written at most once a minute per key', async () => {
+            (prisma.apiKey.findUnique as jest.Mock).mockResolvedValue({
+                id: 'key-1',
+                tenantId,
+                keyType: 'secret',
+                expiresAt: null,
+                revokedAt: null,
+                deletedAt: null
+            });
+            redis.setNx.mockResolvedValueOnce(true).mockResolvedValueOnce(false);
 
-            await expect(service.validateKey(rawKey)).rejects.toBeInstanceOf(UnauthorizedException);
+            await service.validateKey(raw);
+            await service.validateKey(raw);
+
+            expect(prisma.apiKey.update).toHaveBeenCalledTimes(1);
+        });
+    });
+
+    describe('when a key is revoked', () => {
+        it('then it stops validating immediately — the cache entry is dropped — and the reason is carried on the event', async () => {
+            cache.set(`apikey:aaaa:${existing.keyHash.slice(0, 8)}`, { id: 'key-1', tenantId, keyType: 'secret', expiresAt: null });
+
+            await service.delete('key-1', 'user-1', 'leaked in a public repo');
+
+            expect(cache.size).toBe(0);
+            expect(delegate.update).toHaveBeenCalledWith({
+                where: { id: 'key-1' },
+                data: { revokedAt: expect.any(Date), deletedAt: expect.any(Date) }
+            });
+            expect(events.emitAfterCommit).toHaveBeenCalledWith(
+                'api-key.deleted',
+                expect.objectContaining({ payload: expect.objectContaining({ reason: 'leaked in a public repo' }) })
+            );
+        });
+    });
+
+    describe('when a key is rotated', () => {
+        it('then the old secret stops working, a new one is returned once and api_key.rotated is emitted', async () => {
+            cache.set(`apikey:aaaa:${existing.keyHash.slice(0, 8)}`, { id: 'key-1' });
+
+            const rotated = await service.rotate('key-1', 'user-1');
+
+            expect(rotated.rawKey).toMatch(/^rai_live_/);
+            expect(delegate.update).toHaveBeenCalledWith({
+                where: { id: 'key-1' },
+                data: { keyHash: hmac(rotated.rawKey), keyPrefix: rotated.rawKey.slice(-4), lastUsedAt: null }
+            });
+            expect(cache.size).toBe(0);
+            expect(events.emitAfterCommit).toHaveBeenCalledWith(
+                'api-key.rotated',
+                expect.objectContaining({ payload: expect.objectContaining({ oldKeyPrefix: 'aaaa' }) })
+            );
+        });
+
+        it('then a revoked key cannot be rotated', async () => {
+            delegate.findFirst.mockResolvedValue({ ...existing, revokedAt: new Date() });
+            const error = await service.rotate('key-1', 'user-1').catch((e: BaseException) => e);
+            expect((error as BaseException).getStatus()).toBe(HttpStatus.CONFLICT);
+        });
+
+        it('then an unknown key is not found', async () => {
+            delegate.findFirst.mockResolvedValue(null);
+            const error = await service.rotate('nope', 'user-1').catch((e: BaseException) => e);
+            expect((error as BaseException).getStatus()).toBe(HttpStatus.NOT_FOUND);
         });
     });
 });

@@ -147,9 +147,7 @@ export async function seedPendingInvitation(params: { tenantId: string; email: s
 
 /** Remove an invitation + any membership its acceptance created, so the accept flow re-runs cleanly. */
 export async function cleanupInvitationFlow(params: { tenantId: string; token: string; kratosIdentityId: string }): Promise<void> {
-    const users = await fixturesPrisma.user
-        .findMany({ where: { kratosIdentityId: params.kratosIdentityId } })
-        .catch(() => [] as { id: string }[]);
+    const users = await fixturesPrisma.user.findMany({ where: { kratosIdentityId: params.kratosIdentityId } }).catch(() => [] as { id: string }[]);
     const ids = users.map((u) => u.id);
     if (ids.length > 0) {
         await fixturesPrisma.userRole.deleteMany({ where: { userId: { in: ids } } }).catch(() => undefined);
@@ -161,7 +159,13 @@ export async function cleanupInvitationFlow(params: { tenantId: string; token: s
 const sha256 = (value: string): string => createHash('sha256').update(value, 'utf8').digest('hex');
 
 /** Seed (idempotently) a member of the tenant — the acting user of membership-aware routes. */
-export async function ensureMember(params: { tenantId: string; userId: string; kratosIdentityId: string; email: string; role: string }): Promise<void> {
+export async function ensureMember(params: {
+    tenantId: string;
+    userId: string;
+    kratosIdentityId: string;
+    email: string;
+    role: string;
+}): Promise<void> {
     const role = await fixturesPrisma.role.findUnique({ where: { name: params.role }, select: { id: true } });
     const data = {
         tenantId: params.tenantId,

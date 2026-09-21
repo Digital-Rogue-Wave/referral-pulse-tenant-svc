@@ -102,6 +102,7 @@ export type EventAction =
     | 'role_changed'
     | 'logged_in'
     | 'removed'
+    | 'rotated'
     | 'invited'
     | 'verification_requested'
     | 'verification_status_changed';
@@ -330,7 +331,7 @@ export type UserEventType =
     | 'user.invited';
 
 // API Key domain events
-export type ApiKeyEventType = 'api-key.created' | 'api-key.updated' | 'api-key.deleted';
+export type ApiKeyEventType = 'api-key.created' | 'api-key.updated' | 'api-key.deleted' | 'api-key.rotated';
 
 // Tenant Setting domain events
 export type TenantSettingEventType = 'tenant-setting.created' | 'tenant-setting.updated' | 'tenant-setting.deleted';

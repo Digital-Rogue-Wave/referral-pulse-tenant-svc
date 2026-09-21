@@ -40,7 +40,6 @@ export class ApiKeyListener {
                 apiKeyId: event.payload.apiKeyId,
                 label: event.payload.label,
                 keyPrefix: event.payload.keyPrefix,
-                scopes: event.payload.scopes,
                 timestamp: event.occurredAt
             },
             { critical: false }

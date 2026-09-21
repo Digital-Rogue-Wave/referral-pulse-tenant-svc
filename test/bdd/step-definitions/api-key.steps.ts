@@ -18,7 +18,7 @@ When('I create an API key', async function (this: BddWorldInterface) {
     this.response = await this.agent()
         .post(API_KEYS)
         .set('Authorization', `Bearer ${this.currentToken}`)
-        .send({ label: 'CI key', scopes: ['tenant:read'], keyType: 'secret', expiresAt });
+        .send({ label: 'CI key', keyType: 'secret', expiresAt });
 
     const body = this.response.body as { id?: string; rawKey?: string };
     this.lastApiKeyId = body.id ?? null;

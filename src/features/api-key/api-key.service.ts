@@ -1,13 +1,17 @@
-import { Injectable, NotFoundException, UnauthorizedException, BadRequestException } from '@nestjs/common';
-import { randomBytes } from 'crypto';
-import * as bcrypt from 'bcryptjs';
+import { HttpStatus, Injectable } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
+import { Prisma } from '@prisma-gen/generated/client';
+import { createHmac, randomBytes } from 'crypto';
 
 import { DatabaseService } from '@app/database/database.service';
 import { TenantAwareService } from '@common/tenant-aware/tenant-aware.service';
-import { TenantContextService } from '@common/tenant-aware/tenant-context.service';
 import { TransactionEventEmitterService } from '@common/events/transaction-event-emitter.service';
 import { AppLoggerService } from '@common/logging/app-logger.service';
+import { BaseException } from '@common/exceptions/base.exceptions';
+import { RedisService } from '@common/redis/redis.service';
 import { prismaPaginate, PaginateQuery, Paginated } from '@common/nestjs-prisma-pagination';
+
+import type { AllConfigType } from '@config/config.type';
 
 import {
     ApiKeyProps,
@@ -19,28 +23,47 @@ import {
     ApiKeyCreatedEvent,
     ApiKeyUpdatedEvent,
     ApiKeyDeletedEvent,
+    ApiKeyRotatedEvent,
     ApiKeyType
 } from '@domains/api-key';
 
 import { API_KEY_PAGINATE_CONFIG } from './api-key.pagination';
 
+/** DB Model v2 §3 Redis `apikey:{key_prefix}:{key_hash8}` — 300 s, dropped on revoke and rotate. */
+const KEY_CACHE_TTL_SECONDS = 300;
+/** `last_used_at` is written at most this often per key, instead of on every request. */
+const LAST_USED_WRITE_INTERVAL_SECONDS = 60;
+/** A new key's 4-char display suffix must be unique in the tenant; a clash is regenerated. */
+const MAX_GENERATION_ATTEMPTS = 5;
+
+/** What the gateway needs to know about a presented key. */
+export interface ResolvedApiKey {
+    id: string;
+    tenantId: string;
+    keyType: string;
+}
+
 /**
- * Service responsible for API Key management
- * Uses Prisma with TenantAwareService for multi-tenant data access
+ * API keys for ingestion and the SDK (API Contract v1.3 §2 — keys never reach configuration endpoints).
+ *
+ * The stored hash is HMAC-SHA256 with a server-side pepper: a 256-bit random key needs no slow hash,
+ * and a deterministic hash makes validation a single indexed lookup with a cache that revocation can
+ * clear. The raw key is returned once, at creation or rotation, and never stored.
  */
 @Injectable()
 export class ApiKeyService {
-    /** bcrypt cost factor for hashing raw API keys at rest (key_hash, db_tables §api_keys). */
-    private readonly BCRYPT_ROUNDS = 12;
+    private readonly pepper: string;
 
     constructor(
         private readonly prisma: DatabaseService,
         private readonly tenantAware: TenantAwareService,
-        private readonly tenantContext: TenantContextService,
         private readonly txEventEmitter: TransactionEventEmitterService,
-        private readonly logger: AppLoggerService
+        private readonly redis: RedisService,
+        private readonly logger: AppLoggerService,
+        configService: ConfigService<AllConfigType>
     ) {
         this.logger.setContext(ApiKeyService.name);
+        this.pepper = configService.getOrThrow('tokenIssuer.apiKeyHashPepper', { infer: true });
     }
 
     /** Tenant-scoped ApiKey delegate */
@@ -48,29 +71,17 @@ export class ApiKeyService {
         return this.tenantAware.forModel(this.prisma.apiKey);
     }
 
-    /**
-     * Generate a new API key for a tenant
-     * The raw key is returned only once and never stored
-     */
+    /** Issues a new key; the raw key is in the response and nowhere else. */
     async create(userId: string, dto: CreateApiKeyDto): Promise<ApiKeyWithRawKeyResponse> {
         const keyType = dto.keyType ?? ApiKeyType.SECRET;
-        const rawKey = this.generateSecureApiKey(keyType);
-        const keyHash = await this.hashApiKey(rawKey);
-        const keyPrefix = this.extractApiKeyPrefix(rawKey);
+        const { saved, rawKey } = await this.withFreshKey(
+            keyType,
+            (secret) =>
+                this.apiKey.create({
+                    data: { label: dto.label, ...secret, keyType, createdBy: userId, expiresAt: dto.expiresAt ?? null }
+                }) as Promise<ApiKeyProps>
+        );
 
-        const saved = (await this.apiKey.create({
-            data: {
-                label: dto.label,
-                keyHash,
-                keyPrefix,
-                keyType,
-                scopes: dto.scopes,
-                createdBy: userId,
-                expiresAt: dto.expiresAt ?? null
-            }
-        })) as ApiKeyProps;
-
-        // Emit domain event + audit event after commit
         const event = new ApiKeyCreatedEvent(
             saved.id,
             saved.tenantId,
@@ -80,26 +91,17 @@ export class ApiKeyService {
                 label: saved.label,
                 keyPrefix: saved.keyPrefix,
                 keyType: saved.keyType,
-                scopes: saved.scopes as string[],
                 createdBy: userId,
                 createdAt: saved.createdAt
             },
             userId
         );
         this.txEventEmitter.emitAfterCommit('api-key.created', event);
-        this.txEventEmitter.emitAfterCommit('audit.api-key.created', event);
 
-        this.logger.log(`API key created: ${saved.id}`, {
-            apiKeyId: saved.id,
-            label: saved.label
-        });
-
+        this.logger.log('API key created', { apiKeyId: saved.id, keyType });
         return apiKeyResponseMapper.toResponseWithRawKey(saved, rawKey);
     }
 
-    /**
-     * List all API keys for a tenant with pagination
-     */
     async findAll(query: PaginateQuery): Promise<Paginated<ApiKeyResponse>> {
         const baseWhere = this.tenantAware.withTenantFilter({ deletedAt: null });
         const result = await prismaPaginate(query, this.prisma.apiKey, API_KEY_PAGINATE_CONFIG, baseWhere);
@@ -111,124 +113,68 @@ export class ApiKeyService {
         };
     }
 
-    /**
-     * Get a single API key by ID
-     */
     async findById(id: string): Promise<ApiKeyResponse> {
-        const apiKey = (await this.apiKey.findUnique({
-            where: { id }
-        })) as ApiKeyProps | null;
-
-        if (!apiKey) {
-            throw new NotFoundException(`API key with ID ${id} not found`);
-        }
-
-        return apiKeyResponseMapper.toResponse(apiKey);
+        return apiKeyResponseMapper.toResponse(await this.findLive(id));
     }
 
-    /**
-     * Update API key metadata (name, scopes)
-     */
+    /** Renames a key. */
     async update(id: string, userId: string, dto: UpdateApiKeyDto): Promise<ApiKeyResponse> {
-        const existing = await this.apiKey.findUnique({ where: { id } });
-        if (!existing) {
-            throw new NotFoundException(`API key with ID ${id} not found`);
-        }
+        const existing = await this.findLive(id);
+        const updated = (await this.apiKey.update({ where: { id }, data: { label: dto.label } })) as ApiKeyProps;
 
-        const updated = (await this.apiKey.update({
-            where: { id },
-            data: dto
-        })) as ApiKeyProps;
-
-        // Build changes object
-        const changes: Record<string, { from: unknown; to: unknown }> = {};
         if (dto.label && dto.label !== existing.label) {
-            changes.label = { from: existing.label, to: dto.label };
-        }
-        if (dto.scopes) {
-            changes.scopes = { from: existing.scopes, to: dto.scopes };
-        }
-
-        if (Object.keys(changes).length > 0) {
             const event = new ApiKeyUpdatedEvent(
                 id,
                 updated.tenantId,
                 {
                     apiKeyId: id,
                     tenantId: updated.tenantId,
-                    changes,
+                    changes: { label: { from: existing.label, to: dto.label } },
                     updatedBy: userId,
                     updatedAt: updated.updatedAt
                 },
                 userId
             );
             this.txEventEmitter.emitAfterCommit('api-key.updated', event);
-            this.txEventEmitter.emitAfterCommit('audit.api-key.updated', event);
         }
-
-        this.logger.log(`API key updated: ${id}`, { apiKeyId: id, changes });
-
         return apiKeyResponseMapper.toResponse(updated);
     }
 
     /**
-     * Rotate an API key (api-key lifecycle — system_architecture §tenant-service).
-     * Issues a fresh secret for the same key id/label/scopes, invalidating the old secret immediately.
-     * The new raw key is returned exactly once.
+     * Replaces the key's secret (same id, label and type). The old secret stops working immediately —
+     * its cache entry is dropped — and `api_key.rotated` tells downstream caches to drop it too.
      */
     async rotate(id: string, userId: string): Promise<ApiKeyWithRawKeyResponse> {
-        const existing = (await this.apiKey.findUnique({ where: { id } })) as ApiKeyProps | null;
-        if (!existing) {
-            throw new NotFoundException(`API key with ID ${id} not found`);
-        }
+        const existing = await this.findLive(id);
         if (existing.revokedAt) {
-            throw new BadRequestException('Cannot rotate a revoked API key');
+            throw new BaseException('state_conflict', 'A revoked API key cannot be rotated', HttpStatus.CONFLICT);
         }
 
-        const rawKey = this.generateSecureApiKey(existing.keyType as ApiKeyType);
-        const keyHash = await this.hashApiKey(rawKey);
-        const keyPrefix = this.extractApiKeyPrefix(rawKey);
-
-        const updated = (await this.apiKey.update({
-            where: { id },
-            data: { keyHash, keyPrefix, lastUsedAt: null }
-        })) as ApiKeyProps;
-
-        const event = new ApiKeyUpdatedEvent(
-            id,
-            updated.tenantId,
-            {
-                apiKeyId: id,
-                tenantId: updated.tenantId,
-                changes: { keyPrefix: { from: existing.keyPrefix, to: keyPrefix } },
-                updatedBy: userId,
-                updatedAt: updated.updatedAt
-            },
-            userId
+        const { saved, rawKey } = await this.withFreshKey(
+            existing.keyType as ApiKeyType,
+            (secret) => this.apiKey.update({ where: { id }, data: { ...secret, lastUsedAt: null } }) as Promise<ApiKeyProps>
         );
-        this.txEventEmitter.emitAfterCommit('api-key.updated', event);
-        this.txEventEmitter.emitAfterCommit('audit.api-key.updated', event);
+        await this.forget(existing);
 
-        this.logger.log(`API key rotated: ${id}`, { apiKeyId: id });
-
-        return apiKeyResponseMapper.toResponseWithRawKey(updated, rawKey);
+        this.txEventEmitter.emitAfterCommit(
+            'api-key.rotated',
+            new ApiKeyRotatedEvent(
+                id,
+                saved.tenantId,
+                { apiKeyId: id, keyType: saved.keyType, oldKeyPrefix: existing.keyPrefix, newKeyPrefix: saved.keyPrefix, rotatedBy: userId },
+                userId
+            )
+        );
+        this.logger.log('API key rotated', { apiKeyId: id });
+        return apiKeyResponseMapper.toResponseWithRawKey(saved, rawKey);
     }
 
-    /**
-     * Revoke an API key (immediate, irreversible per api_contract §2.2).
-     * Sets revoked_at and soft-deletes the record.
-     */
-    async delete(id: string, userId: string): Promise<void> {
-        const existing = (await this.apiKey.findUnique({
-            where: { id }
-        })) as ApiKeyProps | null;
-        if (!existing) {
-            throw new NotFoundException(`API key with ID ${id} not found`);
-        }
-
+    /** Revokes a key — immediate and irreversible (API §2); the reason travels on `api_key.revoked`. */
+    async delete(id: string, userId: string, reason?: string): Promise<void> {
+        const existing = await this.findLive(id);
         const revokedAt = new Date();
-        await this.apiKey.update({ where: { id }, data: { revokedAt } });
-        await this.apiKey.delete({ where: { id } });
+        await this.apiKey.update({ where: { id }, data: { revokedAt, deletedAt: revokedAt } });
+        await this.forget(existing);
 
         const event = new ApiKeyDeletedEvent(
             id,
@@ -239,94 +185,91 @@ export class ApiKeyService {
                 keyLabel: existing.label,
                 keyPrefix: existing.keyPrefix,
                 deletedBy: userId,
-                deletedAt: revokedAt
+                deletedAt: revokedAt,
+                reason: reason ?? null
             },
             userId
         );
         this.txEventEmitter.emitAfterCommit('api-key.deleted', event);
-        this.txEventEmitter.emitAfterCommit('audit.api-key.deleted', event);
-
-        this.logger.log(`API key deleted: ${id}`, { apiKeyId: id });
+        this.logger.log('API key revoked', { apiKeyId: id });
     }
 
     /**
-     * Validate an API key (for authentication middleware)
-     * Returns the API key entity if valid, null otherwise
-     * Note: This bypasses tenant context since we don't know the tenant yet
+     * Resolves a presented raw key (the gateway's API-key path). Returns null for an unknown, revoked or
+     * expired key. Cached per DB Model §3; revocation and rotation delete the cache entry.
      */
-    async validateKey(rawKey: string): Promise<ApiKeyProps | null> {
-        const keyPrefix = this.extractApiKeyPrefix(rawKey);
-
-        // bcrypt hashes are salted, so we narrow by the (non-unique) last-4 prefix and
-        // bcrypt.compare each candidate. Query directly without tenant context (we're authenticating).
-        const candidates = (await this.prisma.apiKey.findMany({
-            where: {
-                keyPrefix,
-                revokedAt: null,
-                deletedAt: null
-            }
-        })) as ApiKeyProps[];
-
-        const apiKey = await this.findMatchingKey(rawKey, candidates);
-        if (!apiKey) {
+    async validateKey(rawKey: string): Promise<ResolvedApiKey | null> {
+        const keyHash = this.hash(rawKey);
+        const cacheKey = this.cacheKey(rawKey.slice(-4), keyHash);
+        const cached = await this.redis.get<ResolvedApiKey & { expiresAt: string | null }>(cacheKey, { tenantScoped: false });
+        const resolved = cached ?? (await this.loadActive(keyHash, cacheKey));
+        if (!resolved || (resolved.expiresAt && new Date(resolved.expiresAt).getTime() <= Date.now())) {
             return null;
         }
 
-        // Check expiration
-        if (apiKey.expiresAt && new Date() > apiKey.expiresAt) {
-            throw new UnauthorizedException('The API key has expired');
-        }
-
-        // Update last used timestamp asynchronously
-        this.updateLastUsed(apiKey.id).catch((error) => {
-            this.logger.error(`Failed to update API key last used timestamp: ${error.message}`);
-        });
-
-        return apiKey;
+        await this.touch(resolved.id);
+        return { id: resolved.id, tenantId: resolved.tenantId, keyType: resolved.keyType };
     }
 
-    /** Find the candidate whose bcrypt hash matches the raw key. */
-    private async findMatchingKey(rawKey: string, candidates: ApiKeyProps[]): Promise<ApiKeyProps | null> {
-        for (const candidate of candidates) {
-            const isMatch = await this.compareApiKeys(rawKey, candidate.keyHash);
-            if (isMatch) {
-                return candidate;
+    private async loadActive(keyHash: string, cacheKey: string): Promise<(ResolvedApiKey & { expiresAt: string | null }) | null> {
+        const row = await this.prisma.apiKey.findUnique({
+            where: { keyHash },
+            select: { id: true, tenantId: true, keyType: true, expiresAt: true, revokedAt: true, deletedAt: true }
+        });
+        if (!row || row.revokedAt || row.deletedAt) {
+            return null;
+        }
+        const resolved = { id: row.id, tenantId: row.tenantId, keyType: row.keyType, expiresAt: row.expiresAt?.toISOString() ?? null };
+        await this.redis.set(cacheKey, resolved, { tenantScoped: false, ttl: KEY_CACHE_TTL_SECONDS });
+        return resolved;
+    }
+
+    /** `last_used_at` at most once a minute per key — validation runs on every ingestion request. */
+    private async touch(id: string): Promise<void> {
+        const due = await this.redis.setNx(`apikey:last-used:${id}`, '1', LAST_USED_WRITE_INTERVAL_SECONDS);
+        if (due) {
+            await this.prisma.apiKey.update({ where: { id }, data: { lastUsedAt: new Date() } }).catch((error: unknown) => {
+                this.logger.warn('Could not record API key use', { apiKeyId: id, reason: error instanceof Error ? error.message : 'unknown' });
+            });
+        }
+    }
+
+    private async forget(key: ApiKeyProps): Promise<void> {
+        await this.redis.del(this.cacheKey(key.keyPrefix, key.keyHash), false);
+    }
+
+    private async findLive(id: string): Promise<ApiKeyProps> {
+        const key = (await this.apiKey.findFirst({ where: { id, deletedAt: null } })) as ApiKeyProps | null;
+        if (!key) {
+            throw new BaseException('resource_not_found', `API key ${id} not found`, HttpStatus.NOT_FOUND);
+        }
+        return key;
+    }
+
+    /** Generates a key and persists it, regenerating on the (rare) 4-char display-suffix clash in the tenant. */
+    private async withFreshKey(
+        keyType: ApiKeyType,
+        persist: (secret: { keyHash: string; keyPrefix: string }) => Promise<ApiKeyProps>
+    ): Promise<{ saved: ApiKeyProps; rawKey: string }> {
+        for (let attempt = 1; ; attempt++) {
+            const rawKey = `${keyType === ApiKeyType.PUBLISHABLE ? 'rai_pub_' : 'rai_live_'}${randomBytes(32).toString('base64url')}`;
+            try {
+                const saved = await persist({ keyHash: this.hash(rawKey), keyPrefix: rawKey.slice(-4) });
+                return { saved, rawKey };
+            } catch (error) {
+                const clash = error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002';
+                if (!clash || attempt >= MAX_GENERATION_ATTEMPTS) {
+                    throw error;
+                }
             }
         }
-        return null;
     }
 
-    /**
-     * Update last used timestamp (fire and forget)
-     */
-    private async updateLastUsed(id: string): Promise<void> {
-        await this.prisma.apiKey.update({
-            where: { id },
-            data: { lastUsedAt: new Date() }
-        });
+    private hash(rawKey: string): string {
+        return createHmac('sha256', this.pepper).update(rawKey, 'utf8').digest('hex');
     }
 
-    // ============================================================================
-    // Crypto helpers
-    // ============================================================================
-
-    private generateSecureApiKey(keyType: ApiKeyType): string {
-        // Prefix encodes the key type per referralai_api_contract §2.2 (the gateway routes on it).
-        const prefix = keyType === ApiKeyType.PUBLISHABLE ? 'rai_pub_' : 'rai_live_';
-        const randomPart = randomBytes(32).toString('base64url');
-        return `${prefix}${randomPart}`;
-    }
-
-    private hashApiKey(rawKey: string): Promise<string> {
-        return bcrypt.hash(rawKey, this.BCRYPT_ROUNDS);
-    }
-
-    /** Last 4 chars of the raw key — display identifier and validation lookup narrowing (db_tables §api_keys). */
-    private extractApiKeyPrefix(rawKey: string): string {
-        return rawKey.slice(-4);
-    }
-
-    private compareApiKeys(rawKey: string, storedHash: string): Promise<boolean> {
-        return bcrypt.compare(rawKey, storedHash);
+    private cacheKey(keyPrefix: string, keyHash: string): string {
+        return `apikey:${keyPrefix}:${keyHash.slice(0, 8)}`;
     }
 }
