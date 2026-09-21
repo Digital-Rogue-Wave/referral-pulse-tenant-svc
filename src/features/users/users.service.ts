@@ -8,7 +8,7 @@ import { AppLoggerService } from '@common/logging/app-logger.service';
 import { KratosService } from '@common/auth/kratos.service';
 import { BaseException } from '@common/exceptions/base.exceptions';
 import { hashEmail } from '@common/helper/hashing';
-import { prismaPaginate, PaginateQuery, Paginated } from '@common/nestjs-prisma-pagination';
+import { cursorPage, CursorPage, ListQueryDto } from '@common/http-contract/cursor-page';
 import { RoleEnum } from '@common/enums/role.enum';
 import type { IAuthenticatedUser } from '@app/types';
 
@@ -24,7 +24,6 @@ import {
 } from '@domains/user';
 
 import { RoleGrantPolicy } from './role-grant.policy';
-import { USER_PAGINATE_CONFIG } from './users.pagination';
 
 export interface UserMeResponse {
     userId: string;
@@ -95,15 +94,10 @@ export class UsersService {
         return this.createMembership(tx, { tenantId, identity, role, assignedBy: invitedBy });
     }
 
-    async findAll(query: PaginateQuery): Promise<Paginated<UserResponse>> {
-        const baseWhere = this.tenantAware.withTenantFilter({ deletedAt: null });
-        const result = await prismaPaginate(query, this.prisma.user, USER_PAGINATE_CONFIG, baseWhere);
-
-        return {
-            data: userResponseMapper.toResponseArray(result.data as UserProps[]),
-            meta: result.meta as Paginated<UserResponse>['meta'],
-            links: result.links
-        };
+    async findAll(query: ListQueryDto): Promise<CursorPage<UserResponse>> {
+        return cursorPage(this.prisma.user, this.tenantAware.withTenantFilter({ deletedAt: null }), query, (row) =>
+            userResponseMapper.toResponse(row as UserProps)
+        );
     }
 
     async findById(id: string): Promise<UserResponse> {

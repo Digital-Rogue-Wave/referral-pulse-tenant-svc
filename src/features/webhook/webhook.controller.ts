@@ -11,8 +11,12 @@ import { UserLoggedInEvent } from '@domains/user';
 import type { Request } from 'express';
 import { ApiTags } from '@nestjs/swagger';
 
+import { RawWire } from '@common/http-contract/wire-case.interceptor';
+
 import { OryWebhookGuard } from './ory-webhook.guard';
 
+// Payloads are Ory's and Stripe's, not ours: keys are passed through untouched.
+@RawWire()
 @ApiTags('Webhooks')
 @Controller({ path: 'webhook', version: '1' })
 @Public()

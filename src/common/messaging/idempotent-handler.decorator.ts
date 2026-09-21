@@ -33,8 +33,7 @@ export interface IdempotentHandlerOptions {
  * ```typescript
  * @Injectable()
  * export class CampaignConsumer {
- *   @Idempotent({ ttl: 3600 })
- *   async handleCampaignCreated(message: IMessageEnvelope<CampaignCreatedPayload>) {
+ * *   async handleCampaignCreated(message: IMessageEnvelope<CampaignCreatedPayload>) {
  *     // This will only execute once per unique message
  *     await this.campaignService.create(message.payload);
  *   }

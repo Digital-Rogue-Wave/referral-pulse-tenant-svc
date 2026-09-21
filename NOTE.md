@@ -74,11 +74,21 @@ and record it here, rather than wait. Every item below can be revisited; each na
 | K5 | **`api_key.rotated`** is published on rotation; **`api_key.revoked`** carries the optional `?reason=` of the DELETE. `last_used_at` is written at most once a minute per key. | #27, #20, #10. |
 | K6 | Responses list their fields explicitly — the key hash was being returned by create/rotate. | Found during live verification. |
 
+### HTTP conventions (API Contract v1.3 §1) — adopted in full (decision X-1/X-2)
+
+| # | Decision | Why |
+|---|---|---|
+| H1 | **Error body** `{ "error": { type, code, message, param, request_id, doc_url } }` with the spec's type table; `402 → payment_required` is this service's billing extension; validation errors add `details: [{ param, message }]` with full snake_case paths (additive). `Content-Type: application/json`. Replaces RFC 9457. | X-2: the public contract outranks the template rule. |
+| H2 | **`X-Request-Id` on every response**, assigned by middleware before guards run (caller value kept when sane, otherwise `req_<ulid>`), and echoed as `error.request_id`. | Guard failures used to report `requestId: "unknown"`. |
+| H3 | **snake_case on the wire, camelCase inside:** a global interceptor converts request body/query keys to camelCase before validation and response keys to snake_case; the OpenAPI document is converted the same way. Routes whose payloads belong to someone else (Stripe, Ory web hooks) or are already in wire form (JWKS, the gateway exchange) are `@RawWire`. | 105 routes: converting at the boundary is uniform and cannot miss a field, where hand-renaming every DTO would. This **replaces the plan's "explicit DTO naming"** default. Free-form JSON (tenant settings) round-trips: its keys are snake_case on the wire too. |
+| H4 | **Cursor pagination** `{ data, has_more, next_cursor, prev_cursor }` with `limit` (25, max 100), `starting_after`, `ending_before`; newest first; cursors are ULID ids. Offset pagination and its library are removed. The small currency catalog (keyed by ISO code) is returned as one page. | Spec §1 "All list endpoints use cursor-based pagination. No offset pagination." |
+| H5 | **`Idempotency-Key` mandatory on POST/PATCH** for dashboard callers (optional for service callers, which dedupe on business keys); `idempotency_keys` table (DB Model §0.7), SHA-256 fingerprint of method + path + body, 24 h window, stored response replayed verbatim with `Idempotent-Replayed: true`, 409 `idempotency_key_collision` on reuse with a different body, 409 `idempotency_key_in_flight` + `Retry-After` while the first request runs; a failed request releases its key; hourly purge job. Replaces the per-route Redis `@Idempotent` decorator. Redis `IdempotencyService` stays for message-level dedup. | Spec §1 "Idempotency Strategy". |
+| H6 | CORS no longer allows tenant headers (the tenant comes from the token); it allows `Idempotency-Key` and exposes `X-Request-Id`, `Retry-After`, `Idempotent-Replayed`. | Consistency with A8. |
+
 ### Superseded rules (flagged for the lead, not rewritten)
 
 - `CLAUDE.md` / `.claude/rules/security.md` say errors are "RFC 9457 ProblemDetail". Per decision X-2 the
-  platform adopts the API Contract v1.3 `{error:{type,code,message,param,request_id,doc_url}}` body; the
-  switch lands with the HTTP-conventions phase.
+  platform uses the API Contract v1.3 `{error:{type,code,message,param,request_id,doc_url}}` body (H1).
 - `CLAUDE.md` "Consumes: …usage consumer on ANALYTICS_SVC_FIFO" and its Keto description are superseded by
   the model above.
 

@@ -9,6 +9,10 @@ import { Logger } from 'nestjs-pino';
 
 import type { AllConfigType } from '@config/config.type';
 
+import { toWireCaseDocument } from '@common/http-contract/openapi-wire-case';
+import { requestIdMiddleware } from '@common/http-contract/request-id.middleware';
+import { validationExceptionFactory } from '@common/http-contract/validation-exception.factory';
+
 import { AppModule } from './app.module';
 
 /**
@@ -53,22 +57,16 @@ async function bootstrap(): Promise<void> {
             infer: true
         });
 
+        app.use(requestIdMiddleware);
         app.use(helmet());
         app.use(compression());
 
         app.enableCors({
             origin: allowedOrigins || '*',
             methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
-            allowedHeaders: [
-                'Content-Type',
-                'Authorization',
-                'tenant-id',
-                'x-tenant-id',
-                'correlation-id',
-                'x-correlation-id',
-                'x-request-id',
-                'x-idempotency-key'
-            ],
+            // The tenant always comes from the token, so there is no tenant header to allow.
+            allowedHeaders: ['Content-Type', 'Authorization', 'Idempotency-Key', 'X-Request-Id', 'X-Correlation-Id'],
+            exposedHeaders: ['X-Request-Id', 'Retry-After', 'Idempotent-Replayed'],
             credentials: true
         });
 
@@ -82,19 +80,19 @@ async function bootstrap(): Promise<void> {
                 whitelist: true,
                 forbidNonWhitelisted: true,
                 transform: true,
-                transformOptions: { enableImplicitConversion: true }
+                transformOptions: { enableImplicitConversion: true },
+                exceptionFactory: validationExceptionFactory
             })
         );
 
         if (nodeEnv !== 'production') {
             const swaggerConfig = new DocumentBuilder()
-                .setTitle('Campaign Service API')
-                .setDescription('ReferralAI Campaign Management Microservice')
+                .setTitle('Tenant Service API')
+                .setDescription('ReferralAI tenant, identity and billing service (API Contract v1.3)')
                 .setVersion('1.0')
                 .addBearerAuth()
-                .addApiKey({ type: 'apiKey', name: 'tenant-id', in: 'header' }, 'tenant-id')
                 .build();
-            const document = SwaggerModule.createDocument(app, swaggerConfig);
+            const document = toWireCaseDocument(SwaggerModule.createDocument(app, swaggerConfig));
             SwaggerModule.setup('docs', app, document);
         }
 

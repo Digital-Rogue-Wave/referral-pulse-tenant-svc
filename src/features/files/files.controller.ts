@@ -14,7 +14,6 @@ import {
     Query
 } from '@nestjs/common';
 import { ApiBearerAuth, ApiBody, ApiConsumes, ApiOkResponse, ApiTags } from '@nestjs/swagger';
-import { Idempotent, IdempotencyScope } from '@common/idempotency';
 import type { File } from '@prisma-gen/generated/client';
 import type { NullableType } from '@app/types';
 import { FileDto, PresignedUrlResponseDto } from '@domains/files';
@@ -36,7 +35,6 @@ export class FilesController {
 
     @RequirePermission('tenants:write')
     @Post('upload')
-    @Idempotent({ scope: IdempotencyScope.Tenant, ttl: 3600 })
     @ApiBearerAuth()
     @ApiConsumes('multipart/form-data')
     @ApiBody({
@@ -59,7 +57,6 @@ export class FilesController {
 
     @RequirePermission('tenants:write')
     @Post('upload-multiple')
-    @Idempotent({ scope: IdempotencyScope.Tenant, ttl: 3600 })
     @ApiConsumes('multipart/form-data')
     @ApiBody({
         schema: {
@@ -106,7 +103,6 @@ export class FilesController {
      */
     @RequirePermission('tenants:write')
     @Put(':id')
-    @Idempotent({ scope: IdempotencyScope.Tenant, ttl: 1800 })
     @ApiConsumes('multipart/form-data')
     @ApiBody({
         schema: {
@@ -133,7 +129,6 @@ export class FilesController {
      */
     @RequirePermission('tenants:write')
     @Delete(':id')
-    @Idempotent({ scope: IdempotencyScope.Tenant, ttl: 1800 })
     @ApiOkResponse({ type: FileDto })
     @HttpCode(HttpStatus.OK)
     async deleteFile(@Param('id') id: string): Promise<File> {

@@ -12,7 +12,6 @@ export * from './messaging/messaging.module';
 export * from './monitoring/tracing.module';
 export * from './events';
 export * from './bulljobs';
-export * from './nestjs-prisma-pagination';
 export * from './side-effects';
 export * from './enums';
 export * from './pipes';

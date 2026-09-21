@@ -1,4 +1,4 @@
-import { Body, Controller, Delete, Get, HttpCode, HttpStatus, Param, Post } from '@nestjs/common';
+import { Body, Controller, Delete, Get, HttpCode, HttpStatus, Param, Post, Query } from '@nestjs/common';
 import { ApiTags, ApiBearerAuth, ApiBody, ApiCreatedResponse, ApiOkResponse, ApiOperation } from '@nestjs/swagger';
 
 import { CurrentUser } from '@common/auth/current-user.decorator';
@@ -6,14 +6,12 @@ import type { IAuthenticatedUser } from '@app/types';
 import { Public } from '@common/auth/public.decorator';
 import { AllowNoTenant } from '@common/auth/allow-no-tenant.decorator';
 import { RequirePermission } from '@common/auth/require-permission.decorator';
-import { Paginate, PaginateQuery, Paginated, ApiPaginationQuery } from '@common/nestjs-prisma-pagination';
-import { Idempotent, IdempotencyScope } from '@common/idempotency';
+import { CursorPage, ListQueryDto } from '@common/http-contract/cursor-page';
 
 import { CreateInvitationDto, InvitationResponse, PublicInvitationResponse } from '@domains/invitation';
 import { UserResponse } from '@domains/user';
 
 import { InvitationService } from './invitation.service';
-import { INVITATION_PAGINATE_CONFIG } from './invitation.pagination';
 
 /**
  * Tenant member invitations (tenant-aware, Keto-guarded). Sanctioned extension — not in the
@@ -30,17 +28,15 @@ export class InvitationController {
     @RequirePermission('users:write')
     @HttpCode(HttpStatus.CREATED)
     @Post()
-    @Idempotent({ scope: IdempotencyScope.Tenant, ttl: 3600 })
     async create(@Body() dto: CreateInvitationDto, @CurrentUser() user: IAuthenticatedUser): Promise<InvitationResponse> {
         return this.invitationService.create(user, dto);
     }
 
-    @ApiPaginationQuery(INVITATION_PAGINATE_CONFIG)
-    @ApiOkResponse({ description: 'List of tenant invitations', type: InvitationResponse, isArray: true })
+    @ApiOkResponse({ description: 'A page of tenant invitations, newest first', type: CursorPage })
     @RequirePermission('users:read')
     @HttpCode(HttpStatus.OK)
     @Get()
-    async findAll(@Paginate() query: PaginateQuery): Promise<Paginated<InvitationResponse>> {
+    async findAll(@Query() query: ListQueryDto): Promise<CursorPage<InvitationResponse>> {
         return this.invitationService.findAll(query);
     }
 
@@ -48,7 +44,6 @@ export class InvitationController {
     @RequirePermission('users:write')
     @HttpCode(HttpStatus.OK)
     @Post(':id/resend')
-    @Idempotent({ scope: IdempotencyScope.Tenant, ttl: 1800 })
     async resend(@Param('id') id: string, @CurrentUser() user: IAuthenticatedUser): Promise<InvitationResponse> {
         return this.invitationService.resend(id, user.userId);
     }

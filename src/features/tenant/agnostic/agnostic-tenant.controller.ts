@@ -9,7 +9,6 @@ import { AllowNoTenant } from '@common/auth/allow-no-tenant.decorator';
 import { CurrentUser } from '@common/auth/current-user.decorator';
 import { BaseException } from '@common/exceptions/base.exceptions';
 import type { IAuthenticatedUser } from '@app/types';
-import { Idempotent, IdempotencyScope } from '@common/idempotency';
 
 import { TenantResponse, CreateTenantDto } from '@domains/tenant';
 
@@ -24,7 +23,6 @@ export class AgnosticTenantController {
     /** Onboarding: a signed-in Ory identity with no tenant yet creates one and becomes its Owner. */
     @AllowNoTenant()
     @Post()
-    @Idempotent({ scope: IdempotencyScope.User, ttl: 3600 })
     @ApiConsumes('multipart/form-data')
     @ApiExtraModels(CreateTenantDto)
     @ApiBody({

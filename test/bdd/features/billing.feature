@@ -12,7 +12,7 @@ Feature: Billing Management
     When I send a GET request to "/api/v1/billings/subscription" with that token
     Then the response status should be 200
     And the response should contain a "plan" field
-    And the response should contain a "subscriptionStatus" field
+    And the response should contain a "subscription_status" field
 
   @public-endpoint
   Scenario: List public billing plans without authentication
@@ -28,7 +28,7 @@ Feature: Billing Management
       { "plan": "Starter" }
       """
     Then the response status should be 200
-    And the response should contain a "checkoutUrl" field
+    And the response should contain a "checkout_url" field
 
   Scenario: Get usage summary returns usage metrics
     When I send a GET request to "/api/v1/billings/usage" with that token

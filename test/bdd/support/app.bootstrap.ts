@@ -31,6 +31,8 @@ process.env['ORY_WEBHOOK_API_KEY'] = randomBytes(32).toString('hex');
 process.env['API_KEY_HASH_PEPPER'] = randomBytes(32).toString('hex');
 
 import { AppModule } from '../../../src/app.module';
+import { requestIdMiddleware } from '../../../src/common/http-contract/request-id.middleware';
+import { validationExceptionFactory } from '../../../src/common/http-contract/validation-exception.factory';
 import { StripeService } from '../../../src/features/billing/stripe.service';
 import { fakeStripeService } from './stripe.fake';
 
@@ -49,6 +51,8 @@ export async function bootstrapTestApp(): Promise<INestApplication> {
 
     app = moduleRef.createNestApplication({ logger: false });
 
+    app.use(requestIdMiddleware);
+
     const apiPrefix = process.env['APP_API_PREFIX'] ?? 'api';
 
     app.setGlobalPrefix(apiPrefix, {
@@ -60,7 +64,8 @@ export async function bootstrapTestApp(): Promise<INestApplication> {
             whitelist: true,
             forbidNonWhitelisted: true,
             transform: true,
-            transformOptions: { enableImplicitConversion: true }
+            transformOptions: { enableImplicitConversion: true },
+            exceptionFactory: validationExceptionFactory
         })
     );
 

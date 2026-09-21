@@ -23,6 +23,7 @@ import {
     cleanupInvitationFlow,
     disconnectFixturesPrisma,
     ensureMember,
+    clearIdempotencyKeys,
     FIXTURE_IDS
 } from './db.fixtures';
 import type { BddWorldInterface } from './world';
@@ -41,6 +42,8 @@ BeforeAll(async function () {
     await bootstrapTestApp();
     // Every "valid JWT for tenant default-tenant" acts as this Owner.
     await ensureMember({ tenantId: DEFAULT_TENANT_ID, ...BDD_OWNER, role: 'OWNER' });
+    // Fixed Idempotency-Keys in scenarios must start each run unused.
+    await clearIdempotencyKeys(DEFAULT_TENANT_ID);
 });
 
 AfterAll(async function () {

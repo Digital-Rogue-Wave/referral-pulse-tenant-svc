@@ -29,7 +29,7 @@ import { TenantContextService } from './tenant-context.service';
  *
  * // For pagination or complex queries, use withTenantFilter:
  * const where = this.tenantAware.withTenantFilter({ status: 'active' });
- * await prismaPaginate(query, this.prisma.toto, config, where);
+ * await cursorPage(this.prisma.toto, where, query, toItem);
  * ```
  */
 @Injectable()

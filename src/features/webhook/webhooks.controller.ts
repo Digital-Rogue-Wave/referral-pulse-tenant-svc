@@ -1,9 +1,11 @@
 import { Controller, Headers, Post, Req, VERSION_NEUTRAL } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
 import { Public } from '@common/auth/public.decorator';
+import { RawWire } from '@common/http-contract/wire-case.interceptor';
 import { BillingService } from '../billing/billing.service';
 import type { Request } from 'express';
 
+@RawWire()
 @ApiTags('Webhooks')
 @Controller({ path: 'webhooks', version: VERSION_NEUTRAL })
 @Public()

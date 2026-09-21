@@ -1,7 +1,4 @@
+// Message-level dedup (Redis executeOnce) for queue consumers and provider web hooks.
+// HTTP request idempotency is RequestIdempotencyInterceptor (src/common/http-contract), backed by `idempotency_keys`.
 export * from './idempotency.service';
-export * from './idempotency-key.generator';
-export * from './idempotency.decorator';
 export * from './idempotency.module';
-
-// Re-export enums from centralized types
-export { IdempotencyScope } from '@app/types';

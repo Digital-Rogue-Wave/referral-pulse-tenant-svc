@@ -1,18 +1,11 @@
 import { Controller, Get, Put, Delete, Body, HttpCode, HttpStatus } from '@nestjs/common';
-import { ApiTags, ApiBearerAuth, ApiOkResponse, ApiHeader, ApiBody } from '@nestjs/swagger';
+import { ApiTags, ApiBearerAuth, ApiOkResponse, ApiBody } from '@nestjs/swagger';
 
-import { Idempotent, IdempotencyScope } from '@common/idempotency';
 import { UpdateUserNotificationPreferenceDto, UserNotificationPreferenceResponse } from '@domains/tenant-setting';
 
 import { UserNotificationPreferenceService } from './user-notification-preference.service';
 
 @ApiTags('User Notification Preferences')
-@ApiHeader({
-    name: 'x-tenant-id',
-    required: true,
-    description: 'Tenant ID header',
-    schema: { type: 'string' }
-})
 @Controller({ path: 'me/notification-preferences', version: '1' })
 @ApiBearerAuth()
 export class UserNotificationPreferenceController {
@@ -35,7 +28,6 @@ export class UserNotificationPreferenceController {
     })
     @HttpCode(HttpStatus.OK)
     @Put()
-    @Idempotent({ scope: IdempotencyScope.Tenant, ttl: 1800 })
     async updateMyPreferences(@Body() dto: UpdateUserNotificationPreferenceDto): Promise<UserNotificationPreferenceResponse> {
         return this.userNotificationPreferenceService.updateMyPreferences(dto);
     }
@@ -45,7 +37,6 @@ export class UserNotificationPreferenceController {
     })
     @HttpCode(HttpStatus.NO_CONTENT)
     @Delete()
-    @Idempotent({ scope: IdempotencyScope.Tenant, ttl: 1800 })
     async deleteMyPreferences(): Promise<void> {
         await this.userNotificationPreferenceService.deleteMyPreferences();
     }

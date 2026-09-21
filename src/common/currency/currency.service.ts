@@ -3,26 +3,11 @@ import { Injectable } from '@nestjs/common';
 import { DatabaseService } from '@app/database/database.service';
 
 import { Prisma, Currency as CurrencyModel } from '@prisma-gen/generated/client';
-import { BaseService } from '../helper/base.service';
 import { NullableType } from '@app/types';
-import {
-    Paginated,
-    PaginateQuery,
-    prismaPaginate,
-    CursorPaginated,
-    CursorPaginateQuery,
-    prismaCursorPaginate
-} from '@app/common/nestjs-prisma-pagination';
-import { CURRENCY_PAGINATE_CONFIG } from './currency.pagination';
+import type { CursorPage } from '@common/http-contract/cursor-page';
 
 @Injectable()
-export class CurrencyService implements BaseService<
-    CurrencyModel,
-    Prisma.CurrencyCreateInput,
-    Prisma.CurrencyUpdateInput,
-    Prisma.CurrencyWhereUniqueInput,
-    Prisma.CurrencyFindManyArgs
-> {
+export class CurrencyService {
     constructor(private readonly prisma: DatabaseService) {}
 
     async create(createDto: Prisma.CurrencyCreateInput): Promise<CurrencyModel> {
@@ -31,20 +16,13 @@ export class CurrencyService implements BaseService<
         });
     }
 
-    async list(query: PaginateQuery<CurrencyModel>): Promise<Paginated<CurrencyModel>> {
-        return prismaPaginate(query, this.prisma.currency, CURRENCY_PAGINATE_CONFIG, {
-            deletedAt: null
-        });
-    }
-
     /**
-     * List currencies with cursor-based pagination
-     * More efficient for large datasets and infinite scroll UIs
+     * The whole currency catalog in the standard list envelope. It is small reference data keyed by ISO
+     * code (not a ULID), so it is returned in one page, ordered by code.
      */
-    async listCursor(query: CursorPaginateQuery<CurrencyModel>): Promise<CursorPaginated<CurrencyModel>> {
-        return prismaCursorPaginate(query, this.prisma.currency, CURRENCY_PAGINATE_CONFIG, {
-            deletedAt: null
-        });
+    async catalog(): Promise<CursorPage<CurrencyModel>> {
+        const data = await this.prisma.currency.findMany({ where: { deletedAt: null }, orderBy: { code: 'asc' } });
+        return { data, hasMore: false, nextCursor: null, prevCursor: null };
     }
 
     async listUnpaginated(options?: Prisma.CurrencyFindManyArgs): Promise<CurrencyModel[]> {

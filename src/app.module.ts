@@ -2,7 +2,7 @@ import * as path from 'path';
 
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
-import { APP_FILTER, APP_GUARD, APP_INTERCEPTOR } from '@nestjs/core';
+import { APP_FILTER, APP_INTERCEPTOR } from '@nestjs/core';
 import { TerminusModule } from '@nestjs/terminus';
 import { AcceptLanguageResolver, HeaderResolver, I18nModule, QueryResolver } from 'nestjs-i18n';
 
@@ -25,9 +25,11 @@ import { TenantSettingModule } from '@app/features/tenant-setting/tenant-setting
 import { WebhookModule } from '@app/features/webhook/webhook.module';
 
 import { AlsAuthInterceptor } from '@common/interceptor/als-auth.interceptor';
-import { JwtAuthGuard } from '@common/auth/jwt-auth.guard';
 import { CommonModule } from '@common/common.module';
 import { GlobalExceptionsFilter } from '@common/exceptions/global-exceptions.filter';
+import { HttpContractModule } from '@common/http-contract/http-contract.module';
+import { RequestIdempotencyInterceptor } from '@common/http-contract/request-idempotency.interceptor';
+import { WireCaseInterceptor } from '@common/http-contract/wire-case.interceptor';
 
 @Module({
     imports: [
@@ -48,6 +50,7 @@ import { GlobalExceptionsFilter } from '@common/exceptions/global-exceptions.fil
         }),
         TerminusModule,
         CommonModule,
+        HttpContractModule,
         DatabaseModule,
         HealthModule,
         // Feature Modules
@@ -64,8 +67,10 @@ import { GlobalExceptionsFilter } from '@common/exceptions/global-exceptions.fil
     ],
     providers: [
         { provide: APP_FILTER, useClass: GlobalExceptionsFilter },
-        // { provide: APP_GUARD, useClass: JwtAuthGuard },
-        { provide: APP_INTERCEPTOR, useClass: AlsAuthInterceptor }
+        // Order matters: idempotency is outermost (fingerprints the raw body, stores the final wire response).
+        { provide: APP_INTERCEPTOR, useClass: RequestIdempotencyInterceptor },
+        { provide: APP_INTERCEPTOR, useClass: AlsAuthInterceptor },
+        { provide: APP_INTERCEPTOR, useClass: WireCaseInterceptor }
     ]
 })
 export class AppModule {}

@@ -2,7 +2,6 @@ import { Controller, Get, Put, Body, HttpCode, HttpStatus } from '@nestjs/common
 import { ApiTags, ApiBearerAuth, ApiOkResponse, ApiBody } from '@nestjs/swagger';
 
 import { RequirePermission } from '@common/auth/require-permission.decorator';
-import { Idempotent, IdempotencyScope } from '@common/idempotency';
 
 import { UpdateTenantSettingDto, TenantSettingResponse } from '@domains/tenant-setting';
 
@@ -31,7 +30,6 @@ export class TenantSettingController {
     @RequirePermission('tenants:write')
     @HttpCode(HttpStatus.OK)
     @Put()
-    @Idempotent({ scope: IdempotencyScope.Tenant, ttl: 1800 })
     async upsert(@Body() dto: UpdateTenantSettingDto): Promise<TenantSettingResponse> {
         return this.tenantSettingService.upsert(dto);
     }

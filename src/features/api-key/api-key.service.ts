@@ -9,7 +9,7 @@ import { TransactionEventEmitterService } from '@common/events/transaction-event
 import { AppLoggerService } from '@common/logging/app-logger.service';
 import { BaseException } from '@common/exceptions/base.exceptions';
 import { RedisService } from '@common/redis/redis.service';
-import { prismaPaginate, PaginateQuery, Paginated } from '@common/nestjs-prisma-pagination';
+import { cursorPage, CursorPage, ListQueryDto } from '@common/http-contract/cursor-page';
 
 import type { AllConfigType } from '@config/config.type';
 
@@ -26,8 +26,6 @@ import {
     ApiKeyRotatedEvent,
     ApiKeyType
 } from '@domains/api-key';
-
-import { API_KEY_PAGINATE_CONFIG } from './api-key.pagination';
 
 /** DB Model v2 §3 Redis `apikey:{key_prefix}:{key_hash8}` — 300 s, dropped on revoke and rotate. */
 const KEY_CACHE_TTL_SECONDS = 300;
@@ -102,15 +100,10 @@ export class ApiKeyService {
         return apiKeyResponseMapper.toResponseWithRawKey(saved, rawKey);
     }
 
-    async findAll(query: PaginateQuery): Promise<Paginated<ApiKeyResponse>> {
-        const baseWhere = this.tenantAware.withTenantFilter({ deletedAt: null });
-        const result = await prismaPaginate(query, this.prisma.apiKey, API_KEY_PAGINATE_CONFIG, baseWhere);
-
-        return {
-            data: apiKeyResponseMapper.toResponseArray(result.data as ApiKeyProps[]),
-            meta: result.meta as Paginated<ApiKeyResponse>['meta'],
-            links: result.links
-        };
+    async findAll(query: ListQueryDto): Promise<CursorPage<ApiKeyResponse>> {
+        return cursorPage(this.prisma.apiKey, this.tenantAware.withTenantFilter({ deletedAt: null }), query, (row) =>
+            apiKeyResponseMapper.toResponse(row as ApiKeyProps)
+        );
     }
 
     async findById(id: string): Promise<ApiKeyResponse> {

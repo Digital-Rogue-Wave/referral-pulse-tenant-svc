@@ -185,6 +185,10 @@ export async function ensureMember(params: {
     }
 }
 
+export async function clearIdempotencyKeys(tenantId: string): Promise<void> {
+    await fixturesPrisma.idempotencyKey.deleteMany({ where: { tenantId } });
+}
+
 export async function cleanupTenant(id: string): Promise<void> {
     // Delete billing first (FK constraint)
     await fixturesPrisma.billing.deleteMany({ where: { tenantId: id } }).catch(() => undefined);

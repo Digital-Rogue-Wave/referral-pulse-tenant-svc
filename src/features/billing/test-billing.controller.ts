@@ -1,5 +1,5 @@
 import { BadRequestException, Body, Controller, Get, Param, Post, Query, Req, UseGuards } from '@nestjs/common';
-import { ApiBearerAuth, ApiBody, ApiHeader, ApiTags } from '@nestjs/swagger';
+import { ApiBearerAuth, ApiBody, ApiTags } from '@nestjs/swagger';
 import type { Request } from 'express';
 import Stripe from 'stripe';
 
@@ -21,7 +21,6 @@ import { TrialLifecycleService } from './trial-lifecycle.service';
 
 @ApiTags('Testing')
 @ApiBearerAuth()
-@ApiHeader({ name: 'tenant-id', required: false })
 @Controller('test')
 export class TestBillingController {
     constructor(

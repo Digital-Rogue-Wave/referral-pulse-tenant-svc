@@ -9,7 +9,7 @@ import { DatabaseService } from '@app/database/database.service';
 import { TenantAwareService } from '@common/tenant-aware/tenant-aware.service';
 import { TransactionEventEmitterService } from '@common/events/transaction-event-emitter.service';
 import { AppLoggerService } from '@common/logging/app-logger.service';
-import { prismaPaginate, PaginateQuery, Paginated } from '@common/nestjs-prisma-pagination';
+import { cursorPage, CursorPage, ListQueryDto } from '@common/http-contract/cursor-page';
 import { InvitationStatusEnum } from '@common/enums/invitation.enum';
 import type { IAuthenticatedUser } from '@app/types';
 
@@ -27,7 +27,6 @@ import { UserInvitedEvent, UserResponse, userResponseMapper } from '@domains/use
 
 import { UsersService } from '@app/features/users/users.service';
 import { RoleGrantPolicy } from '@app/features/users/role-grant.policy';
-import { INVITATION_PAGINATE_CONFIG } from './invitation.pagination';
 
 /**
  * Tenant member invitations (sanctioned extension — not in the canonical API contract; see NOTE.md).
@@ -88,14 +87,10 @@ export class InvitationService {
         return invitationResponseMapper.toResponse(saved);
     }
 
-    async findAll(query: PaginateQuery): Promise<Paginated<InvitationResponse>> {
-        const baseWhere = this.tenantAware.withTenantFilter({ deletedAt: null });
-        const result = await prismaPaginate(query, this.prisma.invitation, INVITATION_PAGINATE_CONFIG, baseWhere);
-        return {
-            data: invitationResponseMapper.toResponseArray(result.data as InvitationProps[]),
-            meta: result.meta as Paginated<InvitationResponse>['meta'],
-            links: result.links
-        };
+    async findAll(query: ListQueryDto): Promise<CursorPage<InvitationResponse>> {
+        return cursorPage(this.prisma.invitation, this.tenantAware.withTenantFilter({ deletedAt: null }), query, (row) =>
+            invitationResponseMapper.toResponse(row as InvitationProps)
+        );
     }
 
     async resend(id: string, actingUserId: string): Promise<InvitationResponse> {

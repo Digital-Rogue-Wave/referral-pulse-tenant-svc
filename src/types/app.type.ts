@@ -272,6 +272,8 @@ export type ErrorCode =
     | 'duplicate_resource'
     | 'state_conflict'
     | 'idempotency_key_collision'
+    | 'idempotency_key_required'
+    | 'idempotency_key_in_flight'
     | 'foreign_key_violation'
     | 'optimistic_lock_error'
     // 429 - Rate Limit

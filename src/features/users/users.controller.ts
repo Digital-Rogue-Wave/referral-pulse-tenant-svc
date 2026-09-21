@@ -1,16 +1,14 @@
-import { Body, Controller, Delete, Get, HttpCode, HttpStatus, Param, Post, Put } from '@nestjs/common';
+import { Body, Controller, Delete, Get, HttpCode, HttpStatus, Param, Post, Put, Query } from '@nestjs/common';
 import { ApiTags, ApiBearerAuth, ApiBody, ApiCreatedResponse, ApiOkResponse, ApiOperation } from '@nestjs/swagger';
 
 import { CurrentUser } from '@common/auth/current-user.decorator';
 import type { IAuthenticatedUser } from '@app/types';
 import { RequirePermission } from '@common/auth/require-permission.decorator';
-import { Paginate, PaginateQuery, Paginated, ApiPaginationQuery } from '@common/nestjs-prisma-pagination';
-import { Idempotent, IdempotencyScope } from '@common/idempotency';
+import { CursorPage, ListQueryDto } from '@common/http-contract/cursor-page';
 
 import { AddUserDto, UpdateUserRoleDto, UserResponse } from '@domains/user';
 
 import { UsersService, UserMeResponse } from './users.service';
-import { USER_PAGINATE_CONFIG } from './users.pagination';
 
 /**
  * Platform users (operators) — tenant membership + role per referralai_api_contract.
@@ -34,17 +32,15 @@ export class UsersController {
     @RequirePermission('users:write')
     @HttpCode(HttpStatus.CREATED)
     @Post()
-    @Idempotent({ scope: IdempotencyScope.Tenant, ttl: 3600 })
     async add(@Body() dto: AddUserDto, @CurrentUser() user: IAuthenticatedUser): Promise<UserResponse> {
         return this.usersService.addUser(user, dto);
     }
 
-    @ApiPaginationQuery(USER_PAGINATE_CONFIG)
-    @ApiOkResponse({ description: 'List of platform users', type: UserResponse, isArray: true })
+    @ApiOkResponse({ description: 'A page of platform users, newest first', type: CursorPage })
     @RequirePermission('users:read')
     @HttpCode(HttpStatus.OK)
     @Get()
-    async findAll(@Paginate() query: PaginateQuery): Promise<Paginated<UserResponse>> {
+    async findAll(@Query() query: ListQueryDto): Promise<CursorPage<UserResponse>> {
         return this.usersService.findAll(query);
     }
 
@@ -61,7 +57,6 @@ export class UsersController {
     @RequirePermission('users:write')
     @HttpCode(HttpStatus.OK)
     @Put(':id/roles')
-    @Idempotent({ scope: IdempotencyScope.Tenant, ttl: 1800 })
     async updateRole(@Param('id') id: string, @Body() dto: UpdateUserRoleDto, @CurrentUser() user: IAuthenticatedUser): Promise<UserResponse> {
         return this.usersService.updateRole(user, id, dto);
     }
@@ -70,7 +65,6 @@ export class UsersController {
     @RequirePermission('users:write')
     @HttpCode(HttpStatus.NO_CONTENT)
     @Delete(':id')
-    @Idempotent({ scope: IdempotencyScope.Tenant, ttl: 1800 })
     async remove(@Param('id') id: string, @CurrentUser() user: IAuthenticatedUser): Promise<void> {
         await this.usersService.remove(user, id);
     }

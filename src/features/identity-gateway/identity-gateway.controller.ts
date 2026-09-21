@@ -9,6 +9,7 @@ import type { IInternalTokenClaims } from '@app/types';
 
 import { Public } from '@common/auth/public.decorator';
 import { BaseException } from '@common/exceptions/base.exceptions';
+import { RawWire } from '@common/http-contract/wire-case.interceptor';
 
 import type { AllConfigType } from '@config/config.type';
 
@@ -31,6 +32,8 @@ interface ValidateTokenResponse {
  *
  * `GET /.well-known/jwks.json` publishes the verification key for every service.
  */
+// Already in wire shape (JWKS is RFC 7517; the exchange body is the gateway's contract).
+@RawWire()
 @ApiExcludeController()
 @Controller({ version: VERSION_NEUTRAL })
 export class IdentityGatewayController {

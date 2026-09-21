@@ -3,18 +3,16 @@ import { BadRequestException, Injectable } from '@nestjs/common';
 import type { Plan } from '@prisma-gen/generated/client';
 import { Prisma } from '@prisma-gen/generated/client';
 import type { NullableType } from '@app/types';
-import type { PaginateQuery, Paginated } from '@common/nestjs-prisma-pagination';
 
 import { DatabaseService } from '@app/database/database.service';
 import { AppLoggerService } from '@common/logging/app-logger.service';
 import { RedisService } from '@common/redis/redis.service';
 import { RedisKeyBuilder } from '@common/redis/redis-key.builder';
-import { prismaPaginate } from '@common/nestjs-prisma-pagination';
+import { cursorPage, CursorPage, ListQueryDto } from '@common/http-contract/cursor-page';
 
 import { CreatePlanDto, UpdatePlanDto, PlanDto, planResponseMapper } from '@domains/billing';
 import { assertValidPlanLimits } from './plan-limits.type';
 import type { PlanLimits } from './plan-limits.type';
-import { PLAN_PAGINATE_CONFIG } from './plan.pagination';
 
 @Injectable()
 export class PlanService {
@@ -76,20 +74,9 @@ export class PlanService {
         return planResponseMapper.toResponse(plan);
     }
 
-    async findAllPaginated(query: PaginateQuery<PlanDto>, includeInactive = false): Promise<Paginated<PlanDto>> {
-        const baseWhere: Prisma.PlanWhereInput = {
-            deletedAt: null
-        };
-
-        if (!includeInactive) {
-            baseWhere.isActive = true;
-        }
-
-        const result = await prismaPaginate(query as PaginateQuery<Plan>, this.prisma.plan, PLAN_PAGINATE_CONFIG, baseWhere);
-        return {
-            ...result,
-            data: planResponseMapper.toResponseArray(result.data)
-        } as unknown as Paginated<PlanDto>;
+    async findPage(query: ListQueryDto, includeInactive: boolean): Promise<CursorPage<PlanDto>> {
+        const where: Prisma.PlanWhereInput = includeInactive ? { deletedAt: null } : { deletedAt: null, isActive: true };
+        return cursorPage(this.prisma.plan, where, query, (row) => planResponseMapper.toResponse(row as Plan));
     }
 
     async findOne(where: Prisma.PlanWhereInput): Promise<NullableType<PlanDto>> {

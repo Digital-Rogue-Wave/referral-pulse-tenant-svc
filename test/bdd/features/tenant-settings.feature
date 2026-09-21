@@ -14,11 +14,11 @@ Feature: Tenant Settings
       { "branding": { "primaryColor": "#112233" }, "general": { "timezone": "UTC" } }
       """
     Then the response status should be 200
-    And the response should contain a "tenantId" field
+    And the response should contain a "tenant_id" field
     And the response should contain a "branding" field
     When I send a GET request to "/api/v1/tenant-settings/current" with that token
     Then the response status should be 200
-    And the response should contain a "tenantId" field
+    And the response should contain a "tenant_id" field
 
   Scenario: Upsert updates existing settings in place (singleton per tenant)
     When I send a PUT request to "/api/v1/tenant-settings" with body:
