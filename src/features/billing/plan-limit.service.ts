@@ -101,13 +101,13 @@ export class PlanLimitService {
 
         switch (plan) {
             case BillingPlanEnum.FREE:
-                return (cfg as Record<string, string | undefined>).freePriceId ?? null;
+                return cfg.freePriceId ?? null;
             case BillingPlanEnum.STARTER:
-                return (cfg as Record<string, string | undefined>).starterPriceId ?? null;
+                return cfg.starterPriceId ?? null;
             case BillingPlanEnum.GROWTH:
-                return (cfg as Record<string, string | undefined>).growthPriceId ?? null;
+                return cfg.growthPriceId ?? null;
             case BillingPlanEnum.ENTERPRISE:
-                return (cfg as Record<string, string | undefined>).enterprisePriceId ?? null;
+                return cfg.enterprisePriceId ?? null;
             default:
                 return null;
         }

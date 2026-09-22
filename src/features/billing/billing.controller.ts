@@ -1,7 +1,8 @@
-import { Body, Controller, Delete, Get, HttpCode, HttpStatus, Param, Post } from '@nestjs/common';
+import { Body, Controller, Delete, Get, HttpCode, HttpStatus, Param, Post, Query } from '@nestjs/common';
 import { ApiBearerAuth, ApiOkResponse, ApiTags } from '@nestjs/swagger';
 import { RequirePermission } from '@common/auth/require-permission.decorator';
 import { AllowUnpaidTenant } from '@common/auth/tenant-access.guard';
+import { CursorPage, ListQueryDto } from '@common/http-contract/cursor-page';
 import { AppLoggerService } from '@common/logging/app-logger.service';
 
 import {
@@ -127,12 +128,20 @@ export class BillingController {
         await this.billingService.setDefaultPaymentMethod(id);
     }
 
-    @ApiOkResponse({ type: InvoiceDto, isArray: true })
+    @ApiOkResponse({ description: 'A page of invoices, newest first', type: CursorPage })
     @RequirePermission('billing:read')
     @HttpCode(HttpStatus.OK)
     @Get('invoices')
-    async listInvoices(): Promise<InvoiceDto[]> {
-        return await this.billingService.listInvoices();
+    async listInvoices(@Query() query: ListQueryDto): Promise<CursorPage<InvoiceDto>> {
+        return await this.billingService.listInvoices(query);
+    }
+
+    @ApiOkResponse({ description: 'One-time URL of the Stripe Customer Portal' })
+    @RequirePermission('billing:write')
+    @HttpCode(HttpStatus.OK)
+    @Post('portal-session')
+    async createPortalSession(): Promise<{ url: string }> {
+        return await this.billingService.createPortalSession();
     }
 
     @ApiOkResponse({ type: UpcomingInvoiceDto })

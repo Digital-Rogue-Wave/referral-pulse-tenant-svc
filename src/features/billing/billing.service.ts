@@ -33,6 +33,8 @@ import {
     BillingEvents
 } from '@domains/billing';
 
+import { CursorPage, DEFAULT_PAGE_LIMIT, ListQueryDto } from '@common/http-contract/cursor-page';
+
 import { StripeService } from './stripe.service';
 import { subscriptionPeriod } from './stripe-objects';
 import { PlanLimitService } from './plan-limit.service';
@@ -160,7 +162,8 @@ export class BillingService {
             tenantId: billing.tenantId,
             plan,
             userId,
-            couponCode
+            couponCode,
+            customerId: billing.stripeCustomerId
         });
 
         this.logger.log(`Created Stripe Checkout Session ${session.id} via BillingService for tenant ${billing.tenantId}, plan ${plan}`);
@@ -370,14 +373,37 @@ export class BillingService {
         await this.stripeService.setDefaultPaymentMethodForCustomer(billing.stripeCustomerId, paymentMethodId);
     }
 
-    async listInvoices(): Promise<InvoiceDto[]> {
+    /** Invoices, newest first, paged with Stripe's cursors (API v1.3 §1 list envelope). */
+    async listInvoices(query: ListQueryDto): Promise<CursorPage<InvoiceDto>> {
         const billing = await this.getOrCreateBillingForCurrentTenant();
 
         if (!billing.stripeCustomerId) {
-            throw new HttpException(NO_STRIPE_CUSTOMER_ERROR, HttpStatus.BAD_REQUEST);
+            return { data: [], hasMore: false, nextCursor: null, prevCursor: null };
         }
 
-        return await this.stripeService.listInvoicesForCustomer(billing.stripeCustomerId);
+        const page = await this.stripeService.listInvoicesForCustomer(billing.stripeCustomerId, {
+            limit: query.limit ?? DEFAULT_PAGE_LIMIT,
+            startingAfter: query.startingAfter,
+            endingBefore: query.endingBefore
+        });
+        const backward = !query.startingAfter && !!query.endingBefore;
+        const first = page.data[0]?.id ?? null;
+        const last = page.data.at(-1)?.id ?? null;
+        return {
+            data: page.data,
+            hasMore: page.hasMore,
+            nextCursor: (backward || page.hasMore) && last ? last : null,
+            prevCursor: (query.startingAfter || (backward && page.hasMore)) && first ? first : null
+        };
+    }
+
+    /** The Owner's link to Stripe's Customer Portal (cards, billing address, tax ids, invoice PDFs). */
+    async createPortalSession(): Promise<{ url: string }> {
+        const billing = await this.getOrCreateBillingForCurrentTenant();
+        if (!billing.stripeCustomerId) {
+            throw new HttpException(NO_STRIPE_CUSTOMER_ERROR, HttpStatus.BAD_REQUEST);
+        }
+        return { url: await this.stripeService.createPortalSession(billing.stripeCustomerId) };
     }
 
     async getUpcomingInvoice(): Promise<UpcomingInvoiceDto> {

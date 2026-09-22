@@ -135,6 +135,16 @@ and record it here, rather than wait. Every item below can be revisited; each na
 | B6 | **A failed payment never un-escalates:** `invoice.payment_failed` moves only an `active` tenant to `past_due`; a `restricted` or `locked` tenant stays where dunning put it. | Found while porting: the old handler set `past_due` from any state. |
 | B7 | Webhook handling moved out of `BillingService` into `StripeWebhookService` (BillingService: 1217 → ~650 lines). Both `/api/webhook/stripe` and `/api/webhooks/stripe` stay (the Stripe dashboard may point at either). | SRP. |
 
+### Billing — Stripe calls (T6b)
+
+| # | Decision | Why |
+|---|---|---|
+| S1 | **Stripe idempotency keys on every write made for an API request:** `{operation}:{subject}:{the request's Idempotency-Key}` (checkout, upgrade, downgrade schedule, cancel, reactivate, setup intent, payment-method changes, portal). The tenant-deletion cancel uses `tenant-deletion:{subscription}`. Writes outside a request rely on the SDK's own retry keys (`maxNetworkRetries: 2`, 20 s timeout). One Stripe client is reused instead of one per call. | #43: a client retry could create a second checkout or a second proration invoice. The request key already exists (API v1.3 makes it mandatory on POST/PATCH), so it names the business intent exactly. |
+| S2 | **Checkout reuses the tenant's Stripe customer** (`customer`), sets `client_reference_id` and `subscription_data.metadata.tenantId`. | Found while wiring tax: every checkout created a **new Stripe customer**, so a tenant could end up with several, and its payment methods and invoices split across them. |
+| S3 | **Stripe Tax behind `STRIPE_AUTOMATIC_TAX`** (default `false`, recommended `true` in production once Stripe Tax is enabled on the account): `automatic_tax`, `tax_id_collection`, required billing address, `customer_update` for existing customers. | #44: EU VAT (Product Spec EU-first). Off by default so a Stripe account without Stripe Tax does not fail checkout. |
+| S4 | **`GET /v1/billings/invoices` is cursor-paginated** with Stripe's own invoice-id cursors (`limit`, `starting_after`, `ending_before`; API v1.3 envelope). A tenant with no Stripe customer gets an empty page instead of a 400. | #44: it returned at most 100 invoices, silently. |
+| S5 | **`POST /v1/billings/portal-session`** (`billing:write`, reachable while unpaid) returns a Stripe Customer Portal URL: cards, billing address, tax ids, invoice PDFs. New env `STRIPE_PORTAL_RETURN_URL`. | Plan item "Customer Portal"; the unpaid Owner needs a way to fix payment. |
+
 ### Superseded rules (flagged for the lead, not rewritten)
 
 - `CLAUDE.md` / `.claude/rules/security.md` say errors are "RFC 9457 ProblemDetail". Per decision X-2 the
