@@ -6,6 +6,7 @@ import type { Billing } from '@prisma-gen/generated/client';
 import { BillingPlanEnum, LIVE_SUBSCRIPTION_STATUSES, SubscriptionStatusEnum, PaymentStatusEnum } from '@common/enums/billing.enum';
 
 import { DatabaseService } from '@app/database/database.service';
+import { BaseException } from '@common/exceptions/base.exceptions';
 import { AppLoggerService } from '@common/logging/app-logger.service';
 import { TenantContextService } from '@common/tenant-aware/tenant-context.service';
 import { TransactionEventEmitterService } from '@common/events/transaction-event-emitter.service';
@@ -301,18 +302,19 @@ export class BillingService {
             targetPlan
         });
 
-        await this.prisma.billing.update({
-            where: { id: billing.id },
-            data: {
-                plan: targetPlan,
-                status: SubscriptionStatusEnum.ACTIVE
-            }
+        await this.prisma.$transaction(async (tx) => {
+            await tx.billing.update({
+                where: { id: billing.id },
+                data: {
+                    plan: targetPlan,
+                    status: SubscriptionStatusEnum.ACTIVE
+                }
+            });
+            this.txEventEmitter.emitAfterCommit(
+                BillingEvents.SUBSCRIPTION_UPGRADED,
+                new SubscriptionUpgradedEvent(billing.id, billing.tenantId, previousPlan, targetPlan, this.dateService.nowISO(), userId ?? undefined)
+            );
         });
-
-        this.txEventEmitter.emitAfterCommit(
-            BillingEvents.SUBSCRIPTION_UPGRADED,
-            new SubscriptionUpgradedEvent(billing.id, billing.tenantId, previousPlan, targetPlan, this.dateService.nowISO(), userId ?? undefined)
-        );
 
         this.logger.log(`Subscription upgraded from ${previousPlan} to ${targetPlan}`, {
             tenantId: billing.tenantId,
@@ -440,28 +442,29 @@ export class BillingService {
 
         const schedule = await this.stripeService.scheduleSubscriptionCancellation(billing.stripeSubscriptionId);
 
-        await this.prisma.billing.update({
-            where: { id: billing.id },
-            data: {
-                cancellationReason: dto.reason ?? null,
-                cancellationRequestedAt: now,
-                cancellationEffectiveAt: schedule.effectiveDate ?? null
-            }
+        await this.prisma.$transaction(async (tx) => {
+            await tx.billing.update({
+                where: { id: billing.id },
+                data: {
+                    cancellationReason: dto.reason ?? null,
+                    cancellationRequestedAt: now,
+                    cancellationEffectiveAt: schedule.effectiveDate ?? null
+                }
+            });
+            this.txEventEmitter.emitAfterCommit(
+                BillingEvents.SUBSCRIPTION_CANCELLED,
+                new SubscriptionCancelledEvent(
+                    billing.id,
+                    billing.tenantId,
+                    this.dateService.toISO(now),
+                    schedule.effectiveDate ? this.dateService.toISO(schedule.effectiveDate) : this.dateService.toISO(now),
+                    billing.stripeSubscriptionId ?? undefined,
+                    billing.plan,
+                    dto.reason ?? undefined,
+                    userId ?? undefined
+                )
+            );
         });
-
-        this.txEventEmitter.emitAfterCommit(
-            BillingEvents.SUBSCRIPTION_CANCELLED,
-            new SubscriptionCancelledEvent(
-                billing.id,
-                billing.tenantId,
-                this.dateService.toISO(now),
-                schedule.effectiveDate ? this.dateService.toISO(schedule.effectiveDate) : this.dateService.toISO(now),
-                billing.stripeSubscriptionId ?? undefined,
-                billing.plan,
-                dto.reason ?? undefined,
-                userId ?? undefined
-            )
-        );
 
         this.logger.log(`Subscription cancellation scheduled`, {
             tenantId: billing.tenantId,
@@ -507,20 +510,30 @@ export class BillingService {
         return await this.getCurrentSubscription();
     }
 
+    /**
+     * A downgrade is refused while the tenant uses more than the target plan allows (seats, gauges such as
+     * live campaigns, and this month's metered usage), listing each metric over the limit.
+     */
     private async validateDowngradeUsageOrThrow(targetPlan: BillingPlanEnum): Promise<void> {
-        const tenantId = this.tenantContext.getTenantId();
-
-        try {
-            const stats = await this.tenantStatsService.getStats();
-            const usage = stats.planUsagePercentage ?? null;
-
-            this.logger.log(
-                `Downgrade usage validation placeholder for tenant ${tenantId}, targetPlan=${targetPlan}, planUsagePercentage=${usage ?? 'unknown'}`
-            );
-        } catch (err) {
-            this.logger.error(
-                `Failed to perform downgrade usage validation for tenant ${tenantId} and plan ${targetPlan}`,
-                err instanceof Error ? err.stack : String(err)
+        const tenantId = this.tenantContext.getTenantId()!;
+        const limits = (await this.planLimitService.limitsOfPlan(targetPlan)) ?? {};
+        const overLimit: Array<{ metric: string; usage: number; limit: number }> = [];
+        for (const [metric, limit] of Object.entries(limits)) {
+            if (typeof limit !== 'number') {
+                continue;
+            }
+            const usage = await this.planLimitService.usageOf(tenantId, metric);
+            if (usage > limit) {
+                overLimit.push({ metric, usage, limit });
+            }
+        }
+        if (overLimit.length > 0) {
+            throw new BaseException(
+                'state_conflict',
+                `Current usage exceeds the ${targetPlan} plan: ${overLimit.map((o) => `${o.metric} ${o.usage}/${o.limit}`).join(', ')}`,
+                HttpStatus.CONFLICT,
+                undefined,
+                { overLimit }
             );
         }
     }
@@ -563,25 +576,26 @@ export class BillingService {
             targetPlan
         });
 
-        await this.prisma.billing.update({
-            where: { id: billing.id },
-            data: {
-                pendingDowngradePlan: targetPlan,
-                downgradeScheduledAt: schedule.effectiveDate ?? null
-            }
+        await this.prisma.$transaction(async (tx) => {
+            await tx.billing.update({
+                where: { id: billing.id },
+                data: {
+                    pendingDowngradePlan: targetPlan,
+                    downgradeScheduledAt: schedule.effectiveDate ?? null
+                }
+            });
+            this.txEventEmitter.emitAfterCommit(
+                BillingEvents.SUBSCRIPTION_DOWNGRADE_SCHEDULED,
+                new SubscriptionDowngradeScheduledEvent(
+                    billing.id,
+                    billing.tenantId,
+                    previousPlan,
+                    targetPlan,
+                    schedule.effectiveDate ? this.dateService.toISO(schedule.effectiveDate) : this.dateService.nowISO(),
+                    userId ?? undefined
+                )
+            );
         });
-
-        this.txEventEmitter.emitAfterCommit(
-            BillingEvents.SUBSCRIPTION_DOWNGRADE_SCHEDULED,
-            new SubscriptionDowngradeScheduledEvent(
-                billing.id,
-                billing.tenantId,
-                previousPlan,
-                targetPlan,
-                schedule.effectiveDate ? this.dateService.toISO(schedule.effectiveDate) : this.dateService.nowISO(),
-                userId ?? undefined
-            )
-        );
 
         this.logger.log(`Subscription downgrade scheduled from ${previousPlan} to ${targetPlan}`, {
             tenantId: billing.tenantId,

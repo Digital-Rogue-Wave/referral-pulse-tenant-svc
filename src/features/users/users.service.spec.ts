@@ -1,3 +1,5 @@
+import { PlanLimitService } from '@app/features/billing/plan-limit.service';
+import { LimitExceededException } from '@app/features/billing/exceptions/limit-exceeded.exception';
 import { Test, TestingModule } from '@nestjs/testing';
 import { HttpStatus } from '@nestjs/common';
 import { mock, MockProxy } from 'jest-mock-extended';
@@ -43,6 +45,7 @@ describe('UsersService — tenant membership', () => {
     let tenantAware: MockProxy<TenantAwareService>;
     let kratos: MockProxy<KratosService>;
     let events: MockProxy<TransactionEventEmitterService>;
+    let planLimits: MockProxy<PlanLimitService>;
     let rows: Map<string, Row>;
     let tx: {
         user: { findUnique: jest.Mock; create: jest.Mock; update: jest.Mock; delete: jest.Mock };
@@ -88,7 +91,8 @@ describe('UsersService — tenant membership', () => {
                 { provide: TenantAwareService, useValue: tenantAware },
                 { provide: TransactionEventEmitterService, useValue: events },
                 { provide: KratosService, useValue: kratos },
-                { provide: AppLoggerService, useValue: mock<AppLoggerService>() }
+                { provide: AppLoggerService, useValue: mock<AppLoggerService>() },
+                { provide: PlanLimitService, useValue: (planLimits = mock<PlanLimitService>()) }
             ]
         }).compile();
 
@@ -159,6 +163,17 @@ describe('UsersService — tenant membership', () => {
             await service.addUser(actorAs('admin'), { kratosIdentityId: 'kratos-new', role: RoleEnum.OPERATOR });
 
             expect(tx.user.create).toHaveBeenCalledWith({ data: expect.objectContaining({ email: 'new@acme.io', role: RoleEnum.OPERATOR }) });
+        });
+
+        it('then no member is added once the plan’s seats are all taken', async () => {
+            seed(member('admin', RoleEnum.ADMIN));
+            planLimits.assertSeatAvailable.mockRejectedValue(new LimitExceededException({ metric: 'seats', currentUsage: 5, limit: 5 }));
+
+            await expectStatus(
+                service.addUser(actorAs('admin'), { kratosIdentityId: 'kratos-new', role: RoleEnum.OPERATOR }),
+                HttpStatus.PAYMENT_REQUIRED
+            );
+            expect(tx.user.create).not.toHaveBeenCalled();
         });
     });
 

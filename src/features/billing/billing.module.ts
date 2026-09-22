@@ -15,11 +15,10 @@ import { StripeRedirectController } from './stripe-redirect.controller';
 // Services
 import { BillingService } from './billing.service';
 import { StripeService } from './stripe.service';
+import { PlanLimitModule } from './plan-limit.module';
 import { StripeWebhookService } from './stripe-webhook.service';
 import { PlanService } from './plan.service';
 import { PlanStripeSyncService } from './plan-stripe-sync.service';
-import { UsageTrackerService } from './usage-tracker.service';
-import { PlanLimitService } from './plan-limit.service';
 import { BillingUsageQueueService } from './billing-queue.service';
 import { DailyUsageCalculator } from './daily-usage-calculator.service';
 import { MonthlyUsageResetService } from './monthly-usage-reset.service';
@@ -48,7 +47,7 @@ import { BillingUsageProcessor } from './processors/billing-usage.processor';
 const DEV_ONLY_CONTROLLERS = process.env.ENABLE_TEST_ROUTES === 'true' ? [TestBillingController] : [];
 
 @Module({
-    imports: [TenantModule, EventsModule],
+    imports: [TenantModule, EventsModule, PlanLimitModule],
     controllers: [
         BillingController,
         PlanAdminController,
@@ -64,9 +63,7 @@ const DEV_ONLY_CONTROLLERS = process.env.ENABLE_TEST_ROUTES === 'true' ? [TestBi
         StripeWebhookService,
         PlanService,
         PlanStripeSyncService,
-        UsageTrackerService,
         UsageCheckGuard,
-        PlanLimitService,
         BillingGuard,
         BillingUsageQueueService,
         BillingUsageProcessor,
@@ -76,12 +73,11 @@ const DEV_ONLY_CONTROLLERS = process.env.ENABLE_TEST_ROUTES === 'true' ? [TestBi
         TrialLifecycleService
     ],
     exports: [
+        PlanLimitModule,
         BillingService,
         StripeWebhookService,
         PlanService,
-        UsageTrackerService,
         UsageCheckGuard,
-        PlanLimitService,
         BillingGuard,
         DailyUsageCalculator,
         MonthlyUsageResetService,

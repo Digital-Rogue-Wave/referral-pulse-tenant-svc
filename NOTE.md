@@ -145,6 +145,21 @@ and record it here, rather than wait. Every item below can be revisited; each na
 | S4 | **`GET /v1/billings/invoices` is cursor-paginated** with Stripe's own invoice-id cursors (`limit`, `starting_after`, `ending_before`; API v1.3 envelope). A tenant with no Stripe customer gets an empty page instead of a 400. | #44: it returned at most 100 invoices, silently. |
 | S5 | **`POST /v1/billings/portal-session`** (`billing:write`, reachable while unpaid) returns a Stripe Customer Portal URL: cards, billing address, tax ids, invoice PDFs. New env `STRIPE_PORTAL_RETURN_URL`. | Plan item "Customer Portal"; the unpaid Owner needs a way to fix payment. |
 
+### Billing — plans, limits, usage and dunning (T6c)
+
+| # | Decision | Why |
+|---|---|---|
+| U1 | **Durable usage counters (`usage_counters`)** replace the Redis-only counters. Monthly metrics are keyed `YYYY-MM` (UTC), so a new month is a new row and **nothing is reset**; gauges (`campaigns`) use period `current`. Metering is **one atomic SQL statement** that adds only while under the limit (`INSERT … ON CONFLICT DO UPDATE … WHERE value + n <= limit`). Verified on real Postgres: 20 concurrent requests against a limit of 10 add exactly 10. | #42: losing Redis reset every limit; "check, then increment" let concurrent callers overshoot. |
+| U2 | **`POST /internal/tenants/{id}/usage/increment` meters atomically against the plan** (402 `plan_limit_exceeded` when exhausted); `/decrement` releases, never below zero. | #41. |
+| U3 | **Seats are counted, not metered:** operators plus invitations that can still be accepted. Enforced when inviting and when adding a user; a pending invitation already holds its seat, so accepting it is never refused. The API key limit (`api_keys` in the plan, if set) counts live keys. A plan that does not name a metric leaves it **unlimited**. | #41: no seat or key limit was enforced anywhere. |
+| U4 | **Data-driven plans:** limits come from the `plans` catalog by plan name (a tenant's manual-invoicing plan first). The env price ids are now used only to talk to Stripe (checkout, price → plan). | #45: limits were resolved through env price ids, so a missing env var silently meant "no limits". |
+| U5 | **Real downgrade validation:** a downgrade is refused (409 with `over_limit`) while usage (seats, gauges, this month's metered usage) exceeds the target plan. | #41: it was a placeholder that only logged. |
+| U6 | **`GET /v1/internal/tenants/{id}/entitlements`** (`tenant_entitlements.read`): plan, subscription/payment/tenant status, trial end, data region, retention months, `limits` and `usage` (seats included). | Plan item; campaign, ingestion and reward services enforce against it. |
+| U7 | **Usage thresholds (80 % / 100 %) and monthly summaries read the counters.** Thresholds fire once per metric and month (deduplicated in `billing_events`, and by `external_id` in the outbox); limits come from the plan catalog. | They read limits from a Redis key nothing ever wrote, so **no threshold ever fired**. |
+| U8 | **Dunning is configurable** (`BILLING_DUNNING_RESTRICT_AFTER_DAYS`=7, `BILLING_DUNNING_LOCK_AFTER_DAYS`=14) and each step is a compare-and-set committed with its event, so a payment arriving mid-run is never overwritten. Suspended or self-locked tenants are escalated too. | #40. |
+| U9 | Upgrade, cancellation, downgrade scheduling and trial expiry now commit their change and event in one transaction. | Plan item "wrap billing emits in transactions". |
+| U10 | **Integration specs** (`*.integration.spec.ts`, `pnpm test:integration`, real Docker Postgres) are separate from the unit run. | X-5; starts T8. |
+
 ### Superseded rules (flagged for the lead, not rewritten)
 
 - `CLAUDE.md` / `.claude/rules/security.md` say errors are "RFC 9457 ProblemDetail". Per decision X-2 the

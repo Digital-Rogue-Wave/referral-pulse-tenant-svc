@@ -1,5 +1,7 @@
 import { Module } from '@nestjs/common';
 
+import { PlanLimitModule } from '@app/features/billing/plan-limit.module';
+
 import { KetoReconcilerWorker } from './keto-reconciler.worker';
 import { OperatorErasureController } from './operator-erasure.controller';
 import { OperatorErasureService } from './operator-erasure.service';
@@ -12,6 +14,7 @@ import { UsersController } from './users.controller';
  * See referralai_db_tables_per_service.md and referralai_api_contract.
  */
 @Module({
+    imports: [PlanLimitModule],
     controllers: [UsersController, OperatorErasureController],
     providers: [UsersService, OperatorErasureService, KetoReconcilerWorker],
     exports: [UsersService]

@@ -3,114 +3,68 @@ import { Injectable } from '@nestjs/common';
 import { TenantStatus } from '@domains/tenant/tenant.types';
 
 import { DatabaseService } from '@app/database/database.service';
-import { TenantContextService } from '@common/tenant-aware/tenant-context.service';
 import { AppLoggerService } from '@common/logging/app-logger.service';
-import { RedisService } from '@common/redis/redis.service';
 import { TransactionEventEmitterService } from '@common/events/transaction-event-emitter.service';
-import { DateService } from '@common/helper/date.service';
 
 import { BillingEvents, UsageMonthlySummaryEvent } from '@domains/billing';
 
+import { PlanLimitService } from './plan-limit.service';
+import { UsageCounterService } from './usage-counter.service';
+
+/**
+ * On the 1st of the month: publishes `usage.monthly_summary` for each metric of the month that ended.
+ * Nothing is reset — monthly counters are keyed by month, so the new month simply starts a new row.
+ */
 @Injectable()
 export class MonthlyUsageResetService {
     constructor(
         private readonly prisma: DatabaseService,
-        private readonly tenantContext: TenantContextService,
         private readonly logger: AppLoggerService,
-        private readonly redis: RedisService,
-        private readonly txEventEmitter: TransactionEventEmitterService,
-        private readonly dateService: DateService
+        private readonly counters: UsageCounterService,
+        private readonly planLimits: PlanLimitService,
+        private readonly txEventEmitter: TransactionEventEmitterService
     ) {
         this.logger.setContext(MonthlyUsageResetService.name);
     }
 
-    async runMonthlyReset(): Promise<void> {
-        const now = this.dateService.nowMoment();
-        const { prevMonthLabel, prevMonthEnd } = this.getPreviousCalendarMonth(now.toDate());
-
-        this.logger.log(`Running monthly usage reset for month ${prevMonthLabel}`);
-
-        const tenants = await this.prisma.tenant.findMany({
-            where: {
-                status: TenantStatus.ACTIVE,
-                deletedAt: null
-            }
-        });
+    async runMonthlyReset(now = new Date()): Promise<void> {
+        const monthEnd = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 0));
+        const month = monthEnd.toISOString().slice(0, 7);
+        const periodDate = monthEnd.toISOString().slice(0, 10);
+        const tenants = await this.prisma.tenant.findMany({ where: { status: { not: TenantStatus.CLOSED }, deletedAt: null }, select: { id: true } });
 
         for (const tenant of tenants) {
-            const tenantId = tenant.id;
-
-            await this.tenantContext.runWithContext({ tenantId }, async () => {
-                const metrics = await this.redis.listMetrics();
-
-                if (!metrics || metrics.length === 0) {
-                    return;
-                }
-
-                for (const metric of metrics) {
-                    let usage = 0;
-
-                    const snapshot = await this.prisma.tenantUsage.findFirst({
-                        where: {
-                            tenantId,
-                            metricName: metric,
-                            periodDate: prevMonthEnd,
-                            deletedAt: null
-                        }
-                    });
-
-                    if (snapshot) {
-                        usage = snapshot.currentUsage;
-                    } else {
-                        usage = await this.redis.getUsage(metric, prevMonthLabel);
-                    }
-
-                    const limit = await this.redis.getLimit(metric);
-
-                    await this.prisma.billingEvent.create({
-                        data: {
-                            tenantId,
-                            eventType: 'usage.monthly_summary',
-                            metricName: metric,
-                            increment: null,
-                            timestamp: new Date(),
-                            metadata: {
-                                month: prevMonthLabel,
-                                usage,
-                                limit
-                            }
-                        }
-                    });
-
-                    this.txEventEmitter.emitAfterCommit(
-                        BillingEvents.USAGE_MONTHLY_SUMMARY,
-                        new UsageMonthlySummaryEvent(
-                            tenantId,
-                            tenantId,
-                            metric,
-                            prevMonthLabel,
-                            usage,
-                            limit,
-                            prevMonthEnd,
-                            this.dateService.toISO(now)
-                        )
-                    );
-
-                    await this.redis.clearMonthlyUsage(metric, prevMonthLabel);
-                    await this.redis.clearThresholdFlags(metric, [80, 100]);
-                }
-            });
+            try {
+                await this.summarise(tenant.id, month, periodDate, now);
+            } catch (error) {
+                this.logger.error('Monthly usage summary failed for a tenant', error instanceof Error ? error.stack : undefined, {
+                    tenantId: tenant.id
+                });
+            }
         }
     }
 
-    private getPreviousCalendarMonth(ref: Date): {
-        prevMonthLabel: string;
-        prevMonthEnd: string;
-    } {
-        const prev = this.dateService.subtract(ref, 1, 'month');
-        return {
-            prevMonthLabel: this.dateService.format(prev, 'YYYY-MM'),
-            prevMonthEnd: this.dateService.format(this.dateService.endOf(prev, 'month'), 'YYYY-MM-DD')
-        };
+    async summarise(tenantId: string, month: string, periodDate: string, now: Date): Promise<void> {
+        const usage = await this.counters.forMonth(tenantId, month);
+        const limits = (await this.planLimits.getPlanLimits(tenantId)) ?? {};
+        await this.prisma.$transaction(async (tx) => {
+            for (const [metric, value] of Object.entries(usage)) {
+                const limit = typeof limits[metric] === 'number' ? (limits[metric] as number) : null;
+                await tx.billingEvent.create({
+                    data: {
+                        tenantId,
+                        eventType: 'usage.monthly_summary',
+                        metricName: metric,
+                        timestamp: now,
+                        metadata: { month, usage: value, limit }
+                    }
+                });
+                // external_id `usage.monthly_summary:{tenant}:{metric}:{month}` makes a re-run publish nothing new.
+                this.txEventEmitter.emitAfterCommit(
+                    BillingEvents.USAGE_MONTHLY_SUMMARY,
+                    new UsageMonthlySummaryEvent(tenantId, tenantId, metric, month, value, limit, periodDate, now.toISOString())
+                );
+            }
+        });
     }
 }

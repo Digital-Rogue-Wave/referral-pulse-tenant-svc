@@ -26,6 +26,7 @@ import {
     ApiKeyRotatedEvent,
     ApiKeyType
 } from '@domains/api-key';
+import { PlanLimitService } from '@app/features/billing/plan-limit.service';
 
 /** DB Model v2 §3 Redis `apikey:{key_prefix}:{key_hash8}` — 300 s, dropped on revoke and rotate. */
 const KEY_CACHE_TTL_SECONDS = 300;
@@ -58,6 +59,7 @@ export class ApiKeyService {
         private readonly txEventEmitter: TransactionEventEmitterService,
         private readonly redis: RedisService,
         private readonly logger: AppLoggerService,
+        private readonly planLimits: PlanLimitService,
         configService: ConfigService<AllConfigType>
     ) {
         this.logger.setContext(ApiKeyService.name);
@@ -73,6 +75,8 @@ export class ApiKeyService {
     async create(userId: string, dto: CreateApiKeyDto): Promise<ApiKeyWithRawKeyResponse> {
         const keyType = dto.keyType ?? ApiKeyType.SECRET;
         const tenantId = this.tenantAware.getRequiredTenantId();
+        const liveKeys = await this.prisma.apiKey.count({ where: { tenantId, revokedAt: null, deletedAt: null } });
+        await this.planLimits.assertCapacity(tenantId, 'api_keys', liveKeys);
         // The key row and its `api_key.created` outbox row commit together.
         const { saved, rawKey } = await this.withFreshKey(keyType, (secret) =>
             this.prisma.$transaction(async (tx) => {

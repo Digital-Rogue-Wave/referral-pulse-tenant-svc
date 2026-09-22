@@ -26,6 +26,7 @@ import {
 import { TenantEvents, TenantOwnershipTransferredEvent } from '@domains/tenant/events/tenant.events';
 
 import { RoleGrantPolicy } from './role-grant.policy';
+import { PlanLimitService } from '@app/features/billing/plan-limit.service';
 
 export interface UserMeResponse {
     userId: string;
@@ -59,7 +60,8 @@ export class UsersService {
         private readonly tenantAware: TenantAwareService,
         private readonly txEventEmitter: TransactionEventEmitterService,
         private readonly kratos: KratosService,
-        private readonly logger: AppLoggerService
+        private readonly logger: AppLoggerService,
+        private readonly planLimits: PlanLimitService
     ) {
         this.logger.setContext(UsersService.name);
     }
@@ -72,6 +74,7 @@ export class UsersService {
     /** Adds an existing Ory identity to the caller's tenant. */
     async addUser(actor: IAuthenticatedUser, dto: AddUserDto): Promise<UserResponse> {
         RoleGrantPolicy.assertCanGrant(await this.roleOf(actor), dto.role);
+        await this.planLimits.assertSeatAvailable(actor.tenantId);
         const identity = await this.identityOf(dto.kratosIdentityId);
 
         const member = await this.prisma.$transaction((tx) =>

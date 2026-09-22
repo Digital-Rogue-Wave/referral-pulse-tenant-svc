@@ -1,3 +1,5 @@
+import { PlanLimitService } from '@app/features/billing/plan-limit.service';
+import { LimitExceededException } from '@app/features/billing/exceptions/limit-exceeded.exception';
 import { HttpStatus } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { mock, MockProxy } from 'jest-mock-extended';
@@ -19,6 +21,7 @@ const PEPPER = 'p'.repeat(40);
 const hmac = (raw: string): string => createHmac('sha256', PEPPER).update(raw).digest('hex');
 
 describe('ApiKeyService', () => {
+    let planLimits: MockProxy<PlanLimitService>;
     let service: ApiKeyService;
     let prisma: MockProxy<DatabaseService>;
     let redis: MockProxy<RedisService>;
@@ -67,10 +70,20 @@ describe('ApiKeyService', () => {
         redis.setNx.mockResolvedValue(true);
         const config = { getOrThrow: () => PEPPER } as unknown as ConfigService;
 
-        service = new ApiKeyService(prisma, tenantAware, events, redis, mock<AppLoggerService>(), config);
+        planLimits = mock<PlanLimitService>();
+        Object.assign(prisma, { apiKey: { ...(prisma as unknown as { apiKey?: object }).apiKey, count: jest.fn().mockResolvedValue(3) } });
+        service = new ApiKeyService(prisma, tenantAware, events, redis, mock<AppLoggerService>(), planLimits, config);
     });
 
     describe('when a key is created', () => {
+        it('then the plan’s api_keys limit counts the tenant’s live keys', async () => {
+            planLimits.assertCapacity.mockRejectedValue(new LimitExceededException({ metric: 'api_keys', currentUsage: 3, limit: 3 }));
+
+            await expect(service.create('user-1', { label: 'CI' })).rejects.toBeInstanceOf(LimitExceededException);
+            expect(planLimits.assertCapacity).toHaveBeenCalledWith(expect.any(String), 'api_keys', 3);
+            expect(delegate.create).not.toHaveBeenCalled();
+        });
+
         it('then it stores only an HMAC of the key and its last four characters, and returns the raw key once', async () => {
             const created = await service.create('user-1', { label: 'CI', keyType: ApiKeyType.PUBLISHABLE });
 

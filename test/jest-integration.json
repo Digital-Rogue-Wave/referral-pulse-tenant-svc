@@ -1,0 +1,16 @@
+{
+    "moduleFileExtensions": ["js", "json", "ts"],
+    "rootDir": "../src",
+    "testRegex": ".*\\.integration\\.spec\\.ts$",
+    "transform": { "^.+\\.(t|j)s$": "ts-jest" },
+    "testEnvironment": "node",
+    "testTimeout": 30000,
+    "moduleNameMapper": {
+        "^@app/(.*)$": "<rootDir>/$1",
+        "^@domains/(.*)$": "<rootDir>/domains/$1",
+        "^@common/(.*)$": "<rootDir>/common/$1",
+        "^@config/(.*)$": "<rootDir>/config/$1",
+        "^@config$": "<rootDir>/config",
+        "^@prisma-gen/(.*)$": "<rootDir>/prisma/$1"
+    }
+}

@@ -21,6 +21,7 @@
         "test:cov": "jest --coverage",
         "test:debug": "node --inspect-brk -r tsconfig-paths/register -r ts-node/register node_modules/.bin/jest --runInBand",
         "test:e2e": "jest --config ./test/jest-e2e.json",
+        "test:integration": "jest --config ./test/jest-integration.json --runInBand",
         "test:bdd": "cross-env NODE_ENV=test TS_NODE_PROJECT=test/bdd/tsconfig.bdd.json cucumber-js --config cucumber.cjs",
         "test:bdd:auth": "cross-env NODE_ENV=test TS_NODE_PROJECT=test/bdd/tsconfig.bdd.json cucumber-js --config cucumber.cjs --tags \"@auth\"",
         "test:bdd:billing": "cross-env NODE_ENV=test TS_NODE_PROJECT=test/bdd/tsconfig.bdd.json cucumber-js --config cucumber.cjs --tags \"@billing\"",
@@ -176,6 +177,10 @@
         ],
         "rootDir": "src",
         "testRegex": ".*\\.spec\\.ts$",
+        "testPathIgnorePatterns": [
+            "/node_modules/",
+            "\\.integration\\.spec\\.ts$"
+        ],
         "transform": {
             "^.+\\.(t|j)s$": "ts-jest"
         },

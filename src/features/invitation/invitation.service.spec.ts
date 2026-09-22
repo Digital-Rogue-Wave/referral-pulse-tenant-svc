@@ -14,12 +14,15 @@ import type { IAuthenticatedUser } from '@app/types';
 
 import { UsersService } from '@app/features/users/users.service';
 
+import { PlanLimitService } from '@app/features/billing/plan-limit.service';
+import { LimitExceededException } from '@app/features/billing/exceptions/limit-exceeded.exception';
 import { InvitationService } from './invitation.service';
 
 describe('InvitationService', () => {
     let service: InvitationService;
     let prisma: MockProxy<DatabaseService>;
     let tenantAware: MockProxy<TenantAwareService>;
+    let planLimits: MockProxy<PlanLimitService>;
     let txEventEmitter: MockProxy<TransactionEventEmitterService>;
     let usersService: MockProxy<UsersService>;
     let delegate: { findFirst: jest.Mock; findUnique: jest.Mock; create: jest.Mock; update: jest.Mock };
@@ -63,7 +66,8 @@ describe('InvitationService', () => {
                 { provide: TenantAwareService, useValue: tenantAware },
                 { provide: TransactionEventEmitterService, useValue: txEventEmitter },
                 { provide: UsersService, useValue: usersService },
-                { provide: AppLoggerService, useValue: mock<AppLoggerService>() }
+                { provide: AppLoggerService, useValue: mock<AppLoggerService>() },
+                { provide: PlanLimitService, useValue: (planLimits = mock<PlanLimitService>()) }
             ]
         }).compile();
 
@@ -71,6 +75,16 @@ describe('InvitationService', () => {
     });
 
     describe('when an Admin invites someone', () => {
+        it('then the invitation is refused once every seat of the plan is taken (a pending invitation holds a seat)', async () => {
+            delegate.findFirst.mockResolvedValue(null);
+            planLimits.assertSeatAvailable.mockRejectedValue(new LimitExceededException({ metric: 'seats', currentUsage: 2, limit: 2 }));
+
+            await expect(service.create(admin, { email: 'invitee@acme.com', role: RoleEnum.OPERATOR })).rejects.toBeInstanceOf(
+                LimitExceededException
+            );
+            expect(delegate.create).not.toHaveBeenCalled();
+        });
+
         it('then only a hash of the token is stored, and invitation.created and user.invited are emitted', async () => {
             delegate.findFirst.mockResolvedValue(null);
             delegate.create.mockImplementation(({ data }: { data: Record<string, unknown> }) => Promise.resolve({ ...pending, ...data }));

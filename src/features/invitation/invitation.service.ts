@@ -27,6 +27,7 @@ import { UserInvitedEvent, UserResponse, userResponseMapper } from '@domains/use
 
 import { UsersService } from '@app/features/users/users.service';
 import { RoleGrantPolicy } from '@app/features/users/role-grant.policy';
+import { PlanLimitService } from '@app/features/billing/plan-limit.service';
 
 /**
  * Tenant member invitations (sanctioned extension — not in the canonical API contract; see NOTE.md).
@@ -46,6 +47,7 @@ export class InvitationService {
         private readonly tenantAware: TenantAwareService,
         private readonly txEventEmitter: TransactionEventEmitterService,
         private readonly usersService: UsersService,
+        private readonly planLimits: PlanLimitService,
         private readonly logger: AppLoggerService
     ) {
         this.logger.setContext(InvitationService.name);
@@ -63,6 +65,8 @@ export class InvitationService {
         if (existing) {
             throw new ConflictException(`A pending invitation already exists for ${dto.email}`);
         }
+        // A pending invitation holds a seat, so accepting it later never exceeds the plan.
+        await this.planLimits.assertSeatAvailable(actor.tenantId);
 
         const token = this.generateToken();
         const expiresAt = this.expiry();
