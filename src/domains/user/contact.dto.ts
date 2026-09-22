@@ -30,3 +30,29 @@ export class ContactQueryDto {
     @IsEnum(RoleEnum)
     role?: RoleEnum;
 }
+
+/**
+ * What notification-service needs to address mail on a tenant's behalf: the brand shown to recipients,
+ * the default locale, the client-app link emails point to (API §7.1: emails link to the client's own
+ * app, never to a platform page) and a reply-to. The last three come from the tenant's `general`
+ * settings (`locale`, `app_url`, `support_email`) and are null when unset or malformed.
+ */
+export class TenantCommunicationProfileResponse {
+    @ApiProperty()
+    tenantId!: string;
+
+    @ApiProperty({ description: 'Brand name shown to recipients' })
+    name!: string;
+
+    @ApiProperty({ enum: ['active', 'suspended', 'locked', 'closed'] })
+    status!: string;
+
+    @ApiPropertyOptional({ nullable: true, type: String, example: 'de-DE' })
+    locale!: string | null;
+
+    @ApiPropertyOptional({ nullable: true, type: String, example: 'https://app.client.com/referrals' })
+    appUrl!: string | null;
+
+    @ApiPropertyOptional({ nullable: true, type: String })
+    replyTo!: string | null;
+}

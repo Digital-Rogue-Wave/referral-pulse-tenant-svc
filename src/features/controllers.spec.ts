@@ -207,7 +207,7 @@ describe('Internal endpoints', () => {
 
     describe('operator contacts', () => {
         const row = { id: 'u1', tenantId: 't1', email: 'ada@acme.io', name: 'Ada', role: 'OWNER' };
-        const prisma = { user: { findFirst: jest.fn(), findMany: jest.fn() } };
+        const prisma = { user: { findFirst: jest.fn(), findMany: jest.fn() }, tenant: { findFirst: jest.fn() } };
         const controller = new OperatorContactController(prisma as unknown as DatabaseService);
 
         it('returns a live operator’s address, never a removed or erased one', async () => {
@@ -229,6 +229,34 @@ describe('Internal endpoints', () => {
 
             await expect(controller.contactsOf('t1', { role: RoleEnum.OWNER })).resolves.toHaveLength(1);
             expect(prisma.user.findMany.mock.calls[0]![0].where).toEqual({ tenantId: 't1', deletedAt: null, status: 'active', role: 'OWNER' });
+        });
+
+        it('gives the brand, and only well-formed locale, https app link and reply-to from the settings', async () => {
+            prisma.tenant.findFirst
+                .mockResolvedValueOnce({
+                    id: 't1',
+                    name: 'Acme',
+                    status: 'active',
+                    setting: { general: { locale: 'de-DE', appUrl: 'https://app.acme.io/referrals', supportEmail: 'help@acme.io' } }
+                })
+                .mockResolvedValueOnce({
+                    id: 't1',
+                    name: 'Acme',
+                    status: 'active',
+                    setting: { general: { locale: 'klingon!', appUrl: 'http://app.acme.io' } }
+                })
+                .mockResolvedValueOnce(null);
+
+            await expect(controller.profileOf('t1')).resolves.toEqual({
+                tenantId: 't1',
+                name: 'Acme',
+                status: 'active',
+                locale: 'de-DE',
+                appUrl: 'https://app.acme.io/referrals',
+                replyTo: 'help@acme.io'
+            });
+            await expect(controller.profileOf('t1')).resolves.toMatchObject({ locale: null, appUrl: null, replyTo: null });
+            await expect(controller.profileOf('gone')).rejects.toBeInstanceOf(NotFoundException);
         });
     });
 });
