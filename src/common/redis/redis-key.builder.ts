@@ -65,57 +65,6 @@ export class RedisKeyBuilder {
         return `${this.keyPrefix}${sanitizedNamespace}:${sanitizedKey}`;
     }
 
-    /**
-     * Build a lock key for distributed locking
-     *
-     * @param resource - Resource being locked
-     * @param tenantScoped - Whether lock is tenant-specific
-     * @returns Sanitized lock key
-     */
-    buildLockKey(resource: string, tenantScoped = true): string {
-        const sanitizedResource = this.sanitize(resource);
-
-        if (tenantScoped) {
-            return this.buildTenantKey('lock', sanitizedResource);
-        }
-
-        return this.buildGlobalKey('lock', sanitizedResource);
-    }
-
-    /**
-     * Build a cache key
-     *
-     * @param cacheKey - Cache identifier
-     * @param tenantScoped - Whether cache is tenant-specific
-     * @returns Sanitized cache key
-     */
-    buildCacheKey(cacheKey: string, tenantScoped = true): string {
-        const sanitizedKey = this.sanitize(cacheKey);
-
-        if (tenantScoped) {
-            return this.buildTenantKey('cache', sanitizedKey);
-        }
-
-        return this.buildGlobalKey('cache', sanitizedKey);
-    }
-
-    /**
-     * Build a session key
-     *
-     * @param sessionId - Session identifier
-     * @param tenantScoped - Whether session is tenant-specific
-     * @returns Sanitized session key
-     */
-    buildSessionKey(sessionId: string, tenantScoped = true): string {
-        const sanitizedId = this.sanitize(sessionId);
-
-        if (tenantScoped) {
-            return this.buildTenantKey('session', sanitizedId);
-        }
-
-        return this.buildGlobalKey('session', sanitizedId);
-    }
-
     buildDedupKey(sessionId: string, tenantScoped = true): string {
         const sanitizedId = this.sanitize(sessionId);
 
@@ -141,30 +90,6 @@ export class RedisKeyBuilder {
         }
 
         return this.buildGlobalKey('idempotency', sanitizedKey);
-    }
-
-    /**
-     * Build a pattern for key scanning/deletion
-     *
-     * @param namespace - Key namespace
-     * @param pattern - Glob pattern (e.g., 'user:*', '*')
-     * @param tenantScoped - Whether pattern is tenant-specific
-     * @returns Redis key pattern
-     */
-    buildPattern(namespace: string, pattern: string, tenantScoped = true): string {
-        const sanitizedNamespace = this.sanitize(namespace);
-        // Don't sanitize pattern - it may contain wildcards
-
-        if (tenantScoped) {
-            const tenantId = this.tenantContext.getTenantId();
-            if (!tenantId) {
-                throw new Error('Tenant context is required for tenant-scoped patterns');
-            }
-            const sanitizedTenantId = this.sanitize(tenantId);
-            return `${this.keyPrefix}${sanitizedTenantId}:${sanitizedNamespace}:${pattern}`;
-        }
-
-        return `${this.keyPrefix}${sanitizedNamespace}:${pattern}`;
     }
 
     /**

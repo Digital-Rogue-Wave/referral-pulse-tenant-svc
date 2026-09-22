@@ -3,6 +3,7 @@ import { mock, MockProxy } from 'jest-mock-extended';
 
 import { DatabaseService } from '@app/database/database.service';
 import { AppLoggerService } from '@common/logging/app-logger.service';
+import { DomainMetrics } from '@common/monitoring/domain-metrics.service';
 
 import { LimitExceededException } from './exceptions/limit-exceeded.exception';
 import { PlanLimitService } from './plan-limit.service';
@@ -37,7 +38,13 @@ describe('PlanLimitService — plan entitlements', () => {
             invitation: { count: jest.fn().mockResolvedValue(1) }
         };
         counters = mock<UsageCounterService>();
-        service = new PlanLimitService(prisma as unknown as DatabaseService, mock<AppLoggerService>(), counters, mock<ConfigService>());
+        service = new PlanLimitService(
+            prisma as unknown as DatabaseService,
+            mock<AppLoggerService>(),
+            counters,
+            mock<ConfigService>(),
+            mock<DomainMetrics>()
+        );
     });
 
     it('resolves limits from the plan catalog by the tenant’s plan name (data, not env price ids)', async () => {

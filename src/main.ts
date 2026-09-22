@@ -13,6 +13,7 @@ import { toWireCaseDocument } from '@common/http-contract/openapi-wire-case';
 import { requestIdMiddleware } from '@common/http-contract/request-id.middleware';
 import { validationExceptionFactory } from '@common/http-contract/validation-exception.factory';
 
+import { WorkerHealthServer } from '@app/health/worker-health.server';
 import { AppModule } from './app.module';
 
 /**
@@ -41,8 +42,10 @@ async function bootstrap(): Promise<void> {
     app.enableShutdownHooks();
 
     if (appMode === 'worker') {
-        // Worker mode: No HTTP server, just keep app running for cron jobs
+        // Worker mode: no API; a probe-only server answers /health/live and /health/ready.
         await app.init();
+        const healthPort = configService.getOrThrow('app.workerHealthPort', { infer: true });
+        await app.get(WorkerHealthServer).start(healthPort);
 
         console.log(`⚙️  ${serviceName} started in WORKER mode`);
         console.log(`📚 Environment: ${nodeEnv}`);

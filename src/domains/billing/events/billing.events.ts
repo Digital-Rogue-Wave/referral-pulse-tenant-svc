@@ -135,70 +135,6 @@ export class TrialExpiredEvent extends BaseDomainEvent {
     }
 }
 
-export class PaymentFailedEvent extends BaseDomainEvent {
-    readonly eventType = 'payment.failed' as const;
-
-    constructor(
-        public readonly aggregateId: string,
-        public readonly tenantId: string,
-        public readonly previousStatus: string,
-        public readonly nextStatus: string,
-        public readonly changedAt: string,
-        public readonly reason?: string,
-        public readonly userId?: string
-    ) {
-        super();
-    }
-}
-
-export class PaymentRestoredEvent extends BaseDomainEvent {
-    readonly eventType = 'payment.restored' as const;
-
-    constructor(
-        public readonly aggregateId: string,
-        public readonly tenantId: string,
-        public readonly previousStatus: string,
-        public readonly nextStatus: string,
-        public readonly changedAt: string,
-        public readonly reason?: string,
-        public readonly userId?: string
-    ) {
-        super();
-    }
-}
-
-export class TenantRestrictedEvent extends BaseDomainEvent {
-    readonly eventType = 'tenant.restricted' as const;
-
-    constructor(
-        public readonly aggregateId: string,
-        public readonly tenantId: string,
-        public readonly previousStatus: string,
-        public readonly nextStatus: string,
-        public readonly changedAt: string,
-        public readonly reason?: string,
-        public readonly userId?: string
-    ) {
-        super();
-    }
-}
-
-export class TenantRestoredEvent extends BaseDomainEvent {
-    readonly eventType = 'tenant.restored' as const;
-
-    constructor(
-        public readonly aggregateId: string,
-        public readonly tenantId: string,
-        public readonly previousStatus: string,
-        public readonly nextStatus: string,
-        public readonly changedAt: string,
-        public readonly reason?: string,
-        public readonly userId?: string
-    ) {
-        super();
-    }
-}
-
 export class UsageMonthlySummaryEvent extends BaseDomainEvent {
     readonly eventType = 'usage.monthly_summary' as const;
 
@@ -299,11 +235,6 @@ export const BillingEvents = {
     TRIAL_EXPIRED: 'trial.expired',
     USAGE_THRESHOLD_CROSSED: 'usage.threshold_crossed',
     USAGE_MONTHLY_SUMMARY: 'usage.monthly_summary',
-    PAYMENT_FAILED: 'payment.failed',
-    PAYMENT_RESTORED: 'payment.restored',
-    TENANT_RESTRICTED: 'tenant.restricted',
-    TENANT_LOCKED: 'tenant.locked',
-    TENANT_RESTORED: 'tenant.restored',
     PAYMENT_ACTION_REQUIRED: 'payment.action_required',
     PAYMENT_DISPUTED: 'payment.disputed',
     PAYMENT_REFUNDED: 'payment.refunded'

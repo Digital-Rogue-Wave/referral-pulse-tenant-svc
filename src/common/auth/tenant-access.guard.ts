@@ -8,10 +8,10 @@ import { IS_PUBLIC_KEY } from '@app/types';
 
 import { PaymentStatusEnum } from '@common/enums/billing.enum';
 import { BaseException } from '@common/exceptions/base.exceptions';
-import { DatabaseService } from '@app/database/database.service';
 import { TenantStatus } from '@domains/tenant/tenant.types';
 
 import { ALLOW_LOCKED_TENANT_KEY } from './require-permission.decorator';
+import { TenantStateCache } from './tenant-state.cache';
 
 export const ALLOW_UNPAID_TENANT_KEY = 'authz:allow_unpaid_tenant';
 
@@ -21,7 +21,7 @@ export const AllowUnpaidTenant = (): CustomDecorator<string> => SetMetadata(ALLO
 const READ_ONLY_METHODS = new Set(['GET', 'HEAD', 'OPTIONS']);
 
 /**
- * Global tenant access tiers, evaluated once per request from a single tenant read:
+ * Global tenant access tiers, evaluated once per request from the tenant's cached state (TenantStateCache):
  *
  * | state                         | effect                                                          |
  * |-------------------------------|-----------------------------------------------------------------|
@@ -38,7 +38,7 @@ const READ_ONLY_METHODS = new Set(['GET', 'HEAD', 'OPTIONS']);
 export class TenantAccessGuard implements CanActivate {
     constructor(
         private readonly reflector: Reflector,
-        private readonly prisma: DatabaseService
+        private readonly tenantState: TenantStateCache
     ) {}
 
     async canActivate(context: ExecutionContext): Promise<boolean> {
@@ -52,10 +52,7 @@ export class TenantAccessGuard implements CanActivate {
             return true;
         }
 
-        const tenant = await this.prisma.tenant.findUnique({
-            where: { id: user.tenantId },
-            select: { status: true, paymentStatus: true, deletedAt: true, lockedAt: true, lockUntil: true }
-        });
+        const tenant = await this.tenantState.get(user.tenantId);
         if (!tenant || tenant.deletedAt || tenant.status === TenantStatus.CLOSED) {
             throw new BaseException('tenant_not_found', 'Tenant not found', HttpStatus.NOT_FOUND);
         }

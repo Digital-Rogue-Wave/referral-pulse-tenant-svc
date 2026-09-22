@@ -1,6 +1,6 @@
 import { Injectable, OnModuleInit } from '@nestjs/common';
 
-import { Counter, Histogram, ObservableGauge, Span, SpanKind, SpanStatusCode } from '@opentelemetry/api';
+import { Counter, Histogram, ObservableGauge } from '@opentelemetry/api';
 import { LRUCache } from 'lru-cache';
 
 import { TenantContextService } from '@app/common/tenant-aware/tenant-context.service';
@@ -166,36 +166,6 @@ export class HttpMetricsService implements OnModuleInit {
     // ==================== Inbound HTTP Metrics ====================
 
     /**
-     * Record an inbound HTTP request
-     */
-    recordInboundRequest(
-        method: string,
-        route: string,
-        statusCode: number,
-        durationMs: number,
-        requestSizeBytes?: number,
-        responseSizeBytes?: number
-    ): void {
-        // Use the existing MetricsService method for consistency
-        this.metricsService.recordHttpRequest(method, route, statusCode, durationMs);
-
-        // Record request/response sizes if provided (using pre-initialized histograms)
-        if (requestSizeBytes !== undefined) {
-            this.inboundRequestSizeHistogram.record(requestSizeBytes, {
-                method,
-                route
-            });
-        }
-
-        if (responseSizeBytes !== undefined) {
-            this.inboundResponseSizeHistogram.record(responseSizeBytes, {
-                method,
-                route
-            });
-        }
-    }
-
-    /**
      * Record inbound HTTP error
      */
     recordInboundError(method: string, route: string, statusCode: number, errorType: string): void {
@@ -205,20 +175,6 @@ export class HttpMetricsService implements OnModuleInit {
             status_code: statusCode.toString(),
             error_type: errorType
         });
-    }
-
-    /**
-     * Increment active inbound HTTP requests
-     */
-    incrementInboundActiveRequests(): void {
-        this.metricsService.incrementActiveHttpRequests();
-    }
-
-    /**
-     * Decrement active inbound HTTP requests
-     */
-    decrementInboundActiveRequests(): void {
-        this.metricsService.decrementActiveHttpRequests();
     }
 
     // ==================== Outbound HTTP Metrics ====================
@@ -278,269 +234,18 @@ export class HttpMetricsService implements OnModuleInit {
     }
 
     /**
-     * Record outbound HTTP timeout
-     */
-    recordOutboundTimeout(method: string, host: string, path: string, timeoutMs: number): void {
-        this.outboundTimeoutsCounter.add(1, {
-            method,
-            host,
-            path,
-            timeout: timeoutMs.toString()
-        });
-    }
-
-    /**
-     * Record outbound HTTP retry
-     */
-    recordOutboundRetry(method: string, host: string, path: string, attemptNumber: number, reason: string): void {
-        this.outboundRetriesCounter.add(1, {
-            method,
-            host,
-            path,
-            attempt: attemptNumber.toString(),
-            reason
-        });
-    }
-
-    /**
-     * Record outbound circuit breaker state (uses LRU cache for state tracking)
-     */
-    recordOutboundCircuitBreakerState(host: string, state: 'CLOSED' | 'HALF_OPEN' | 'OPEN'): void {
-        this.logger.log(`Circuit breaker state changed: ${host} - ${state}`);
-        const stateValue = state === 'CLOSED' ? 0 : state === 'HALF_OPEN' ? 1 : 2;
-        this.circuitBreakerStates.set(host, stateValue);
-    }
-
-    /**
-     * Record outbound circuit breaker trip
-     */
-    recordOutboundCircuitBreakerTrip(host: string, reason: string): void {
-        this.logger.warn(`Circuit breaker tripped: ${host} - ${reason}`);
-        this.outboundCircuitBreakerTripsCounter.add(1, { host, reason });
-    }
-
-    /**
      * Track active outbound HTTP requests
      */
     private activeOutboundRequests: Map<string, number> = new Map();
-
-    /**
-     * Increment active outbound HTTP requests
-     */
-    incrementOutboundActiveRequests(host: string): void {
-        const current = this.activeOutboundRequests.get(host) || 0;
-        this.activeOutboundRequests.set(host, current + 1);
-    }
-
-    /**
-     * Decrement active outbound HTTP requests
-     */
-    decrementOutboundActiveRequests(host: string): void {
-        const current = this.activeOutboundRequests.get(host) || 0;
-        if (current > 0) {
-            this.activeOutboundRequests.set(host, current - 1);
-        }
-    }
-
-    /**
-     * Get active outbound requests count
-     */
-    getActiveOutboundRequests(host: string): number {
-        return this.activeOutboundRequests.get(host) || 0;
-    }
 
     // ==================== Connection Pool Metrics ====================
 
     /**
      * Record HTTP connection pool stats
      */
-    /**
-     * Record HTTP connection pool stats (uses LRU cache for state tracking)
-     */
-    recordConnectionPoolStats(host: string, active: number, idle: number, waiting: number): void {
-        this.connectionPoolStats.set(host, { active, idle, waiting });
-    }
-
     // ==================== Inbound HTTP Tracing ====================
 
-    /**
-     * Trace an inbound HTTP request with automatic span management
-     * Use this to wrap HTTP request handlers
-     */
-    async traceInboundRequest<T>(
-        method: string,
-        route: string,
-        handler: (span: Span) => Promise<T>,
-        metadata?: Record<string, string | number>
-    ): Promise<T> {
-        const startTime = Date.now();
-
-        return this.tracingService.withSpan(`HTTP ${method} ${route}`, async (span: Span) => {
-            const tenantId = this.tenantContext.getTenantId();
-
-            // Set span attributes including tenant context
-            span.setAttributes({
-                'http.method': method,
-                'http.route': route,
-                'http.flavor': '1.1',
-                'span.kind': 'server',
-                'tenant.id': tenantId || 'unknown',
-                ...metadata
-            });
-
-            try {
-                this.incrementInboundActiveRequests();
-                const result = await handler(span);
-                const durationMs = Date.now() - startTime;
-
-                // Assume success if no error thrown
-                span.setAttribute('http.status_code', 200);
-                this.recordInboundRequest(method, route, 200, durationMs);
-
-                span.setStatus({ code: SpanStatusCode.OK });
-                return result;
-            } catch (error) {
-                const durationMs = Date.now() - startTime;
-                const statusCode = (error as { statusCode?: number })?.statusCode ?? 500;
-                const errorType = error instanceof Error ? error.constructor.name : 'Unknown';
-
-                // Record error metrics
-                span.setAttribute('http.status_code', statusCode);
-                this.recordInboundRequest(method, route, statusCode, durationMs);
-                this.recordInboundError(method, route, statusCode, errorType);
-
-                // Record exceptions in span
-                span.recordException(error as Error);
-                span.setStatus({
-                    code: SpanStatusCode.ERROR,
-                    message: error instanceof Error ? error.message : 'Unknown error'
-                });
-
-                throw error;
-            } finally {
-                this.decrementInboundActiveRequests();
-            }
-        });
-    }
-
     // ==================== Outbound HTTP Tracing ====================
-
-    /**
-     * Trace an outbound HTTP request with automatic span management
-     * Use this to wrap HTTP client calls
-     */
-    async traceOutboundRequest<T>(
-        method: string,
-        url: string,
-        caller: (span: Span) => Promise<{
-            data: T;
-            statusCode: number;
-            headers?: Record<string, string>;
-        }>,
-        metadata?: Record<string, string | number>
-    ): Promise<T> {
-        const startTime = Date.now();
-        const parsedUrl = new URL(url);
-        const host = parsedUrl.hostname;
-        const path = parsedUrl.pathname;
-
-        return this.tracingService.withSpan(`HTTP ${method} ${host}${path}`, async (span: Span) => {
-            const tenantId = this.tenantContext.getTenantId();
-
-            // Set span attributes for outbound call including tenant context
-            span.setAttributes({
-                'http.method': method,
-                'http.url': url,
-                'http.host': host,
-                'http.target': path,
-                'http.scheme': parsedUrl.protocol.replace(':', ''),
-                'span.kind': 'client',
-                'tenant.id': tenantId || 'unknown',
-                ...metadata
-            });
-
-            try {
-                this.incrementOutboundActiveRequests(host);
-                const response = await caller(span);
-                const durationMs = Date.now() - startTime;
-
-                // Record success metrics
-                span.setAttribute('http.status_code', response.statusCode);
-                this.recordOutboundRequest(method, host, path, response.statusCode, durationMs);
-
-                span.setStatus({ code: SpanStatusCode.OK });
-                return response.data;
-            } catch (error) {
-                const durationMs = Date.now() - startTime;
-                const errorType = error instanceof Error ? error.constructor.name : 'Unknown';
-
-                // Check if it's a timeout
-                if (errorType.toLowerCase().includes('timeout') || (error as { code?: string })?.code === 'ETIMEDOUT') {
-                    this.recordOutboundTimeout(method, host, path, durationMs);
-                }
-
-                // Record error metrics
-                this.recordOutboundError(method, host, path, errorType);
-
-                // Record exceptions in span
-                span.recordException(error as Error);
-                span.setStatus({
-                    code: SpanStatusCode.ERROR,
-                    message: error instanceof Error ? error.message : 'Unknown error'
-                });
-
-                throw error;
-            } finally {
-                this.decrementOutboundActiveRequests(host);
-            }
-        });
-    }
-
-    /**
-     * Start a new span for outbound HTTP request (manual span management)
-     * Use this when you need more control over the span lifecycle
-     */
-    startOutboundSpan(method: string, url: string): Span {
-        const parsedUrl = new URL(url);
-        const tracer = this.tracingService.getTracer();
-        return tracer.startSpan(`HTTP ${method} ${parsedUrl.hostname}${parsedUrl.pathname}`, {
-            kind: SpanKind.CLIENT,
-            attributes: {
-                'http.method': method,
-                'http.url': url,
-                'http.host': parsedUrl.hostname,
-                'http.target': parsedUrl.pathname,
-                'http.scheme': parsedUrl.protocol.replace(':', '')
-            }
-        });
-    }
-
-    /**
-     * End a span with success
-     */
-    endSpanSuccess(span: Span, statusCode: number, durationMs?: number): void {
-        span.setAttribute('http.status_code', statusCode);
-        if (durationMs !== undefined) {
-            span.setAttribute('http.duration_ms', durationMs);
-        }
-        span.setStatus({ code: SpanStatusCode.OK });
-        span.end();
-    }
-
-    /**
-     * End a span with error
-     */
-    endSpanError(span: Span, error: Error, statusCode?: number, durationMs?: number): void {
-        if (statusCode !== undefined) {
-            span.setAttribute('http.status_code', statusCode);
-        }
-        if (durationMs !== undefined) {
-            span.setAttribute('http.duration_ms', durationMs);
-        }
-        span.recordException(error);
-        span.setStatus({ code: SpanStatusCode.ERROR, message: error.message });
-        span.end();
-    }
 
     /**
      * Inject tracing headers into outbound HTTP requests
@@ -587,38 +292,5 @@ export class HttpMetricsService implements OnModuleInit {
         delete headers['cookie'];
 
         return headers;
-    }
-
-    /**
-     * Get headers safe for outbound calls (filtered from incoming request)
-     * Removes sensitive headers like Authorization, Cookie, etc.
-     */
-    getSafeOutboundHeaders(incomingHeaders: Record<string, string | string[]>): Record<string, string> {
-        const safeHeaders: Record<string, string> = {};
-
-        // List of headers safe to forward
-        const allowedHeaders = [
-            'accept',
-            'accept-encoding',
-            'accept-language',
-            'content-type',
-            'user-agent',
-            'x-request-id',
-            'x-forwarded-for',
-            'x-forwarded-proto',
-            'x-forwarded-host'
-        ];
-
-        for (const [key, value] of Object.entries(incomingHeaders)) {
-            const lowerKey = key.toLowerCase();
-
-            // Only forward allowed headers
-            if (allowedHeaders.includes(lowerKey) && value !== undefined) {
-                safeHeaders[key] = Array.isArray(value) ? (value[0] ?? '') : value;
-            }
-        }
-
-        // Add tracing headers
-        return this.injectTracingHeaders(safeHeaders);
     }
 }

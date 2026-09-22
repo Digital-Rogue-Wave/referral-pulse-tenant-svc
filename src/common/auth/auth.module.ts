@@ -8,6 +8,7 @@ import { JwtAuthGuard } from './jwt-auth.guard';
 import { JwtStrategy } from './jwt.strategy';
 import { PermissionGuard } from './permission.guard';
 import { TenantAccessGuard } from './tenant-access.guard';
+import { TenantStateCache } from './tenant-state.cache';
 import { KetoService } from './keto.service';
 import { KratosService } from './kratos.service';
 import { AlsAuthInterceptor } from '../interceptor';
@@ -27,6 +28,7 @@ import { AlsAuthInterceptor } from '../interceptor';
         { provide: APP_GUARD, useClass: JwtAuthGuard },
         { provide: APP_GUARD, useClass: PermissionGuard },
         { provide: APP_GUARD, useClass: TenantAccessGuard },
+        TenantStateCache,
         AlsAuthInterceptor,
         AuthorizationService,
         KetoProvisioningService,

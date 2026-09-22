@@ -204,28 +204,7 @@ export class MetricsService implements OnModuleInit {
 
     // ==================== Database Metrics ====================
 
-    recordDatabaseQuery(operation: string, table: string, durationMs: number, success: boolean): void {
-        if (!this.dbQueriesTotal || !this.dbQueryDuration) {
-            return;
-        }
-
-        const labels = {
-            operation,
-            table,
-            success: success.toString(),
-            service: this.serviceName
-        };
-
-        this.dbQueriesTotal.add(1, labels);
-        this.dbQueryDuration.record(durationMs, labels);
-    }
-
     // ==================== Circuit Breaker Metrics ====================
-
-    recordCircuitBreakerState(_serviceName: string, _state: 'CLOSED' | 'HALF_OPEN' | 'OPEN'): void {
-        // State is recorded via observable gauge in circuit breaker service
-        // This is a placeholder for future implementation
-    }
 
     // ==================== Redis Metrics ====================
 
@@ -311,18 +290,6 @@ export class MetricsService implements OnModuleInit {
 
         this.queueJobsProcessed.add(1, labels);
         this.queueJobProcessingDuration.record(durationMs, labels);
-    }
-
-    incrementActiveQueueJobs(queueName: string): void {
-        const current = this.activeQueueJobs.get(queueName) || 0;
-        this.activeQueueJobs.set(queueName, current + 1);
-    }
-
-    decrementActiveQueueJobs(queueName: string): void {
-        const current = this.activeQueueJobs.get(queueName) || 0;
-        if (current > 0) {
-            this.activeQueueJobs.set(queueName, current - 1);
-        }
     }
 
     // ==================== Custom Metrics ====================

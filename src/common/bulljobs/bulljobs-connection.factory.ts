@@ -35,16 +35,6 @@ export class BullJobsConnectionFactory {
     }
 
     /**
-     * Get the existing Redis client from RedisService
-     * This is the preferred method as it supports IAM auth and reuses connections
-     *
-     * Note: BullMQ can accept an existing ioredis client via the `connection` option
-     */
-    getSharedConnection(): ReturnType<RedisService['getClient']> {
-        return this.redisService.getClient();
-    }
-
-    /**
      * Create Redis connection options for BullMQ
      * Supports both standalone and cluster configurations
      *
@@ -82,7 +72,6 @@ export class BullJobsConnectionFactory {
         const tlsEnabled = this.configService.getOrThrow('redis.tlsEnabled', {
             infer: true
         });
-        const maxRetriesPerRequest = this.configService.get('redis.maxRetriesPerRequest', { infer: true });
         const connectTimeout = this.configService.getOrThrow('redis.connectTimeout', { infer: true });
 
         this.logger.debug('Creating BullMQ standalone connection', {
@@ -96,7 +85,8 @@ export class BullJobsConnectionFactory {
             port,
             password: password || undefined,
             db,
-            maxRetriesPerRequest: maxRetriesPerRequest ?? null, // BullMQ recommends null for workers
+            // BullMQ workers require null (block until Redis answers); anything else is overridden with a warning.
+            maxRetriesPerRequest: null,
             connectTimeout,
             ...(tlsEnabled && { tls: {} })
         };

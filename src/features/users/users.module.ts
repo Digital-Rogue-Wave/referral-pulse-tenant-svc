@@ -3,6 +3,7 @@ import { Module } from '@nestjs/common';
 import { PlanLimitModule } from '@app/features/billing/plan-limit.module';
 
 import { KetoReconcilerWorker } from './keto-reconciler.worker';
+import { OperatorContactController } from './operator-contact.controller';
 import { OperatorErasureController } from './operator-erasure.controller';
 import { OperatorErasureService } from './operator-erasure.service';
 import { UsersService } from './users.service';
@@ -15,7 +16,7 @@ import { UsersController } from './users.controller';
  */
 @Module({
     imports: [PlanLimitModule],
-    controllers: [UsersController, OperatorErasureController],
+    controllers: [UsersController, OperatorErasureController, OperatorContactController],
     providers: [UsersService, OperatorErasureService, KetoReconcilerWorker],
     exports: [UsersService]
 })

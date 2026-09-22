@@ -72,7 +72,7 @@ describe('ApiKeyService', () => {
 
         planLimits = mock<PlanLimitService>();
         Object.assign(prisma, { apiKey: { ...(prisma as unknown as { apiKey?: object }).apiKey, count: jest.fn().mockResolvedValue(3) } });
-        service = new ApiKeyService(prisma, tenantAware, events, redis, mock<AppLoggerService>(), planLimits, config);
+        service = new ApiKeyService(prisma, tenantAware, events, redis, mock<AppLoggerService>(), planLimits, config as never);
     });
 
     describe('when a key is created', () => {

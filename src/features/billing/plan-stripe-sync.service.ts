@@ -30,7 +30,8 @@ export class PlanStripeSyncService {
             const rawValue =
                 (price.metadata && price.metadata[key as string]) ?? (product && product.metadata ? product.metadata[key as string] : undefined);
 
-            if (rawValue === null) {
+            // A key absent from both price and product metadata is simply not limited by this plan.
+            if (rawValue === null || rawValue === undefined) {
                 continue;
             }
 

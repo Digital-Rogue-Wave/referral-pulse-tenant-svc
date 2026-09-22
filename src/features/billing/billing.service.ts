@@ -189,21 +189,18 @@ export class BillingService {
 
         try {
             const tenant = await this.tenantService.findOneById(tenantId);
+            // The payment status applies whether or not the tenant ever had a trial.
+            if (tenant?.paymentStatus) {
+                paymentStatus = tenant.paymentStatus as PaymentStatusEnum;
+            }
+            trialActive = false;
             if (tenant?.trialEndsAt) {
                 trialEndsAt = tenant.trialEndsAt;
                 const now = new Date();
                 if (tenant.trialEndsAt > now) {
                     trialActive = true;
                     trialDaysRemaining = Math.ceil(this.dateService.diff(tenant.trialEndsAt, now, 'days'));
-                } else {
-                    trialActive = false;
                 }
-
-                if (tenant.paymentStatus) {
-                    paymentStatus = tenant.paymentStatus as PaymentStatusEnum;
-                }
-            } else {
-                trialActive = false;
             }
         } catch (err) {
             this.logger.error(`Failed to load tenant trial info for tenant ${tenantId}`, err instanceof Error ? err.stack : String(err));

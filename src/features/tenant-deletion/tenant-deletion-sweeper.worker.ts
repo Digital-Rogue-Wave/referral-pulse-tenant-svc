@@ -8,6 +8,7 @@ import { BaseWorkerService, BullJobsConnectionFactory, BullJobsService } from '@
 import { DateService } from '@common/helper/date.service';
 import { AppLoggerService } from '@common/logging/app-logger.service';
 import { MetricsService } from '@common/monitoring/metrics.service';
+import { DomainMetrics } from '@common/monitoring/domain-metrics.service';
 import { TracingService } from '@common/monitoring/tracing.service';
 
 import type { AllConfigType } from '@config/config.type';
@@ -29,7 +30,8 @@ export class TenantDeletionSweeperWorker extends BaseWorkerService<IBaseJobData>
         tenantContext: TenantContextService,
         dateService: DateService,
         private readonly deletions: TenantDeletionService,
-        private readonly bullJobs: BullJobsService
+        private readonly bullJobs: BullJobsService,
+        private readonly domainMetrics: DomainMetrics
     ) {
         super(TENANT_DELETION_QUEUE, connectionFactory, configService, logger, metricsService, tracingService, tenantContext, dateService);
     }
@@ -46,9 +48,13 @@ export class TenantDeletionSweeperWorker extends BaseWorkerService<IBaseJobData>
         const failed: string[] = [];
         for (const tenantId of await this.deletions.findDue()) {
             try {
-                deleted += (await this.deletions.execute(tenantId)) ? 1 : 0;
+                if (await this.deletions.execute(tenantId)) {
+                    deleted += 1;
+                    this.domainMetrics.tenantDeletion('deleted');
+                }
             } catch (error) {
                 failed.push(tenantId);
+                this.domainMetrics.tenantDeletion('failed');
                 this.logger.error('Tenant deletion failed; it is retried on the next sweep', error instanceof Error ? error.stack : undefined, {
                     tenantId
                 });

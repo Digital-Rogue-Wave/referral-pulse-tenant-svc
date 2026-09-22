@@ -8,6 +8,7 @@ import { DatabaseService } from '@app/database/database.service';
 import { AppLoggerService } from '@common/logging/app-logger.service';
 import { TransactionEventEmitterService } from '@common/events/transaction-event-emitter.service';
 import { BillingEvents, TenantPaymentStatusChangedEvent } from '@domains/billing';
+import { DomainMetrics } from '@common/monitoring/domain-metrics.service';
 
 const DAY_MS = 86_400_000;
 
@@ -23,7 +24,8 @@ export class PaymentStatusEscalationService {
         private readonly prisma: DatabaseService,
         private readonly logger: AppLoggerService,
         private readonly txEventEmitter: TransactionEventEmitterService,
-        private readonly config: ConfigService<AllConfigType>
+        private readonly config: ConfigService<AllConfigType>,
+        private readonly domainMetrics: DomainMetrics
     ) {
         this.logger.setContext(PaymentStatusEscalationService.name);
     }
@@ -61,19 +63,23 @@ export class PaymentStatusEscalationService {
     }
 
     private async escalate(tenantId: string, from: PaymentStatusEnum, to: PaymentStatusEnum, now: Date): Promise<void> {
-        await this.prisma.$transaction(async (tx) => {
+        const escalated = await this.prisma.$transaction(async (tx) => {
             const { count } = await tx.tenant.updateMany({
                 where: { id: tenantId, paymentStatus: from },
                 data: { paymentStatus: to, paymentStatusChangedAt: now }
             });
             if (count === 0) {
-                return;
+                return false;
             }
             this.txEventEmitter.emitAfterCommit(
                 BillingEvents.TENANT_PAYMENT_STATUS_CHANGED,
                 new TenantPaymentStatusChangedEvent(tenantId, tenantId, from, to, now.toISOString(), 'dunning')
             );
+            return true;
         });
-        this.logger.warn('Dunning escalated a tenant', { tenantId, from, to });
+        if (escalated) {
+            this.domainMetrics.dunningEscalation(to);
+            this.logger.warn('Dunning escalated a tenant', { tenantId, from, to });
+        }
     }
 }

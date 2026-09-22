@@ -34,9 +34,9 @@ describe('StripeWebhookService', () => {
     let stripe: MockProxy<StripeService>;
     let events: MockProxy<TransactionEventEmitterService>;
     let tx: {
-        billing: Record<string, jest.Mock>;
-        tenant: Record<string, jest.Mock>;
-        stripeEvent: Record<string, jest.Mock>;
+        billing: { findFirst: jest.Mock; upsert: jest.Mock; updateMany: jest.Mock };
+        tenant: { findUnique: jest.Mock; updateMany: jest.Mock };
+        stripeEvent: { update: jest.Mock };
         $queryRaw: jest.Mock;
     };
     let service: StripeWebhookService;

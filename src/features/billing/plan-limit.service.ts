@@ -8,6 +8,7 @@ import { InvitationStatusEnum } from '@common/enums/invitation.enum';
 
 import { DatabaseService } from '@app/database/database.service';
 import { AppLoggerService } from '@common/logging/app-logger.service';
+import { DomainMetrics } from '@common/monitoring/domain-metrics.service';
 import { LimitExceededException } from './exceptions/limit-exceeded.exception';
 import type { PlanLimits } from './plan-limits.type';
 import type { TenantEntitlementsDto } from '@domains/billing';
@@ -41,7 +42,8 @@ export class PlanLimitService {
         private readonly prisma: DatabaseService,
         private readonly logger: AppLoggerService,
         private readonly counters: UsageCounterService,
-        private readonly configService: ConfigService<AllConfigType>
+        private readonly configService: ConfigService<AllConfigType>,
+        private readonly domainMetrics: DomainMetrics
     ) {
         this.logger.setContext(PlanLimitService.name);
     }
@@ -171,6 +173,7 @@ export class PlanLimitService {
     }
 
     private exceeded(metric: string, currentUsage: number, limit: number, requested: number, effectiveLimit = limit, options?: EnforceLimitOptions) {
+        this.domainMetrics.limitRejected(metric);
         return new LimitExceededException({
             metric,
             currentUsage,

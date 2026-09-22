@@ -11,6 +11,7 @@ import { DateService } from '@common/helper/date.service';
 import { AppLoggerService } from '@common/logging/app-logger.service';
 import { SnsPublisherService } from '@common/messaging/sns-publisher.service';
 import { MetricsService } from '@common/monitoring/metrics.service';
+import { DomainMetrics } from '@common/monitoring/domain-metrics.service';
 import { TracingService } from '@common/monitoring/tracing.service';
 
 import type { AllConfigType } from '@config/config.type';
@@ -47,7 +48,8 @@ export class EventOutboxRelayWorker extends BaseWorkerService<IBaseJobData> {
         dateService: DateService,
         private readonly prisma: DatabaseService,
         private readonly bullJobs: BullJobsService,
-        private readonly sns: SnsPublisherService
+        private readonly sns: SnsPublisherService,
+        private readonly domainMetrics: DomainMetrics
     ) {
         super(QUEUE, connectionFactory, configService, logger, metricsService, tracingService, tenantContext, dateService);
     }
@@ -74,22 +76,35 @@ export class EventOutboxRelayWorker extends BaseWorkerService<IBaseJobData> {
 
         const pending = await this.prisma.eventOutbox.findMany({ where: { status: 'pending' }, orderBy: { createdAt: 'asc' }, take: BATCH_SIZE });
         let published = 0;
+        let failed = 0;
         // A tenant's events stay in order: after a failure, its later rows wait for the next run.
         const blocked = new Set<string>();
         for (const row of pending) {
             if (blocked.has(row.tenantId)) {
                 continue;
             }
-            if (await this.publish(row)) {
+            const outcome = await this.publish(row);
+            if (outcome === 'published') {
                 published += 1;
             } else {
                 blocked.add(row.tenantId);
+                failed += outcome === 'failed' ? 1 : 0;
             }
         }
+        await this.recordBacklog(published, failed);
         return { success: true, data: { published, attempted: pending.length } };
     }
 
-    private async publish(row: EventOutbox): Promise<boolean> {
+    private async recordBacklog(published: number, failed: number): Promise<void> {
+        const [pending, oldest] = await Promise.all([
+            this.prisma.eventOutbox.count({ where: { status: 'pending' } }),
+            this.prisma.eventOutbox.findFirst({ where: { status: 'pending' }, orderBy: { createdAt: 'asc' }, select: { createdAt: true } })
+        ]);
+        this.domainMetrics.outboxRun(published, failed, { pending, oldestCreatedAt: oldest?.createdAt ?? null });
+    }
+
+    /** `pending`: will be retried next run; `failed`: out of attempts, needs an operator. */
+    private async publish(row: EventOutbox): Promise<'published' | 'pending' | 'failed'> {
         const envelope = row.payload as Envelope;
         try {
             await this.tenantContext.runWithContext(
@@ -102,7 +117,7 @@ export class EventOutboxRelayWorker extends BaseWorkerService<IBaseJobData> {
                     })
             );
             await this.prisma.eventOutbox.update({ where: { id: row.id }, data: { status: 'published', publishedAt: new Date(), lastError: null } });
-            return true;
+            return 'published';
         } catch (error) {
             const attemptCount = row.attemptCount + 1;
             const status = attemptCount >= MAX_ATTEMPTS ? 'failed' : 'pending';
@@ -115,7 +130,7 @@ export class EventOutboxRelayWorker extends BaseWorkerService<IBaseJobData> {
                     lastError
                 });
             }
-            return false;
+            return status;
         }
     }
 }

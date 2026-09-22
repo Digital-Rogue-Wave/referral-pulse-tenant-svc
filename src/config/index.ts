@@ -2,7 +2,6 @@ import appConfig from './app.config';
 import authConfig from './auth.config';
 import awsConfig from './aws.config';
 import billingConfig from './billing.config';
-import clickhouseConfig from './clickhouse.config';
 import databaseConfig from './database.config';
 import httpConfig from './http.config';
 import oryConfig from './ory.config';
@@ -25,7 +24,6 @@ export type { HttpConfig } from './http.config';
 export type { ResilienceConfig } from './resilience.config';
 export type { ServicesConfig } from './services.config';
 export type { OryConfig } from './ory.config';
-export type { ClickHouseConfig } from './clickhouse.config';
 export type { TemporalConfig } from './temporal.config';
 export type { BillingConfig } from './billing.config';
 export type { StripeConfig } from './stripe.config';
@@ -42,7 +40,6 @@ export const configLoaders = [
     resilienceConfig,
     servicesConfig,
     oryConfig,
-    clickhouseConfig,
     temporalConfig,
     billingConfig,
     stripeConfig,
@@ -60,7 +57,6 @@ export {
     resilienceConfig,
     servicesConfig,
     oryConfig,
-    clickhouseConfig,
     temporalConfig,
     billingConfig,
     stripeConfig,

@@ -160,6 +160,37 @@ and record it here, rather than wait. Every item below can be revisited; each na
 | U9 | Upgrade, cancellation, downgrade scheduling and trial expiry now commit their change and event in one transaction. | Plan item "wrap billing emits in transactions". |
 | U10 | **Integration specs** (`*.integration.spec.ts`, `pnpm test:integration`, real Docker Postgres) are separate from the unit run. | X-5; starts T8. |
 
+### Operations, admin routes, tests (T8)
+
+| # | Decision | Why |
+|---|---|---|
+| O1 | **Worker pods get a probe-only HTTP server** (`WORKER_HEALTH_PORT`, default 3001): `GET /health/live`, `GET /health/ready` (Postgres + Redis); everything else 404. The worker serves no API. | #55: worker pods had no probe at all. |
+| O2 | **Domain metrics** (`DomainMetrics`, pushed over OTLP like the rest): `tenant_outbox_published_total`, `tenant_outbox_failed_total`, `tenant_outbox_pending`, `tenant_outbox_pending_oldest_seconds`, `tenant_deletions_total{result}`, `billing_dunning_escalations_total{to}`, `usage_limit_rejections_total{metric}`, `dsr_operator_erasures_total{status}`; Stripe webhooks keep `billing_subscription_events_total{result}`. **Alert on:** oldest pending outbox row growing, any `tenant_outbox_failed_total`, any `tenant_deletions_total{result="failed"}`, Stripe `result=error`. | #56. |
+| O3 | **Cached tenant access state** (`TenantStateCache`): the per-request tier check reads a 15 s Redis entry, evicted when a state change commits (suspend, lock, deletion, payment status); Redis down falls back to Postgres, never to allowing access. | #58: one Postgres read per request. |
+| O4 | **Platform-admin lock/unlock:** `POST /v1/admin/tenants/{id}/lock` (`reason`, optional `lock_until`) and `/unlock`, platform admin only (live Keto). **Timed locks now expire:** a 5-minute sweeper unlocks tenants past `lock_until`. | #15; found: nothing ever queued the unlock job, so a `lock_until` was never honoured. |
+| O5 | **Operator contacts for notification-service:** `GET /v1/internal/tenants/{id}/users/{userId}/contact` and `GET /v1/internal/tenants/{id}/contacts?role=OWNER` (`tenant_contacts.read`); live operators only. | Decision X-3. |
+| O6 | **Custom domains behind `FEATURE_CUSTOM_DOMAINS`** (default off): setting or verifying a domain is a 409 while off, instead of accepting a domain that is never served (ACM/CloudFront provisioning does not exist). | #52. |
+| O7 | **Messaging is producer-only:** SQS consumers were created for every configured queue (other services' queues included) with no handlers; tenant-service consumes nothing (Architecture §2.1). Removed with the consumer-side template code (DLQ consumer/replay, message processor, consumer decorators, Redis consumer dedupe, SES client). | Found during coverage work. |
+| O8 | **Dead template code removed:** ClickHouse client/config (tenant-service owns no ClickHouse data; every pod opened a client), `common/mock`, `common/clients`, `common/rules-engines`, S3 key builder, unused exception classes, unused Redis/date/mapper/metrics/BullJobs helpers, the unused Redis subscriber connection, four never-emitted billing event classes. `@clickhouse/client` dependency removed. | Less surface; no code without a caller. |
+| O9 | **Tests and gate:** `pnpm test:cov` enforces lines/statements ≥ 80 %, functions ≥ 75 %, branches ≥ 65 % (current 82 / 83 / 76 / 69; ratchet branches and functions up). Coverage counts logic files only (generated Prisma client, modules, DTOs, types, config and the dev-only `test-billing.controller.ts` are excluded). Integration specs (`pnpm test:integration`) run on the Docker infrastructure; BDD (`pnpm test:bdd`) covers HTTP flows incl. really signed Stripe webhooks. | Decision X-5. |
+| O10 | Small fixes found while testing: the subscription view reported `payment_status: active` for any tenant without a trial; BullMQ connections now use `maxRetriesPerRequest: null` (was overridden with a warning on every boot); Stripe plan sync no longer warns for every absent limit key. | |
+
+### Not done — deferred (shared phase or later), tenant-service
+
+| Item | Why deferred / what is needed |
+|---|---|
+| Helm values for the new env vars (`STRIPE_AUTOMATIC_TAX`, `STRIPE_PORTAL_RETURN_URL`, `BILLING_DUNNING_*`, `WORKER_HEALTH_PORT`, `FEATURE_CUSTOM_DOMAINS`, `INTERNAL_JWT_*`, `GATEWAY_SHARED_SECRET`, `ORY_WEBHOOK_API_KEY`, `API_KEY_HASH_PEPPER`) and the worker Deployment's probes on `WORKER_HEALTH_PORT` | Shared deployment phase (Helm/CI). |
+| Keto namespaces, Traefik forwardAuth, Kratos web hooks, SNS topic `tenant-events.fifo` | Shared infrastructure — see `my-docs/cross-service-requirements.md` §2. Until then the outbox relay cannot publish and Keto writes 404 locally. |
+| Custom-domain provisioning (ACM certificate + CloudFront alias) | Infrastructure work; then set `FEATURE_CUSTOM_DOMAINS=true`. |
+| Stripe catalog naming | Plan limits resolve by plan **name**: the Stripe product names must equal the plan names (`Free`, `Starter`, `Growth`, `Enterprise`) for synced plans to match `billings.plan`. |
+| Stripe Tax | Enable Stripe Tax on the account, then `STRIPE_AUTOMATIC_TAX=true`. |
+| Outbound headers | The HTTP client and outbound interceptor add `x-tenant-id` / `x-user-id` to every outbound call, external ones included. Restrict to internal hosts (review with the platform lead). |
+| Client IP | `AlsAuthInterceptor` trusts the first `X-Forwarded-For` value; correct behind Traefik, spoofable if the service is ever reached directly. Configure the trusted proxy in the shared phase. |
+| Unused config left in place | `aws.sqs.pollingEnabled` and consumer tuning, `temporalConfig`, `IIdempotentHandlerOptions` type — harmless, remove in a config clean-up. |
+| Invitation email path | `EmailNotificationListener` still sends invitation emails to notification-service over SQS (raw token in the message). Reviewed in the notification phase (N2: recipient lookup). |
+| Branch/function coverage | Gate floors 65 % / 75 %; raise as tests are added. |
+| `tasks/lessons.md`, `tenant-implementation.md` | Updated at the end of the service pass. |
+
 ### Superseded rules (flagged for the lead, not rewritten)
 
 - `CLAUDE.md` / `.claude/rules/security.md` say errors are "RFC 9457 ProblemDetail". Per decision X-2 the

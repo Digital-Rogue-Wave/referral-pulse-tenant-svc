@@ -4,6 +4,7 @@ import { mock, MockProxy } from 'jest-mock-extended';
 import { DatabaseService } from '@app/database/database.service';
 import { TransactionEventEmitterService } from '@common/events/transaction-event-emitter.service';
 import { AppLoggerService } from '@common/logging/app-logger.service';
+import { DomainMetrics } from '@common/monitoring/domain-metrics.service';
 
 import { PaymentStatusEscalationService } from './payment-status-escalation.service';
 
@@ -23,7 +24,13 @@ describe('PaymentStatusEscalationService — dunning', () => {
         const config = mock<ConfigService>();
         config.get.mockReturnValue({ dunningRestrictAfterDays: 3, dunningLockAfterDays: 10 });
         events = mock<TransactionEventEmitterService>();
-        service = new PaymentStatusEscalationService(prisma as unknown as DatabaseService, mock<AppLoggerService>(), events, config);
+        service = new PaymentStatusEscalationService(
+            prisma as unknown as DatabaseService,
+            mock<AppLoggerService>(),
+            events,
+            config,
+            mock<DomainMetrics>()
+        );
     });
 
     it('uses the configured days for each step', async () => {

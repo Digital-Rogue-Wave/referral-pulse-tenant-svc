@@ -12,6 +12,9 @@ import { TenantStatus } from '@domains/tenant/tenant.types';
 
 import { ALLOW_LOCKED_TENANT_KEY } from './require-permission.decorator';
 import { ALLOW_UNPAID_TENANT_KEY, TenantAccessGuard } from './tenant-access.guard';
+import { TenantStateCache } from './tenant-state.cache';
+import { AppLoggerService } from '@common/logging/app-logger.service';
+import { RedisService } from '@common/redis/redis.service';
 
 const member: IAuthenticatedUser = { userId: 'user-1', tenantId: 'tenant-1', source: 'dashboard' };
 
@@ -33,7 +36,9 @@ describe('TenantAccessGuard — tenant access tiers', () => {
             getClass: () => undefined,
             switchToHttp: () => ({ getRequest: () => ({ user: opts.user ?? member, method: opts.method ?? 'GET' }) })
         } as unknown as ExecutionContext;
-        return new TenantAccessGuard(reflector, prisma).canActivate(context).catch((error: BaseException) => error);
+        return new TenantAccessGuard(reflector, new TenantStateCache(prisma, mock<RedisService>(), mock<AppLoggerService>()))
+            .canActivate(context)
+            .catch((error: BaseException) => error);
     };
 
     const expectRefused = (result: boolean | BaseException, status: HttpStatus, code: string): void => {
@@ -103,5 +108,38 @@ describe('TenantAccessGuard — tenant access tiers', () => {
 
     it('lets a past-due tenant work normally — the dashboard warns, access is unchanged', async () => {
         expect(await run({ tenant: { paymentStatus: PaymentStatusEnum.PAST_DUE }, method: 'POST' })).toBe(true);
+    });
+
+    describe('tenant state cache', () => {
+        it('serves the cached state without reading the database, and drops it when the state changes', async () => {
+            const prisma = mock<DatabaseService>();
+            const findUnique = jest.fn();
+            (prisma as unknown as { tenant: unknown }).tenant = { findUnique };
+            const redis = mock<RedisService>();
+            redis.get.mockResolvedValue({ status: 'active', paymentStatus: 'active', deletedAt: null, lockedAt: null, lockUntil: null } as never);
+            const cache = new TenantStateCache(prisma, redis, mock<AppLoggerService>());
+
+            await expect(cache.get('tenant-1')).resolves.toMatchObject({ status: 'active' });
+            expect(findUnique).not.toHaveBeenCalled();
+
+            await cache.evict({ tenantId: 'tenant-1' } as never);
+            expect(redis.del).toHaveBeenCalledWith('tenant-access:tenant-1', false);
+        });
+
+        it('falls back to the database when Redis fails, never to an open door', async () => {
+            const prisma = mock<DatabaseService>();
+            (prisma as unknown as { tenant: unknown }).tenant = {
+                findUnique: jest
+                    .fn()
+                    .mockResolvedValue({ status: 'suspended', paymentStatus: 'active', deletedAt: null, lockedAt: null, lockUntil: null })
+            };
+            const redis = mock<RedisService>();
+            redis.get.mockRejectedValue(new Error('redis down'));
+            redis.set.mockRejectedValue(new Error('redis down'));
+
+            await expect(new TenantStateCache(prisma, redis, mock<AppLoggerService>()).get('tenant-1')).resolves.toMatchObject({
+                status: 'suspended'
+            });
+        });
     });
 });

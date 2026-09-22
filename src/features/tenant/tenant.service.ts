@@ -1,5 +1,7 @@
 import { BadRequestException, HttpStatus, Injectable, NotFoundException } from '@nestjs/common';
 import { ulid } from 'ulid';
+import { ConfigService } from '@nestjs/config';
+import type { AllConfigType } from '@config/config.type';
 import type { Prisma, Tenant } from '@prisma-gen/generated/client';
 import type { BaseDomainEvent } from '@domains/common/events';
 
@@ -82,7 +84,8 @@ export class TenantService {
         private readonly dnsVerificationService: DnsVerificationService,
         private readonly filesService: FilesService,
         private readonly kratos: KratosService,
-        private readonly usersService: UsersService
+        private readonly usersService: UsersService,
+        private readonly config: ConfigService<AllConfigType>
     ) {
         this.logger.setContext(TenantService.name);
     }
@@ -325,6 +328,7 @@ export class TenantService {
         }
 
         if (dto.customDomain !== undefined && dto.customDomain !== tenant.customDomain) {
+            this.assertCustomDomainsEnabled();
             updateData.customDomain = dto.customDomain;
             updateData.domainVerificationStatus = 'pending';
             updateData.domainVerificationToken = ulid();
@@ -366,6 +370,7 @@ export class TenantService {
      * Verify the custom domain TXT record for the current tenant.
      */
     async verifyCustomDomain(): Promise<TenantResponse> {
+        this.assertCustomDomainsEnabled();
         const tenantId = this.tenantContext.getTenantId()!;
         const tenant = await this.findOneOrFail(tenantId);
 
@@ -456,16 +461,46 @@ export class TenantService {
 
         await this.assertPasswordConfirmed(user, tenantId, dto.password);
 
-        const lockUntil = dto.lockUntil ? new Date(dto.lockUntil) : null;
+        return this.lockTenant(tenantId, dto.reason, dto.lockUntil ? new Date(dto.lockUntil) : null, user.userId);
+    }
 
+    /** Platform-admin lock of any tenant (no password: the platform role is checked live in Keto). */
+    async lockAsAdmin(tenantId: string, reason: string, lockUntil: Date | null, actorId: string): Promise<TenantResponse> {
+        const tenant = await this.findOneOrFail(tenantId);
+        if (tenant.status === TenantStatus.CLOSED) {
+            throw new BaseException('state_conflict', `Tenant ${tenantId} is closed`, HttpStatus.CONFLICT);
+        }
+        return this.lockTenant(tenantId, reason, lockUntil, actorId);
+    }
+
+    async unlockAsAdmin(tenantId: string, actorId: string): Promise<TenantResponse> {
+        const tenant = await this.findOneOrFail(tenantId);
+        if (tenant.status !== TenantStatus.LOCKED) {
+            throw new BaseException('state_conflict', `Tenant ${tenantId} is not locked`, HttpStatus.CONFLICT);
+        }
+        return this.performUnlock(tenantId, actorId);
+    }
+
+    /** Unlocks every tenant whose `lock_until` has passed. Returns how many were unlocked. */
+    async unlockExpired(now = new Date()): Promise<number> {
+        const expired = await this.prisma.tenant.findMany({
+            where: { status: TenantStatus.LOCKED, lockUntil: { lte: now } },
+            select: { id: true },
+            take: 100
+        });
+        for (const tenant of expired) {
+            await this.performUnlock(tenant.id);
+        }
+        return expired.length;
+    }
+
+    private async lockTenant(tenantId: string, reason: string, lockUntil: Date | null, actorId: string): Promise<TenantResponse> {
         const updated = await this.applyChange(
             tenantId,
-            { status: TenantStatus.LOCKED, lockedAt: new Date(), lockUntil, lockReason: dto.reason },
-            (row) => [TenantEvents.LOCKED, new TenantLockedEvent(tenantId, tenantId, dto.reason, row.lockedAt!, lockUntil ?? undefined, user.userId)]
+            { status: TenantStatus.LOCKED, lockedAt: new Date(), lockUntil, lockReason: reason },
+            (row) => [TenantEvents.LOCKED, new TenantLockedEvent(tenantId, tenantId, reason, row.lockedAt!, lockUntil ?? undefined, actorId)]
         );
-
-        this.logger.log(`Tenant locked: ${tenantId}`, { tenantId, reason: dto.reason });
-
+        this.logger.log(`Tenant locked: ${tenantId}`, { tenantId, reason, lockUntil });
         return tenantResponseMapper.toResponse(updated);
     }
 
@@ -509,10 +544,6 @@ export class TenantService {
     /**
      * Auto-unlock called by the TenantUnlockProcessor (BullMQ job).
      */
-    async autoUnlock(tenantId: string): Promise<void> {
-        await this.performUnlock(tenantId);
-    }
-
     // =========================================================
     // Suspend / Unsuspend (admin)
     // =========================================================
@@ -560,6 +591,16 @@ export class TenantService {
     // =========================================================
     // Private helpers
     // =========================================================
+
+    /**
+     * A custom domain is accepted only when it can actually be served. Provisioning (ACM certificate and
+     * CloudFront alias) is not built yet, so the feature is off unless FEATURE_CUSTOM_DOMAINS=true.
+     */
+    private assertCustomDomainsEnabled(): void {
+        if (!this.config.get('app.customDomainsEnabled', { infer: true })) {
+            throw new BaseException('state_conflict', 'Custom domains are not available yet', HttpStatus.CONFLICT, 'custom_domain');
+        }
+    }
 
     /**
      * Applies a tenant change and emits its event in one transaction: the published event is written to the

@@ -1,5 +1,6 @@
 import { Test } from '@nestjs/testing';
 import { HttpStatus } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { mock, MockProxy } from 'jest-mock-extended';
 
 import { TenantService } from './tenant.service';
@@ -61,6 +62,7 @@ describe('TenantService.applyVerificationReport', () => {
                 { provide: DnsVerificationService, useValue: mock<DnsVerificationService>() },
                 { provide: FilesService, useValue: mock<FilesService>() },
                 { provide: KratosService, useValue: mock<KratosService>() },
+                { provide: ConfigService, useValue: mock<ConfigService>() },
                 { provide: UsersService, useValue: mock<UsersService>() }
             ]
         }).compile();

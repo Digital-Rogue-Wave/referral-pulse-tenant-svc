@@ -136,6 +136,20 @@ export class UnlockTenantDto {
     password!: string;
 }
 
+/** Platform-admin lock: a reason is mandatory (it is audited); `lock_until` makes it expire on its own. */
+export class AdminLockTenantDto {
+    @ApiProperty()
+    @IsString()
+    @IsNotEmpty()
+    @MaxLength(500)
+    reason!: string;
+
+    @ApiPropertyOptional({ format: 'date-time' })
+    @IsOptional()
+    @IsDateString()
+    lockUntil?: string;
+}
+
 export class SuspendTenantDto {
     @ApiProperty()
     @IsString()

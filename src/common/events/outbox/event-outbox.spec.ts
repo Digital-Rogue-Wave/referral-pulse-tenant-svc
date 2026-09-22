@@ -2,6 +2,7 @@ import { mock, MockProxy } from 'jest-mock-extended';
 import type { Prisma } from '@prisma-gen/generated/client';
 
 import { AppLoggerService } from '@common/logging/app-logger.service';
+import { DomainMetrics } from '@common/monitoring/domain-metrics.service';
 import { SnsPublisherService } from '@common/messaging/sns-publisher.service';
 import { TenantContextService } from '@common/tenant-aware/tenant-context.service';
 import { BeforeCommitHook, TransactionEventEmitterService } from '@common/events/transaction-event-emitter.service';
@@ -162,12 +163,14 @@ describe('EventOutboxRelayWorker', () => {
                 update: jest.fn(async ({ where, data }: { where: { id: string }; data: Record<string, unknown> }) =>
                     updates.push({ id: where.id, data })
                 ),
-                deleteMany: jest.fn().mockResolvedValue({ count: 3 })
+                deleteMany: jest.fn().mockResolvedValue({ count: 3 }),
+                count: jest.fn().mockResolvedValue(0),
+                findFirst: jest.fn().mockResolvedValue(null)
             }
         };
         const context = { runWithContext: (_ctx: unknown, fn: () => unknown) => fn() };
         worker = Object.create(EventOutboxRelayWorker.prototype) as EventOutboxRelayWorker;
-        Object.assign(worker, { prisma, sns, tenantContext: context, logger: mock<AppLoggerService>() });
+        Object.assign(worker, { prisma, sns, tenantContext: context, logger: mock<AppLoggerService>(), domainMetrics: mock<DomainMetrics>() });
     });
 
     const run = (name = 'relay') => (worker as unknown as { processJob: (job: { name: string }) => Promise<{ data: unknown }> }).processJob({ name });

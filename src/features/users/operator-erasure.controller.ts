@@ -4,6 +4,7 @@ import { ApiBearerAuth, ApiOkResponse, ApiOperation, ApiTags } from '@nestjs/swa
 import { ServiceCapability } from '@common/auth/authz/keto-tuples';
 import { AllowServices } from '@common/auth/require-permission.decorator';
 import { ErasureReceiptResponse, OperatorErasureDto } from '@domains/erasure';
+import { DomainMetrics } from '@common/monitoring/domain-metrics.service';
 
 import { OperatorErasureService } from './operator-erasure.service';
 
@@ -16,7 +17,10 @@ import { OperatorErasureService } from './operator-erasure.service';
 @ApiBearerAuth()
 @Controller({ path: 'internal/erasures', version: '1' })
 export class OperatorErasureController {
-    constructor(private readonly erasure: OperatorErasureService) {}
+    constructor(
+        private readonly erasure: OperatorErasureService,
+        private readonly domainMetrics: DomainMetrics
+    ) {}
 
     @ApiOperation({ summary: 'Erase an operator (data subject) from tenant-service and return the receipt' })
     @ApiOkResponse({ type: ErasureReceiptResponse })
@@ -24,6 +28,8 @@ export class OperatorErasureController {
     @HttpCode(HttpStatus.OK)
     @Post('operators')
     async eraseOperator(@Body() dto: OperatorErasureDto): Promise<ErasureReceiptResponse> {
-        return this.erasure.erase(dto);
+        const receipt = await this.erasure.erase(dto);
+        this.domainMetrics.erasure(receipt.status);
+        return receipt;
     }
 }

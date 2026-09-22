@@ -419,3 +419,6 @@ export function toPublishedEvents(eventName: string, event: unknown): PublishedE
 }
 
 export const isPublishedEvent = (eventName: string): boolean => eventName in MAPPERS;
+
+/** Every in-process event type that is published on `tenant-events`. */
+export const PUBLISHED_EVENT_TYPES: readonly string[] = Object.keys(MAPPERS);

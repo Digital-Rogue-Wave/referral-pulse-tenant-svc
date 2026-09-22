@@ -11,6 +11,8 @@ import { HttpModule } from '@common/http/http.module';
 import { RedisHealthIndicator } from '@common/redis/redis-health.indicator';
 import { DatabaseService } from '@app/database/database.service';
 
+import { WorkerHealthServer } from './worker-health.server';
+
 /**
  * The database probe used `TypeOrmHealthIndicator`, a leftover from before the
  * platform moved to Prisma. `@nestjs/terminus` ships indicators for several ORMs,
@@ -92,6 +94,7 @@ export class HealthController {
 
 @Module({
     imports: [TerminusModule, HttpModule],
-    controllers: [HealthController]
+    controllers: [HealthController],
+    providers: [WorkerHealthServer]
 })
 export class HealthModule {}

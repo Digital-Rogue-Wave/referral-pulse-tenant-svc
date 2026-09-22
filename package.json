@@ -46,7 +46,6 @@
         "@aws-sdk/credential-provider-node": "^3.972.6",
         "@aws-sdk/lib-storage": "^3.987.0",
         "@aws-sdk/s3-request-presigner": "^3.987.0",
-        "@clickhouse/client": "^1.17.0",
         "@faker-js/faker": "^10.3.0",
         "@nestjs/axios": "^4.0.1",
         "@nestjs/common": "^11.1.13",
@@ -185,9 +184,28 @@
             "^.+\\.(t|j)s$": "ts-jest"
         },
         "collectCoverageFrom": [
-            "**/*.(t|j)s"
+            "**/*.ts",
+            "!prisma/**",
+            "!**/*.module.ts",
+            "!main.ts",
+            "!**/dto/**",
+            "!**/*.dto.ts",
+            "!**/index.ts",
+            "!types/**",
+            "!config/**",
+            "!test-support/**",
+            "!**/*.spec.ts",
+            "!features/billing/test-billing.controller.ts"
         ],
         "coverageDirectory": "../coverage",
+        "coverageThreshold": {
+            "global": {
+                "lines": 80,
+                "statements": 80,
+                "functions": 75,
+                "branches": 65
+            }
+        },
         "testEnvironment": "node",
         "moduleNameMapper": {
             "^@app/(.*)$": "<rootDir>/$1",

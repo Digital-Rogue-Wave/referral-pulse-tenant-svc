@@ -2,7 +2,6 @@ import type { AppConfig } from './app.config';
 import type { AuthConfig } from './auth.config';
 import type { AwsConfig } from './aws.config';
 import type { BillingConfig } from './billing.config';
-import type { ClickHouseConfig } from './clickhouse.config';
 import type { DatabaseConfig } from './database.config';
 import type { HttpConfig } from './http.config';
 import type { OryConfig } from './ory.config';
@@ -31,7 +30,6 @@ export interface AllConfigType {
     resilience: ResilienceConfig;
     services: ServicesConfig;
     oryConfig: OryConfig;
-    clickhouse: ClickHouseConfig;
     temporal: TemporalConfig;
     billingConfig: BillingConfig;
     stripeConfig: StripeConfig;
