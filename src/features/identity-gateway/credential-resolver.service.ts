@@ -137,7 +137,7 @@ export class CredentialResolverService {
     /** A deleted/closed tenant authenticates nobody. Suspension and locks are enforced per route by the tenant guards. */
     private async assertTenantOpen(tenantId: string): Promise<void> {
         const tenant = await this.prisma.tenant.findUnique({ where: { id: tenantId }, select: { status: true, deletedAt: true } });
-        if (!tenant || tenant.deletedAt || tenant.status === TenantStatus.DELETED) {
+        if (!tenant || tenant.deletedAt || tenant.status === TenantStatus.CLOSED) {
             throw this.unauthenticated('authentication_error', 'This account is closed');
         }
     }

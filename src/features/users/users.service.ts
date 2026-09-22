@@ -149,7 +149,7 @@ export class UsersService {
         }
 
         await this.prisma.$transaction(async (tx) => {
-            await tx.user.update({ where: { id }, data: { deletedAt: new Date() } });
+            await tx.user.update({ where: { id }, data: { status: 'disabled', deletedAt: new Date() } });
             await tx.userRole.deleteMany({ where: { userId: id } });
             this.txEventEmitter.emitAfterCommit('user.removed', new UserRemovedEvent(id, target.tenantId, target.role, actor.userId));
         });

@@ -157,7 +157,7 @@ describe('CredentialResolverService', () => {
 
         it('then a key of a closed tenant is unauthenticated', async () => {
             apiKeys.validateKey.mockResolvedValue({ id: 'key-1', tenantId: 't1', keyType: ApiKeyType.SECRET } as never);
-            findTenant.mockResolvedValue({ status: TenantStatus.DELETED, deletedAt: new Date() });
+            findTenant.mockResolvedValue({ status: TenantStatus.CLOSED, deletedAt: new Date() });
             const error = await resolver.resolve('rai_live_abc').catch((e: BaseException) => e);
             expect((error as BaseException).getStatus()).toBe(HttpStatus.UNAUTHORIZED);
         });

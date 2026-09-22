@@ -58,7 +58,6 @@ export class TenantSettingService {
                 userId
             );
             this.txEventEmitter.emitAfterCommit('tenant-setting.created', event);
-            this.txEventEmitter.emitAfterCommit('audit.tenant-setting.created', event);
             this.logger.log(`Tenant setting created: ${created.id}`, { settingId: created.id, tenantId: created.tenantId });
             return tenantSettingResponseMapper.toResponse(created);
         }
@@ -77,7 +76,6 @@ export class TenantSettingService {
                 userId
             );
             this.txEventEmitter.emitAfterCommit('tenant-setting.updated', event);
-            this.txEventEmitter.emitAfterCommit('audit.tenant-setting.updated', event);
         }
         this.logger.log(`Tenant setting updated: ${updated.id}`, { settingId: updated.id });
         return tenantSettingResponseMapper.toResponse(updated);

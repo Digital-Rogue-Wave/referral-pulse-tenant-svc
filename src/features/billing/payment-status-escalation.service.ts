@@ -2,7 +2,7 @@ import { Injectable } from '@nestjs/common';
 
 import type { Tenant } from '@prisma-gen/generated/client';
 import { PaymentStatusEnum } from '@common/enums/billing.enum';
-import { TenantStatusEnum } from '@common/enums/tenant.enum';
+import { TenantStatus } from '@domains/tenant/tenant.types';
 
 import { DatabaseService } from '@app/database/database.service';
 import { AppLoggerService } from '@common/logging/app-logger.service';
@@ -28,7 +28,7 @@ export class PaymentStatusEscalationService {
 
         const tenants = await this.prisma.tenant.findMany({
             where: {
-                status: TenantStatusEnum.ACTIVE,
+                status: TenantStatus.ACTIVE,
                 paymentStatus: {
                     in: [PaymentStatusEnum.PAST_DUE, PaymentStatusEnum.RESTRICTED]
                 },

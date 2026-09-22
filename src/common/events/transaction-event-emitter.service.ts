@@ -154,10 +154,10 @@ export class TransactionEventEmitterService {
             return nativeTransaction(promises);
         }
 
-        const logContext = this.tenantContext.getLogContext();
+        // The whole request context carries over (IP, user agent, metadata), not just the log fields.
         return this.tenantContext.runWithContext(
             {
-                ...(logContext as Partial<RequestContext>),
+                ...this.tenantContext.snapshot(),
                 isInTransaction: true,
                 transactionEvents: []
             },
@@ -184,10 +184,10 @@ export class TransactionEventEmitterService {
             return nativeTransaction(fn, options);
         }
 
-        const logContext = this.tenantContext.getLogContext();
+        // The whole request context carries over (IP, user agent, metadata), not just the log fields.
         return this.tenantContext.runWithContext(
             {
-                ...(logContext as Partial<RequestContext>),
+                ...this.tenantContext.snapshot(),
                 isInTransaction: true,
                 transactionEvents: []
             },

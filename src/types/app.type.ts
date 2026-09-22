@@ -436,29 +436,14 @@ export const AnalyticsSqsEvents = {
     EVENT: 'analytics.event' as AnalyticsSqsEventType
 } as const;
 
-// Audit trail events (sent to audit service)
-export type AuditSqsEventType = 'audit.event';
-export const AuditSqsEvents = {
-    EVENT: 'audit.event' as AuditSqsEventType
-} as const;
-
 // Email service events (sent to notification-webhook service)
 export type EmailSqsEventType = 'email.send';
 export const EmailSqsEvents = {
     SEND: 'email.send' as EmailSqsEventType
 } as const;
 
-// API Key SQS events (sent to audit service)
-export type ApiKeySqsEventType = 'api-key.created' | 'api-key.updated' | 'api-key.deleted';
-
 // All SQS events
-export type SqsEventType =
-    | TotoSqsEventType
-    | CampaignSqsEventType
-    | AnalyticsSqsEventType
-    | AuditSqsEventType
-    | EmailSqsEventType
-    | ApiKeySqsEventType;
+export type SqsEventType = TotoSqsEventType | CampaignSqsEventType | AnalyticsSqsEventType | EmailSqsEventType;
 
 // ============================================================================
 // EVENT DELIVERY PRIORITY
@@ -495,9 +480,6 @@ export const REFERRAL_WORKFLOW_SVC_FIFO = 'referral-workflow-svc.fifo' as const;
 export const NOTIFICATION_WEBHOOK_SVC_FIFO = 'notification-webhook-svc.fifo' as const;
 export const AI_INTELLIGENCE_SVC_FIFO = 'ai-intelligence-svc.fifo' as const;
 
-// Dedicated queues (compliance isolation)
-export const AUDIT_TRAIL_FIFO = 'audit-trail.fifo' as const;
-
 export type SqsQueueName =
     | typeof TENANT_SVC_FIFO
     | typeof REWARD_SVC_FIFO
@@ -506,8 +488,7 @@ export type SqsQueueName =
     | typeof SEGMENTATION_SVC_FIFO
     | typeof REFERRAL_WORKFLOW_SVC_FIFO
     | typeof NOTIFICATION_WEBHOOK_SVC_FIFO
-    | typeof AI_INTELLIGENCE_SVC_FIFO
-    | typeof AUDIT_TRAIL_FIFO;
+    | typeof AI_INTELLIGENCE_SVC_FIFO;
 
 /**
  * SNS topics tenant-service publishes to. Architecture v1.3 §3.2 gives it exactly one: `tenant-events`

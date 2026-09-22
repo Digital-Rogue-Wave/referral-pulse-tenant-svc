@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 
 import type { Tenant, Billing } from '@prisma-gen/generated/client';
-import { TenantStatusEnum } from '@common/enums/tenant.enum';
+import { TenantStatus } from '@domains/tenant/tenant.types';
 import { BillingPlanEnum, SubscriptionStatusEnum } from '@common/enums/billing.enum';
 
 import { DatabaseService } from '@app/database/database.service';
@@ -30,7 +30,7 @@ export class TrialLifecycleService {
     async runDailyLifecycle(now = new Date()): Promise<void> {
         const tenants = await this.prisma.tenant.findMany({
             where: {
-                status: TenantStatusEnum.ACTIVE,
+                status: TenantStatus.ACTIVE,
                 deletedAt: null
             }
         });

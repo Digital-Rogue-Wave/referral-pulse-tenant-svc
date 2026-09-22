@@ -1,0 +1,22 @@
+// Platform-wide operator-action trail (DB Model v2 §3 `audit_log`, API Contract v1.3 §8.3: tenant lifetime
+// + 12 months, dashboard only). Append-only: rows are written in the same transaction as the action they
+// record and are never updated; they are deleted only by the retention sweep.
+model AuditLog {
+  id          String   @id @default(ulid()) @db.VarChar(26)
+  tenantId    String   @map("tenant_id") @db.VarChar(26)
+  // Operator ULID, `service:{client_id}` for a platform service, or `system`.
+  actorUserId String   @map("actor_user_id") @db.VarChar(80)
+  action      String   @db.VarChar(100)
+  targetType  String?  @map("target_type") @db.VarChar(50)
+  targetId    String?  @map("target_id") @db.VarChar(64)
+  reason      String?  @db.Text
+  requestId   String?  @map("request_id") @db.VarChar(64)
+  ipHash      String?  @map("ip_hash") @db.Char(64)
+  before      Json?
+  after       Json?
+  occurredAt  DateTime @map("occurred_at") @db.Timestamptz
+
+  @@index([tenantId, occurredAt(sort: Desc)], map: "idx_audit_tenant_time")
+  @@index([tenantId, targetType, targetId], map: "idx_audit_target")
+  @@map("audit_log")
+}

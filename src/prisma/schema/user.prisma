@@ -14,6 +14,8 @@ model User {
   // One Ory identity belongs to exactly one tenant (DB Model v2 §3 `users` UNIQUE(kratos_identity_id)).
   kratosIdentityId String    @unique @map("kratos_identity_id") @db.VarChar(64)
   lastLoginAt      DateTime? @map("last_login_at") @db.Timestamptz
+  // `invited` | `active` | `disabled` (DB Model v2 §3). A removed operator is `disabled` with `deleted_at` set.
+  status           String    @default("active") @db.VarChar(20)
 
   createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz
   updatedAt DateTime  @updatedAt @map("updated_at") @db.Timestamptz

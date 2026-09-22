@@ -141,7 +141,6 @@ export class SubdomainService {
             userId
         );
         this.txEventEmitter.emitAfterCommit('dns.reserved', event);
-        this.txEventEmitter.emitAfterCommit('audit.dns.reserved', event);
 
         this.logger.log(`Subdomain reserved: ${slug}`, {
             slug,
@@ -184,7 +183,6 @@ export class SubdomainService {
             userId
         );
         this.txEventEmitter.emitAfterCommit('dns.released', event);
-        this.txEventEmitter.emitAfterCommit('audit.dns.released', event);
 
         this.logger.log(`Subdomain released: ${slug}`, { slug, tenantId });
     }

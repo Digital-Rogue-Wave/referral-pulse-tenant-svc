@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 
-import { TenantStatusEnum } from '@common/enums/tenant.enum';
+import { TenantStatus } from '@domains/tenant/tenant.types';
 
 import { DatabaseService } from '@app/database/database.service';
 import { TenantContextService } from '@common/tenant-aware/tenant-context.service';
@@ -32,7 +32,7 @@ export class DailyUsageCalculator {
         this.logger.log(`Running daily usage snapshot for date ${periodDate}`);
 
         const tenants = await this.prisma.tenant.findMany({
-            where: { status: TenantStatusEnum.ACTIVE, deletedAt: null }
+            where: { status: TenantStatus.ACTIVE, deletedAt: null }
         });
 
         for (const tenant of tenants) {

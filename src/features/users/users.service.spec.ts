@@ -188,12 +188,12 @@ describe('UsersService — tenant membership', () => {
     });
 
     describe('when removing a member', () => {
-        it('then the member is soft-deleted, their role projection cleared, sessions revoked and user.removed emitted', async () => {
+        it('then the member is disabled, their role projection cleared, sessions revoked and user.removed emitted', async () => {
             seed(member('owner', RoleEnum.OWNER), member('op', RoleEnum.OPERATOR));
 
             await service.remove(actorAs('owner'), 'op');
 
-            expect(tx.user.update).toHaveBeenCalledWith({ where: { id: 'op' }, data: { deletedAt: expect.any(Date) } });
+            expect(tx.user.update).toHaveBeenCalledWith({ where: { id: 'op' }, data: { status: 'disabled', deletedAt: expect.any(Date) } });
             expect(tx.userRole.deleteMany).toHaveBeenCalledWith({ where: { userId: 'op' } });
             expect(kratos.revokeSessions).toHaveBeenCalledWith('kratos-op');
             expect(events.emitAfterCommit).toHaveBeenCalledWith('user.removed', expect.objectContaining({ aggregateId: 'op', tenantId: TENANT }));

@@ -592,51 +592,6 @@ export interface ISnsSideEffectPayload {
 }
 
 /**
- * Email attachment interface
- */
-export interface IEmailAttachment {
-    /**
-     * Filename for the attachment
-     */
-    filename: string;
-
-    /**
-     * Path to the file (S3 key or local path)
-     */
-    path: string;
-}
-
-/**
- * Payload for email side effect
- * Used when sending emails via the outbox pattern
- */
-export interface IEmailSideEffectPayload {
-    [key: string]: unknown;
-    to: string | string[];
-    subject: string;
-    body: string;
-    from?: string;
-    cc?: string | string[];
-    bcc?: string | string[];
-    attachments?: IEmailAttachment[];
-    templateId?: string;
-    templateVars?: Record<string, unknown>;
-}
-
-/**
- * Payload for audit side effect
- * Used when creating audit log entries via the outbox pattern
- */
-export interface IAuditSideEffectPayload {
-    [key: string]: unknown;
-    action: string;
-    changes: Record<string, unknown>;
-    userId?: string;
-    timestamp: string;
-    context?: Record<string, unknown>;
-}
-
-/**
  * Payload for a Keto authorization sync. Written in the same transaction as the membership change it
  * mirrors, so a Keto outage can delay permissions but never lose them. Every operation is idempotent.
  */
@@ -651,12 +606,7 @@ export interface IKetoSideEffectPayload {
 /**
  * Union type for all side effect payloads
  */
-export type SideEffectPayload =
-    | ISqsSideEffectPayload
-    | ISnsSideEffectPayload
-    | IEmailSideEffectPayload
-    | IAuditSideEffectPayload
-    | IKetoSideEffectPayload;
+export type SideEffectPayload = ISqsSideEffectPayload | ISnsSideEffectPayload | IKetoSideEffectPayload;
 
 /**
  * DTO for creating a side effect in the outbox pattern

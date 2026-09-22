@@ -56,7 +56,7 @@ export class TenantAccessGuard implements CanActivate {
             where: { id: user.tenantId },
             select: { status: true, paymentStatus: true, deletedAt: true, lockedAt: true, lockUntil: true }
         });
-        if (!tenant || tenant.deletedAt || tenant.status === TenantStatus.DELETED) {
+        if (!tenant || tenant.deletedAt || tenant.status === TenantStatus.CLOSED) {
             throw new BaseException('tenant_not_found', 'Tenant not found', HttpStatus.NOT_FOUND);
         }
         if (tenant.status === TenantStatus.SUSPENDED) {

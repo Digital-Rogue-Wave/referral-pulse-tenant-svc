@@ -1,13 +1,13 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { BillingPlanEnum, PaymentStatusEnum, SubscriptionStatusEnum } from '@common/enums/billing.enum';
-import { TenantStatusEnum } from '@common/enums/tenant.enum';
+import { TenantStatus } from '@domains/tenant/tenant.types';
 
 export class InternalTenantBillingStatusDto {
     @ApiProperty()
     tenantId!: string;
 
-    @ApiProperty({ enum: TenantStatusEnum })
-    tenantStatus!: TenantStatusEnum;
+    @ApiProperty({ enum: TenantStatus })
+    tenantStatus!: TenantStatus;
 
     @ApiProperty({ enum: PaymentStatusEnum })
     paymentStatus!: PaymentStatusEnum;

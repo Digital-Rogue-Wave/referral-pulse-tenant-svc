@@ -13,6 +13,7 @@ import { HealthModule } from '@app/health/health.module';
 
 // Feature Modules
 import { ApiKeyModule } from '@app/features/api-key/api-key.module';
+import { AuditLogModule } from '@app/features/audit-log/audit-log.module';
 import { BillingModule } from '@app/features/billing/billing.module';
 
 import { DnsModule } from '@app/features/dns/dns.module';
@@ -55,6 +56,7 @@ import { WireCaseInterceptor } from '@common/http-contract/wire-case.interceptor
         HealthModule,
         // Feature Modules
         ApiKeyModule,
+        AuditLogModule,
         BillingModule,
         DnsModule,
         FilesModule,

@@ -1,7 +1,6 @@
 import { Module, Global } from '@nestjs/common';
 import { EventEmitterModule } from '@nestjs/event-emitter';
 
-import { AuditTrailListener } from './listeners/audit-trail.listener';
 import { EmailNotificationListener } from './listeners/email-notification.listener';
 import { KetoSyncListener } from './listeners/keto-sync.listener';
 import { EventOutboxRelayWorker } from './outbox/event-outbox-relay.worker';
@@ -23,7 +22,6 @@ import { TransactionEventEmitterService } from './transaction-event-emitter.serv
  * transaction); EventOutboxRelayWorker publishes them to SNS `tenant-events`.
  *
  * Infrastructure Listeners:
- * - AuditTrailListener: Send all events to audit service (SQS + DLQ)
  * - EmailNotificationListener: Critical emails (SQS) + marketing (HTTP)
  *
  * Note: Metrics are recorded at the actual operation sites (MessagingMetricsService,
@@ -61,7 +59,6 @@ import { TransactionEventEmitterService } from './transaction-event-emitter.serv
         EventOutboxRelayWorker,
 
         // Infrastructure listeners
-        AuditTrailListener, // Audit trail service (async SQS)
         EmailNotificationListener, // Email service (critical SQS + marketing HTTP)
         KetoSyncListener // Membership → Ory Keto, through the outbox
     ],

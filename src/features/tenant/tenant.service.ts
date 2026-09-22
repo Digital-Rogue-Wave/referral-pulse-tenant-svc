@@ -280,6 +280,11 @@ export class TenantService {
             changes.customDomain = { from: tenant.customDomain, to: dto.customDomain };
         }
 
+        if (dto.retentionMonths !== undefined && dto.retentionMonths !== tenant.retentionMonths) {
+            updateData.retentionMonths = dto.retentionMonths;
+            changes.retentionMonths = { from: tenant.retentionMonths, to: dto.retentionMonths };
+        }
+
         if (file) {
             try {
                 const uploaded = await this.filesService.uploadFile(file);
@@ -393,7 +398,7 @@ export class TenantService {
     async executeDeletion(tenantId: string): Promise<void> {
         const tenant = await this.findOneOrFail(tenantId);
 
-        await this.applyChange(tenantId, { status: TenantStatus.DELETED, deletedAt: new Date() }, () => [
+        await this.applyChange(tenantId, { status: TenantStatus.CLOSED, deletedAt: new Date() }, () => [
             TenantEvents.DELETED,
             new TenantDeletedEvent(tenantId, tenantId, tenant.name, tenant.slug)
         ]);

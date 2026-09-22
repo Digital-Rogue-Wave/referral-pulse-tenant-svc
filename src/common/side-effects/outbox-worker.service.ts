@@ -5,16 +5,7 @@ import { Job } from 'bullmq';
 import { SideEffectOutbox as SideEffectOutboxModel } from '@prisma-gen/generated/client';
 
 import { TenantContextService } from '@app/common/tenant-aware/tenant-context.service';
-import type {
-    IOutboxJobData,
-    IJobResult,
-    IWorkerConfig,
-    ISqsSideEffectPayload,
-    ISnsSideEffectPayload,
-    IEmailSideEffectPayload,
-    IAuditSideEffectPayload,
-    IKetoSideEffectPayload
-} from '@app/types';
+import type { IOutboxJobData, IJobResult, IWorkerConfig, ISqsSideEffectPayload, ISnsSideEffectPayload, IKetoSideEffectPayload } from '@app/types';
 
 import { KetoProvisioningService } from '@common/auth/authz/keto-provisioning.service';
 import { BaseWorkerService, BullJobsConnectionFactory } from '@common/bulljobs';
@@ -112,12 +103,6 @@ export class OutboxWorkerService extends BaseWorkerService<IOutboxJobData> {
                 case 'sns':
                     await this.processSnsEffect(sideEffect);
                     break;
-                case 'email':
-                    await this.processEmailEffect(sideEffect);
-                    break;
-                case 'audit':
-                    await this.processAuditEffect(sideEffect);
-                    break;
                 case 'keto':
                     await this.processKetoEffect(sideEffect);
                     break;
@@ -194,42 +179,6 @@ export class OutboxWorkerService extends BaseWorkerService<IOutboxJobData> {
         await this.snsPublisher.publish(topicName, eventType, message);
 
         this.logger.debug(`Published SNS message to topic ${topicName} for side effect ${sideEffect.id}`);
-    }
-
-    /**
-     * Process email side effect
-     * NOTE: Implement actual email sending service (e.g., AWS SES, SendGrid)
-     */
-    private async processEmailEffect(sideEffect: SideEffectOutboxModel): Promise<void> {
-        const payload = sideEffect.payload as unknown as IEmailSideEffectPayload;
-        const { to, subject, body } = payload;
-
-        if (!to || !subject || !body) {
-            throw new Error('Invalid email payload: missing to, subject, or body');
-        }
-
-        // TODO: Implement actual email service integration
-        // await this.emailService.send({ to, subject, body, ...payload });
-
-        this.logger.log(`[PLACEHOLDER] Would send email to ${to} with subject "${subject}"`);
-    }
-
-    /**
-     * Process audit log side effect
-     * NOTE: Implement actual audit logging service
-     */
-    private async processAuditEffect(sideEffect: SideEffectOutboxModel): Promise<void> {
-        const payload = sideEffect.payload as unknown as IAuditSideEffectPayload;
-        const { action } = payload;
-
-        if (!action) {
-            throw new Error('Invalid audit payload: missing action');
-        }
-
-        // TODO: Implement actual audit logging service
-        // await this.auditService.log({ ...payload, tenantId: sideEffect.tenantId });
-
-        this.logger.log(`[PLACEHOLDER] Would create audit log for ${sideEffect.aggregateType}:${sideEffect.aggregateId} - action: ${action}`);
     }
 
     /** Mirror a membership change into Keto (idempotent — safe to replay). */

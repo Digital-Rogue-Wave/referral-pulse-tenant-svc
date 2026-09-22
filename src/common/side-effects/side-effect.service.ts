@@ -7,10 +7,7 @@ import type {
     ICreateSideEffectDto,
     ISqsSideEffectPayload,
     ISnsSideEffectPayload,
-    IEmailSideEffectPayload,
-    IAuditSideEffectPayload,
     IKetoSideEffectPayload,
-    IEmailAttachment,
     IOutboxJobData,
     IPublishOptions,
     SqsQueueName,
@@ -206,10 +203,6 @@ export class SideEffectService {
                 messageId = await this.snsPublisher.publish(payload.topicName, payload.eventType, payload.message, publishOptions);
                 break;
             }
-            case 'email':
-            case 'audit':
-                // Email and audit always require outbox pattern
-                throw new Error(`Direct delivery not supported for effect type: ${dto.effectType}. Use critical=true.`);
             default:
                 throw new Error(`Unknown effect type: ${dto.effectType}`);
         }
@@ -297,80 +290,6 @@ export class SideEffectService {
             },
             options
         );
-    }
-
-    /**
-     * Convenience method: Create email side effect
-     */
-    async createEmailSideEffect(
-        aggregateType: string,
-        aggregateId: string,
-        eventType: string,
-        to: string | string[],
-        subject: string,
-        body: string,
-        emailOptions?: {
-            from?: string;
-            cc?: string | string[];
-            bcc?: string | string[];
-            attachments?: IEmailAttachment[];
-            templateId?: string;
-            templateVars?: Record<string, unknown>;
-        },
-        options: Omit<ISideEffectOptions, 'critical'> = {}
-    ): Promise<SideEffectOutboxModel> {
-        const payload: IEmailSideEffectPayload = {
-            to,
-            subject,
-            body,
-            ...emailOptions
-        };
-
-        const result = await this.createSideEffect(
-            {
-                effectType: 'email',
-                aggregateType,
-                aggregateId,
-                eventType,
-                payload
-            },
-            { ...options, critical: true } // Always critical
-        );
-
-        return result as SideEffectOutboxModel;
-    }
-
-    /**
-     * Convenience method: Create audit log side effect
-     */
-    async createAuditSideEffect(
-        aggregateType: string,
-        aggregateId: string,
-        eventType: string,
-        action: string,
-        changes: Record<string, unknown>,
-        userId?: string,
-        options: Omit<ISideEffectOptions, 'critical'> = {}
-    ): Promise<SideEffectOutboxModel> {
-        const payload: IAuditSideEffectPayload = {
-            action,
-            changes,
-            userId,
-            timestamp: new Date().toISOString()
-        };
-
-        const result = await this.createSideEffect(
-            {
-                effectType: 'audit',
-                aggregateType,
-                aggregateId,
-                eventType,
-                payload
-            },
-            { ...options, critical: true } // Always critical
-        );
-
-        return result as SideEffectOutboxModel;
     }
 
     /**

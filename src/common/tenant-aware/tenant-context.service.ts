@@ -105,6 +105,11 @@ export class TenantContextService implements ITenantContext {
         };
     }
 
+    /** A shallow copy of the whole request context, for running work in a child context that keeps it all. */
+    snapshot(): Partial<RequestContext> {
+        return { ...this.getStore() };
+    }
+
     async runWithContext<T>(context: Partial<RequestContext>, fn: () => Promise<T>): Promise<T> {
         const fullContext: RequestContext = {
             requestId: context.requestId ?? '',

@@ -1,5 +1,5 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { IsString, IsOptional, IsEnum, IsDateString, IsInt, Min, IsNotEmpty } from 'class-validator';
+import { IsString, IsOptional, IsEnum, IsDateString, IsInt, Min, Max, IsNotEmpty } from 'class-validator';
 
 import { BaseResponseMapper } from '@common/helper';
 
@@ -33,6 +33,9 @@ export interface TenantProps {
     customDomain?: string | null;
     domainVerificationStatus?: string | null;
     domainVerificationToken?: string | null;
+    dataRegion: string;
+    retentionMonths: number;
+    metadata?: unknown;
     createdAt: Date;
     updatedAt: Date;
     deletedAt?: Date | null;
@@ -62,6 +65,13 @@ export class UpdateTenantDto {
     @IsOptional()
     @IsString()
     customDomain?: string;
+
+    @ApiPropertyOptional({ minimum: 6, maximum: 36, description: 'Raw-data retention window in months (API §8.3)' })
+    @IsOptional()
+    @IsInt()
+    @Min(6)
+    @Max(36)
+    retentionMonths?: number;
 }
 
 export class TransferOwnershipDto {
@@ -204,6 +214,12 @@ export class TenantResponse {
 
     @ApiPropertyOptional()
     domainVerificationToken?: string | null;
+
+    @ApiProperty({ example: 'eu-central-1' })
+    dataRegion!: string;
+
+    @ApiProperty({ minimum: 6, maximum: 36 })
+    retentionMonths!: number;
 
     @ApiProperty()
     createdAt!: Date;

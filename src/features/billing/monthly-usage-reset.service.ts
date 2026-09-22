@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 
-import { TenantStatusEnum } from '@common/enums/tenant.enum';
+import { TenantStatus } from '@domains/tenant/tenant.types';
 
 import { DatabaseService } from '@app/database/database.service';
 import { TenantContextService } from '@common/tenant-aware/tenant-context.service';
@@ -32,7 +32,7 @@ export class MonthlyUsageResetService {
 
         const tenants = await this.prisma.tenant.findMany({
             where: {
-                status: TenantStatusEnum.ACTIVE,
+                status: TenantStatus.ACTIVE,
                 deletedAt: null
             }
         });

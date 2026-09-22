@@ -4,7 +4,7 @@ import { ApiBearerAuth, ApiOkResponse, ApiTags } from '@nestjs/swagger';
 import { AllowServices } from '@common/auth/require-permission.decorator';
 import { ServiceCapability } from '@common/auth/authz/keto-tuples';
 import { BillingPlanEnum, PaymentStatusEnum, SubscriptionStatusEnum } from '@common/enums/billing.enum';
-import { TenantStatusEnum } from '@common/enums/tenant.enum';
+import { TenantStatus } from '@domains/tenant/tenant.types';
 
 import { DatabaseService } from '@app/database/database.service';
 import { InternalTenantBillingStatusDto } from '@domains/billing';
@@ -37,7 +37,7 @@ export class InternalTenantStatusController {
 
         return {
             tenantId,
-            tenantStatus: tenant.status as TenantStatusEnum,
+            tenantStatus: tenant.status as TenantStatus,
             paymentStatus: tenant.paymentStatus as PaymentStatusEnum,
             trialStartedAt: tenant.trialStartedAt ?? null,
             trialEndsAt: tenant.trialEndsAt ?? null,
