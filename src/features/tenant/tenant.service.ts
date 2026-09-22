@@ -33,7 +33,10 @@ import {
     DeletionScheduledResponse,
     tenantResponseMapper,
     TenantStatus,
-    VerificationStatus
+    UpdateVerificationStatusDto,
+    VerificationRecordStatus,
+    VerificationStatus,
+    VerificationType
 } from '@domains/tenant';
 
 import {
@@ -58,6 +61,14 @@ const TRIAL_PERIOD_DAYS = 14;
 
 /** Default days until deletion after scheduling */
 const DEFAULT_DELETION_DAYS = 30;
+
+/** A company verification's state as the tenant shows it: an open one (pending or in review) is `pending`. */
+const toTenantVerificationStatus = (status: VerificationRecordStatus): VerificationStatus =>
+    status === VerificationRecordStatus.VERIFIED
+        ? VerificationStatus.VERIFIED
+        : status === VerificationRecordStatus.REJECTED
+          ? VerificationStatus.REJECTED
+          : VerificationStatus.PENDING;
 
 @Injectable()
 export class TenantService {
@@ -184,25 +195,29 @@ export class TenantService {
                     slug,
                     imageId: imageId ?? null,
                     status: TenantStatus.ACTIVE,
+                    verificationStatus: VerificationStatus.PENDING,
                     paymentStatus: 'active',
                     trialStartedAt,
                     trialEndsAt
                 }
             });
+            // Company verification at signup: the workflow service runs the account_verification workflow.
+            const verification = await tx.tenantVerification.create({ data: { tenantId: created.id, verificationType: VerificationType.COMPANY } });
             // Emitted before the owner's user.registered so the tenant's Keto grants are queued first.
             this.txEventEmitter.emitAfterCommit(
                 TenantEvents.CREATED,
-                new TenantCreatedEvent(created.id, created.id, created.name, created.slug, owner.identityId, trialStartedAt, trialEndsAt)
+                new TenantCreatedEvent(created.id, created.id, created.name, created.slug, owner.identityId, trialStartedAt, trialEndsAt, undefined, {
+                    dataRegion: created.dataRegion,
+                    retentionMonths: created.retentionMonths
+                })
             );
             const createdOwner = await this.usersService.createOwner(tx, created.id, owner);
+            this.txEventEmitter.emitAfterCommit(
+                TenantEvents.VERIFICATION_REQUESTED,
+                new TenantVerificationRequestedEvent(created.id, created.id, created.name, createdOwner.id, verification.id)
+            );
             return { tenant: created, ownerUser: createdOwner };
         });
-
-        // Company verification at signup: the workflow service runs the account_verification workflow.
-        this.txEventEmitter.emitAfterCommit(
-            TenantEvents.VERIFICATION_REQUESTED,
-            new TenantVerificationRequestedEvent(tenant.id, tenant.id, tenant.name, ownerUser.id)
-        );
 
         this.logger.log('Tenant created', { tenantId: tenant.id, slug: tenant.slug, ownerUserId: ownerUser.id });
         return tenantResponseMapper.toResponse(tenant);
@@ -234,24 +249,60 @@ export class TenantService {
      * account_verification workflow via the internal endpoint). Updates verification_status
      * and emits tenant.verification_status_changed.
      */
-    async setVerificationStatus(tenantId: string, status: VerificationStatus, reason?: string, reviewedBy?: string): Promise<TenantResponse> {
+    /**
+     * Records the account_verification workflow's report in `tenant_verifications` and, for a company
+     * verification, moves `tenants.verification_status` with it — both in one transaction.
+     */
+    async applyVerificationReport(tenantId: string, dto: UpdateVerificationStatusDto): Promise<TenantResponse> {
         const existing = await this.prisma.tenant.findUnique({ where: { id: tenantId } });
         if (!existing) {
             throw new NotFoundException(`Tenant with ID ${tenantId} not found`);
         }
+        const type = dto.verificationType ?? VerificationType.COMPANY;
+        const decided = dto.status === VerificationRecordStatus.VERIFIED || dto.status === VerificationRecordStatus.REJECTED;
+        const tenantStatus = type === VerificationType.COMPANY ? toTenantVerificationStatus(dto.status) : existing.verificationStatus;
 
-        const updated = await this.applyChange(tenantId, { verificationStatus: status }, () => [
-            TenantEvents.VERIFICATION_STATUS_CHANGED,
-            new TenantVerificationStatusChangedEvent(tenantId, tenantId, existing.verificationStatus, status, reason, reviewedBy)
-        ]);
-
-        this.logger.log(`Tenant verification status changed: ${tenantId}`, {
-            tenantId,
-            previousStatus: existing.verificationStatus,
-            newStatus: status
+        const updated = await this.prisma.$transaction(async (tx) => {
+            const record = await this.openVerification(tx, tenantId, type, dto.verificationId);
+            const data = {
+                status: dto.status,
+                reason: dto.reason ?? null,
+                reviewedBy: dto.reviewedBy ?? null,
+                reviewedAt: decided ? new Date() : null,
+                ...(dto.temporalWorkflowId ? { temporalWorkflowId: dto.temporalWorkflowId } : {}),
+                ...(dto.temporalRunId ? { temporalRunId: dto.temporalRunId } : {}),
+                ...(dto.evidence ? { evidence: dto.evidence as Prisma.InputJsonValue } : {})
+            };
+            await (record
+                ? tx.tenantVerification.update({ where: { id: record.id }, data })
+                : tx.tenantVerification.create({ data: { tenantId, verificationType: type, ...data } }));
+            if (tenantStatus === existing.verificationStatus) {
+                return existing;
+            }
+            this.txEventEmitter.emitAfterCommit(
+                TenantEvents.VERIFICATION_STATUS_CHANGED,
+                new TenantVerificationStatusChangedEvent(tenantId, tenantId, existing.verificationStatus, tenantStatus, dto.reason, dto.reviewedBy)
+            );
+            return tx.tenant.update({ where: { id: tenantId }, data: { verificationStatus: tenantStatus } });
         });
 
+        this.logger.log('Tenant verification report applied', { tenantId, verificationType: type, status: dto.status });
         return tenantResponseMapper.toResponse(updated);
+    }
+
+    /** The verification a report is about: the named one, else the latest still open of that type. */
+    private async openVerification(tx: Prisma.TransactionClient, tenantId: string, type: VerificationType, verificationId?: string) {
+        if (verificationId) {
+            const named = await tx.tenantVerification.findFirst({ where: { id: verificationId, tenantId } });
+            if (!named) {
+                throw new BaseException('resource_not_found', `Verification ${verificationId} not found`, HttpStatus.NOT_FOUND, 'verification_id');
+            }
+            return named;
+        }
+        return tx.tenantVerification.findFirst({
+            where: { tenantId, verificationType: type, status: { in: [VerificationRecordStatus.PENDING, VerificationRecordStatus.IN_REVIEW] } },
+            orderBy: { createdAt: 'desc' }
+        });
     }
 
     // =========================================================
@@ -363,7 +414,7 @@ export class TenantService {
         const executionDate = this.dateService.nowMoment().add(days, 'days').toDate();
         const reason = dto.reason ?? 'User requested deletion';
 
-        const updated = await this.applyChange(tenantId, { deletionScheduledAt, deletionReason: reason }, () => [
+        const updated = await this.applyChange(tenantId, { deletionScheduledAt, deletionDueAt: executionDate, deletionReason: reason }, () => [
             TenantEvents.DELETION_SCHEDULED,
             new TenantDeletionScheduledEvent(tenantId, tenantId, deletionScheduledAt, executionDate, reason, user.userId)
         ]);
@@ -373,6 +424,7 @@ export class TenantService {
         return {
             tenantId,
             deletionScheduledAt: updated.deletionScheduledAt!,
+            deletionDueAt: updated.deletionDueAt!,
             deletionReason: updated.deletionReason
         };
     }
@@ -384,26 +436,12 @@ export class TenantService {
         const tenantId = this.tenantContext.getTenantId()!;
         await this.findOneOrFail(tenantId);
 
-        await this.applyChange(tenantId, { deletionScheduledAt: null, deletionReason: null }, () => [
+        await this.applyChange(tenantId, { deletionScheduledAt: null, deletionDueAt: null, deletionReason: null }, () => [
             TenantEvents.DELETION_CANCELLED,
             new TenantDeletionCancelledEvent(tenantId, tenantId, this.dateService.nowMoment().toDate(), user.userId)
         ]);
 
         this.logger.log(`Tenant deletion cancelled: ${tenantId}`, { tenantId });
-    }
-
-    /**
-     * Execute the actual hard delete of a tenant (called by BullMQ processor).
-     */
-    async executeDeletion(tenantId: string): Promise<void> {
-        const tenant = await this.findOneOrFail(tenantId);
-
-        await this.applyChange(tenantId, { status: TenantStatus.CLOSED, deletedAt: new Date() }, () => [
-            TenantEvents.DELETED,
-            new TenantDeletedEvent(tenantId, tenantId, tenant.name, tenant.slug)
-        ]);
-
-        this.logger.log(`Tenant deleted: ${tenantId}`, { tenantId });
     }
 
     // =========================================================

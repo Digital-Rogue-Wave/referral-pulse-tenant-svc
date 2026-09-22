@@ -15,6 +15,8 @@ model Tenant {
   lockReason               String?   @map("lock_reason") @db.Text
   deletionScheduledAt      DateTime? @map("deletion_scheduled_at") @db.Timestamptz
   deletionReason           String?   @map("deletion_reason") @db.Text
+  // When the deletion saga may run; the hourly sweeper picks up every open tenant past it.
+  deletionDueAt            DateTime? @map("deletion_due_at") @db.Timestamptz
   customDomain             String?   @unique @map("custom_domain") @db.VarChar(255)
   domainVerificationStatus String    @default("unverified") @map("domain_verification_status") @db.VarChar(50)
   domainVerificationToken  String?   @map("domain_verification_token") @db.VarChar(255)
@@ -36,6 +38,7 @@ model Tenant {
   billingEvents               BillingEvent[]
   tenantUsages                TenantUsage[]
   apiKeys                     ApiKey[]
+  verifications               TenantVerification[]
   userNotificationPreferences UserNotificationPreference[]
 
   @@index([status])

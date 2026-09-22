@@ -29,7 +29,8 @@ export enum ServiceCapability {
     TENANT_CONTACTS_READ = 'tenant_contacts.read',
     TENANT_VERIFICATION_WRITE = 'tenant_verification.write',
     TENANT_SUSPEND = 'tenant.suspend',
-    USAGE_WRITE = 'usage.write'
+    USAGE_WRITE = 'usage.write',
+    DSR_ERASE = 'dsr.erase'
 }
 
 export const userSubject = (userId: string): string => `user:${userId}`;

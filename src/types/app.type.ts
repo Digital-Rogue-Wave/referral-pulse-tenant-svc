@@ -104,6 +104,7 @@ export type EventAction =
     | 'removed'
     | 'rotated'
     | 'invited'
+    | 'anonymised'
     | 'verification_requested'
     | 'verification_status_changed';
 
@@ -330,7 +331,8 @@ export type UserEventType =
     | 'user.registered'
     | 'user.role_changed'
     | 'user.removed'
-    | 'user.invited';
+    | 'user.invited'
+    | 'user.anonymised';
 
 // API Key domain events
 export type ApiKeyEventType = 'api-key.created' | 'api-key.updated' | 'api-key.deleted' | 'api-key.rotated';
@@ -576,15 +578,6 @@ export type BillingUsageJobData = {
     metricName: string;
     increment: number;
     timestamp: Date;
-};
-
-/**
- * Tenant deletion job data
- */
-export type TenantDeletionJobData = {
-    tenantId: string;
-    reason?: string;
-    scheduledAt: Date;
 };
 
 /**

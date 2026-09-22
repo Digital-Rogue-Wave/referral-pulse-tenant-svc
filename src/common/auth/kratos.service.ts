@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import { isAxiosError } from 'axios';
 
 import { HttpClientService } from '@common/http/http-client.service';
 import { AppLoggerService } from '@common/logging/app-logger.service';
@@ -113,5 +114,20 @@ export class KratosService {
      */
     async revokeSessions(identityId: string): Promise<void> {
         await this.http.delete(`${this.adminUrl}/admin/identities/${identityId}/sessions`);
+    }
+
+    /**
+     * Deletes an identity, its credentials and every session (erasure). Idempotent: an identity that is
+     * already gone is not an error.
+     */
+    async deleteIdentity(identityId: string): Promise<void> {
+        try {
+            await this.http.delete(`${this.adminUrl}/admin/identities/${identityId}`, { retries: 0 });
+        } catch (error) {
+            if (isAxiosError(error) && error.response?.status === 404) {
+                return;
+            }
+            throw error;
+        }
     }
 }

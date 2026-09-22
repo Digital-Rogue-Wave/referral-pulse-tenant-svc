@@ -1,0 +1,23 @@
+// KYB verification records backing `tenants.verification_status` (DB Model v2 §3 `tenant_verifications`).
+// Only `company` verifications drive the tenant's status; `tax` and `payout_provider` are recorded as-is.
+model TenantVerification {
+  id                 String    @id @default(ulid()) @db.VarChar(26)
+  tenantId           String    @map("tenant_id") @db.VarChar(26)
+  verificationType   String    @default("company") @map("verification_type") @db.VarChar(20)
+  status             String    @default("pending") @db.VarChar(20)
+  // References to uploaded documents, never the documents themselves.
+  evidence           Json?
+  temporalWorkflowId String?   @map("temporal_workflow_id") @db.VarChar(255)
+  temporalRunId      String?   @map("temporal_run_id") @db.VarChar(255)
+  reviewedBy         String?   @map("reviewed_by") @db.VarChar(80)
+  reviewedAt         DateTime? @map("reviewed_at") @db.Timestamptz
+  reason             String?   @db.Text
+
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, status], map: "idx_verif_tenant")
+  @@map("tenant_verifications")
+}

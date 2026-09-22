@@ -1,5 +1,5 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { IsString, IsOptional, IsEnum, IsDateString, IsInt, Min, Max, IsNotEmpty } from 'class-validator';
+import { IsString, IsOptional, IsEnum, IsDateString, IsInt, Min, Max, IsNotEmpty, IsObject, Length, MaxLength } from 'class-validator';
 
 import { BaseResponseMapper } from '@common/helper';
 
@@ -7,8 +7,8 @@ import { BaseResponseMapper } from '@common/helper';
 // Enums (canonical definition lives in tenant.types.ts)
 // ============================================================
 
-import { TenantStatus, VerificationStatus } from './tenant.types';
-export { TenantStatus, VerificationStatus };
+import { TenantStatus, VerificationRecordStatus, VerificationStatus, VerificationType } from './tenant.types';
+export { TenantStatus, VerificationRecordStatus, VerificationStatus, VerificationType };
 
 // ============================================================
 // Props (shape of the Prisma model)
@@ -30,6 +30,7 @@ export interface TenantProps {
     lockReason?: string | null;
     deletionScheduledAt?: Date | null;
     deletionReason?: string | null;
+    deletionDueAt?: Date | null;
     customDomain?: string | null;
     domainVerificationStatus?: string | null;
     domainVerificationToken?: string | null;
@@ -90,6 +91,7 @@ export class ScheduleDeletionDto {
     @IsOptional()
     @IsInt()
     @Min(1)
+    @Max(90)
     daysUntilDeletion?: number;
 }
 
@@ -140,20 +142,54 @@ export class SuspendTenantDto {
     reason!: string;
 }
 
+/**
+ * The account_verification workflow's report on one verification. Without `verification_id` it applies to the
+ * tenant's latest open verification of `verification_type` (a new one is opened when none is).
+ */
 export class UpdateVerificationStatusDto {
-    @ApiProperty({ enum: VerificationStatus })
-    @IsEnum(VerificationStatus)
-    status!: VerificationStatus;
+    @ApiProperty({ enum: VerificationRecordStatus })
+    @IsEnum(VerificationRecordStatus)
+    status!: VerificationRecordStatus;
+
+    @ApiPropertyOptional({ enum: VerificationType, default: VerificationType.COMPANY })
+    @IsOptional()
+    @IsEnum(VerificationType)
+    verificationType?: VerificationType;
 
     @ApiPropertyOptional()
     @IsOptional()
     @IsString()
+    @Length(26, 26)
+    verificationId?: string;
+
+    @ApiPropertyOptional()
+    @IsOptional()
+    @IsString()
+    @MaxLength(2000)
     reason?: string;
 
+    @ApiPropertyOptional({ description: 'Operator id or `system` for an automated decision' })
+    @IsOptional()
+    @IsString()
+    @MaxLength(80)
+    reviewedBy?: string;
+
+    @ApiPropertyOptional({ description: 'Temporal workflow id, so a crashed verification can be resumed' })
+    @IsOptional()
+    @IsString()
+    @MaxLength(255)
+    temporalWorkflowId?: string;
+
     @ApiPropertyOptional()
     @IsOptional()
     @IsString()
-    reviewedBy?: string;
+    @MaxLength(255)
+    temporalRunId?: string;
+
+    @ApiPropertyOptional({ description: 'References to uploaded documents — never the documents themselves' })
+    @IsOptional()
+    @IsObject()
+    evidence?: Record<string, unknown>;
 }
 
 // ============================================================
@@ -264,6 +300,9 @@ export class DeletionScheduledResponse {
 
     @ApiProperty()
     deletionScheduledAt!: Date;
+
+    @ApiProperty({ description: 'When the tenant and its data are deleted, unless the deletion is cancelled first' })
+    deletionDueAt!: Date;
 
     @ApiPropertyOptional()
     deletionReason?: string | null;

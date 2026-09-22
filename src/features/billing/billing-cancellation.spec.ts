@@ -28,6 +28,7 @@ describe('BillingService — Stripe subscription cancellation', () => {
     let service: BillingService;
     let prisma: MockProxy<DatabaseService>;
     let txEventEmitter: MockProxy<TransactionEventEmitterService>;
+    let stripe: MockProxy<StripeService>;
 
     const BILLING_ROW = {
         id: 'bil_1',
@@ -54,6 +55,7 @@ describe('BillingService — Stripe subscription cancellation', () => {
             update: jest.fn().mockResolvedValue({ ...BILLING_ROW, plan: BillingPlanEnum.FREE })
         };
         txEventEmitter = mock<TransactionEventEmitterService>();
+        stripe = mock<StripeService>();
 
         const dateService = mock<DateService>();
         dateService.fromUnix.mockReturnValue({ toDate: () => new Date('2026-10-09T00:00:00.000Z') } as never);
@@ -66,7 +68,7 @@ describe('BillingService — Stripe subscription cancellation', () => {
                 { provide: AppLoggerService, useValue: mock<AppLoggerService>() },
                 { provide: TenantContextService, useValue: mock<TenantContextService>() },
                 { provide: TransactionEventEmitterService, useValue: txEventEmitter },
-                { provide: StripeService, useValue: mock<StripeService>() },
+                { provide: StripeService, useValue: stripe },
                 { provide: IdempotencyService, useValue: mock<IdempotencyService>() },
                 { provide: MetricsService, useValue: mock<MetricsService>() },
                 { provide: TenantService, useValue: mock<TenantService>() },
@@ -125,5 +127,44 @@ describe('BillingService — Stripe subscription cancellation', () => {
 
         const [{ data }] = (prisma.billing.update as jest.Mock).mock.calls[0];
         expect(data.cancellationEffectiveAt).toBe(scheduled);
+    });
+
+    describe('when the tenant is deleted', () => {
+        beforeEach(() => {
+            Object.assign(prisma.billing, {
+                findUnique: jest.fn().mockResolvedValue({ ...BILLING_ROW, stripeSubscriptionId: 'sub_123', deletedAt: null })
+            });
+            Object.assign(prisma, { $transaction: jest.fn((fn: (tx: unknown) => Promise<unknown>) => fn(prisma)) });
+        });
+
+        it('ends the Stripe subscription now and drops the record to a cancelled Free plan', async () => {
+            await service.closeForDeletion('ten_1');
+
+            expect(stripe.cancelSubscriptionNow).toHaveBeenCalledWith('sub_123');
+            const [{ data }] = (prisma.billing.update as jest.Mock).mock.calls[0];
+            expect(data).toMatchObject({
+                plan: BillingPlanEnum.FREE,
+                status: SubscriptionStatusEnum.CANCELED,
+                stripeSubscriptionId: null,
+                cancellationReason: 'tenant_deleted'
+            });
+            expect(txEventEmitter.emitAfterCommit.mock.calls[0]![1]).toMatchObject({ reason: 'tenant_deleted', stripeSubscriptionId: 'sub_123' });
+        });
+
+        it('is a no-op the second time, so a retried saga does not fail', async () => {
+            (prisma.billing.findUnique as jest.Mock).mockResolvedValue({ ...BILLING_ROW, deletedAt: new Date() });
+
+            await service.closeForDeletion('ten_1');
+
+            expect(stripe.cancelSubscriptionNow).not.toHaveBeenCalled();
+            expect(prisma.billing.update).not.toHaveBeenCalled();
+        });
+
+        it('does not update the record when Stripe refuses the cancellation', async () => {
+            stripe.cancelSubscriptionNow.mockRejectedValue(new Error('stripe down'));
+
+            await expect(service.closeForDeletion('ten_1')).rejects.toThrow('stripe down');
+            expect(prisma.billing.update).not.toHaveBeenCalled();
+        });
     });
 });

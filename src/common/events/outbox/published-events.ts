@@ -22,9 +22,17 @@ import type {
     TenantSuspendedEvent,
     TenantUnlockedEvent,
     TenantUpdatedEvent,
+    TenantVerificationRequestedEvent,
     TenantVerificationStatusChangedEvent
 } from '@domains/tenant/events/tenant.events';
-import type { UserInvitedEvent, UserLoggedInEvent, UserRegisteredEvent, UserRemovedEvent, UserRoleChangedEvent } from '@domains/user';
+import type {
+    UserAnonymisedEvent,
+    UserInvitedEvent,
+    UserLoggedInEvent,
+    UserRegisteredEvent,
+    UserRemovedEvent,
+    UserRoleChangedEvent
+} from '@domains/user';
 
 /** Event Model v3 §2.3 `object.object_type`, extended with tenant-service's aggregates (additive enum values). */
 export type PublishedObjectType = 'tenant' | 'user' | 'api_key' | 'subscription' | 'invitation';
@@ -65,7 +73,9 @@ const MAPPERS: Record<string, Mapper<never>> = {
                 name: e.name,
                 slug: e.slug,
                 trial_started_at: iso(e.trialStartedAt),
-                trial_ends_at: iso(e.trialEndsAt)
+                trial_ends_at: iso(e.trialEndsAt),
+                data_region: e.residency?.dataRegion ?? null,
+                retention_months: e.residency?.retentionMonths ?? null
             }
         }
     ],
@@ -74,7 +84,12 @@ const MAPPERS: Record<string, Mapper<never>> = {
             eventType: 'tenant.updated',
             externalId: `tenant.updated:${e.eventId}`,
             object: tenantObject(e),
-            properties: { tenant_id: e.tenantId, changed_fields: Object.keys(e.changes).sort().join(',') }
+            properties: {
+                tenant_id: e.tenantId,
+                changed_fields: Object.keys(e.changes).sort().join(','),
+                // Services applying the tenant's retention window need the new value, not only the field name.
+                ...(e.changes.retentionMonths ? { retention_months: Number(e.changes.retentionMonths.to) } : {})
+            }
         }
     ],
     'tenant.suspended': (e: TenantSuspendedEvent) => [
@@ -144,12 +159,12 @@ const MAPPERS: Record<string, Mapper<never>> = {
             properties: { tenant_id: e.tenantId, domain: e.domain, verified_at: iso(e.verifiedAt) }
         }
     ],
-    'tenant.verification_requested': (e: BaseDomainEvent) => [
+    'tenant.verification_requested': (e: TenantVerificationRequestedEvent) => [
         {
             eventType: 'tenant.verification_requested',
-            externalId: `tenant.verification_requested:${e.eventId}`,
+            externalId: `tenant.verification_requested:${e.verificationId ?? e.eventId}`,
             object: tenantObject(e),
-            properties: { tenant_id: e.tenantId }
+            properties: { tenant_id: e.tenantId, verification_id: e.verificationId ?? null, verification_type: 'company' }
         }
     ],
     'tenant.verification_status_changed': (e: TenantVerificationStatusChangedEvent) => [
@@ -184,6 +199,14 @@ const MAPPERS: Record<string, Mapper<never>> = {
             externalId: `user.removed:${e.eventId}`,
             object: { type: 'user', id: e.aggregateId },
             properties: { user_id: e.aggregateId, tenant_id: e.tenantId, role: e.role.toLowerCase() }
+        }
+    ],
+    'user.anonymised': (e: UserAnonymisedEvent) => [
+        {
+            eventType: 'user.anonymised',
+            externalId: `user.anonymised:${e.aggregateId}`,
+            object: { type: 'user', id: e.aggregateId },
+            properties: { user_id: e.aggregateId, tenant_id: e.tenantId, dsr_id: e.dsrId }
         }
     ],
     'user.invited': (e: UserInvitedEvent) => [

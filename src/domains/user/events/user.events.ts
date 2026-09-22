@@ -88,6 +88,23 @@ export class UserInvitedEvent extends BaseDomainEvent {
 }
 
 /**
+ * Emitted when an operator's personal data is erased for a data-subject request (Product Spec v4 "DSR
+ * Propagation": Identity anonymises the user record). The record keeps its id; `dsrId` ties the receipt to
+ * the request. Services holding the operator's contact details drop them on this event.
+ */
+export class UserAnonymisedEvent extends BaseDomainEvent {
+    readonly eventType = 'user.anonymised' as const;
+
+    constructor(
+        public readonly aggregateId: string,
+        public readonly tenantId: string,
+        public readonly dsrId: string
+    ) {
+        super();
+    }
+}
+
+/**
  * Event type constants for convenience
  */
 export const UserEvents = {
@@ -95,5 +112,6 @@ export const UserEvents = {
     ROLE_CHANGED: 'user.role_changed',
     LOGGED_IN: 'user.logged_in',
     REMOVED: 'user.removed',
-    INVITED: 'user.invited'
+    INVITED: 'user.invited',
+    ANONYMISED: 'user.anonymised'
 } as const;

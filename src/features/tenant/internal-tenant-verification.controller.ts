@@ -24,6 +24,6 @@ export class InternalTenantVerificationController {
     @HttpCode(HttpStatus.OK)
     @Patch(':id/verification')
     async updateVerificationStatus(@Param('id') tenantId: string, @Body() dto: UpdateVerificationStatusDto): Promise<TenantResponse> {
-        return this.tenantService.setVerificationStatus(tenantId, dto.status, dto.reason, dto.reviewedBy);
+        return this.tenantService.applyVerificationReport(tenantId, dto);
     }
 }

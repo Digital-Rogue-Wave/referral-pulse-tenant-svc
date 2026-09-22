@@ -21,3 +21,18 @@ export enum VerificationStatus {
     VERIFIED = 'verified',
     REJECTED = 'rejected'
 }
+
+/** What a `tenant_verifications` row verifies (DB Model v2 §3). Only `company` drives the tenant's status. */
+export enum VerificationType {
+    COMPANY = 'company',
+    TAX = 'tax',
+    PAYOUT_PROVIDER = 'payout_provider'
+}
+
+/** A verification's own state; `pending` and `in_review` both show the tenant as `pending`. */
+export enum VerificationRecordStatus {
+    PENDING = 'pending',
+    IN_REVIEW = 'in_review',
+    VERIFIED = 'verified',
+    REJECTED = 'rejected'
+}

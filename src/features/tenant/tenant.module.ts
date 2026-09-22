@@ -21,7 +21,6 @@ import { TenantListener } from './listeners/tenant.listener';
 import { UsersModule } from '../users/users.module';
 
 // Processors
-import { TenantDeletionProcessor } from './processors/tenant-deletion.processor';
 import { TenantUnlockProcessor } from './processors/tenant-unlock.processor';
 
 @Module({
@@ -45,7 +44,6 @@ import { TenantUnlockProcessor } from './processors/tenant-unlock.processor';
         TenantListener,
 
         // Background Processors
-        TenantDeletionProcessor,
         TenantUnlockProcessor
     ],
     exports: [TenantService, TenantStatsService, DnsModule]

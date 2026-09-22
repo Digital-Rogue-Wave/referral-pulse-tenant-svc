@@ -425,8 +425,16 @@ export class StripeService {
         this.logger.log(`Reactivated Stripe subscription ${stripeSubscriptionId} by clearing cancel_at_period_end`);
     }
 
-    async cancelSubscription(stripeSubscriptionId: string): Promise<void> {
+    /**
+     * Ends a subscription now, without a refund or a final prorated invoice. Idempotent: a subscription that
+     * has already ended is left as it is, so a retried deletion does not fail on it.
+     */
+    async cancelSubscriptionNow(stripeSubscriptionId: string): Promise<void> {
         const stripe = this.stripeClient();
+        const subscription = await stripe.subscriptions.retrieve(stripeSubscriptionId);
+        if (subscription.status === 'canceled' || subscription.status === 'incomplete_expired') {
+            return;
+        }
         await stripe.subscriptions.cancel(stripeSubscriptionId);
         this.logger.log(`Canceled Stripe subscription ${stripeSubscriptionId}`);
     }

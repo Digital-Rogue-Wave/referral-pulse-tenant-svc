@@ -27,7 +27,7 @@ describe('TenantService.create — tenant onboarding', () => {
     let prisma: MockProxy<DatabaseService>;
     let users: MockProxy<UsersService>;
     let events: MockProxy<TransactionEventEmitterService>;
-    let tx: { tenant: { create: jest.Mock } };
+    let tx: { tenant: { create: jest.Mock }; tenantVerification: { create: jest.Mock } };
     const owner = { identityId: 'kratos-1', email: 'ada@acme.io', name: 'Ada' };
 
     beforeEach(async () => {
@@ -37,7 +37,8 @@ describe('TenantService.create — tenant onboarding', () => {
         tx = {
             tenant: {
                 create: jest.fn(async ({ data }: { data: Record<string, unknown> }) => ({ ...data, createdAt: new Date(), updatedAt: new Date() }))
-            }
+            },
+            tenantVerification: { create: jest.fn().mockResolvedValue({ id: 'verif-1' }) }
         };
         (prisma as unknown as { user: unknown }).user = { findUnique: jest.fn().mockResolvedValue(null) };
         (prisma as unknown as { tenant: unknown }).tenant = { count: jest.fn().mockResolvedValue(0), findUnique: jest.fn() };
@@ -73,7 +74,17 @@ describe('TenantService.create — tenant onboarding', () => {
             expect(tx.tenant.create).toHaveBeenCalledWith({ data: expect.objectContaining({ name: 'Acme', status: 'active' }) });
             expect(users.createOwner).toHaveBeenCalledWith(tx, tenant.id, owner);
             expect(events.emitAfterCommit).toHaveBeenCalledWith('tenant.created', expect.objectContaining({ tenantId: tenant.id }));
-            expect(events.emitAfterCommit).toHaveBeenCalledWith('tenant.verification_requested', expect.objectContaining({ tenantId: tenant.id }));
+            expect(events.emitAfterCommit).toHaveBeenCalledWith(
+                'tenant.verification_requested',
+                expect.objectContaining({ tenantId: tenant.id, verificationId: 'verif-1' })
+            );
+        });
+
+        it('then its company verification is opened in the same transaction and the tenant shows as pending', async () => {
+            const tenant = await service.create({ name: 'Acme' }, owner, { onExisting: 'conflict' });
+
+            expect(tx.tenantVerification.create).toHaveBeenCalledWith({ data: { tenantId: tenant.id, verificationType: 'company' } });
+            expect(tx.tenant.create).toHaveBeenCalledWith({ data: expect.objectContaining({ verificationStatus: 'pending' }) });
         });
 
         it('then a taken slug is refused with 409 before anything is written', async () => {

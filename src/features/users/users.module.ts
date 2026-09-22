@@ -1,6 +1,8 @@
 import { Module } from '@nestjs/common';
 
 import { KetoReconcilerWorker } from './keto-reconciler.worker';
+import { OperatorErasureController } from './operator-erasure.controller';
+import { OperatorErasureService } from './operator-erasure.service';
 import { UsersService } from './users.service';
 import { UsersController } from './users.controller';
 
@@ -10,8 +12,8 @@ import { UsersController } from './users.controller';
  * See referralai_db_tables_per_service.md and referralai_api_contract.
  */
 @Module({
-    controllers: [UsersController],
-    providers: [UsersService, KetoReconcilerWorker],
+    controllers: [UsersController, OperatorErasureController],
+    providers: [UsersService, OperatorErasureService, KetoReconcilerWorker],
     exports: [UsersService]
 })
 export class UsersModule {}

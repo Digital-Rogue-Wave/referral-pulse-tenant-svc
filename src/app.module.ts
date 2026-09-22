@@ -22,6 +22,8 @@ import { IdentityGatewayModule } from '@app/features/identity-gateway/identity-g
 import { InvitationModule } from '@app/features/invitation/invitation.module';
 import { UsersModule } from '@app/features/users/users.module';
 import { TenantModule } from '@app/features/tenant/tenant.module';
+import { TenantDeletionModule } from '@app/features/tenant-deletion/tenant-deletion.module';
+import { RetentionModule } from '@app/features/retention/retention.module';
 import { TenantSettingModule } from '@app/features/tenant-setting/tenant-setting.module';
 import { WebhookModule } from '@app/features/webhook/webhook.module';
 
@@ -64,6 +66,8 @@ import { WireCaseInterceptor } from '@common/http-contract/wire-case.interceptor
         InvitationModule,
         UsersModule,
         TenantModule,
+        TenantDeletionModule,
+        RetentionModule,
         TenantSettingModule,
         WebhookModule
     ],

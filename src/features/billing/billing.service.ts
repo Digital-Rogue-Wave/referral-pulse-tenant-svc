@@ -1106,6 +1106,52 @@ export class BillingService {
         }
     }
 
+    /**
+     * Stops charging a tenant that is being deleted: ends the Stripe subscription now and drops the billing
+     * record to a cancelled Free plan. Idempotent, so the deletion saga can retry it. The Stripe customer and
+     * its invoices are kept, because invoices must be retained for accounting.
+     */
+    async closeForDeletion(tenantId: string): Promise<void> {
+        const billing = await this.prisma.billing.findUnique({ where: { tenantId } });
+        if (!billing || billing.deletedAt) {
+            return;
+        }
+        if (billing.stripeSubscriptionId) {
+            await this.stripeService.cancelSubscriptionNow(billing.stripeSubscriptionId);
+        }
+        const now = new Date();
+        await this.prisma.$transaction(async (tx) => {
+            await tx.billing.update({
+                where: { id: billing.id },
+                data: {
+                    plan: BillingPlanEnum.FREE,
+                    status: SubscriptionStatusEnum.CANCELED,
+                    stripeSubscriptionId: null,
+                    pendingDowngradePlan: null,
+                    downgradeScheduledAt: null,
+                    cancellationReason: 'tenant_deleted',
+                    cancellationRequestedAt: billing.cancellationRequestedAt ?? now,
+                    cancellationEffectiveAt: now,
+                    deletedAt: now
+                }
+            });
+            if (billing.stripeSubscriptionId) {
+                this.txEventEmitter.emitAfterCommit(
+                    BillingEvents.SUBSCRIPTION_CANCELLED,
+                    new SubscriptionCancelledEvent(
+                        billing.id,
+                        tenantId,
+                        this.dateService.toISO(now),
+                        this.dateService.toISO(now),
+                        billing.stripeSubscriptionId,
+                        BillingPlanEnum.FREE,
+                        'tenant_deleted'
+                    )
+                );
+            }
+        });
+    }
+
     private async handleCustomerSubscriptionDeleted(event: Stripe.Event): Promise<void> {
         const subscription = event.data.object as Stripe.Subscription;
         const subscriptionId = subscription.id;
