@@ -1,4 +1,4 @@
-import { Module, Controller, Get, Param, Post, HttpCode, HttpStatus } from '@nestjs/common';
+import { Module, Controller, Get, Param, Post, HttpCode, HttpStatus, Version, VERSION_NEUTRAL } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse } from '@nestjs/swagger';
 import { TerminusModule, HealthCheckService, HealthCheck, PrismaHealthIndicator, MemoryHealthIndicator } from '@nestjs/terminus';
 
@@ -19,6 +19,9 @@ import { WorkerHealthServer } from './worker-health.server';
  * so it imported cleanly with no TypeORM installed — and then could never resolve
  * a DataSource, which made `/health/ready` and `/health` 503 permanently.
  *
+ * The probes answer on the unversioned paths the load balancer and Kubernetes poll (`/health/live`,
+ * `/health/ready`, `/health`); with URI versioning on, they were only reachable under `/v1/health/*`.
+ *
  * `@Public()` covers only the three probe endpoints. It used to sit at class level,
  * which also exposed the circuit-breaker routes — internal service topology on the
  * reads, and unauthenticated state mutation on the reset.
@@ -36,6 +39,7 @@ export class HealthController {
     ) {}
 
     @Public()
+    @Version(VERSION_NEUTRAL)
     @Get('live')
     @ApiOperation({ summary: 'Liveness probe' })
     @HealthCheck()
@@ -44,6 +48,7 @@ export class HealthController {
     }
 
     @Public()
+    @Version(VERSION_NEUTRAL)
     @Get('ready')
     @ApiOperation({ summary: 'Readiness probe' })
     @HealthCheck()
@@ -52,6 +57,7 @@ export class HealthController {
     }
 
     @Public()
+    @Version(VERSION_NEUTRAL)
     @Get()
     @ApiOperation({ summary: 'Full health check' })
     @HealthCheck()
