@@ -49,7 +49,8 @@ export async function bootstrapTestApp(): Promise<INestApplication> {
         .useValue(fakeStripeService)
         .compile();
 
-    app = moduleRef.createNestApplication({ logger: false });
+    // rawBody as in main.ts: Stripe signs the exact bytes it sent.
+    app = moduleRef.createNestApplication({ logger: false, rawBody: true });
 
     app.use(requestIdMiddleware);
 

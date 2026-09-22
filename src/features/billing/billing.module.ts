@@ -15,6 +15,7 @@ import { StripeRedirectController } from './stripe-redirect.controller';
 // Services
 import { BillingService } from './billing.service';
 import { StripeService } from './stripe.service';
+import { StripeWebhookService } from './stripe-webhook.service';
 import { PlanService } from './plan.service';
 import { PlanStripeSyncService } from './plan-stripe-sync.service';
 import { UsageTrackerService } from './usage-tracker.service';
@@ -60,6 +61,7 @@ const DEV_ONLY_CONTROLLERS = process.env.ENABLE_TEST_ROUTES === 'true' ? [TestBi
     providers: [
         BillingService,
         StripeService,
+        StripeWebhookService,
         PlanService,
         PlanStripeSyncService,
         UsageTrackerService,
@@ -75,6 +77,7 @@ const DEV_ONLY_CONTROLLERS = process.env.ENABLE_TEST_ROUTES === 'true' ? [TestBi
     ],
     exports: [
         BillingService,
+        StripeWebhookService,
         PlanService,
         UsageTrackerService,
         UsageCheckGuard,

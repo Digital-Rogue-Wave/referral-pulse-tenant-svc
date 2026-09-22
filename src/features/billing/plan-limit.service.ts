@@ -3,7 +3,7 @@ import { ConfigService } from '@nestjs/config';
 
 import type { Plan } from '@prisma-gen/generated/client';
 import type { AllConfigType } from '@config/config.type';
-import { BillingPlanEnum, SubscriptionStatusEnum } from '@common/enums/billing.enum';
+import { BillingPlanEnum, LIVE_SUBSCRIPTION_STATUSES, SubscriptionStatusEnum } from '@common/enums/billing.enum';
 
 import { DatabaseService } from '@app/database/database.service';
 import { TenantContextService } from '@common/tenant-aware/tenant-context.service';
@@ -78,7 +78,7 @@ export class PlanLimitService {
         const billing = await this.prisma.billing.findUnique({
             where: { tenantId }
         });
-        if (billing?.status === SubscriptionStatusEnum.ACTIVE) {
+        if (billing && LIVE_SUBSCRIPTION_STATUSES.includes(billing.status)) {
             return;
         }
 

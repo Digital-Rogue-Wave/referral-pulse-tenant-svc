@@ -30,6 +30,8 @@ model Billing {
   cancellationReason      String?   @map("cancellation_reason") @db.Text
   cancellationRequestedAt DateTime? @map("cancellation_requested_at") @db.Timestamptz
   cancellationEffectiveAt DateTime? @map("cancellation_effective_at") @db.Timestamptz
+  // `created` of the last Stripe event applied to this subscription: an older event arriving late is ignored.
+  lastStripeEventAt       DateTime? @map("last_stripe_event_at") @db.Timestamptz
 
   createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz
   updatedAt DateTime  @updatedAt @map("updated_at") @db.Timestamptz

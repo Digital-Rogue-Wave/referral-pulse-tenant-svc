@@ -22,7 +22,8 @@ describe('RetentionSweeperWorker', () => {
             tenant: { findMany: jest.fn().mockResolvedValue([{ id: 't-closed' }]) },
             auditLog: { deleteMany: jest.fn().mockResolvedValue({ count: 12 }) },
             invitation: { deleteMany: jest.fn().mockResolvedValue({ count: 3 }) },
-            sideEffectOutbox: { deleteMany: jest.fn().mockResolvedValue({ count: 40 }) }
+            sideEffectOutbox: { deleteMany: jest.fn().mockResolvedValue({ count: 40 }) },
+            stripeEvent: { deleteMany: jest.fn().mockResolvedValue({ count: 7 }) }
         });
         worker = new RetentionSweeperWorker(
             mock<BullJobsConnectionFactory>(),
@@ -68,5 +69,13 @@ describe('RetentionSweeperWorker', () => {
         await worker.purgeDoneSideEffects(cutoff);
 
         expect(prisma.sideEffectOutbox.deleteMany).toHaveBeenCalledWith({ where: { status: 'completed', updatedAt: { lt: cutoff } } });
+    });
+
+    it('prunes applied Stripe events but keeps failed ones for an operator', async () => {
+        await worker.purgeDoneStripeEvents(cutoff);
+
+        expect(prisma.stripeEvent.deleteMany).toHaveBeenCalledWith({
+            where: { status: { in: ['processed', 'ignored'] }, receivedAt: { lt: cutoff } }
+        });
     });
 });

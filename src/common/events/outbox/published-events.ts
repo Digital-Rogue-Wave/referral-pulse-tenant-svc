@@ -6,6 +6,9 @@ import type {
     SubscriptionCreatedEvent,
     SubscriptionDowngradeScheduledEvent,
     SubscriptionUpgradedEvent,
+    PaymentActionRequiredEvent,
+    PaymentDisputedEvent,
+    PaymentRefundedEvent,
     TenantPaymentStatusChangedEvent,
     TrialExpiredEvent,
     TrialReminderEvent,
@@ -309,6 +312,50 @@ const MAPPERS: Record<string, Mapper<never>> = {
                 limit: e.limit,
                 percentage: e.percentage,
                 period_date: String(e.periodDate)
+            }
+        }
+    ],
+    'payment.action_required': (e: PaymentActionRequiredEvent) => [
+        {
+            eventType: 'payment.action_required',
+            externalId: `payment.action_required:${e.stripeEventId}`,
+            object: tenantObject(e),
+            properties: {
+                tenant_id: e.tenantId,
+                invoice_id: e.stripeInvoiceId,
+                hosted_invoice_url: e.hostedInvoiceUrl,
+                amount_due: e.amountDue,
+                currency: e.currency
+            }
+        }
+    ],
+    'payment.disputed': (e: PaymentDisputedEvent) => [
+        {
+            eventType: e.phase === 'opened' ? 'payment.dispute_opened' : 'payment.dispute_closed',
+            externalId: `payment.dispute_${e.phase}:${e.stripeEventId}`,
+            object: tenantObject(e),
+            properties: {
+                tenant_id: e.tenantId,
+                dispute_id: e.disputeId,
+                charge_id: e.chargeId,
+                amount: e.amount,
+                currency: e.currency,
+                reason: e.reason,
+                status: e.disputeStatus
+            }
+        }
+    ],
+    'payment.refunded': (e: PaymentRefundedEvent) => [
+        {
+            eventType: 'payment.refunded',
+            externalId: `payment.refunded:${e.stripeEventId}`,
+            object: tenantObject(e),
+            properties: {
+                tenant_id: e.tenantId,
+                charge_id: e.chargeId,
+                amount_refunded: e.amountRefunded,
+                currency: e.currency,
+                fully_refunded: e.fullyRefunded
             }
         }
     ],

@@ -24,6 +24,8 @@ export const AUDIT_AFTER_CLOSE_DAYS = 365;
 export const INVITATION_AFTER_END_DAYS = 30;
 /** Delivered side effects are kept this long for troubleshooting (DB Model v2 §0.6 keeps published events 7 days). */
 export const SIDE_EFFECT_AFTER_DONE_DAYS = 7;
+/** Applied Stripe events are kept this long to explain billing state, then pruned (Stripe keeps its own 30 days). */
+export const STRIPE_EVENT_AFTER_DONE_DAYS = 90;
 /** Closed tenants handled per run, so one run stays one bounded delete. */
 const CLOSED_TENANT_BATCH = 500;
 
@@ -62,7 +64,8 @@ export class RetentionSweeperWorker extends BaseWorkerService<IBaseJobData> {
             data: {
                 auditRows: await this.purgeAuditOfClosedTenants(new Date(now - AUDIT_AFTER_CLOSE_DAYS * DAY_MS)),
                 invitations: await this.purgeEndedInvitations(new Date(now - INVITATION_AFTER_END_DAYS * DAY_MS)),
-                sideEffects: await this.purgeDoneSideEffects(new Date(now - SIDE_EFFECT_AFTER_DONE_DAYS * DAY_MS))
+                sideEffects: await this.purgeDoneSideEffects(new Date(now - SIDE_EFFECT_AFTER_DONE_DAYS * DAY_MS)),
+                stripeEvents: await this.purgeDoneStripeEvents(new Date(now - STRIPE_EVENT_AFTER_DONE_DAYS * DAY_MS))
             }
         };
     }
@@ -94,6 +97,14 @@ export class RetentionSweeperWorker extends BaseWorkerService<IBaseJobData> {
 
     async purgeDoneSideEffects(doneBefore: Date): Promise<number> {
         const purged = await this.prisma.sideEffectOutbox.deleteMany({ where: { status: 'completed', updatedAt: { lt: doneBefore } } });
+        return purged.count;
+    }
+
+    /** Failed events are kept until an operator has looked at them. */
+    async purgeDoneStripeEvents(doneBefore: Date): Promise<number> {
+        const purged = await this.prisma.stripeEvent.deleteMany({
+            where: { status: { in: ['processed', 'ignored'] }, receivedAt: { lt: doneBefore } }
+        });
         return purged.count;
     }
 }

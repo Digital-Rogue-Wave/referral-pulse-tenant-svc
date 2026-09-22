@@ -1,10 +1,10 @@
-import { Controller, Post, Body, Headers, HttpStatus, Req, UseGuards } from '@nestjs/common';
+import { Controller, HttpCode, Post, Body, Headers, HttpStatus, Req, UseGuards } from '@nestjs/common';
 
 import { BaseException } from '@common/exceptions/base.exceptions';
 import { InvitationStatusEnum } from '@common/enums/invitation.enum';
 import { TenantService } from '../tenant/tenant.service';
 import { Public } from '@common/auth/public.decorator';
-import { BillingService } from '../billing/billing.service';
+import { StripeWebhookService } from '../billing/stripe-webhook.service';
 import { DatabaseService } from '@app/database/database.service';
 import { TransactionEventEmitterService } from '@common/events/transaction-event-emitter.service';
 import { UserLoggedInEvent } from '@domains/user';
@@ -23,7 +23,7 @@ import { OryWebhookGuard } from './ory-webhook.guard';
 export class WebhookController {
     constructor(
         private readonly tenantService: TenantService,
-        private readonly billingService: BillingService,
+        private readonly stripeWebhooks: StripeWebhookService,
         private readonly prisma: DatabaseService,
         private readonly txEventEmitter: TransactionEventEmitterService
     ) {}
@@ -82,9 +82,10 @@ export class WebhookController {
         return { status: 'ok' };
     }
 
+    @HttpCode(HttpStatus.OK)
     @Post('stripe')
     async handleStripeWebhook(@Headers('stripe-signature') signature: string, @Req() req: Request) {
-        await this.billingService.handleStripeWebhook(req.rawBody ?? req.body, signature);
+        await this.stripeWebhooks.handle(req.rawBody ?? req.body, signature);
         return { received: true };
     }
 }

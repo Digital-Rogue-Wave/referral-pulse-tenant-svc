@@ -105,6 +105,9 @@ export type EventAction =
     | 'rotated'
     | 'invited'
     | 'anonymised'
+    | 'action_required'
+    | 'disputed'
+    | 'refunded'
     | 'verification_requested'
     | 'verification_status_changed';
 

@@ -2,7 +2,7 @@ import { Injectable } from '@nestjs/common';
 
 import type { Tenant, Billing } from '@prisma-gen/generated/client';
 import { TenantStatus } from '@domains/tenant/tenant.types';
-import { BillingPlanEnum, SubscriptionStatusEnum } from '@common/enums/billing.enum';
+import { BillingPlanEnum, LIVE_SUBSCRIPTION_STATUSES, SubscriptionStatusEnum } from '@common/enums/billing.enum';
 
 import { DatabaseService } from '@app/database/database.service';
 import { AppLoggerService } from '@common/logging/app-logger.service';
@@ -91,7 +91,7 @@ export class TrialLifecycleService {
 
         const billing = await this.ensureBillingForTenant(tenantId);
 
-        if (billing.status === SubscriptionStatusEnum.ACTIVE) {
+        if (LIVE_SUBSCRIPTION_STATUSES.includes(billing.status)) {
             return;
         }
 

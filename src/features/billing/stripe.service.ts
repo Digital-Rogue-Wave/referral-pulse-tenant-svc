@@ -223,6 +223,12 @@ export class StripeService {
         return { id: session.id, url: session.url };
     }
 
+    /** The customer a charge belongs to (dispute events carry only the charge id). */
+    async getChargeCustomerId(chargeId: string): Promise<string | undefined> {
+        const charge = await this.stripeClient().charges.retrieve(chargeId);
+        return typeof charge.customer === 'string' ? charge.customer : (charge.customer?.id ?? undefined);
+    }
+
     async getSubscription(stripeSubscriptionId: string): Promise<Stripe.Subscription> {
         const stripe = this.stripeClient();
         const subscription = await stripe.subscriptions.retrieve(stripeSubscriptionId);

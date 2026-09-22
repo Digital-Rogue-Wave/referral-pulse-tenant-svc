@@ -7,7 +7,7 @@ import { DatabaseService } from '@app/database/database.service';
 import { TransactionEventEmitterService } from '@common/events/transaction-event-emitter.service';
 import { BaseException } from '@common/exceptions/base.exceptions';
 import { TenantService } from '../tenant/tenant.service';
-import { BillingService } from '../billing/billing.service';
+import { StripeWebhookService } from '../billing/stripe-webhook.service';
 
 import { WebhookController } from './webhook.controller';
 import { OryWebhookGuard } from './ory-webhook.guard';
@@ -30,7 +30,7 @@ describe('Ory web hooks', () => {
             providers: [
                 WebhookController,
                 { provide: TenantService, useValue: tenantService },
-                { provide: BillingService, useValue: mock<BillingService>() },
+                { provide: StripeWebhookService, useValue: mock<StripeWebhookService>() },
                 { provide: DatabaseService, useValue: prisma },
                 { provide: TransactionEventEmitterService, useValue: txEventEmitter }
             ]
