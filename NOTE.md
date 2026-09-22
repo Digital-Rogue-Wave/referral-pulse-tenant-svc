@@ -176,6 +176,7 @@ and record it here, rather than wait. Every item below can be revisited; each na
 | O10 | Small fixes found while testing: the subscription view reported `payment_status: active` for any tenant without a trial; BullMQ connections now use `maxRetriesPerRequest: null` (was overridden with a warning on every boot); Stripe plan sync no longer warns for every absent limit key. | |
 | O11 | **Probes on the unversioned paths.** `/health/live`, `/health/ready` and `/health` are version-neutral; with URI versioning they were only served at `/v1/health/*`, so the load balancer and Kubernetes probes the Helm chart points at `/health/*` got 404. | Found while aligning notification-service. |
 | O12 | **Tenant communication profile for notification-service:** `GET /v1/internal/tenants/{id}/profile` (`tenant_contacts.read`) → `tenant_id, name, status, locale, app_url, reply_to`. The last three come from the tenant's `general` settings keys `locale` (BCP 47, canonicalised), `app_url` (https only) and `support_email`; null when unset or malformed. | Emails show the tenant's brand and link to the client's own app (API §7.1); events carry ids only. |
+| O13 | **Request logs carry method, path and status only.** pino-http's default serializers logged every request header (bearer tokens, cookies, the Ory and Stripe web hook secrets), the client IP and full URLs with their query strings; the exception filter logged full URLs too. | Found while hardening notification-service logs (its M4). |
 
 ### Not done — deferred (shared phase or later), tenant-service
 

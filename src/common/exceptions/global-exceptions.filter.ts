@@ -4,6 +4,7 @@ import type { Request, Response } from 'express';
 
 import { BaseException } from '@common/exceptions/base.exceptions';
 import { AppLoggerService } from '@common/logging/app-logger.service';
+import { pathOf } from '@common/logging/request-path';
 import { TenantContextService } from '@common/tenant-aware/tenant-context.service';
 import { PrismaClientKnownRequestError } from '@prisma/client/runtime/client';
 
@@ -257,9 +258,11 @@ export class GlobalExceptionsFilter implements ExceptionFilter {
     }
 
     private logError(request: Request, status: HttpStatus, apiError: IApiError, exception: unknown): void {
+        // The path only: query strings can carry tokens.
+        const path = pathOf(request.url);
         const logContext = {
             method: request.method,
-            url: request.url,
+            path,
             requestId: apiError.requestId,
             correlationId: apiError.correlationId,
             code: apiError.code,
@@ -270,12 +273,12 @@ export class GlobalExceptionsFilter implements ExceptionFilter {
 
         if (status >= 500) {
             this.logger.error(
-                `${request.method} ${request.url} ${status} - ${apiError.message}`,
+                `${request.method} ${path} ${status} - ${apiError.message}`,
                 exception instanceof Error ? exception.stack : String(exception),
                 logContext
             );
         } else {
-            this.logger.warn(`${request.method} ${request.url} ${status} - ${apiError.message}`, logContext);
+            this.logger.warn(`${request.method} ${path} ${status} - ${apiError.message}`, logContext);
         }
     }
 
