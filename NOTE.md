@@ -9,12 +9,207 @@ Date of pass: 2026-06-17.
 
 ## Source of truth
 
-The canonical specs now live (verbatim) in `docs/`:
+**Superseded 2026-09-21:** the authoritative specs are the newer suite in `spec/` — API Contract v1.3,
+Event Model v3, DB Model v2, Product Spec v4, System & Application Architecture, Failure & Observability
+v3, Responsibility Contract v3. The `docs/` set below is kept read-only for history only.
+
+The canonical specs previously lived (verbatim) in `docs/`:
 `referralai_system_architecture_v1.md`, `referralai_db_tables_per_service.md`,
 `referralai_event_model_v2.1.md`, `referralai_api_contract_v1.2.md`,
 `referral_platform_product_spec.md`, `referralai_responsibility_contract_v2.md`,
 `referralai_failure_observability_model_v2.md`, `docker-compose.yml`.
 `docs/` and `docs/specs/` are READ-ONLY.
+
+---
+
+## Decisions — batch 2 (2026-09-21)
+
+Ahmed's rule for this batch: where a ruling is open, implement the recommended production-grade option
+and record it here, rather than wait. Every item below can be revisited; each names what was rejected.
+
+### Authorization model (API Contract v1.3 §2) — tenant-service owns Ory Keto
+
+| # | Decision | Why | Rejected |
+|---|---|---|---|
+| A1 | **The permission catalog is code** (`src/common/auth/authz/permission-catalog.ts`): the spec's 11 namespaces plus tenant-service's own `tenants` (read/write/delete), `users` (read/write), `billing` (read/write), `audit` (read). The Keto namespace config (`deployment/ory/keto/`) mirrors it and a spec fails on drift. | One definition drives tuples, the `perms` snapshot and the guards, so they cannot disagree. The spec table covers the other domains only. | Hand-maintained namespace list in infra. |
+| A2 | **Role objects are tenant-scoped:** `role:{tenant_id}:{role}#member@user:{user_id}`; grants are subject sets `campaigns:{tenant_id}#write@(role:{tenant_id}:operator#member)`. | The spec example `role:operator#member` is global — an operator of tenant A would satisfy tenant B's grant. Verified on the running Keto that subject-set grants resolve transitively and deny outsiders. | Global role objects (spec example taken literally). |
+| A3 | **Role matrix = API §2:** Owner all; Admin all except `billing:*` **and `tenants:delete`**; Operator and Viewer as specified **plus `tenants:read`**. | Deleting a tenant cancels the subscription and is irreversible — Owner-only. Every dashboard page reads the tenant profile. | Admin may delete the tenant. |
+| A4 | **Live-check set** (never trusted from the JWT): the spec's `rewards:approve/reject/clawback`, `payouts:write/confirm`, `api_keys:manage`, plus `users:write`, `billing:write`, `tenants:delete`. Decisions cached 45 s in Redis (`keto:decision:*`, DB Model §3). | A stale token must not win on money, keys, membership or deletion. | Live Keto on every request. |
+| A5 | **Keto subject = platform user ULID** (`user:{users.id}`); the Kratos identity id stays internal to credential resolution. | API §2 actor table (`user:{id}`), and `users.id` is the id on the wire. | Kratos identity id as subject. |
+| A6 | **Platform scope:** `platform:referralai#admin@user:{id}` for staff routes (tenant suspend/unsuspend, plan catalog, currencies, circuit breakers). **Services:** `services:{capability}#call@service:{client_id}` for internal routes (`tenant_status.read`, `tenant_entitlements.read`, `tenant_contacts.read`, `tenant_verification.write`, `tenant.suspend`, `usage.write`). A route that lists only service capabilities is service-only — human tokens are refused. | Fixes #3 (a tenant Owner could suspend any tenant), #13/#14 (platform tables writable by tenants) and #4 (service tokens bypassed Keto). | The `allowServiceTokens` bypass. |
+| A7 | **Internal JWT minted by tenant-service** at `GET /internal/validate-token` (Architecture §13.1). The gateway (Traefik forwardAuth, `authResponseHeaders: [Authorization]`) exchanges an API key or a Hydra user token for an ES256 JWT `{tenant_id, user_id, identity_id, source, key_type, key_id, perms}`, TTL 5 min (API key: 60 s). JWKS at `/.well-known/jwks.json`, `kid` = RFC 7638 thumbprint. The gateway authenticates with `X-Gateway-Secret`. Closed tenants are refused here. | The spec's design; `perms` is resolved once per token, not per request. | A Hydra token hook — it would put tenant logic inside Hydra's issuance and still leave API keys unsolved. |
+| A8 | **Every service accepts two token kinds:** the internal JWT, and Hydra **client-credentials** tokens for mesh calls. A Hydra token for a human is rejected — dashboard traffic must pass the gateway. The tenant comes only from the verified token; the `x-tenant-id` header fallback is removed everywhere. | #4, #7. | Header-selected tenant. |
+| A9 | **Membership is the write model, Keto is kept in sync:** `users` + `user_roles` change in a transaction; `tenant.created`, `user.registered`, `user.role_changed`, `user.removed` and `tenant.deleted` feed `KetoSyncListener`, which writes `keto` outbox side effects (idempotent tuple patches). A nightly `KetoReconcilerWorker` rewrites every live tenant's grants and memberships from the database. | Follows this repo's rule that services never call SideEffectService directly (`architecture.md`); the reconciler covers the crash window between commit and listener, and repairs drift. | Writing Keto inline (a Keto outage would fail signups). |
+
+### Identity lifecycle
+
+| # | Decision | Why |
+|---|---|---|
+| L1 | **One Ory identity belongs to exactly one tenant** — `users.kratos_identity_id` is globally unique (DB Model v2 §3). | Spec; makes token-time tenant resolution unambiguous. |
+| L2 | **Onboarding** (Kratos after-registration hook `POST /v1/webhook/ory/signup`, or `POST /v1/tenants` for a signed-in identity with no tenant) creates the tenant, its Owner user and the role projection in **one transaction**. A replayed hook returns the existing tenant; a second tenant request gets 409. An address with a pending invitation gets **no** tenant — it joins through the invitation. | #8: signup used to create an ownerless tenant, and duplicates on retry. |
+| L3 | **Role grants:** nobody grants `OWNER` directly (only ownership transfer, by the Owner); nobody grants above their own rank; nobody manages a peer or superior (except the Owner) or themselves; the last Owner/Admin cannot be removed or downgraded. | #5 role escalation. |
+| L4 | **Removal** soft-deletes the member, clears the projection, revokes the Keto membership and ends every Ory session; emits `user.removed`. A removed identity may later join another tenant (the old row is replaced). | #6. |
+| L5 | **Ownership transfer** promotes the target to Owner and demotes the previous Owner to Admin atomically. | #50: it only emitted an event before. |
+| L6 | **Invitations** store only `sha256(token)`; the inviter's rank bounds the invited role; acceptance reads the invitee's email **from Kratos** (never from the token) and claims PENDING→ACCEPTED in the same transaction as the membership; emits `user.invited` (id and role only). | #33. |
+| L7 | **Password confirmation** (lock/unlock) runs a Kratos native login flow and revokes the session it creates, with no retries and outside the circuit breaker. | Batch 1 called `/admin/identities/{id}/credentials/password/verify`, **which does not exist** (404 on the running Kratos) — lock/unlock could never succeed. |
+| L8 | **Ory web hooks** authenticate with a mandatory ≥32-char `ORY_WEBHOOK_API_KEY`, compared in constant time. | #53: an empty value disabled the check. |
+
+### Access tiers, uploads, test routes, outbox
+
+| # | Decision | Why |
+|---|---|---|
+| G1 | **One global `TenantAccessGuard`** (one tenant read per request): suspended → 403 everywhere; self-locked → 403 except `@AllowLockedTenant` (unlock); payment-locked → 402 except `@AllowUnpaidTenant` (billing); restricted → read-only. | The per-controller guards read the tenant from request context, which is **empty while guards run** — the payment tiers never applied over HTTP. Also fixes #11 (unlock unreachable) and #12. |
+| G2 | **One upload policy** for multipart and presigned uploads: png/jpeg/webp/gif/pdf, 10 MB; **SVG removed** (it can carry script). Presigned URLs sign the content type and exact byte size; ULID keys under the tenant prefix. File routes require `tenants:read/write`. | #49. |
+| G3 | **`/test/*` billing routes register only with `ENABLE_TEST_ROUTES=true`.** | #46: they were live on staging. |
+| G4 | **Outbox:** the queue client is injected by class; the worker claims rows atomically and retries a row not yet visible; `OutboxSweeperService` re-enqueues lost or stuck rows every minute; `effect_type` is `text` + CHECK (DB Model §0.3). | `SideEffectService` took its queue client through a string token **no module provided** — every critical side effect was written and never enqueued. Found during live verification. |
+
+### API keys (API §2, DB Model v2 §3 `api_keys`)
+
+| # | Decision | Why |
+|---|---|---|
+| K1 | **`key_hash` = HMAC-SHA256(`API_KEY_HASH_PEPPER`, raw key)**, unique; `key_prefix` = last 4 characters (`char(4)`, unique per tenant, regenerated on the rare clash). | The spec's Redis key `apikey:{key_prefix}:{key_hash8}` and `UNIQUE(key_hash)` need a deterministic hash. A 256-bit random key needs no slow hash; bcrypt forced comparing every key sharing a 4-char suffix (a CPU-DoS vector). The pepper keeps a database leak alone useless. |
+| K2 | **Keys issued before 2026-09-21 were revoked** by migration `20260921210000_api_key_hmac_hash`. | Their raw values are unknown, so they cannot be re-hashed; no production keys existed. |
+| K3 | **Validation cache** `apikey:{prefix}:{hash8}` for 300 s; revoke and rotate delete it, so a revoked key stops at once. The gateway exchange no longer caches API keys separately. | DB Model §3 Redis; #10. |
+| K4 | **`scopes` removed** from keys, DTOs, responses and events. Keys are gated by type only and never carry permissions. | #21, API §2 "keys are never Keto subjects". |
+| K5 | **`api_key.rotated`** is published on rotation; **`api_key.revoked`** carries the optional `?reason=` of the DELETE. `last_used_at` is written at most once a minute per key. | #27, #20, #10. |
+| K6 | Responses list their fields explicitly — the key hash was being returned by create/rotate. | Found during live verification. |
+
+### HTTP conventions (API Contract v1.3 §1) — adopted in full (decision X-1/X-2)
+
+| # | Decision | Why |
+|---|---|---|
+| H1 | **Error body** `{ "error": { type, code, message, param, request_id, doc_url } }` with the spec's type table; `402 → payment_required` is this service's billing extension; validation errors add `details: [{ param, message }]` with full snake_case paths (additive). `Content-Type: application/json`. Replaces RFC 9457. | X-2: the public contract outranks the template rule. |
+| H2 | **`X-Request-Id` on every response**, assigned by middleware before guards run (caller value kept when sane, otherwise `req_<ulid>`), and echoed as `error.request_id`. | Guard failures used to report `requestId: "unknown"`. |
+| H3 | **snake_case on the wire, camelCase inside:** a global interceptor converts request body/query keys to camelCase before validation and response keys to snake_case; the OpenAPI document is converted the same way. Routes whose payloads belong to someone else (Stripe, Ory web hooks) or are already in wire form (JWKS, the gateway exchange) are `@RawWire`. | 105 routes: converting at the boundary is uniform and cannot miss a field, where hand-renaming every DTO would. This **replaces the plan's "explicit DTO naming"** default. Free-form JSON (tenant settings) round-trips: its keys are snake_case on the wire too. |
+| H4 | **Cursor pagination** `{ data, has_more, next_cursor, prev_cursor }` with `limit` (25, max 100), `starting_after`, `ending_before`; newest first; cursors are ULID ids. Offset pagination and its library are removed. The small currency catalog (keyed by ISO code) is returned as one page. | Spec §1 "All list endpoints use cursor-based pagination. No offset pagination." |
+| H5 | **`Idempotency-Key` mandatory on POST/PATCH** for dashboard callers (optional for service callers, which dedupe on business keys); `idempotency_keys` table (DB Model §0.7), SHA-256 fingerprint of method + path + body, 24 h window, stored response replayed verbatim with `Idempotent-Replayed: true`, 409 `idempotency_key_collision` on reuse with a different body, 409 `idempotency_key_in_flight` + `Retry-After` while the first request runs; a failed request releases its key; hourly purge job. Replaces the per-route Redis `@Idempotent` decorator. Redis `IdempotencyService` stays for message-level dedup. | Spec §1 "Idempotency Strategy". |
+| H6 | CORS no longer allows tenant headers (the tenant comes from the token); it allows `Idempotency-Key` and exposes `X-Request-Id`, `Retry-After`, `Idempotent-Replayed`. | Consistency with A8. |
+
+### Events (DB Model v2 §0.6, Event Model v3 §2, Architecture v1.3 §3.2)
+
+| # | Decision | Why |
+|---|---|---|
+| E1 | **Transactional `event_outbox`** (the §0.6 shape, `text`+CHECK status, UNIQUE(tenant, event_type, external_id), partial `idx_outbox_pending`). Services keep emitting domain events as before; a before-commit hook on the transaction wrapper writes the publishable ones **inside the same transaction**. Events emitted outside a transaction are recorded when emitted, and every publishing site in identity, API keys, invitations and tenant lifecycle now runs its change and its event in one transaction. | "An acknowledged event is eventually processed" without two-phase commit, and without every service calling an outbox by hand (the repo rule keeps side-effect calls out of services). |
+| E2 | **One registry** (`src/common/events/outbox/published-events.ts`) decides what is public and maps each in-process event to its wire event(s): identity events per Event Model v2.1 §4.12; tenant, billing and usage events are this service's documented extensions. Wire names use snake_case actions (`tenant.deletion_scheduled`, not `tenant.deletion-scheduled`). Properties are flat and snake_case (§2.5). `external_id` is deterministic per domain fact. | Replaces the scattered SNS calls in `TenantListener` and `BroadcastEventListener`, which published three payload shapes to three topics. |
+| E3 | **Canonical v3 envelope** in every row: `event_id`, `external_id`, `schema_version`, `event_type`, `event_class: domain`, `occurred_at`, `ingested_at`, `source {origin: platform_service, trust_level: high, producing_service: tenant-service}`, `tenant`, `actor` (operator or system), `object` (object types extended additively with `tenant`, `user`, `api_key`, `subscription`, `invitation`), `properties`, `metadata {correlation_id, request_id}`. | Event Model v3 §2. |
+| E4 | **One topic, `tenant-events`** (AWS `tenant-events.fifo`) for identity and billing alike; message group = tenant, dedup id = `event_id`, message attribute `eventType` for subscription filters. The platform's transport wrapper is kept and carries the v3 envelope as its `payload`. | Architecture §3.2 lists only `tenant-events` for this service; keeping the shared transport wrapper means consumers built on the template keep working. |
+| E5 | **Payment access tiers are `tenant.payment_restricted` / `tenant.payment_locked` / `tenant.payment_restored`**, distinct from the tenant's own `tenant.locked` / `tenant.unlocked`. | #25: `tenant.locked` meant two different things. |
+| E6 | **Relay** (`EventOutboxRelayWorker`): every 2 s, oldest first, one job at a time; a tenant's later events wait after a failure so order holds; 10 attempts then `failed` (logged for an operator); published rows pruned after 7 days. | §0.6. Not run against a real topic — LocalStack has no `tenant-events.fifo` until the shared infrastructure creates it. |
+| E7 | **tenant-service consumes nothing** (Architecture §2.1): the SQS usage consumer is removed; usage is metered only through the internal API, which dedupes on an `Idempotency-Key` business key (e.g. `referral.converted:{referral_id}`). | #28. |
+
+### Data model and audit trail (DB Model v2 §3, API Contract v1.3 §8.3)
+
+| # | Decision | Why |
+|---|---|---|
+| D1 | **One tenant status vocabulary:** `active`, `suspended`, `locked`, `closed` (text + CHECK). `deleted` rows migrated to `closed`; the unused `TenantStatusEnum` (with `pending` / `deletion_scheduled`) is gone. `locked` is kept as an **additive** value for the owner's self-service lock (§0.3 treats adding a value as non-breaking). Payment tiers stay in `payment_status`. | #31: two enums disagreed and the spec set has no self-lock state. |
+| D2 | **Verification states per spec:** `unverified`, `pending`, `verified`, `rejected` (`pending_review` migrated to `pending`). | #31. |
+| D3 | **`data_region`** (default `eu-central-1`, set at creation, not editable), **`retention_months`** (6–36, default 24, editable by the owner through `PATCH /v1/tenants`) and **`metadata`** added to `tenants`. **`plan` stays in `billings`** (the billing aggregate), not duplicated on `tenants`. `deleted_at` is kept instead of the spec's `archived_at`. | Residency and retention are spec columns (§3, API §8.3); a second copy of the plan would drift from Stripe. |
+| D4 | **`users.status`** (`invited` / `active` / `disabled`). A removed operator becomes `disabled`, and `deleted_at` stays the timestamp (the spec's `disabled_at`) so the 15 existing `deleted_at: null` filters keep working. Pending invitees live in `invitations`, so `invited` is allowed but not written today. | #32. |
+| D5 | **`audit_log` is written from the domain events the services already emit**, by a before-commit hook (same mechanism as the event outbox), so an action is audited exactly when it commits. Recorded: every published event with an operator or service principal, plus the non-published operator actions (settings, API key label, invitation resend, subdomain reserve/release). Not recorded: sign-ins, usage meters and trial clocks. The system is recorded as actor only for erasure (`tenant.deleted`, `user.anonymised`). `action` / target reuse the public event name and object; change sets split into `before` / `after`; the IP is stored only as a SHA-256 hash; the row id is the domain event id. No FK to `tenants`, so the trail outlives the tenant purge. | #34, DB Model v2 §0.5 and §3. Reusing the events means a new operator action is audited by emitting its event, with no second call to forget. |
+| D6 | **`GET /v1/audit-log`** (human only, `audit:read`, i.e. Owner and Admin): cursor pagination plus `action`, `target_type`, `target_id`, `actor_user_id`, `occurred_after`, `occurred_before`. The IP hash is not returned. | API §8.3 says "dashboard only" and names no path. |
+| D7 | **Removed the audit placeholders:** `AuditTrailListener` (SQS to an `audit-trail.fifo` no service consumes), `ApiKeyListener` (same queue), the `audit.*` duplicate emits, and the `email` / `audit` side-effect types, whose workers only logged "would send". The `effect_type` CHECK is now `sqs`, `sns`, `keto`. | They lost the data silently. `audit_log` replaces the audit path. Invitation emails are unaffected: `EmailNotificationListener` still sends them to notification-service (reviewed in the notification phase). |
+| D8 | **A transaction keeps the whole request context** (IP, user agent, metadata), not only the log fields. | Found by the audit trail: actions inside a transaction had no IP. |
+
+### Deletion, erasure, retention and verification (API Contract v1.3 §8.3, Product Spec v4 "DSR Propagation", DB Model v2 §3)
+
+| # | Decision | Why |
+|---|---|---|
+| P1 | **Tenant deletion is a saga driven by `tenants.deletion_due_at`**, run by an hourly sweeper (`TenantDeletionSweeperWorker`) instead of a delayed BullMQ job. Scheduling sets the due date (1–90 days, default 30); cancelling clears it; the saga re-checks both before running, so a cancelled deletion never executes. | #36. A delayed job is lost with Redis and had no retry; the database is the source of truth. |
+| P2 | **Saga order:** (1) Stripe subscription cancelled **immediately**, no refund or prorated invoice (`BillingService.closeForDeletion`, idempotent); (2) every member's Ory identity deleted (ends all sessions, 404 counts as done); (3) one transaction: API keys revoked, members anonymised in place, roles, invitations, notification preferences and tenant settings deleted, the tenant closed with name `Deleted tenant` and slug `deleted-{id}`, `tenant.deleted` written to the outbox. Every step is idempotent; a failure is retried by the next sweep, and the tenant stays open until the last step commits. | #36: before this, a "deleted" tenant only had its status flipped: it was **still billed**, its keys and sessions still worked, and its PII stayed. |
+| P3 | **Kept after deletion:** the Stripe customer and its invoices (accounting retention), billing usage rows (no personal data), the `audit_log` (12 more months). The tenant logo file is not deleted (company branding, not personal data). | Legal retention; Product Spec v4 "Tension handled honestly". |
+| P4 | **Data-subject erasure is an internal endpoint, not a queue consumer:** `POST /v1/internal/erasures/operators` (service capability `dsr.erase`), called by the compliance orchestrator's workflow activity with `{dsr_id, subject_email_hash | user_id}`. It returns this service's **receipt** (`completed` / `not_found` / `blocked`, erased ids, what is retained) and emits `user.anonymised`. | Product Spec v4 fans DSRs out from a Temporal orchestrator; Architecture §2.1 says tenant-service consumes nothing, and a synchronous activity gets the receipt without a reply queue. **Changes plan item "each service consumes `dsr.requested`" for this service only.** |
+| P5 | **Operator erasure anonymises in place** (`member-erasure.ts`): email → `erased-{id}@erased.invalid` (undeliverable), `email_hash` of that placeholder, name null, `kratos_identity_id` → `erased:{id}`, status `disabled`; the row id stays so audit rows and other services' references stay valid. The Ory identity, roles, preferences and pending invitations to the address are deleted. The Owner of an open tenant is **`blocked`** (they transfer ownership or delete the tenant first). Participants (`/v1/erasure-requests`, `referrers:*`) are not held here. | API §8.3 "PII → hashed tokens"; a tenant is never left without an Owner. |
+| P6 | **Retention sweep** (`RetentionSweeperWorker`, nightly 04:20): `audit_log` deleted 12 months after its tenant closed; invitations deleted 30 days after they can no longer be accepted (they hold the invitee's address); delivered side effects pruned after 7 days. `tenants.retention_months` is **published** (`tenant.created` with `data_region`, `tenant.updated` when it changes) for the services that hold event data to apply. | X-10 retention defaults; tenant-service holds no event data. |
+| P7 | **`tenant_verifications`** backs `verification_status`: signup opens a `company` verification (`pending`) in the onboarding transaction and `tenant.verification_requested` carries its id. The workflow's `PATCH /v1/internal/tenants/{id}/verification` now reports `pending` / `in_review` / `verified` / `rejected` for a `verification_type` (default `company`), optionally with `verification_id`, `temporal_workflow_id` / `temporal_run_id`, `evidence` (document references only), `reviewed_by`, `reason`. Only `company` verifications move the tenant's status (`in_review` shows as `pending`). | #54, DB Model v2 §3 (R7: Temporal ids make a crashed verification resumable). |
+| P8 | Removed the dead `features/tenant/stripe.service.ts` (never provided). | #47. |
+
+### Billing — Stripe webhooks (T6a)
+
+| # | Decision | Why |
+|---|---|---|
+| B1 | **`stripe_events` table** (Stripe event id as primary key) replaces the 24 h Redis dedup marker. Each event is recorded on arrival, then applied in a transaction that locks its row (`SELECT … FOR UPDATE`): state change, outbox events and the `processed` mark commit together. A redelivery or concurrent duplicate is acknowledged without effect. The payload is **not** stored (it can hold customer PII; Stripe keeps events 30 days). Processed/ignored rows are pruned after 90 days; `failed` rows are kept for an operator. | #39. Before: every handler caught and logged its own errors, so a failed event was still marked processed and **silently lost**; a Redis flush replayed old events. |
+| B2 | **Out-of-order guard:** `billings.last_stripe_event_at` holds Stripe's `created` of the last applied state event; every state change is a compare-and-set on it, so an older event arriving late is recorded `ignored`. Tenant payment-status moves are compare-and-set too. | #39. Stripe does not guarantee delivery order. |
+| B3 | **Failures propagate:** a handler error marks the row `failed` with the error and returns 5xx, so Stripe redelivers (up to 3 days). A bad signature is a 400 (not retried). Stripe reads (subscription plan, charge customer) happen **before** the transaction opens. Webhook routes answer **200**. | #39. |
+| B4 | **Handled events:** `checkout.session.completed`, `invoice.paid` / `invoice.payment_succeeded`, `invoice.payment_failed`, **`invoice.payment_action_required`** (SCA → `payment.action_required` with the hosted invoice URL, for notification-service to email the Owner), **`customer.subscription.created/updated`** (status, plan, and cancel-at-period-end changes made in Stripe are mirrored), `customer.subscription.deleted`, **`charge.dispute.created/closed`** (→ `payment.dispute_opened` / `payment.dispute_closed`), **`charge.refunded`** (→ `payment.refunded`). `invoice_payment.paid` is ignored (it duplicates `invoice.paid`, and its object is not an invoice). | #38. |
+| B5 | **Full Stripe status mapping:** `billings.status` now mirrors Stripe (`trialing`, `active`, `past_due`, `unpaid`, `incomplete`, `paused`, `canceled`; `incomplete_expired` → `canceled`; `none` = never subscribed). "Has a subscription" checks (trial expiry, plan limits, cancel) use the live set `trialing/active/past_due/unpaid`, so a past-due tenant keeps its plan while dunning runs. | #38: only `none/active/canceled` existed, so any other Stripe state was invisible. |
+| B6 | **A failed payment never un-escalates:** `invoice.payment_failed` moves only an `active` tenant to `past_due`; a `restricted` or `locked` tenant stays where dunning put it. | Found while porting: the old handler set `past_due` from any state. |
+| B7 | Webhook handling moved out of `BillingService` into `StripeWebhookService` (BillingService: 1217 → ~650 lines). Both `/api/webhook/stripe` and `/api/webhooks/stripe` stay (the Stripe dashboard may point at either). | SRP. |
+
+### Billing — Stripe calls (T6b)
+
+| # | Decision | Why |
+|---|---|---|
+| S1 | **Stripe idempotency keys on every write made for an API request:** `{operation}:{subject}:{the request's Idempotency-Key}` (checkout, upgrade, downgrade schedule, cancel, reactivate, setup intent, payment-method changes, portal). The tenant-deletion cancel uses `tenant-deletion:{subscription}`. Writes outside a request rely on the SDK's own retry keys (`maxNetworkRetries: 2`, 20 s timeout). One Stripe client is reused instead of one per call. | #43: a client retry could create a second checkout or a second proration invoice. The request key already exists (API v1.3 makes it mandatory on POST/PATCH), so it names the business intent exactly. |
+| S2 | **Checkout reuses the tenant's Stripe customer** (`customer`), sets `client_reference_id` and `subscription_data.metadata.tenantId`. | Found while wiring tax: every checkout created a **new Stripe customer**, so a tenant could end up with several, and its payment methods and invoices split across them. |
+| S3 | **Stripe Tax behind `STRIPE_AUTOMATIC_TAX`** (default `false`, recommended `true` in production once Stripe Tax is enabled on the account): `automatic_tax`, `tax_id_collection`, required billing address, `customer_update` for existing customers. | #44: EU VAT (Product Spec EU-first). Off by default so a Stripe account without Stripe Tax does not fail checkout. |
+| S4 | **`GET /v1/billings/invoices` is cursor-paginated** with Stripe's own invoice-id cursors (`limit`, `starting_after`, `ending_before`; API v1.3 envelope). A tenant with no Stripe customer gets an empty page instead of a 400. | #44: it returned at most 100 invoices, silently. |
+| S5 | **`POST /v1/billings/portal-session`** (`billing:write`, reachable while unpaid) returns a Stripe Customer Portal URL: cards, billing address, tax ids, invoice PDFs. New env `STRIPE_PORTAL_RETURN_URL`. | Plan item "Customer Portal"; the unpaid Owner needs a way to fix payment. |
+
+### Billing — plans, limits, usage and dunning (T6c)
+
+| # | Decision | Why |
+|---|---|---|
+| U1 | **Durable usage counters (`usage_counters`)** replace the Redis-only counters. Monthly metrics are keyed `YYYY-MM` (UTC), so a new month is a new row and **nothing is reset**; gauges (`campaigns`) use period `current`. Metering is **one atomic SQL statement** that adds only while under the limit (`INSERT … ON CONFLICT DO UPDATE … WHERE value + n <= limit`). Verified on real Postgres: 20 concurrent requests against a limit of 10 add exactly 10. | #42: losing Redis reset every limit; "check, then increment" let concurrent callers overshoot. |
+| U2 | **`POST /internal/tenants/{id}/usage/increment` meters atomically against the plan** (402 `plan_limit_exceeded` when exhausted); `/decrement` releases, never below zero. | #41. |
+| U3 | **Seats are counted, not metered:** operators plus invitations that can still be accepted. Enforced when inviting and when adding a user; a pending invitation already holds its seat, so accepting it is never refused. The API key limit (`api_keys` in the plan, if set) counts live keys. A plan that does not name a metric leaves it **unlimited**. | #41: no seat or key limit was enforced anywhere. |
+| U4 | **Data-driven plans:** limits come from the `plans` catalog by plan name (a tenant's manual-invoicing plan first). The env price ids are now used only to talk to Stripe (checkout, price → plan). | #45: limits were resolved through env price ids, so a missing env var silently meant "no limits". |
+| U5 | **Real downgrade validation:** a downgrade is refused (409 with `over_limit`) while usage (seats, gauges, this month's metered usage) exceeds the target plan. | #41: it was a placeholder that only logged. |
+| U6 | **`GET /v1/internal/tenants/{id}/entitlements`** (`tenant_entitlements.read`): plan, subscription/payment/tenant status, trial end, data region, retention months, `limits` and `usage` (seats included). | Plan item; campaign, ingestion and reward services enforce against it. |
+| U7 | **Usage thresholds (80 % / 100 %) and monthly summaries read the counters.** Thresholds fire once per metric and month (deduplicated in `billing_events`, and by `external_id` in the outbox); limits come from the plan catalog. | They read limits from a Redis key nothing ever wrote, so **no threshold ever fired**. |
+| U8 | **Dunning is configurable** (`BILLING_DUNNING_RESTRICT_AFTER_DAYS`=7, `BILLING_DUNNING_LOCK_AFTER_DAYS`=14) and each step is a compare-and-set committed with its event, so a payment arriving mid-run is never overwritten. Suspended or self-locked tenants are escalated too. | #40. |
+| U9 | Upgrade, cancellation, downgrade scheduling and trial expiry now commit their change and event in one transaction. | Plan item "wrap billing emits in transactions". |
+| U10 | **Integration specs** (`*.integration.spec.ts`, `pnpm test:integration`, real Docker Postgres) are separate from the unit run. | X-5; starts T8. |
+
+### Operations, admin routes, tests (T8)
+
+| # | Decision | Why |
+|---|---|---|
+| O1 | **Worker pods get a probe-only HTTP server** (`WORKER_HEALTH_PORT`, default 3001): `GET /health/live`, `GET /health/ready` (Postgres + Redis); everything else 404. The worker serves no API. | #55: worker pods had no probe at all. |
+| O2 | **Domain metrics** (`DomainMetrics`, pushed over OTLP like the rest): `tenant_outbox_published_total`, `tenant_outbox_failed_total`, `tenant_outbox_pending`, `tenant_outbox_pending_oldest_seconds`, `tenant_deletions_total{result}`, `billing_dunning_escalations_total{to}`, `usage_limit_rejections_total{metric}`, `dsr_operator_erasures_total{status}`; Stripe webhooks keep `billing_subscription_events_total{result}`. **Alert on:** oldest pending outbox row growing, any `tenant_outbox_failed_total`, any `tenant_deletions_total{result="failed"}`, Stripe `result=error`. | #56. |
+| O3 | **Cached tenant access state** (`TenantStateCache`): the per-request tier check reads a 15 s Redis entry, evicted when a state change commits (suspend, lock, deletion, payment status); Redis down falls back to Postgres, never to allowing access. | #58: one Postgres read per request. |
+| O4 | **Platform-admin lock/unlock:** `POST /v1/admin/tenants/{id}/lock` (`reason`, optional `lock_until`) and `/unlock`, platform admin only (live Keto). **Timed locks now expire:** a 5-minute sweeper unlocks tenants past `lock_until`. | #15; found: nothing ever queued the unlock job, so a `lock_until` was never honoured. |
+| O5 | **Operator contacts for notification-service:** `GET /v1/internal/tenants/{id}/users/{userId}/contact` and `GET /v1/internal/tenants/{id}/contacts?role=OWNER` (`tenant_contacts.read`); live operators only. | Decision X-3. |
+| O6 | **Custom domains behind `FEATURE_CUSTOM_DOMAINS`** (default off): setting or verifying a domain is a 409 while off, instead of accepting a domain that is never served (ACM/CloudFront provisioning does not exist). | #52. |
+| O7 | **Messaging is producer-only:** SQS consumers were created for every configured queue (other services' queues included) with no handlers; tenant-service consumes nothing (Architecture §2.1). Removed with the consumer-side template code (DLQ consumer/replay, message processor, consumer decorators, Redis consumer dedupe, SES client). | Found during coverage work. |
+| O8 | **Dead template code removed:** ClickHouse client/config (tenant-service owns no ClickHouse data; every pod opened a client), `common/mock`, `common/clients`, `common/rules-engines`, S3 key builder, unused exception classes, unused Redis/date/mapper/metrics/BullJobs helpers, the unused Redis subscriber connection, four never-emitted billing event classes. `@clickhouse/client` dependency removed. | Less surface; no code without a caller. |
+| O9 | **Tests and gate:** `pnpm test:cov` enforces lines/statements ≥ 80 %, functions ≥ 75 %, branches ≥ 65 % (current 82 / 83 / 76 / 69; ratchet branches and functions up). Coverage counts logic files only (generated Prisma client, modules, DTOs, types, config and the dev-only `test-billing.controller.ts` are excluded). Integration specs (`pnpm test:integration`) run on the Docker infrastructure; BDD (`pnpm test:bdd`) covers HTTP flows incl. really signed Stripe webhooks. | Decision X-5. |
+| O10 | Small fixes found while testing: the subscription view reported `payment_status: active` for any tenant without a trial; BullMQ connections now use `maxRetriesPerRequest: null` (was overridden with a warning on every boot); Stripe plan sync no longer warns for every absent limit key. | |
+| O11 | **Probes on the unversioned paths.** `/health/live`, `/health/ready` and `/health` are version-neutral; with URI versioning they were only served at `/v1/health/*`, so the load balancer and Kubernetes probes the Helm chart points at `/health/*` got 404. | Found while aligning notification-service. |
+| O12 | **Tenant communication profile for notification-service:** `GET /v1/internal/tenants/{id}/profile` (`tenant_contacts.read`) → `tenant_id, name, status, locale, app_url, reply_to`. The last three come from the tenant's `general` settings keys `locale` (BCP 47, canonicalised), `app_url` (https only) and `support_email`; null when unset or malformed. | Emails show the tenant's brand and link to the client's own app (API §7.1); events carry ids only. |
+| O13 | **Request logs carry method, path and status only.** pino-http's default serializers logged every request header (bearer tokens, cookies, the Ory and Stripe web hook secrets), the client IP and full URLs with their query strings; the exception filter logged full URLs too. | Found while hardening notification-service logs (its M4). |
+
+### Not done — deferred (shared phase or later), tenant-service
+
+| Item | Why deferred / what is needed |
+|---|---|
+| Helm values for the new env vars (`STRIPE_AUTOMATIC_TAX`, `STRIPE_PORTAL_RETURN_URL`, `BILLING_DUNNING_*`, `WORKER_HEALTH_PORT`, `FEATURE_CUSTOM_DOMAINS`, `INTERNAL_JWT_*`, `GATEWAY_SHARED_SECRET`, `ORY_WEBHOOK_API_KEY`, `API_KEY_HASH_PEPPER`) and the worker Deployment's probes on `WORKER_HEALTH_PORT` | Shared deployment phase (Helm/CI). |
+| Keto namespaces, Traefik forwardAuth, Kratos web hooks, SNS topic `tenant-events.fifo` | Shared infrastructure — see `my-docs/cross-service-requirements.md` §2. Until then the outbox relay cannot publish and Keto writes 404 locally. |
+| Custom-domain provisioning (ACM certificate + CloudFront alias) | Infrastructure work; then set `FEATURE_CUSTOM_DOMAINS=true`. |
+| Stripe catalog naming | Plan limits resolve by plan **name**: the Stripe product names must equal the plan names (`Free`, `Starter`, `Growth`, `Enterprise`) for synced plans to match `billings.plan`. |
+| Stripe Tax | Enable Stripe Tax on the account, then `STRIPE_AUTOMATIC_TAX=true`. |
+| Outbound headers | The HTTP client and outbound interceptor add `x-tenant-id` / `x-user-id` to every outbound call, external ones included. Restrict to internal hosts (review with the platform lead). |
+| Client IP | `AlsAuthInterceptor` trusts the first `X-Forwarded-For` value; correct behind Traefik, spoofable if the service is ever reached directly. Configure the trusted proxy in the shared phase. |
+| Unused config left in place | `aws.sqs.pollingEnabled` and consumer tuning, `temporalConfig`, `IIdempotentHandlerOptions` type — harmless, remove in a config clean-up. |
+| Invitation email path | `EmailNotificationListener` still sends invitation emails to notification-service over SQS (raw token in the message). Reviewed in the notification phase (N2: recipient lookup). |
+| Branch/function coverage | Gate floors 65 % / 75 %; raise as tests are added. |
+| `tasks/lessons.md`, `tenant-implementation.md` | Updated at the end of the service pass. |
+
+### Superseded rules (flagged for the lead, not rewritten)
+
+- `CLAUDE.md` / `.claude/rules/security.md` say errors are "RFC 9457 ProblemDetail". Per decision X-2 the
+  platform uses the API Contract v1.3 `{error:{type,code,message,param,request_id,doc_url}}` body (H1).
+- `CLAUDE.md` "Consumes: …usage consumer on ANALYTICS_SVC_FIFO" and its Keto description are superseded by
+  the model above.
+
+### For the colleague's services
+
+Full, step-by-step list: `D:\Projects\Work\REFERRAL\my-docs\cross-service-requirements.md`. In short:
+
+- Accept the internal JWT (issuer `referralai-tenant-svc`, audience `referralai-internal`, JWKS at
+  tenant-service `/.well-known/jwks.json`) and read `perms`; call Keto live only for the high-risk set.
+- Check permissions as `{namespace}:{tenant_id}#{relation}` with subject `user:{user_id}`.
+- Service-to-service calls into tenant-service use a Hydra client-credentials token whose client is granted
+  the capability in Keto.
 
 ---
 

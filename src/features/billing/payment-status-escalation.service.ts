@@ -1,87 +1,85 @@
 import { Injectable } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 
-import type { Tenant } from '@prisma-gen/generated/client';
+import type { AllConfigType } from '@config/config.type';
 import { PaymentStatusEnum } from '@common/enums/billing.enum';
-import { TenantStatusEnum } from '@common/enums/tenant.enum';
-
+import { TenantStatus } from '@domains/tenant/tenant.types';
 import { DatabaseService } from '@app/database/database.service';
 import { AppLoggerService } from '@common/logging/app-logger.service';
 import { TransactionEventEmitterService } from '@common/events/transaction-event-emitter.service';
-
 import { BillingEvents, TenantPaymentStatusChangedEvent } from '@domains/billing';
+import { DomainMetrics } from '@common/monitoring/domain-metrics.service';
 
+const DAY_MS = 86_400_000;
+
+/**
+ * Dunning: a tenant whose payment keeps failing goes `past_due` → `restricted` → `locked` after the
+ * configured number of days in each state (`BILLING_DUNNING_*`). A payment restores it through the Stripe
+ * webhook. Each step is a compare-and-set on the status it escalates from, committed with its event, so a
+ * payment arriving during the run is never overwritten.
+ */
 @Injectable()
 export class PaymentStatusEscalationService {
-    private static readonly PAST_DUE_TO_RESTRICTED_MS = 7 * 24 * 60 * 60 * 1000;
-    private static readonly RESTRICTED_TO_LOCKED_MS = 14 * 24 * 60 * 60 * 1000;
-
     constructor(
         private readonly prisma: DatabaseService,
         private readonly logger: AppLoggerService,
-        private readonly txEventEmitter: TransactionEventEmitterService
+        private readonly txEventEmitter: TransactionEventEmitterService,
+        private readonly config: ConfigService<AllConfigType>,
+        private readonly domainMetrics: DomainMetrics
     ) {
         this.logger.setContext(PaymentStatusEscalationService.name);
     }
 
-    async runEscalation(): Promise<void> {
-        const now = new Date();
-
-        const tenants = await this.prisma.tenant.findMany({
-            where: {
-                status: TenantStatusEnum.ACTIVE,
-                paymentStatus: {
-                    in: [PaymentStatusEnum.PAST_DUE, PaymentStatusEnum.RESTRICTED]
+    async runEscalation(now = new Date()): Promise<void> {
+        const billing = this.config.get('billingConfig', { infer: true });
+        const steps: Array<{ from: PaymentStatusEnum; to: PaymentStatusEnum; afterDays: number }> = [
+            { from: PaymentStatusEnum.PAST_DUE, to: PaymentStatusEnum.RESTRICTED, afterDays: billing?.dunningRestrictAfterDays ?? 7 },
+            { from: PaymentStatusEnum.RESTRICTED, to: PaymentStatusEnum.LOCKED, afterDays: billing?.dunningLockAfterDays ?? 14 }
+        ];
+        for (const step of steps) {
+            const due = await this.prisma.tenant.findMany({
+                where: {
+                    status: { not: TenantStatus.CLOSED },
+                    deletedAt: null,
+                    paymentStatus: step.from,
+                    OR: [{ paymentStatusChangedAt: null }, { paymentStatusChangedAt: { lte: new Date(now.getTime() - step.afterDays * DAY_MS) } }]
                 },
-                deletedAt: null
-            }
-        });
-
-        for (const tenant of tenants) {
-            const changedAt = tenant.paymentStatusChangedAt;
-
-            if (!changedAt) {
-                await this.prisma.tenant.update({
-                    where: { id: tenant.id },
-                    data: { paymentStatusChangedAt: now }
-                });
-                continue;
-            }
-
-            const elapsedMs = now.getTime() - changedAt.getTime();
-
-            if (tenant.paymentStatus === PaymentStatusEnum.PAST_DUE) {
-                if (elapsedMs >= PaymentStatusEscalationService.PAST_DUE_TO_RESTRICTED_MS) {
-                    await this.transition(tenant, PaymentStatusEnum.RESTRICTED, now);
-                }
-                continue;
-            }
-
-            if (tenant.paymentStatus === PaymentStatusEnum.RESTRICTED && elapsedMs >= PaymentStatusEscalationService.RESTRICTED_TO_LOCKED_MS) {
-                await this.transition(tenant, PaymentStatusEnum.LOCKED, now);
+                select: { id: true, paymentStatusChangedAt: true }
+            });
+            for (const tenant of due) {
+                await (tenant.paymentStatusChangedAt
+                    ? this.escalate(tenant.id, step.from, step.to, now)
+                    : this.startClock(tenant.id, step.from, now));
             }
         }
     }
 
-    private async transition(tenant: Tenant, nextStatus: PaymentStatusEnum, now: Date): Promise<void> {
-        const previousStatus = tenant.paymentStatus;
-
-        if (previousStatus === nextStatus) {
-            return;
-        }
-
-        await this.prisma.tenant.update({
-            where: { id: tenant.id },
-            data: {
-                paymentStatus: nextStatus,
-                paymentStatusChangedAt: now
-            }
+    /** A status set without a timestamp starts its clock now instead of escalating at once. */
+    private async startClock(tenantId: string, status: PaymentStatusEnum, now: Date): Promise<void> {
+        await this.prisma.tenant.updateMany({
+            where: { id: tenantId, paymentStatus: status, paymentStatusChangedAt: null },
+            data: { paymentStatusChangedAt: now }
         });
+    }
 
-        this.logger.warn(`Escalated tenant paymentStatus: tenantId=${tenant.id}, from=${previousStatus}, to=${nextStatus}`);
-
-        this.txEventEmitter.emitAfterCommit(
-            BillingEvents.TENANT_PAYMENT_STATUS_CHANGED,
-            new TenantPaymentStatusChangedEvent(tenant.id, tenant.id, previousStatus ?? '', nextStatus, now.toISOString())
-        );
+    private async escalate(tenantId: string, from: PaymentStatusEnum, to: PaymentStatusEnum, now: Date): Promise<void> {
+        const escalated = await this.prisma.$transaction(async (tx) => {
+            const { count } = await tx.tenant.updateMany({
+                where: { id: tenantId, paymentStatus: from },
+                data: { paymentStatus: to, paymentStatusChangedAt: now }
+            });
+            if (count === 0) {
+                return false;
+            }
+            this.txEventEmitter.emitAfterCommit(
+                BillingEvents.TENANT_PAYMENT_STATUS_CHANGED,
+                new TenantPaymentStatusChangedEvent(tenantId, tenantId, from, to, now.toISOString(), 'dunning')
+            );
+            return true;
+        });
+        if (escalated) {
+            this.domainMetrics.dunningEscalation(to);
+            this.logger.warn('Dunning escalated a tenant', { tenantId, from, to });
+        }
     }
 }

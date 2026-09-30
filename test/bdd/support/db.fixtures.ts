@@ -8,6 +8,7 @@
  * Fixture IDs are prefixed with "bdd-" to make them easy to identify.
  */
 
+import { createHash } from 'crypto';
 import pg from 'pg';
 import { PrismaClient } from '../../../src/prisma/generated/client';
 import { PrismaPg } from '@prisma/adapter-pg';
@@ -136,24 +137,56 @@ export async function clearInvitations(tenantId: string): Promise<void> {
 
 export async function seedPendingInvitation(params: { tenantId: string; email: string; token: string; role: string }): Promise<void> {
     const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000);
+    const tokenHash = sha256(params.token);
     await fixturesPrisma.invitation.upsert({
-        where: { token: params.token },
+        where: { tokenHash },
         update: { tenantId: params.tenantId, email: params.email, role: params.role, status: 'PENDING', expiresAt, deletedAt: null },
-        create: { tenantId: params.tenantId, email: params.email, role: params.role, status: 'PENDING', token: params.token, expiresAt }
+        create: { tenantId: params.tenantId, email: params.email, role: params.role, status: 'PENDING', tokenHash, expiresAt }
     });
 }
 
 /** Remove an invitation + any membership its acceptance created, so the accept flow re-runs cleanly. */
 export async function cleanupInvitationFlow(params: { tenantId: string; token: string; kratosIdentityId: string }): Promise<void> {
-    const users = await fixturesPrisma.user
-        .findMany({ where: { tenantId: params.tenantId, kratosIdentityId: params.kratosIdentityId } })
-        .catch(() => [] as { id: string }[]);
+    const users = await fixturesPrisma.user.findMany({ where: { kratosIdentityId: params.kratosIdentityId } }).catch(() => [] as { id: string }[]);
     const ids = users.map((u) => u.id);
     if (ids.length > 0) {
         await fixturesPrisma.userRole.deleteMany({ where: { userId: { in: ids } } }).catch(() => undefined);
         await fixturesPrisma.user.deleteMany({ where: { id: { in: ids } } }).catch(() => undefined);
     }
-    await fixturesPrisma.invitation.deleteMany({ where: { token: params.token } }).catch(() => undefined);
+    await fixturesPrisma.invitation.deleteMany({ where: { tokenHash: sha256(params.token) } }).catch(() => undefined);
+}
+
+const sha256 = (value: string): string => createHash('sha256').update(value, 'utf8').digest('hex');
+
+/** Seed (idempotently) a member of the tenant — the acting user of membership-aware routes. */
+export async function ensureMember(params: {
+    tenantId: string;
+    userId: string;
+    kratosIdentityId: string;
+    email: string;
+    role: string;
+}): Promise<void> {
+    const role = await fixturesPrisma.role.findUnique({ where: { name: params.role }, select: { id: true } });
+    const data = {
+        tenantId: params.tenantId,
+        kratosIdentityId: params.kratosIdentityId,
+        email: params.email,
+        emailHash: sha256(params.email.toLowerCase()),
+        role: params.role,
+        deletedAt: null
+    };
+    await fixturesPrisma.user.upsert({ where: { id: params.userId }, update: data, create: { id: params.userId, ...data } });
+    if (role) {
+        await fixturesPrisma.userRole.upsert({
+            where: { userId_roleId: { userId: params.userId, roleId: role.id } },
+            update: {},
+            create: { userId: params.userId, roleId: role.id, tenantId: params.tenantId }
+        });
+    }
+}
+
+export async function clearIdempotencyKeys(tenantId: string): Promise<void> {
+    await fixturesPrisma.idempotencyKey.deleteMany({ where: { tenantId } });
 }
 
 export async function cleanupTenant(id: string): Promise<void> {

@@ -6,6 +6,7 @@ import { LoggerModule as PinoLoggerModule } from 'nestjs-pino';
 import { Environment } from '@app/types';
 
 import { AppLoggerService } from '@common/logging/app-logger.service';
+import { pathOf } from '@common/logging/request-path';
 import { JsonService } from '@common/helper/json.service';
 
 import type { AllConfigType } from '@config/config.type';
@@ -80,11 +81,21 @@ import type { AllConfigType } from '@config/config.type';
                         autoLogging: {
                             ignore: (req) => ['/health', '/metrics'].some((p) => req.url?.startsWith(p))
                         },
+                        // Method, path and status only. pino-http's defaults log every header — bearer tokens, cookies,
+                        // the Ory and Stripe web hook secrets — the client IP, and query strings with tokens.
+                        serializers: {
+                            req: (req: { id?: unknown; method?: string; url?: string }) => ({
+                                id: req.id,
+                                method: req.method,
+                                path: pathOf(req.url)
+                            }),
+                            res: (res: { statusCode?: number }) => ({ statusCode: res.statusCode })
+                        },
                         customSuccessMessage: (req, res) => {
-                            return `✅ ${req.method} ${req.url} ${res.statusCode}`;
+                            return `✅ ${req.method} ${pathOf(req.url)} ${res.statusCode}`;
                         },
                         customErrorMessage: (req, res, err) => {
-                            return `❌ ${req.method} ${req.url} ${res.statusCode} - ${err.message}`;
+                            return `❌ ${req.method} ${pathOf(req.url)} ${res.statusCode} - ${err.message}`;
                         },
                         ...(transport ? { transport } : {})
                     }

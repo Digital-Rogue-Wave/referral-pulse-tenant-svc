@@ -9,7 +9,8 @@
 
 import { BeforeAll, AfterAll, Before, After, setDefaultTimeout } from '@cucumber/cucumber';
 import { bootstrapTestApp, teardownTestApp } from './app.bootstrap';
-import { setupNock, teardownNock } from './nock.setup';
+import { setupNock, stubKratosIdentity, teardownNock } from './nock.setup';
+import { BDD_OWNER } from './jwt.helper';
 import {
     createSuspendedTenant,
     createLockedTenant,
@@ -21,6 +22,8 @@ import {
     seedPendingInvitation,
     cleanupInvitationFlow,
     disconnectFixturesPrisma,
+    ensureMember,
+    clearIdempotencyKeys,
     FIXTURE_IDS
 } from './db.fixtures';
 import type { BddWorldInterface } from './world';
@@ -37,6 +40,10 @@ BeforeAll(async function () {
     // nock MUST be set up before the app boots so the JWKS intercept is in place
     setupNock();
     await bootstrapTestApp();
+    // Every "valid JWT for tenant default-tenant" acts as this Owner.
+    await ensureMember({ tenantId: DEFAULT_TENANT_ID, ...BDD_OWNER, role: 'OWNER' });
+    // Fixed Idempotency-Keys in scenarios must start each run unused.
+    await clearIdempotencyKeys(DEFAULT_TENANT_ID);
 });
 
 AfterAll(async function () {
@@ -58,6 +65,7 @@ const INVITEE_EMAIL = 'invitee-bdd@acme.com';
 const INVITEE_KRATOS_ID = 'kratos-invitee-bdd';
 
 Before({ tags: '@needs-pending-invitation' }, async function () {
+    stubKratosIdentity(INVITEE_KRATOS_ID, INVITEE_EMAIL);
     await cleanupInvitationFlow({ tenantId: DEFAULT_TENANT_ID, token: INVITE_TOKEN, kratosIdentityId: INVITEE_KRATOS_ID });
     await seedPendingInvitation({ tenantId: DEFAULT_TENANT_ID, email: INVITEE_EMAIL, token: INVITE_TOKEN, role: 'OPERATOR' });
 });

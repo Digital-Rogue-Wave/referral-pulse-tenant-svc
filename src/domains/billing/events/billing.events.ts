@@ -135,70 +135,6 @@ export class TrialExpiredEvent extends BaseDomainEvent {
     }
 }
 
-export class PaymentFailedEvent extends BaseDomainEvent {
-    readonly eventType = 'payment.failed' as const;
-
-    constructor(
-        public readonly aggregateId: string,
-        public readonly tenantId: string,
-        public readonly previousStatus: string,
-        public readonly nextStatus: string,
-        public readonly changedAt: string,
-        public readonly reason?: string,
-        public readonly userId?: string
-    ) {
-        super();
-    }
-}
-
-export class PaymentRestoredEvent extends BaseDomainEvent {
-    readonly eventType = 'payment.restored' as const;
-
-    constructor(
-        public readonly aggregateId: string,
-        public readonly tenantId: string,
-        public readonly previousStatus: string,
-        public readonly nextStatus: string,
-        public readonly changedAt: string,
-        public readonly reason?: string,
-        public readonly userId?: string
-    ) {
-        super();
-    }
-}
-
-export class TenantRestrictedEvent extends BaseDomainEvent {
-    readonly eventType = 'tenant.restricted' as const;
-
-    constructor(
-        public readonly aggregateId: string,
-        public readonly tenantId: string,
-        public readonly previousStatus: string,
-        public readonly nextStatus: string,
-        public readonly changedAt: string,
-        public readonly reason?: string,
-        public readonly userId?: string
-    ) {
-        super();
-    }
-}
-
-export class TenantRestoredEvent extends BaseDomainEvent {
-    readonly eventType = 'tenant.restored' as const;
-
-    constructor(
-        public readonly aggregateId: string,
-        public readonly tenantId: string,
-        public readonly previousStatus: string,
-        public readonly nextStatus: string,
-        public readonly changedAt: string,
-        public readonly reason?: string,
-        public readonly userId?: string
-    ) {
-        super();
-    }
-}
-
 export class UsageMonthlySummaryEvent extends BaseDomainEvent {
     readonly eventType = 'usage.monthly_summary' as const;
 
@@ -234,6 +170,60 @@ export class UsageThresholdCrossedEvent extends BaseDomainEvent {
     }
 }
 
+/** Stripe needs the customer to authenticate a payment (SCA / 3-D Secure) before it can be collected. */
+export class PaymentActionRequiredEvent extends BaseDomainEvent {
+    readonly eventType = 'payment.action_required' as const;
+
+    constructor(
+        public readonly aggregateId: string,
+        public readonly tenantId: string,
+        public readonly stripeEventId: string,
+        public readonly stripeInvoiceId: string,
+        public readonly hostedInvoiceUrl: string | null,
+        public readonly amountDue: number,
+        public readonly currency: string
+    ) {
+        super();
+    }
+}
+
+/** A card payment was disputed (chargeback) or a dispute was decided. */
+export class PaymentDisputedEvent extends BaseDomainEvent {
+    readonly eventType = 'payment.disputed' as const;
+
+    constructor(
+        public readonly aggregateId: string,
+        public readonly tenantId: string,
+        public readonly stripeEventId: string,
+        public readonly phase: 'opened' | 'closed',
+        public readonly disputeId: string,
+        public readonly chargeId: string,
+        public readonly amount: number,
+        public readonly currency: string,
+        public readonly reason: string,
+        public readonly disputeStatus: string
+    ) {
+        super();
+    }
+}
+
+/** A payment was refunded, fully or in part. */
+export class PaymentRefundedEvent extends BaseDomainEvent {
+    readonly eventType = 'payment.refunded' as const;
+
+    constructor(
+        public readonly aggregateId: string,
+        public readonly tenantId: string,
+        public readonly stripeEventId: string,
+        public readonly chargeId: string,
+        public readonly amountRefunded: number,
+        public readonly currency: string,
+        public readonly fullyRefunded: boolean
+    ) {
+        super();
+    }
+}
+
 export const BillingEvents = {
     SUBSCRIPTION_CHANGED: 'subscription.changed',
     SUBSCRIPTION_CREATED: 'subscription.created',
@@ -245,9 +235,7 @@ export const BillingEvents = {
     TRIAL_EXPIRED: 'trial.expired',
     USAGE_THRESHOLD_CROSSED: 'usage.threshold_crossed',
     USAGE_MONTHLY_SUMMARY: 'usage.monthly_summary',
-    PAYMENT_FAILED: 'payment.failed',
-    PAYMENT_RESTORED: 'payment.restored',
-    TENANT_RESTRICTED: 'tenant.restricted',
-    TENANT_LOCKED: 'tenant.locked',
-    TENANT_RESTORED: 'tenant.restored'
+    PAYMENT_ACTION_REQUIRED: 'payment.action_required',
+    PAYMENT_DISPUTED: 'payment.disputed',
+    PAYMENT_REFUNDED: 'payment.refunded'
 } as const;

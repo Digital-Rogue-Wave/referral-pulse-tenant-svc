@@ -1,13 +1,13 @@
-import { Controller, Get, Body, Put, HttpCode, HttpStatus, UploadedFile, UseGuards, UseInterceptors, Query } from '@nestjs/common';
+import { Controller, Get, Body, Put, HttpCode, HttpStatus, UploadedFile, UseInterceptors, Query } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
-import { ApiBody, ApiConsumes, ApiExtraModels, ApiOkResponse, ApiTags, getSchemaPath, ApiBearerAuth, ApiHeader } from '@nestjs/swagger';
 
-import { RequirePermission } from '@common/auth/require-permission.decorator';
-import { KetoNamespace, KetoRelation } from '@common/auth/keto.constants';
+import { FILE_UPLOAD_OPTIONS } from '@app/features/files/file-upload.policy';
+import { ApiBody, ApiConsumes, ApiExtraModels, ApiOkResponse, ApiTags, getSchemaPath, ApiBearerAuth } from '@nestjs/swagger';
+
+import { AllowLockedTenant, RequirePermission } from '@common/auth/require-permission.decorator';
 import { CurrentUser } from '@common/auth/current-user.decorator';
 import type { IAuthenticatedUser } from '@app/types';
 import { ParseFormdataPipe } from '@common/pipes/parse-formdata.pipe';
-import { Idempotent, IdempotencyScope } from '@common/idempotency';
 
 import {
     TenantResponse,
@@ -26,19 +26,9 @@ import {
 
 import { TenantService } from '../tenant.service';
 import { TenantStatsService } from './tenant-stats.service';
-import { TenantStatusGuard } from '../guards/tenant-status.guard';
-import { TenantLockGuard } from '../guards/tenant-lock.guard';
-import { PaymentRequiredGuard } from '@app/features/billing/guards/payment-required.guard';
 
 @ApiTags('Aware Tenants')
-@ApiHeader({
-    name: 'tenant-id',
-    required: true,
-    description: 'Tenant-Id header',
-    schema: { type: 'string' }
-})
 @ApiBearerAuth()
-@UseGuards(TenantStatusGuard, TenantLockGuard, PaymentRequiredGuard)
 @Controller({ path: 'tenants', version: '1' })
 export class AwareTenantController {
     constructor(
@@ -46,6 +36,7 @@ export class AwareTenantController {
         private readonly statsService: TenantStatsService
     ) {}
 
+    @RequirePermission('tenants:read')
     @Get('subdomain/check')
     @ApiOkResponse({
         description: 'Check if subdomain is available',
@@ -56,6 +47,7 @@ export class AwareTenantController {
         return await this.tenantService.checkSubdomainAvailability(subdomain);
     }
 
+    @RequirePermission('tenants:read')
     @Get('stats')
     @ApiOkResponse({
         description: 'Get dashboard stats for current tenant',
@@ -66,6 +58,7 @@ export class AwareTenantController {
         return await this.statsService.getStats();
     }
 
+    @RequirePermission('tenants:read')
     @Get('custom-domain/status')
     @ApiOkResponse({
         description: 'Get custom domain verification status',
@@ -76,6 +69,7 @@ export class AwareTenantController {
         return await this.tenantService.getDomainStatus();
     }
 
+    @RequirePermission('tenants:read')
     @Get('profile')
     @ApiOkResponse({ type: TenantProfileResponse })
     @HttpCode(HttpStatus.OK)
@@ -84,7 +78,6 @@ export class AwareTenantController {
     }
 
     @Put()
-    @Idempotent({ scope: IdempotencyScope.Tenant, ttl: 1800 })
     @ApiConsumes('multipart/form-data')
     @ApiExtraModels(UpdateTenantDto)
     @ApiBody({
@@ -102,8 +95,8 @@ export class AwareTenantController {
         }
     })
     @ApiOkResponse({ type: TenantResponse })
-    @RequirePermission({ namespace: KetoNamespace.TENANT, relation: KetoRelation.UPDATE })
-    @UseInterceptors(FileInterceptor('file'))
+    @RequirePermission('tenants:write')
+    @UseInterceptors(FileInterceptor('file', FILE_UPLOAD_OPTIONS))
     @HttpCode(HttpStatus.OK)
     async update(
         @CurrentUser() user: IAuthenticatedUser,
@@ -114,65 +107,60 @@ export class AwareTenantController {
     }
 
     @Put('custom-domain/verify')
-    @Idempotent({ scope: IdempotencyScope.Tenant, ttl: 1800 })
     @ApiOkResponse({
         description: 'Domain verified successfully',
         type: TenantResponse
     })
-    @RequirePermission({ namespace: KetoNamespace.TENANT, relation: KetoRelation.UPDATE })
+    @RequirePermission('tenants:write')
     @HttpCode(HttpStatus.OK)
     async verifyCustomDomain(): Promise<TenantResponse> {
         return await this.tenantService.verifyCustomDomain();
     }
 
     @Put('transfer-ownership')
-    @Idempotent({ scope: IdempotencyScope.Tenant, ttl: 1800 })
     @ApiBody({ type: TransferOwnershipDto })
     @ApiOkResponse({ description: 'Ownership transferred successfully' })
-    @RequirePermission({ namespace: KetoNamespace.TENANT, relation: KetoRelation.UPDATE })
+    @RequirePermission('users:write')
     @HttpCode(HttpStatus.OK)
     async transferOwnership(@Body() dto: TransferOwnershipDto, @CurrentUser() user: IAuthenticatedUser): Promise<void> {
         return await this.tenantService.transferOwnership(dto, user);
     }
 
     @Put('schedule-deletion')
-    @Idempotent({ scope: IdempotencyScope.Tenant, ttl: 1800 })
     @ApiBody({ type: ScheduleDeletionDto })
     @ApiOkResponse({
         description: 'Deletion scheduled successfully',
         type: DeletionScheduledResponse
     })
-    @RequirePermission({ namespace: KetoNamespace.TENANT, relation: KetoRelation.DELETE })
+    @RequirePermission('tenants:delete')
     @HttpCode(HttpStatus.OK)
     async scheduleDeletion(@Body() dto: ScheduleDeletionDto, @CurrentUser() user: IAuthenticatedUser): Promise<DeletionScheduledResponse> {
         return await this.tenantService.scheduleDeletion(dto, user);
     }
 
     @Put('cancel-deletion')
-    @Idempotent({ scope: IdempotencyScope.Tenant, ttl: 1800 })
     @ApiBody({ type: CancelDeletionDto })
     @ApiOkResponse({ description: 'Deletion cancelled successfully' })
-    @RequirePermission({ namespace: KetoNamespace.TENANT, relation: KetoRelation.UPDATE })
+    @RequirePermission('tenants:delete')
     @HttpCode(HttpStatus.OK)
     async cancelDeletion(@Body() dto: CancelDeletionDto, @CurrentUser() user: IAuthenticatedUser): Promise<void> {
         return await this.tenantService.cancelDeletion(dto, user);
     }
 
     @Put('lock')
-    @Idempotent({ scope: IdempotencyScope.Tenant, ttl: 1800 })
     @ApiBody({ type: LockTenantDto })
     @ApiOkResponse({ type: TenantResponse })
-    @RequirePermission({ namespace: KetoNamespace.TENANT, relation: KetoRelation.UPDATE })
+    @RequirePermission('tenants:write')
     @HttpCode(HttpStatus.OK)
     async lock(@Body() dto: LockTenantDto, @CurrentUser() user: IAuthenticatedUser): Promise<TenantResponse> {
         return await this.tenantService.lock(dto, user);
     }
 
     @Put('unlock')
-    @Idempotent({ scope: IdempotencyScope.Tenant, ttl: 1800 })
     @ApiBody({ type: UnlockTenantDto })
     @ApiOkResponse({ type: TenantResponse })
-    @RequirePermission({ namespace: KetoNamespace.TENANT, relation: KetoRelation.UPDATE })
+    @RequirePermission('tenants:write')
+    @AllowLockedTenant()
     @HttpCode(HttpStatus.OK)
     async unlock(@Body() dto: UnlockTenantDto, @CurrentUser() user: IAuthenticatedUser): Promise<TenantResponse> {
         return await this.tenantService.unlock(dto, user);

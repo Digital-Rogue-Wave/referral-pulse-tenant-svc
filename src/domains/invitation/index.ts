@@ -1,4 +1,4 @@
-import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import { ApiProperty } from '@nestjs/swagger';
 import { IsEmail, IsEnum } from 'class-validator';
 
 import { BaseResponseMapper } from '@common/helper';
@@ -77,7 +77,7 @@ export interface InvitationProps {
     email: string;
     role: string;
     status: string;
-    token: string;
+    tokenHash: string;
     expiresAt: Date;
     createdAt: Date;
     updatedAt: Date;

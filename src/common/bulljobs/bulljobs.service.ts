@@ -1,6 +1,6 @@
 import { Injectable, OnModuleDestroy } from '@nestjs/common';
 
-import { Queue, Job, JobState } from 'bullmq';
+import { Queue, Job } from 'bullmq';
 
 import { TenantContextService } from '@app/common/tenant-aware/tenant-context.service';
 import type { IBaseJobData, IJobOptions, IQueueMetrics } from '@app/types';
@@ -103,37 +103,6 @@ export class BullJobsService implements OnModuleDestroy {
     }
 
     /**
-     * Add multiple jobs in bulk (more efficient)
-     */
-    async addBulk<T extends IBaseJobData>(queueName: string, jobs: Array<{ name: string; data: T; options?: IJobOptions }>): Promise<Job<T>[]> {
-        const queue = this.getQueue<T>(queueName);
-
-        const enrichedJobs = jobs.map((job) => ({
-            name: job.name,
-            data: {
-                ...job.data,
-                tenantId: job.data.tenantId || this.tenantContext.getTenantId(),
-                userId: job.data.userId || this.tenantContext.getUserId(),
-                correlationId: job.data.correlationId || this.tenantContext.getCorrelationId()
-            } as T,
-            opts: {
-                ...this.getDefaultJobOptions(),
-                ...job.options
-            }
-        }));
-
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any -- BullMQ's ExtractNameType doesn't accept plain string
-        const addedJobs = await queue.addBulk(enrichedJobs as any);
-
-        this.logger.log(`✅ Added ${jobs.length} jobs to queue ${queueName}`, {
-            queueName,
-            count: jobs.length
-        });
-
-        return addedJobs;
-    }
-
-    /**
      * Add a delayed job (scheduled for future execution)
      */
     async addDelayedJob<T extends IBaseJobData>(
@@ -178,28 +147,6 @@ export class BullJobsService implements OnModuleDestroy {
     }
 
     /**
-     * Get job state
-     */
-    async getJobState(queueName: string, jobId: string): Promise<JobState | 'unknown'> {
-        const job = await this.getJob(queueName, jobId);
-        if (!job) {
-            return 'unknown';
-        }
-        return job.getState();
-    }
-
-    /**
-     * Remove a job
-     */
-    async removeJob(queueName: string, jobId: string): Promise<void> {
-        const job = await this.getJob(queueName, jobId);
-        if (job) {
-            await job.remove();
-            this.logger.debug(`Job ${jobId} removed from queue ${queueName}`);
-        }
-    }
-
-    /**
      * Retry a failed job
      */
     async retryJob(queueName: string, jobId: string): Promise<void> {
@@ -236,30 +183,6 @@ export class BullJobsService implements OnModuleDestroy {
     }
 
     /**
-     * Get completed jobs
-     */
-    async getCompletedJobs<T extends IBaseJobData = IBaseJobData>(queueName: string, start = 0, end = 10): Promise<Job<T>[]> {
-        const queue = this.getQueue<T>(queueName);
-        return queue.getCompleted(start, end);
-    }
-
-    /**
-     * Get waiting jobs
-     */
-    async getWaitingJobs<T extends IBaseJobData = IBaseJobData>(queueName: string, start = 0, end = 10): Promise<Job<T>[]> {
-        const queue = this.getQueue<T>(queueName);
-        return queue.getWaiting(start, end);
-    }
-
-    /**
-     * Get active jobs
-     */
-    async getActiveJobs<T extends IBaseJobData = IBaseJobData>(queueName: string, start = 0, end = 10): Promise<Job<T>[]> {
-        const queue = this.getQueue<T>(queueName);
-        return queue.getActive(start, end);
-    }
-
-    /**
      * Clean old jobs from queue
      */
     async cleanQueue(
@@ -278,39 +201,5 @@ export class BullJobsService implements OnModuleDestroy {
         });
 
         return cleaned;
-    }
-
-    /**
-     * Pause queue (stop processing new jobs)
-     */
-    async pauseQueue(queueName: string): Promise<void> {
-        const queue = this.getQueue(queueName);
-        await queue.pause();
-        this.logger.log(`⏸️ Queue paused: ${queueName}`);
-    }
-
-    /**
-     * Resume queue
-     */
-    async resumeQueue(queueName: string): Promise<void> {
-        const queue = this.getQueue(queueName);
-        await queue.resume();
-        this.logger.log(`▶️ Queue resumed: ${queueName}`);
-    }
-
-    /**
-     * Empty queue (remove all jobs)
-     */
-    async emptyQueue(queueName: string): Promise<void> {
-        const queue = this.getQueue(queueName);
-        await queue.drain();
-        this.logger.warn(`🗑️ Queue emptied: ${queueName}`);
-    }
-
-    /**
-     * Get all registered queues
-     */
-    getRegisteredQueues(): string[] {
-        return Array.from(this.queues.keys());
     }
 }

@@ -11,4 +11,3 @@ export { InterceptorModule } from './interceptor.module';
 // Interceptors
 export { AlsAuthInterceptor } from './als-auth.interceptor';
 export { HttpOutboundInterceptor } from './http-outbound.interceptor';
-export { IdempotencyInterceptor } from './idempotency.interceptor';

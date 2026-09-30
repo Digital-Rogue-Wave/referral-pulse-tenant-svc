@@ -5,7 +5,7 @@ import { ulid } from 'ulid';
 import { z } from 'zod';
 
 import { TenantContextService } from '@app/common/tenant-aware/tenant-context.service';
-import type { RequestContext, IMessageEnvelope, IMessageMetadata } from '@app/types';
+import type { IMessageEnvelope } from '@app/types';
 
 import { DateService } from '@common/helper/date.service';
 import { JsonService } from '@common/helper/json.service';
@@ -31,17 +31,6 @@ const envelopeSchema = z.object({
     metadata: z.object({
         userId: z.string().min(1, 'userId is required'),
         traceId: z.string().min(1, 'traceId is required'),
-        spanId: z.string().optional()
-    })
-});
-
-/**
- * Schema for system messages (no userId required)
- */
-const systemEnvelopeSchema = envelopeSchema.extend({
-    metadata: z.object({
-        userId: z.string().optional(),
-        traceId: z.string().optional(),
         spanId: z.string().optional()
     })
 });
@@ -125,88 +114,5 @@ export class MessageEnvelopeService {
         }
 
         return envelope;
-    }
-
-    /**
-     * Create envelope for system messages (no user context required).
-     * Used for system-level events, maintenance, and cross-tenant operations.
-     *
-     * @param eventType - Event type identifier
-     * @param payload - Event payload
-     * @param tenantId - Tenant ID (defaults to 'system' for system-wide messages)
-     * @param idempotencyKey - Optional idempotency key for deduplication
-     */
-    createSystemEnvelope<T>(eventType: string, payload: T, tenantId?: string, idempotencyKey?: string): IMessageEnvelope<T> {
-        const traceInfo = this.tracingService.getCurrentTraceInfo();
-
-        const envelope: IMessageEnvelope<T> = {
-            messageId: ulid(),
-            eventType,
-            version: '1.0',
-            timestamp: this.dateService.nowISO(),
-            source: this.serviceName,
-            tenantId: tenantId || 'system',
-            correlationId: ulid(),
-            idempotencyKey,
-            payload,
-            metadata: {
-                userId: 'system',
-                traceId: traceInfo?.traceId || ulid(),
-                spanId: traceInfo?.spanId
-            }
-        };
-
-        // Validate the system envelope
-        const result = systemEnvelopeSchema.safeParse(envelope);
-        if (!result.success) {
-            const errors = result.error.issues.map((issue) => `${issue.path.join('.')}: ${issue.message}`).join(', ');
-            throw new Error(`Invalid system message envelope: ${errors}`);
-        }
-
-        return envelope;
-    }
-
-    /**
-     * Parse a message body into an envelope using simdjson for performance.
-     * Validates all required fields including traceability context.
-     * @throws Error if envelope is invalid or missing required fields
-     */
-    parseEnvelope<T>(body: string): IMessageEnvelope<T> {
-        const parsed = this.jsonService.parse<unknown>(body);
-
-        // Validate envelope structure
-        const result = envelopeSchema.safeParse(parsed);
-        if (!result.success) {
-            const errors = result.error.issues.map((issue) => `${issue.path.join('.')}: ${issue.message}`).join(', ');
-            throw new Error(`Invalid message envelope: ${errors}`);
-        }
-
-        return result.data as IMessageEnvelope<T>;
-    }
-
-    /**
-     * Extract ALS context from envelope for setting up tenant context.
-     */
-    extractRequestContext(envelope: IMessageEnvelope): Partial<RequestContext> {
-        return {
-            tenantId: envelope.tenantId,
-            userId: envelope.metadata?.userId || '',
-            correlationId: envelope.correlationId,
-            requestId: envelope.messageId,
-            traceId: envelope.metadata?.traceId,
-            spanId: envelope.metadata?.spanId,
-            idempotencyKey: envelope.idempotencyKey
-        };
-    }
-
-    /**
-     * Wrap a handler to run within tenant context from envelope.
-     * Use this in your message handlers to ensure multi-tenancy.
-     */
-    async withTenantContext<T, R>(envelope: IMessageEnvelope<T>, handler: (payload: T, envelope: IMessageEnvelope<T>) => Promise<R>): Promise<R> {
-        const context = this.extractRequestContext(envelope);
-        return this.tenantContext.runWithContext(context, async () => {
-            return handler(envelope.payload, envelope);
-        });
     }
 }

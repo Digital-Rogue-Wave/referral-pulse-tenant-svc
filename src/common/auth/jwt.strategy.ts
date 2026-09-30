@@ -1,138 +1,92 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, UnauthorizedException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { PassportStrategy } from '@nestjs/passport';
 
+import type { Request } from 'express';
+import * as jwt from 'jsonwebtoken';
 import { passportJwtSecret } from 'jwks-rsa';
 import { Strategy, ExtractJwt } from 'passport-jwt';
 
-import { IAuthenticatedUser, IJwtPayload } from '@app/types';
+import type { IAuthenticatedUser, IInternalTokenClaims, IJwtPayload } from '@app/types';
 
 import type { AllConfigType } from '@config/config.type';
 
+type KeyProvider = (request: Request, rawJwtToken: string, done: (err: unknown, secretOrKey?: string | Buffer) => void) => void;
+type InternalPayload = IJwtPayload & IInternalTokenClaims;
+
 /**
- * JWT Strategy using JWKS (JSON Web Key Set) for token validation.
- * Validates OpenID Connect tokens from auth providers (Auth0, Ory Kratos, etc.)
+ * Verifies the two token kinds a service may receive (Architecture §13.1, API Contract v1.3 §2):
+ *
+ * 1. The internal JWT minted by tenant-service's /internal/validate-token — every dashboard and API-key
+ *    request, after the gateway exchanged the credential. Carries tenant_id, user_id, source, key_type, perms.
+ * 2. An Ory Hydra client-credentials token — service-to-service calls on the mesh.
+ *
+ * A Hydra token for a *human* is rejected: dashboard traffic must come through the gateway, which is the
+ * only place `perms` is resolved.
  */
 @Injectable()
 export class JwtStrategy extends PassportStrategy(Strategy) {
-    private readonly tenantClaimPath: string;
+    private readonly hydraIssuer: string;
 
-    constructor(private readonly configService: ConfigService<AllConfigType>) {
-        const jwksUri = configService.getOrThrow('auth.jwksUri', { infer: true });
-        const issuer = configService.getOrThrow('auth.issuer', { infer: true });
-        const audience = configService.getOrThrow('auth.audience', { infer: true });
-        const algorithms = configService.getOrThrow('auth.algorithms', {
-            infer: true
-        });
-        const clockTolerance = configService.getOrThrow('auth.clockTolerance', {
-            infer: true
-        });
-        const cacheEnabled = configService.getOrThrow('auth.cacheEnabled', {
-            infer: true
-        });
-        const cacheTtl = configService.getOrThrow('auth.cacheTtl', { infer: true });
-
-        super({
-            jwtFromRequest: ExtractJwt.fromAuthHeaderAsBearerToken(),
-            secretOrKeyProvider: passportJwtSecret({
-                cache: cacheEnabled,
+    constructor(configService: ConfigService<AllConfigType>) {
+        const auth = configService.getOrThrow('auth', { infer: true });
+        const keyProviderFor = (jwksUri: string): KeyProvider =>
+            passportJwtSecret({
+                cache: auth.cacheEnabled,
                 rateLimit: true,
                 jwksRequestsPerMinute: 10,
                 jwksUri,
-                ...(cacheEnabled && { cacheMaxAge: cacheTtl * 1000 })
-            }),
-            issuer,
-            audience,
-            algorithms: algorithms as ('RS256' | 'RS384' | 'RS512' | 'ES256' | 'ES384' | 'ES512')[],
-            jsonWebTokenOptions: {
-                clockTolerance
-            }
+                ...(auth.cacheEnabled && { cacheMaxAge: auth.cacheTtl * 1000 })
+            }) as KeyProvider;
+        const internalKeys = keyProviderFor(auth.internalJwksUri);
+        const hydraKeys = keyProviderFor(auth.jwksUri);
+
+        super({
+            jwtFromRequest: ExtractJwt.fromAuthHeaderAsBearerToken(),
+            secretOrKeyProvider: (request: Request, rawJwtToken: string, done: (err: unknown, key?: string | Buffer) => void) => {
+                const decoded = jwt.decode(rawJwtToken) as { iss?: string } | null;
+                const provider = decoded?.iss === auth.internalIssuer ? internalKeys : hydraKeys;
+                provider(request, rawJwtToken, done);
+            },
+            issuer: [auth.internalIssuer, auth.issuer],
+            audience: [auth.internalAudience, auth.audience],
+            algorithms: auth.algorithms as jwt.Algorithm[],
+            jsonWebTokenOptions: { clockTolerance: auth.clockTolerance }
         });
 
-        this.tenantClaimPath = configService.get('auth.tenantClaimPath', { infer: true }) || 'tenantId';
+        this.hydraIssuer = auth.issuer;
     }
 
-    /**
-     * Validate JWT payload and extract user information.
-     * This is called after the token signature is verified.
-     *
-     * Handles two token types:
-     * - User tokens (authorization_code): has sub = user ID, ext.tenant_id, email
-     * - Service tokens (client_credentials): has sub = client ID, client_id field
-     */
-    async validate(payload: IJwtPayload): Promise<IAuthenticatedUser> {
-        if (this.isServiceToken(payload)) {
-            return this.buildServiceUser(payload);
+    validate(payload: IJwtPayload): IAuthenticatedUser {
+        if (payload.iss === this.hydraIssuer) {
+            return this.buildServicePrincipal(payload);
         }
-
-        return this.buildHumanUser(payload);
+        return this.buildInternalPrincipal(payload as InternalPayload);
     }
 
-    private isServiceToken(payload: IJwtPayload): boolean {
-        return payload.grant_type === 'client_credentials' || (!!payload.client_id && !payload.email && !payload.ext?.user_id);
-    }
-
-    private buildServiceUser(payload: IJwtPayload): IAuthenticatedUser {
-        const tenantId = this.extractNestedClaim(payload, this.tenantClaimPath);
-
+    private buildServicePrincipal(payload: IJwtPayload): IAuthenticatedUser {
+        if (payload.grant_type !== 'client_credentials' && !(payload.client_id && payload.sub === payload.client_id)) {
+            throw new UnauthorizedException('User tokens must be exchanged at the gateway');
+        }
         return {
-            userId: payload.sub,
-            tenantId: tenantId ?? '',
-            clientId: payload.client_id,
+            userId: '',
+            tenantId: '',
+            source: 'client_credentials',
             isServiceToken: true,
-            scopes: payload.scp,
-            metadata: this.extractMetadata(payload)
+            clientId: payload.client_id ?? payload.sub
         };
     }
 
-    private buildHumanUser(payload: IJwtPayload): IAuthenticatedUser {
-        // Tenant is normally required, but it is enforced in JwtAuthGuard (which has route context) so
-        // that tenant-optional onboarding routes (@AllowNoTenant, e.g. invitation accept) can pass.
-        const tenantId = this.extractNestedClaim(payload, this.tenantClaimPath);
-        const userId = payload.ext?.user_id ?? payload.sub;
-
+    private buildInternalPrincipal(payload: InternalPayload): IAuthenticatedUser {
         return {
-            userId,
-            tenantId: tenantId ?? '',
-            email: payload.email,
-            roles: payload.ext?.roles,
-            scopes: payload.scp,
-            metadata: this.extractMetadata(payload)
+            userId: payload.user_id ?? '',
+            tenantId: payload.tenant_id ?? '',
+            identityId: payload.identity_id ?? undefined,
+            email: payload.email ?? undefined,
+            source: payload.source,
+            keyType: payload.key_type,
+            keyId: payload.key_id,
+            perms: payload.perms ?? []
         };
-    }
-
-    /**
-     * Extract a claim from JWT payload using a dot-separated path.
-     * Supports nested paths like "ext.tenant_id"
-     */
-    private extractNestedClaim(payload: IJwtPayload, path: string): string | undefined {
-        const parts = path.split('.');
-        let value: unknown = payload;
-
-        for (const key of parts) {
-            value = (value as Record<string, unknown>)?.[key];
-            if (value === undefined) {
-                return undefined;
-            }
-        }
-
-        return typeof value === 'string' ? value : undefined;
-    }
-
-    /**
-     * Extract additional metadata from JWT claims.
-     * Filters out standard JWT claims.
-     */
-    private extractMetadata(payload: IJwtPayload): Record<string, unknown> {
-        const standardClaims = ['sub', 'iss', 'aud', 'exp', 'iat', 'nbf', 'jti', 'azp', 'client_id', 'scp', 'grant_type', 'ext'];
-        const metadata: Record<string, unknown> = {};
-
-        for (const [key, value] of Object.entries(payload)) {
-            if (!standardClaims.includes(key)) {
-                metadata[key] = value;
-            }
-        }
-
-        return metadata;
     }
 }

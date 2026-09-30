@@ -12,6 +12,10 @@
 import { INestApplication, ValidationPipe, VersioningType } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
 
+import { randomBytes } from 'crypto';
+
+import { internalPrivateKeyBase64 } from './jwt.helper';
+
 // Set env overrides BEFORE AppModule is imported so ConfigModule picks them up
 process.env['NODE_ENV'] = 'test';
 // Cache the JWKS signing key: jwks-rsa rate-limits at 10 fetches/min, and with cache
@@ -20,8 +24,15 @@ process.env['NODE_ENV'] = 'test';
 // still checked per token against the (stable) test key.
 process.env['AUTH_CACHE_ENABLED'] = 'true';
 process.env['AUTH_AUDIENCE'] = 'test-audience';
+// Secrets the app refuses to boot without — generated per run, never committed.
+process.env['INTERNAL_JWT_PRIVATE_KEY'] = internalPrivateKeyBase64;
+process.env['GATEWAY_SHARED_SECRET'] = randomBytes(32).toString('hex');
+process.env['ORY_WEBHOOK_API_KEY'] = randomBytes(32).toString('hex');
+process.env['API_KEY_HASH_PEPPER'] = randomBytes(32).toString('hex');
 
 import { AppModule } from '../../../src/app.module';
+import { requestIdMiddleware } from '../../../src/common/http-contract/request-id.middleware';
+import { validationExceptionFactory } from '../../../src/common/http-contract/validation-exception.factory';
 import { StripeService } from '../../../src/features/billing/stripe.service';
 import { fakeStripeService } from './stripe.fake';
 
@@ -38,12 +49,15 @@ export async function bootstrapTestApp(): Promise<INestApplication> {
         .useValue(fakeStripeService)
         .compile();
 
-    app = moduleRef.createNestApplication({ logger: false });
+    // rawBody as in main.ts: Stripe signs the exact bytes it sent.
+    app = moduleRef.createNestApplication({ logger: false, rawBody: true });
+
+    app.use(requestIdMiddleware);
 
     const apiPrefix = process.env['APP_API_PREFIX'] ?? 'api';
 
     app.setGlobalPrefix(apiPrefix, {
-        exclude: ['/health', '/health/ready', '/health/live', '/metrics']
+        exclude: ['/health', '/health/ready', '/health/live', '/metrics', '/.well-known/jwks.json', '/internal/validate-token']
     });
     app.enableVersioning({ type: VersioningType.URI, defaultVersion: '1' });
     app.useGlobalPipes(
@@ -51,7 +65,8 @@ export async function bootstrapTestApp(): Promise<INestApplication> {
             whitelist: true,
             forbidNonWhitelisted: true,
             transform: true,
-            transformOptions: { enableImplicitConversion: true }
+            transformOptions: { enableImplicitConversion: true },
+            exceptionFactory: validationExceptionFactory
         })
     );
 

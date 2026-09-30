@@ -33,9 +33,6 @@ importers:
       '@aws-sdk/s3-request-presigner':
         specifier: ^3.987.0
         version: 3.987.0
-      '@clickhouse/client':
-        specifier: ^1.17.0
-        version: 1.17.0
       '@faker-js/faker':
         specifier: ^10.3.0
         version: 10.3.0
@@ -804,13 +801,6 @@ packages:
 
   '@chevrotain/utils@10.5.0':
     resolution: {integrity: sha512-hBzuU5+JjB2cqNZyszkDHZgOSrUUT8V3dhgRl8Q9Gp6dAj/H5+KILGjbhDpc3Iy9qmqlm/akuOI2ut9VUtzJxQ==}
-
-  '@clickhouse/client-common@1.17.0':
-    resolution: {integrity: sha512-MiwwgXViFAQA2YZkN4ymF1ynzG0K49KeSX9/iOcmJetWkxqSekDdpyp1GjwATWa9R215uQ+hGzJtJujeQVZZIw==}
-
-  '@clickhouse/client@1.17.0':
-    resolution: {integrity: sha512-Y3DQoamKZ/Iyosoq7Lj7lqpDkQDK4R/5mI52yJs4ZLPIO+d6/CYDqTbFBIb4No3C/AlXUYE4TKhj/kXDpe6rOA==}
-    engines: {node: '>=16'}
 
   '@colors/colors@1.5.0':
     resolution: {integrity: sha512-ooWCrlZP11i8GImSjTHYHLkvFDP48nS4+204nGb1RiX/WXYHmJA2III9/e2DWVabCESdW7hBAEzHRqUn9OUVvQ==}
@@ -7972,12 +7962,6 @@ snapshots:
   '@chevrotain/types@10.5.0': {}
 
   '@chevrotain/utils@10.5.0': {}
-
-  '@clickhouse/client-common@1.17.0': {}
-
-  '@clickhouse/client@1.17.0':
-    dependencies:
-      '@clickhouse/client-common': 1.17.0
 
   '@colors/colors@1.5.0':
     optional: true

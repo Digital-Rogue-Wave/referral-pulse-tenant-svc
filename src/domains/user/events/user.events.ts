@@ -54,10 +54,64 @@ export class UserLoggedInEvent extends BaseDomainEvent {
 }
 
 /**
+ * Emitted when an operator is removed from a tenant. Downstream caches keyed on the user must drop it;
+ * the membership is revoked in Keto and the user's Ory sessions are ended.
+ */
+export class UserRemovedEvent extends BaseDomainEvent {
+    readonly eventType = 'user.removed' as const;
+
+    constructor(
+        public readonly aggregateId: string,
+        public readonly tenantId: string,
+        public readonly role: string,
+        public readonly userId?: string
+    ) {
+        super();
+    }
+}
+
+/**
+ * Emitted when an operator is invited to a tenant (Product Spec v4, per-domain events: `user.invited`).
+ * Carries the invitation id and role only — never the invitee's address or the token.
+ */
+export class UserInvitedEvent extends BaseDomainEvent {
+    readonly eventType = 'user.invited' as const;
+
+    constructor(
+        public readonly aggregateId: string,
+        public readonly tenantId: string,
+        public readonly role: string,
+        public readonly userId?: string
+    ) {
+        super();
+    }
+}
+
+/**
+ * Emitted when an operator's personal data is erased for a data-subject request (Product Spec v4 "DSR
+ * Propagation": Identity anonymises the user record). The record keeps its id; `dsrId` ties the receipt to
+ * the request. Services holding the operator's contact details drop them on this event.
+ */
+export class UserAnonymisedEvent extends BaseDomainEvent {
+    readonly eventType = 'user.anonymised' as const;
+
+    constructor(
+        public readonly aggregateId: string,
+        public readonly tenantId: string,
+        public readonly dsrId: string
+    ) {
+        super();
+    }
+}
+
+/**
  * Event type constants for convenience
  */
 export const UserEvents = {
     REGISTERED: 'user.registered',
     ROLE_CHANGED: 'user.role_changed',
-    LOGGED_IN: 'user.logged_in'
+    LOGGED_IN: 'user.logged_in',
+    REMOVED: 'user.removed',
+    INVITED: 'user.invited',
+    ANONYMISED: 'user.anonymised'
 } as const;

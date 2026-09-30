@@ -1,136 +1,118 @@
 /**
  * JWT Helper for BDD tests
  *
- * Generates a throw-away RSA-2048 key pair once at module load.
- * All test tokens are signed with this private key.
- * nock serves the matching public key as a JWKS response so that
- * the real JwtStrategy/jwks-rsa validates tokens without a live Hydra.
+ * Two throw-away key pairs are generated once per run:
+ * - an EC P-256 key standing in for tenant-service's internal-JWT signing key (INTERNAL_JWT_PRIVATE_KEY is
+ *   set from it before the app boots, and nock serves its public half at AUTH_INTERNAL_JWKS_URI) — every
+ *   dashboard request is authenticated with an internal JWT, exactly as behind the gateway;
+ * - an RSA key standing in for Ory Hydra, used only for client-credentials (service) tokens.
+ *
+ * The real JwtStrategy/jwks-rsa validates both, so no guard is mocked.
  */
 
 import * as crypto from 'crypto';
 import * as jwt from 'jsonwebtoken';
 
-// ─── Key pair (generated once per test run) ───────────────────────────────────
+import { ALL_PERMISSIONS } from '../../../src/common/auth/authz/permission-catalog';
 
-const { privateKey, publicKey } = crypto.generateKeyPairSync('rsa', {
+// ─── Keys (generated once per test run) ───────────────────────────────────────
+
+const internalKey = crypto.generateKeyPairSync('ec', {
+    namedCurve: 'P-256',
+    publicKeyEncoding: { type: 'spki', format: 'pem' },
+    privateKeyEncoding: { type: 'pkcs8', format: 'pem' }
+});
+const hydraKey = crypto.generateKeyPairSync('rsa', {
     modulusLength: 2048,
     publicKeyEncoding: { type: 'spki', format: 'pem' },
     privateKeyEncoding: { type: 'pkcs8', format: 'pem' }
 });
 
-const TEST_KID = 'bdd-test-key-1';
-const TEST_ISSUER = 'http://localhost:4444/';
-const TEST_AUDIENCE = 'test-audience';
+const INTERNAL_KID = 'bdd-internal-key-1';
+const HYDRA_KID = 'bdd-hydra-key-1';
+const INTERNAL_ISSUER = 'referralai-tenant-svc';
+const INTERNAL_AUDIENCE = 'referralai-internal';
+const HYDRA_ISSUER = 'http://localhost:4444/';
+const HYDRA_AUDIENCE = 'test-audience';
 
-// ─── JWKS export ──────────────────────────────────────────────────────────────
+/** The default tenant's Owner, seeded by the hooks so membership-aware services find an acting user. */
+export const BDD_OWNER = { userId: 'user-bdd-001', kratosIdentityId: 'kratos-bdd-owner', email: 'owner-bdd@acme.com' } as const;
 
-/**
- * The JWKS JSON that nock serves at /.well-known/jwks.json
- * Uses Node.js native JWK export (available since Node 16).
- */
-export function buildJwks(): { keys: object[] } {
-    const keyObj = crypto.createPublicKey(publicKey);
-    const jwk = keyObj.export({ format: 'jwk' }) as Record<string, unknown>;
+/** Base64 PEM for INTERNAL_JWT_PRIVATE_KEY — the app signs with the same key the tests do. */
+export const internalPrivateKeyBase64 = Buffer.from(internalKey.privateKey).toString('base64');
 
-    return {
-        keys: [
-            {
-                ...jwk,
-                alg: 'RS256',
-                use: 'sig',
-                kid: TEST_KID
-            }
-        ]
-    };
-}
+// ─── JWKS exports ─────────────────────────────────────────────────────────────
+
+const jwksFor = (publicKeyPem: string, kid: string, alg: string): { keys: object[] } => ({
+    keys: [{ ...(crypto.createPublicKey(publicKeyPem).export({ format: 'jwk' }) as Record<string, unknown>), alg, use: 'sig', kid }]
+});
+
+export const buildInternalJwks = (): { keys: object[] } => jwksFor(internalKey.publicKey, INTERNAL_KID, 'ES256');
+export const buildHydraJwks = (): { keys: object[] } => jwksFor(hydraKey.publicKey, HYDRA_KID, 'RS256');
 
 // ─── Token factories ──────────────────────────────────────────────────────────
 
-interface TokenClaims {
-    sub?: string;
-    exp?: number;
-    tenantId?: string;
-    // service token fields
-    client_id?: string;
-    grant_type?: string;
+interface InternalClaims {
+    tenant_id: string | null;
+    user_id: string | null;
+    identity_id: string | null;
+    email: string | null;
+    perms: string[];
 }
 
-function sign(claims: TokenClaims & Record<string, unknown>): string {
-    const { exp, ...rest } = claims;
-    return jwt.sign(
-        {
-            iss: TEST_ISSUER,
-            aud: TEST_AUDIENCE,
-            iat: Math.floor(Date.now() / 1000),
-            ...rest
-        },
-        privateKey,
-        {
-            algorithm: 'RS256',
-            keyid: TEST_KID,
-            ...(exp !== undefined ? { expiresIn: exp - Math.floor(Date.now() / 1000) } : { expiresIn: 3600 })
-        }
-    );
-}
-
-/**
- * A valid user token for a human user belonging to the given tenant.
- * Uses ext.tenant_id path matching AUTH_TENANT_CLAIM_PATH=ext.tenant_id
- */
-export function makeActiveUserToken(tenantId: string, userId = 'user-bdd-001'): string {
-    return sign({
-        sub: userId,
-        ext: {
-            tenant_id: tenantId,
-            user_id: userId,
-            roles: ['member']
-        }
+function signInternal(claims: InternalClaims, expiresInSeconds = 3600): string {
+    return jwt.sign({ source: 'dashboard', key_type: null, key_id: null, ...claims }, internalKey.privateKey, {
+        algorithm: 'ES256',
+        keyid: INTERNAL_KID,
+        issuer: INTERNAL_ISSUER,
+        audience: INTERNAL_AUDIENCE,
+        subject: claims.user_id ? `user:${claims.user_id}` : `identity:${claims.identity_id}`,
+        expiresIn: expiresInSeconds
     });
 }
 
 /**
- * A token for an invitee accepting an invitation: carries an email and identity but NO tenant claim,
- * exercising the @AllowNoTenant path on the accept endpoint.
+ * The internal JWT a dashboard user of the tenant receives from the gateway. Defaults to the seeded
+ * Owner with the full permission snapshot; high-risk permissions are still re-checked against Keto (nock).
  */
+export function makeActiveUserToken(tenantId: string, userId: string = BDD_OWNER.userId, perms: string[] = [...ALL_PERMISSIONS]): string {
+    return signInternal({ tenant_id: tenantId, user_id: userId, identity_id: BDD_OWNER.kratosIdentityId, email: null, perms });
+}
+
+/** An Ory identity with no membership yet (an invitee): no tenant, no permissions — tenant-optional routes only. */
 export function makeInviteeToken(email: string, kratosId = 'kratos-invitee-bdd'): string {
-    return sign({
-        sub: kratosId,
-        email,
-        ext: { user_id: kratosId }
-    });
+    return signInternal({ tenant_id: null, user_id: null, identity_id: kratosId, email, perms: [] });
 }
 
-/**
- * A token that has already expired.
- */
+/** An internal JWT that has already expired. */
 export function makeExpiredToken(tenantId: string): string {
     const now = Math.floor(Date.now() / 1000);
     return jwt.sign(
         {
-            sub: 'user-expired-001',
-            iss: TEST_ISSUER,
-            aud: TEST_AUDIENCE,
+            source: 'dashboard',
+            tenant_id: tenantId,
+            user_id: 'user-expired-001',
+            identity_id: null,
+            email: null,
+            key_type: null,
+            key_id: null,
+            perms: [],
             iat: now - 7200,
-            exp: now - 3600, // expired 1 hour ago
-            ext: {
-                tenant_id: tenantId,
-                user_id: 'user-expired-001'
-            }
+            exp: now - 3600
         },
-        privateKey,
-        { algorithm: 'RS256', keyid: TEST_KID }
+        internalKey.privateKey,
+        { algorithm: 'ES256', keyid: INTERNAL_KID, issuer: INTERNAL_ISSUER, audience: INTERNAL_AUDIENCE }
     );
 }
 
-/**
- * A service token (client_credentials grant).
- * JwtStrategy.isServiceToken() returns true because grant_type === 'client_credentials'
- */
-export function makeServiceToken(tenantId?: string): string {
-    return sign({
-        sub: 'svc-bdd-client',
-        client_id: 'svc-bdd-client',
-        grant_type: 'client_credentials',
-        ...(tenantId ? { ext: { tenant_id: tenantId } } : {})
+/** A Hydra client-credentials token — a service calling tenant-service on the mesh (tenant-less by design). */
+export function makeServiceToken(clientId = 'svc-bdd-client'): string {
+    return jwt.sign({ client_id: clientId }, hydraKey.privateKey, {
+        algorithm: 'RS256',
+        keyid: HYDRA_KID,
+        issuer: HYDRA_ISSUER,
+        audience: HYDRA_AUDIENCE,
+        subject: clientId,
+        expiresIn: 3600
     });
 }

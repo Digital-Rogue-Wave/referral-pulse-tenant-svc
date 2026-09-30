@@ -1,5 +1,6 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { HttpException, HttpStatus } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { mock, MockProxy } from 'jest-mock-extended';
 
 import { TenantService } from './tenant.service';
@@ -12,6 +13,7 @@ import { KratosService } from '@common/auth/kratos.service';
 import { SubdomainService } from '../dns/subdomain.service';
 import { DnsVerificationService } from '../dns/dns-verification.service';
 import { FilesService } from '../files/files.service';
+import { UsersService } from '../users/users.service';
 
 import type { IAuthenticatedUser } from '@app/types';
 
@@ -33,7 +35,7 @@ describe('TenantService — password confirmation on destructive actions', () =>
     let kratos: MockProxy<KratosService>;
     let tenantContext: MockProxy<TenantContextService>;
 
-    const user: IAuthenticatedUser = { userId: 'usr_app_1', tenantId: 'ten_1' };
+    const user: IAuthenticatedUser = { userId: 'usr_app_1', tenantId: 'ten_1', source: 'dashboard' };
     const KRATOS_ID = 'kratos-identity-abc';
 
     const expectUnauthorized = async (action: Promise<unknown>): Promise<void> => {
@@ -49,6 +51,7 @@ describe('TenantService — password confirmation on destructive actions', () =>
         (prisma as unknown as { user: unknown }).user = { findFirst: jest.fn() };
         (prisma as unknown as { tenant: unknown }).tenant = { update: jest.fn().mockResolvedValue({ id: 'ten_1', lockedAt: new Date() }) };
 
+        (prisma as unknown as { $transaction: jest.Mock }).$transaction = jest.fn(async (fn: (tx: unknown) => Promise<unknown>) => fn(prisma));
         kratos = mock<KratosService>();
         tenantContext = mock<TenantContextService>();
         tenantContext.getTenantId.mockReturnValue('ten_1');
@@ -64,7 +67,9 @@ describe('TenantService — password confirmation on destructive actions', () =>
                 { provide: SubdomainService, useValue: mock<SubdomainService>() },
                 { provide: DnsVerificationService, useValue: mock<DnsVerificationService>() },
                 { provide: FilesService, useValue: mock<FilesService>() },
-                { provide: KratosService, useValue: kratos }
+                { provide: KratosService, useValue: kratos },
+                { provide: ConfigService, useValue: mock<ConfigService>() },
+                { provide: UsersService, useValue: mock<UsersService>() }
             ]
         }).compile();
 

@@ -15,10 +15,10 @@ import { StripeRedirectController } from './stripe-redirect.controller';
 // Services
 import { BillingService } from './billing.service';
 import { StripeService } from './stripe.service';
+import { PlanLimitModule } from './plan-limit.module';
+import { StripeWebhookService } from './stripe-webhook.service';
 import { PlanService } from './plan.service';
 import { PlanStripeSyncService } from './plan-stripe-sync.service';
-import { UsageTrackerService } from './usage-tracker.service';
-import { PlanLimitService } from './plan-limit.service';
 import { BillingUsageQueueService } from './billing-queue.service';
 import { DailyUsageCalculator } from './daily-usage-calculator.service';
 import { MonthlyUsageResetService } from './monthly-usage-reset.service';
@@ -26,13 +26,11 @@ import { PaymentStatusEscalationService } from './payment-status-escalation.serv
 import { TrialLifecycleService } from './trial-lifecycle.service';
 
 // Guards
-import { PaymentRequiredGuard } from './guards/payment-required.guard';
 import { UsageCheckGuard } from './guards/usage-check.guard';
 import { BillingGuard } from './guards/billing.guard';
 
 // Processors
 import { BillingUsageProcessor } from './processors/billing-usage.processor';
-import { BillingConsumer } from './billing.consumer';
 
 /**
  * `TestBillingController` is dev scaffolding: ~24 routes under `/test/*` behind
@@ -41,14 +39,15 @@ import { BillingConsumer } from './billing.consumer';
  * direct triggers for all four scheduled billing jobs. It was registered
  * unconditionally, so it shipped to production.
  *
- * Kept for local demos and manual testing, but never registered in production.
- * Module metadata is evaluated at import time, so this reads `process.env`
- * directly rather than ConfigService.
+ * Kept for local demos and manual testing. Registered only when ENABLE_TEST_ROUTES=true is set
+ * explicitly — keying off NODE_ENV left them exposed on staging and any mis-set environment.
+ * Module metadata is evaluated at import time, so this reads `process.env` directly rather than
+ * ConfigService.
  */
-const DEV_ONLY_CONTROLLERS = process.env.NODE_ENV === 'production' ? [] : [TestBillingController];
+const DEV_ONLY_CONTROLLERS = process.env.ENABLE_TEST_ROUTES === 'true' ? [TestBillingController] : [];
 
 @Module({
-    imports: [TenantModule, EventsModule],
+    imports: [TenantModule, EventsModule, PlanLimitModule],
     controllers: [
         BillingController,
         PlanAdminController,
@@ -61,31 +60,26 @@ const DEV_ONLY_CONTROLLERS = process.env.NODE_ENV === 'production' ? [] : [TestB
     providers: [
         BillingService,
         StripeService,
+        StripeWebhookService,
         PlanService,
         PlanStripeSyncService,
-        PaymentRequiredGuard,
-        UsageTrackerService,
         UsageCheckGuard,
-        PlanLimitService,
         BillingGuard,
         BillingUsageQueueService,
         BillingUsageProcessor,
         DailyUsageCalculator,
-        BillingConsumer,
         MonthlyUsageResetService,
         PaymentStatusEscalationService,
         TrialLifecycleService
     ],
     exports: [
+        PlanLimitModule,
         BillingService,
+        StripeWebhookService,
         PlanService,
-        PaymentRequiredGuard,
-        UsageTrackerService,
         UsageCheckGuard,
-        PlanLimitService,
         BillingGuard,
         DailyUsageCalculator,
-        BillingConsumer,
         MonthlyUsageResetService,
         PaymentStatusEscalationService,
         TrialLifecycleService

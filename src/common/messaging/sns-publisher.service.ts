@@ -1,7 +1,7 @@
 import { Injectable, OnModuleInit } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 
-import { SNSClient, PublishCommand, PublishBatchCommand } from '@aws-sdk/client-sns';
+import { SNSClient, PublishCommand } from '@aws-sdk/client-sns';
 import { LRUCache } from 'lru-cache';
 
 import type { IPublishOptions } from '@app/types';
@@ -105,106 +105,5 @@ export class SnsPublisherService implements OnModuleInit {
                 this.messagingMetrics.recordOutboundMessage(topicName, eventType, success, Date.now() - startTime);
             }
         });
-    }
-
-    /**
-     * Publish system message (no tenant context required).
-     * Use for cross-tenant notifications or system events.
-     *
-     * @example
-     * ```typescript
-     * // Notify all tenants about system maintenance
-     * await sns.publishSystem('system-notifications', 'system.maintenance.scheduled', {
-     *   startTime: '2024-01-01T00:00:00Z',
-     *   duration: 3600,
-     * });
-     * ```
-     */
-    async publishSystem<T>(topicName: string, eventType: string, payload: T, tenantId?: string): Promise<string> {
-        const startTime = Date.now();
-
-        return this.tracingService.withSpan('sns.publishSystem', async () => {
-            const topicArn = this.topicMap.get(topicName);
-            if (!topicArn) {
-                this.logger.error(`Topic not configured: ${topicName}`);
-                this.messagingMetrics.recordOutboundMessage(topicName, eventType, false, Date.now() - startTime, tenantId);
-                throw new Error(`Topic not configured: ${topicName}`);
-            }
-
-            const envelope = this.envelopeService.createSystemEnvelope(eventType, payload, tenantId);
-
-            this.logger.debug(`Publishing system message to topic ${topicName}`, {
-                eventType,
-                messageId: envelope.messageId,
-                tenantId: envelope.tenantId
-            });
-
-            let success = true;
-            try {
-                const result = await this.client.send(
-                    new PublishCommand({
-                        TopicArn: topicArn,
-                        Message: this.jsonService.stringify(envelope),
-                        MessageAttributes: {
-                            eventType: { DataType: 'String', StringValue: eventType },
-                            tenantId: { DataType: 'String', StringValue: envelope.tenantId },
-                            isSystem: { DataType: 'String', StringValue: 'true' }
-                        }
-                    })
-                );
-
-                this.logger.log(`System message published to topic ${topicName}: ${result.MessageId}`);
-                return result.MessageId!;
-            } catch (error) {
-                success = false;
-                throw error;
-            } finally {
-                this.messagingMetrics.recordOutboundMessage(topicName, eventType, success, Date.now() - startTime, tenantId);
-            }
-        });
-    }
-
-    async publishBatch<T>(
-        topicName: string,
-        messages: Array<{
-            eventType: string;
-            payload: T;
-            options?: IPublishOptions;
-        }>
-    ): Promise<{ successful: string[]; failed: string[] }> {
-        return this.tracingService.withSpan('sns.publishBatch', async () => {
-            const topicArn = this.topicMap.get(topicName);
-            if (!topicArn) {
-                throw new Error(`Topic not configured: ${topicName}`);
-            }
-            if (messages.length > 10) {
-                throw new Error('SNS batch size cannot exceed 10');
-            }
-
-            const entries = messages.map((msg, i) => {
-                const envelope = this.envelopeService.createEnvelope(msg.eventType, msg.payload);
-                return {
-                    Id: `${i}`,
-                    Message: this.jsonService.stringify(envelope),
-                    MessageGroupId: msg.options?.messageGroupId
-                };
-            });
-
-            const result = await this.client.send(
-                new PublishBatchCommand({
-                    TopicArn: topicArn,
-                    PublishBatchRequestEntries: entries
-                })
-            );
-
-            return {
-                successful: (result.Successful || []).map((s) => s.MessageId!),
-                failed: (result.Failed || []).map((f) => f.Id!)
-            };
-        });
-    }
-
-    getTopicNames(): string[] {
-        return Array.from(this.topicMap.keys());
     }
 }

@@ -30,6 +30,8 @@ model Billing {
   cancellationReason      String?   @map("cancellation_reason") @db.Text
   cancellationRequestedAt DateTime? @map("cancellation_requested_at") @db.Timestamptz
   cancellationEffectiveAt DateTime? @map("cancellation_effective_at") @db.Timestamptz
+  // `created` of the last Stripe event applied to this subscription: an older event arriving late is ignored.
+  lastStripeEventAt       DateTime? @map("last_stripe_event_at") @db.Timestamptz
 
   createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz
   updatedAt DateTime  @updatedAt @map("updated_at") @db.Timestamptz
@@ -78,4 +80,18 @@ model TenantUsage {
 
   @@unique([tenantId, metricName, periodDate])
   @@map("tenant_usages")
+}
+
+// Authoritative usage counters. Monthly metrics are keyed by `YYYY-MM` (a new month is a new row, so there
+// is nothing to reset); gauges such as live campaigns use the period `current`. Updated with one atomic
+// statement per change, so concurrent metering can neither lose an increment nor overshoot a limit.
+model UsageCounter {
+  tenantId  String   @map("tenant_id") @db.VarChar(26)
+  metric    String   @db.VarChar(100)
+  period    String   @db.VarChar(10)
+  value     Int      @default(0)
+  updatedAt DateTime @default(now()) @map("updated_at") @db.Timestamptz
+
+  @@id([tenantId, metric, period])
+  @@map("usage_counters")
 }

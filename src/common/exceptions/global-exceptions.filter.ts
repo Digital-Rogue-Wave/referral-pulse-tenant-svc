@@ -4,10 +4,42 @@ import type { Request, Response } from 'express';
 
 import { BaseException } from '@common/exceptions/base.exceptions';
 import { AppLoggerService } from '@common/logging/app-logger.service';
+import { pathOf } from '@common/logging/request-path';
 import { TenantContextService } from '@common/tenant-aware/tenant-context.service';
 import { PrismaClientKnownRequestError } from '@prisma/client/runtime/client';
 
-import type { IApiError, IProblemDetail, IValidationErrorDetail } from '@app/types';
+import type { IApiError, IValidationErrorDetail } from '@app/types';
+
+import { toSnakeCase } from '@common/http-contract/wire-case';
+
+/** API Contract v1.3 §1 "Error Model": the `type` for each HTTP status. 402 is this service's billing extension. */
+const ERROR_TYPE_BY_STATUS: Readonly<Record<number, string>> = {
+    400: 'invalid_request',
+    401: 'authentication_error',
+    402: 'payment_required',
+    403: 'authorization_error',
+    404: 'not_found',
+    409: 'conflict',
+    410: 'gone',
+    422: 'unprocessable',
+    429: 'rate_limit'
+};
+
+const DOC_URL_BASE = 'https://docs.referralai.com/errors/';
+
+/** The error body every service returns (API Contract v1.3 §1). */
+export interface ErrorEnvelope {
+    error: {
+        type: string;
+        code: string;
+        message: string;
+        param?: string;
+        request_id: string;
+        doc_url: string;
+        /** Additive: one entry per failing field on validation errors. */
+        details?: Array<{ param: string; message: string }>;
+    };
+}
 
 @Catch()
 export class GlobalExceptionsFilter implements ExceptionFilter {
@@ -24,7 +56,8 @@ export class GlobalExceptionsFilter implements ExceptionFilter {
         const response = ctx.getResponse<Response>();
 
         // Get IDs from ALS context
-        const requestId = this.tenantContext.getRequestId() ?? 'unknown';
+        // Set by requestIdMiddleware before guards run, so it exists even for authentication failures.
+        const requestId = (request as Request & { requestId?: string }).requestId ?? this.tenantContext.getRequestId() ?? 'unknown';
         const correlationId = this.tenantContext.getCorrelationId();
 
         let status: HttpStatus;
@@ -50,57 +83,35 @@ export class GlobalExceptionsFilter implements ExceptionFilter {
         // Log error
         this.logError(request, status, apiError, exception);
 
-        response
-            .setHeader('X-Request-Id', requestId)
-            .status(status)
-            .type('application/problem+json')
-            .json(this.toProblemDetail(apiError, status, request.originalUrl || request.url));
+        const retryAfter = exception instanceof BaseException ? exception.details?.retryAfterSeconds : undefined;
+        if (typeof retryAfter === 'number') {
+            response.setHeader('Retry-After', String(retryAfter));
+        }
+        response.setHeader('X-Request-Id', requestId).status(status).type('application/json').json(this.toErrorEnvelope(apiError, status));
     }
 
     /**
-     * Map the filter's internal error shape onto RFC 9457 Problem Details.
-     *
-     * Kept as a single mapping step at the boundary so the four handlers below
-     * continue to produce codes and messages exactly as before — only the wire
-     * format changes.
+     * The filter's internal error shape, in the API Contract v1.3 wire envelope. Parameter names are
+     * snake_case, like every other field on the wire.
      */
-    private toProblemDetail(apiError: IApiError, status: HttpStatus, instance: string): IProblemDetail {
-        const problem: IProblemDetail = {
-            type: `/errors/${apiError.code}`,
-            title: this.titleFor(status),
-            status,
-            detail: apiError.message,
-            instance,
-            code: apiError.code,
-            requestId: apiError.requestId
+    private toErrorEnvelope(apiError: IApiError, status: HttpStatus): ErrorEnvelope {
+        const envelope: ErrorEnvelope = {
+            error: {
+                type: ERROR_TYPE_BY_STATUS[status] ?? 'internal_error',
+                code: apiError.code,
+                message: apiError.message,
+                request_id: apiError.requestId,
+                doc_url: `${DOC_URL_BASE}${apiError.code}`
+            }
         };
-
-        if (apiError.correlationId) {
-            problem.correlationId = apiError.correlationId;
-        }
         if (apiError.param) {
-            problem.param = apiError.param;
+            envelope.error.param = toSnakeCase(apiError.param);
         }
         if (apiError.details?.length) {
-            problem.errors = apiError.details;
+            envelope.error.details = apiError.details.map((detail) => ({ param: toSnakeCase(detail.field), message: detail.message }));
+            envelope.error.param ??= envelope.error.details[0]?.param;
         }
-
-        return problem;
-    }
-
-    /** HTTP status phrase, e.g. 422 -> "Unprocessable Entity". */
-    private titleFor(status: HttpStatus): string {
-        const name = HttpStatus[status] as string | undefined;
-
-        if (!name) {
-            return 'Error';
-        }
-
-        return name
-            .toLowerCase()
-            .split('_')
-            .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
-            .join(' ');
+        return envelope;
     }
 
     private handleBaseException(exception: BaseException, requestId: string, correlationId?: string): { status: HttpStatus; apiError: IApiError } {
@@ -247,9 +258,11 @@ export class GlobalExceptionsFilter implements ExceptionFilter {
     }
 
     private logError(request: Request, status: HttpStatus, apiError: IApiError, exception: unknown): void {
+        // The path only: query strings can carry tokens.
+        const path = pathOf(request.url);
         const logContext = {
             method: request.method,
-            url: request.url,
+            path,
             requestId: apiError.requestId,
             correlationId: apiError.correlationId,
             code: apiError.code,
@@ -260,12 +273,12 @@ export class GlobalExceptionsFilter implements ExceptionFilter {
 
         if (status >= 500) {
             this.logger.error(
-                `${request.method} ${request.url} ${status} - ${apiError.message}`,
+                `${request.method} ${path} ${status} - ${apiError.message}`,
                 exception instanceof Error ? exception.stack : String(exception),
                 logContext
             );
         } else {
-            this.logger.warn(`${request.method} ${request.url} ${status} - ${apiError.message}`, logContext);
+            this.logger.warn(`${request.method} ${path} ${status} - ${apiError.message}`, logContext);
         }
     }
 

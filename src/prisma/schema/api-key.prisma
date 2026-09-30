@@ -2,10 +2,12 @@ model ApiKey {
   id         String    @id @default(ulid()) @db.VarChar(26)
   tenantId   String    @map("tenant_id") @db.VarChar(26)
   label      String    @db.VarChar(255)
-  keyHash    String    @map("key_hash") @db.VarChar(255)
-  keyPrefix  String    @map("key_prefix") @db.VarChar(20)
+  // HMAC-SHA256(API_KEY_HASH_PEPPER, raw key), hex — deterministic, so validation is one indexed lookup.
+  keyHash    String    @unique @map("key_hash") @db.VarChar(64)
+  // Last 4 characters of the raw key: the only part ever shown in dashboards or logs (API §8.3).
+  keyPrefix  String    @map("key_prefix") @db.Char(4)
+  // text + CHECK: secret | publishable (DB Model v2 §3)
   keyType    String    @default("secret") @map("key_type") @db.VarChar(20)
-  scopes     Json      @default("[]")
   createdBy  String    @map("created_by") @db.VarChar(26)
   lastUsedAt DateTime? @map("last_used_at") @db.Timestamptz
   expiresAt  DateTime? @map("expires_at") @db.Timestamptz
@@ -18,7 +20,7 @@ model ApiKey {
   // Relations
   tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
+  @@unique([tenantId, keyPrefix])
   @@index([tenantId, revokedAt])
-  @@index([keyPrefix])
   @@map("api_keys")
 }

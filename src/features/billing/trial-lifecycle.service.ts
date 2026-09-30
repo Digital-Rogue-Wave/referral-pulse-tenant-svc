@@ -1,8 +1,8 @@
 import { Injectable } from '@nestjs/common';
 
 import type { Tenant, Billing } from '@prisma-gen/generated/client';
-import { TenantStatusEnum } from '@common/enums/tenant.enum';
-import { BillingPlanEnum, SubscriptionStatusEnum } from '@common/enums/billing.enum';
+import { TenantStatus } from '@domains/tenant/tenant.types';
+import { BillingPlanEnum, LIVE_SUBSCRIPTION_STATUSES, SubscriptionStatusEnum } from '@common/enums/billing.enum';
 
 import { DatabaseService } from '@app/database/database.service';
 import { AppLoggerService } from '@common/logging/app-logger.service';
@@ -30,7 +30,7 @@ export class TrialLifecycleService {
     async runDailyLifecycle(now = new Date()): Promise<void> {
         const tenants = await this.prisma.tenant.findMany({
             where: {
-                status: TenantStatusEnum.ACTIVE,
+                status: TenantStatus.ACTIVE,
                 deletedAt: null
             }
         });
@@ -91,56 +91,51 @@ export class TrialLifecycleService {
 
         const billing = await this.ensureBillingForTenant(tenantId);
 
-        if (billing.status === SubscriptionStatusEnum.ACTIVE) {
+        if (LIVE_SUBSCRIPTION_STATUSES.includes(billing.status)) {
             return;
         }
 
-        if (billing.plan !== BillingPlanEnum.FREE || billing.status !== SubscriptionStatusEnum.NONE) {
-            await this.prisma.billing.update({
-                where: { id: billing.id },
-                data: {
-                    plan: BillingPlanEnum.FREE,
-                    status: SubscriptionStatusEnum.NONE,
-                    pendingDowngradePlan: null,
-                    downgradeScheduledAt: null,
-                    cancellationReason: null,
-                    cancellationRequestedAt: null,
-                    cancellationEffectiveAt: null,
-                    stripeSubscriptionId: null
-                }
-            });
-
-            this.txEventEmitter.emitAfterCommit(
-                BillingEvents.SUBSCRIPTION_CHANGED,
-                new SubscriptionChangedEvent(
-                    billing.id,
-                    billing.tenantId,
-                    BillingPlanEnum.FREE,
-                    SubscriptionStatusEnum.NONE,
-                    undefined,
-                    billing.stripeCustomerId ?? undefined
-                )
-            );
-        }
-
+        const resetBilling = billing.plan !== BillingPlanEnum.FREE || billing.status !== SubscriptionStatusEnum.NONE;
         const oldTrialEndsAt = tenant.trialEndsAt;
-
-        await this.prisma.tenant.update({
-            where: { id: tenantId },
-            data: { trialEndsAt: null }
-        });
-
         const dedupKey = this.keyBuilder.buildDedupKey(`trial-expired-${tenantId}-${(oldTrialEndsAt ?? now).toISOString().slice(0, 10)}`, false);
-        const shouldEmit = await this.redis.setNx(dedupKey, '1', TrialLifecycleService.DEDUP_TTL_SECONDS);
+        const announce = await this.redis.setNx(dedupKey, '1', TrialLifecycleService.DEDUP_TTL_SECONDS);
 
-        if (!shouldEmit) {
-            return;
-        }
-
-        this.txEventEmitter.emitAfterCommit(
-            BillingEvents.TRIAL_EXPIRED,
-            new TrialExpiredEvent(tenantId, tenantId, (oldTrialEndsAt ?? now).toISOString(), now.toISOString())
-        );
+        // The billing reset, the trial end and their events commit together.
+        await this.prisma.$transaction(async (tx) => {
+            if (resetBilling) {
+                await tx.billing.update({
+                    where: { id: billing.id },
+                    data: {
+                        plan: BillingPlanEnum.FREE,
+                        status: SubscriptionStatusEnum.NONE,
+                        pendingDowngradePlan: null,
+                        downgradeScheduledAt: null,
+                        cancellationReason: null,
+                        cancellationRequestedAt: null,
+                        cancellationEffectiveAt: null,
+                        stripeSubscriptionId: null
+                    }
+                });
+                this.txEventEmitter.emitAfterCommit(
+                    BillingEvents.SUBSCRIPTION_CHANGED,
+                    new SubscriptionChangedEvent(
+                        billing.id,
+                        billing.tenantId,
+                        BillingPlanEnum.FREE,
+                        SubscriptionStatusEnum.NONE,
+                        undefined,
+                        billing.stripeCustomerId ?? undefined
+                    )
+                );
+            }
+            await tx.tenant.update({ where: { id: tenantId }, data: { trialEndsAt: null } });
+            if (announce) {
+                this.txEventEmitter.emitAfterCommit(
+                    BillingEvents.TRIAL_EXPIRED,
+                    new TrialExpiredEvent(tenantId, tenantId, (oldTrialEndsAt ?? now).toISOString(), now.toISOString())
+                );
+            }
+        });
     }
 
     private async ensureBillingForTenant(tenantId: string): Promise<Billing> {

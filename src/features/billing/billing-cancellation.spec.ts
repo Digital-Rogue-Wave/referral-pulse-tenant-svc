@@ -8,55 +8,40 @@ import { DatabaseService } from '@app/database/database.service';
 import { TenantContextService } from '@common/tenant-aware/tenant-context.service';
 import { TransactionEventEmitterService } from '@common/events/transaction-event-emitter.service';
 import { AppLoggerService } from '@common/logging/app-logger.service';
-import { IdempotencyService } from '@common/idempotency/idempotency.service';
-import { MetricsService } from '@common/monitoring/metrics.service';
 import { DateService } from '@common/helper/date.service';
 import { TenantService } from '../tenant/tenant.service';
 import { TenantStatsService } from '@app/features/tenant/aware/tenant-stats.service';
 import { BillingPlanEnum, SubscriptionStatusEnum } from '@common/enums/billing.enum';
-import { BillingEvents } from '@domains/billing';
 
 /**
- * `customer.subscription.deleted` set `status = CANCELED` and nothing else — it
- * left `billing.plan` on the paid tier. Plan limits resolve from `billing.plan`
- * (PlanLimitService) and PaymentRequiredGuard only blocks on an explicit LOCKED
- * payment status, which cancellation never sets. A cancelled tenant therefore kept
- * full paid entitlements indefinitely, with no alert anywhere — a silent, ongoing
- * revenue leak. `BILLING_TASKS.md` marked this flow complete (3.6).
+ * Deleting a tenant must stop billing it. Stripe webhook cancellations are covered in
+ * stripe-webhook.service.spec.ts.
  */
-describe('BillingService — Stripe subscription cancellation', () => {
+describe('BillingService.closeForDeletion — billing of a deleted tenant', () => {
     let service: BillingService;
     let prisma: MockProxy<DatabaseService>;
     let txEventEmitter: MockProxy<TransactionEventEmitterService>;
+    let stripe: MockProxy<StripeService>;
 
     const BILLING_ROW = {
         id: 'bil_1',
         tenantId: 'ten_1',
         plan: BillingPlanEnum.GROWTH,
         status: SubscriptionStatusEnum.ACTIVE,
-        cancellationEffectiveAt: null
+        stripeSubscriptionId: 'sub_123',
+        cancellationRequestedAt: null,
+        deletedAt: null
     };
-
-    const deletedEvent = {
-        id: 'evt_1',
-        type: 'customer.subscription.deleted',
-        data: { object: { id: 'sub_123', ended_at: 1_760_000_000 } }
-    };
-
-    /** The handler is private; this exercises it directly rather than reconstructing a signed Stripe event. */
-    const handleDeleted = (event: unknown): Promise<void> =>
-        (service as unknown as { handleCustomerSubscriptionDeleted(e: unknown): Promise<void> }).handleCustomerSubscriptionDeleted(event);
 
     beforeEach(async () => {
         prisma = mock<DatabaseService>();
-        (prisma as unknown as { billing: unknown }).billing = {
-            findFirst: jest.fn().mockResolvedValue(BILLING_ROW),
-            update: jest.fn().mockResolvedValue({ ...BILLING_ROW, plan: BillingPlanEnum.FREE })
-        };
+        Object.assign(prisma, {
+            billing: { findUnique: jest.fn().mockResolvedValue(BILLING_ROW), update: jest.fn() },
+            $transaction: jest.fn((fn: (tx: unknown) => Promise<unknown>) => fn(prisma))
+        });
         txEventEmitter = mock<TransactionEventEmitterService>();
-
+        stripe = mock<StripeService>();
         const dateService = mock<DateService>();
-        dateService.fromUnix.mockReturnValue({ toDate: () => new Date('2026-10-09T00:00:00.000Z') } as never);
         dateService.toISO.mockImplementation((d: Date) => d.toISOString());
 
         const module: TestingModule = await Test.createTestingModule({
@@ -66,9 +51,7 @@ describe('BillingService — Stripe subscription cancellation', () => {
                 { provide: AppLoggerService, useValue: mock<AppLoggerService>() },
                 { provide: TenantContextService, useValue: mock<TenantContextService>() },
                 { provide: TransactionEventEmitterService, useValue: txEventEmitter },
-                { provide: StripeService, useValue: mock<StripeService>() },
-                { provide: IdempotencyService, useValue: mock<IdempotencyService>() },
-                { provide: MetricsService, useValue: mock<MetricsService>() },
+                { provide: StripeService, useValue: stripe },
                 { provide: TenantService, useValue: mock<TenantService>() },
                 { provide: TenantStatsService, useValue: mock<TenantStatsService>() },
                 { provide: PlanLimitService, useValue: mock<PlanLimitService>() },
@@ -79,51 +62,33 @@ describe('BillingService — Stripe subscription cancellation', () => {
         service = module.get<BillingService>(BillingService);
     });
 
-    it('resets the plan to Free, so entitlements actually drop', async () => {
-        await handleDeleted(deletedEvent);
+    it('ends the Stripe subscription now and drops the record to a cancelled Free plan', async () => {
+        await service.closeForDeletion('ten_1');
 
+        expect(stripe.cancelSubscriptionNow).toHaveBeenCalledWith('sub_123');
         const [{ data }] = (prisma.billing.update as jest.Mock).mock.calls[0];
-        expect(data.plan).toBe(BillingPlanEnum.FREE);
-    });
-
-    it('still marks the subscription cancelled and clears the Stripe subscription id', async () => {
-        await handleDeleted(deletedEvent);
-
-        const [{ data }] = (prisma.billing.update as jest.Mock).mock.calls[0];
-        expect(data.status).toBe(SubscriptionStatusEnum.CANCELED);
-        expect(data.stripeSubscriptionId).toBeNull();
-    });
-
-    it('publishes subscription.cancelled so downstream services learn about it', async () => {
-        await handleDeleted(deletedEvent);
-
-        expect(txEventEmitter.emitAfterCommit).toHaveBeenCalledTimes(1);
-        const [eventName, payload] = (txEventEmitter.emitAfterCommit as jest.Mock).mock.calls[0];
-
-        expect(eventName).toBe(BillingEvents.SUBSCRIPTION_CANCELLED);
-        expect(payload).toMatchObject({
-            tenantId: 'ten_1',
-            stripeSubscriptionId: 'sub_123',
-            billingPlan: BillingPlanEnum.FREE
+        expect(data).toMatchObject({
+            plan: BillingPlanEnum.FREE,
+            status: SubscriptionStatusEnum.CANCELED,
+            stripeSubscriptionId: null,
+            cancellationReason: 'tenant_deleted'
         });
+        expect(txEventEmitter.emitAfterCommit.mock.calls[0]![1]).toMatchObject({ reason: 'tenant_deleted', stripeSubscriptionId: 'sub_123' });
     });
 
-    it('does nothing when no billing row matches the subscription', async () => {
-        (prisma.billing.findFirst as jest.Mock).mockResolvedValue(null);
+    it('is a no-op the second time, so a retried saga does not fail', async () => {
+        (prisma.billing.findUnique as jest.Mock).mockResolvedValue({ ...BILLING_ROW, deletedAt: new Date() });
 
-        await handleDeleted(deletedEvent);
+        await service.closeForDeletion('ten_1');
 
+        expect(stripe.cancelSubscriptionNow).not.toHaveBeenCalled();
         expect(prisma.billing.update).not.toHaveBeenCalled();
-        expect(txEventEmitter.emitAfterCommit).not.toHaveBeenCalled();
     });
 
-    it('preserves an already-recorded cancellation date rather than overwriting it', async () => {
-        const scheduled = new Date('2026-09-30T00:00:00.000Z');
-        (prisma.billing.findFirst as jest.Mock).mockResolvedValue({ ...BILLING_ROW, cancellationEffectiveAt: scheduled });
+    it('does not update the record when Stripe refuses the cancellation', async () => {
+        stripe.cancelSubscriptionNow.mockRejectedValue(new Error('stripe down'));
 
-        await handleDeleted(deletedEvent);
-
-        const [{ data }] = (prisma.billing.update as jest.Mock).mock.calls[0];
-        expect(data.cancellationEffectiveAt).toBe(scheduled);
+        await expect(service.closeForDeletion('ten_1')).rejects.toThrow('stripe down');
+        expect(prisma.billing.update).not.toHaveBeenCalled();
     });
 });

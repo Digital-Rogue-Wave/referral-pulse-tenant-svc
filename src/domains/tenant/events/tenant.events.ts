@@ -15,7 +15,9 @@ export class TenantCreatedEvent extends BaseDomainEvent {
         public readonly ownerId: string,
         public readonly trialStartedAt: Date,
         public readonly trialEndsAt: Date,
-        public readonly userId?: string
+        public readonly userId?: string,
+        /** Residency and raw-data retention (API §8.3) — services holding event data apply them. */
+        public readonly residency?: { dataRegion: string; retentionMonths: number }
     ) {
         super();
     }
@@ -172,7 +174,8 @@ export class TenantVerificationRequestedEvent extends BaseDomainEvent {
         public readonly aggregateId: string,
         public readonly tenantId: string,
         public readonly tenantName: string,
-        public readonly userId?: string
+        public readonly userId?: string,
+        public readonly verificationId?: string
     ) {
         super();
     }

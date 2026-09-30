@@ -1,94 +1,110 @@
-import { CanActivate, ExecutionContext, HttpException, HttpStatus, Inject, Injectable, Logger } from '@nestjs/common';
+import { CanActivate, ExecutionContext, HttpStatus, Injectable } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
 
 import type { Request } from 'express';
 
-import type { IAuthenticatedUser, KetoPermission } from '@app/types';
+import type { IAuthenticatedUser } from '@app/types';
 import { IS_PUBLIC_KEY } from '@app/types';
 
-import { TenantContextService } from '@common/tenant-aware/tenant-context.service';
-import { KetoService } from '@common/auth/keto.service';
-import { PERMISSIONS_KEY } from '@common/auth/require-permission.decorator';
+import { BaseException } from '@common/exceptions/base.exceptions';
+import { AppLoggerService } from '@common/logging/app-logger.service';
 
+import { AuthorizationService } from './authz/authorization.service';
+import type { ServiceCapability } from './authz/keto-tuples';
+import { LIVE_CHECK_PERMISSIONS, Permission } from './authz/permission-catalog';
+import { PERMISSIONS_KEY, PLATFORM_ADMIN_KEY, SERVICE_CAPABILITIES_KEY } from './require-permission.decorator';
+
+/**
+ * Deny-by-default authorization (API Contract v1.3 §2).
+ *
+ * - API-key principals never reach this service: keys are gated to ingestion/SDK, and tenant-service
+ *   exposes neither.
+ * - Service (client-credentials) principals pass only routes marked `@AllowServices`, and only with a
+ *   live Keto grant for one of the listed capabilities. Humans never pass a route that only lists
+ *   service capabilities.
+ * - Human principals: `@PlatformAdmin` routes need a live platform grant; `@RequirePermission` routes are
+ *   authorized from the JWT `perms` snapshot, except LIVE_CHECK_PERMISSIONS, which re-check Keto.
+ * - The tenant is always the one in the verified token — never a header or a route param.
+ */
 @Injectable()
 export class PermissionGuard implements CanActivate {
-    private readonly logger = new Logger(PermissionGuard.name);
-
     constructor(
-        @Inject(Reflector) private readonly reflector: Reflector,
-        private readonly keto: KetoService,
-        private readonly tenantContext: TenantContextService
-    ) {}
+        private readonly reflector: Reflector,
+        private readonly authorization: AuthorizationService,
+        private readonly logger: AppLoggerService
+    ) {
+        this.logger.setContext(PermissionGuard.name);
+    }
 
     async canActivate(context: ExecutionContext): Promise<boolean> {
         const targets = [context.getHandler(), context.getClass()];
-
-        const isPublic = this.reflector.getAllAndOverride<boolean>(IS_PUBLIC_KEY, targets);
-        if (isPublic) {
+        if (this.reflector.getAllAndOverride<boolean>(IS_PUBLIC_KEY, targets)) {
             return true;
         }
 
-        const requiredPermissions = this.reflector.getAllAndOverride<KetoPermission[]>(PERMISSIONS_KEY, targets);
-
-        if (!requiredPermissions || requiredPermissions.length === 0) {
-            return true;
-        }
-
-        const req = context.switchToHttp().getRequest<Request>();
-        const user = req.user as IAuthenticatedUser | undefined;
-
+        const user = context.switchToHttp().getRequest<Request>().user as IAuthenticatedUser | undefined;
         if (!user) {
-            throw new HttpException({ message: 'No authenticated user', code: HttpStatus.FORBIDDEN }, HttpStatus.FORBIDDEN);
+            throw this.denied('No authenticated principal');
+        }
+        if (user.source === 'api_key') {
+            throw this.denied('API keys are limited to event ingestion and SDK endpoints');
         }
 
-        const tenantId = this.tenantContext.getTenantId() ?? user.tenantId;
-
-        if (!tenantId) {
-            throw new HttpException({ message: 'No tenant context available', code: HttpStatus.FORBIDDEN }, HttpStatus.FORBIDDEN);
+        const capabilities = this.reflector.getAllAndOverride<ServiceCapability[]>(SERVICE_CAPABILITIES_KEY, targets) ?? [];
+        if (user.isServiceToken) {
+            return this.authorizeService(user, capabilities);
         }
 
-        for (const permission of requiredPermissions) {
-            // M2M service tokens can bypass Keto when explicitly allowed
-            if (user.isServiceToken && permission.allowServiceTokens) {
-                continue;
-            }
-
-            // Resolve the object: explicit object, route param, or default to tenantId
-            const object = this.resolveObject(permission, req, tenantId);
-
-            const allowed = await this.keto.check(permission.namespace, object, permission.relation, user.userId);
-
-            if (!allowed) {
-                this.logger.warn(`User ${user.userId} denied: ${permission.namespace}:${object}#${permission.relation}`);
-                throw new HttpException(
-                    {
-                        message: `Missing permission: ${permission.namespace}:${object}#${permission.relation}`,
-                        code: HttpStatus.FORBIDDEN
-                    },
-                    HttpStatus.FORBIDDEN
-                );
-            }
+        if (this.reflector.getAllAndOverride<boolean>(PLATFORM_ADMIN_KEY, targets)) {
+            await this.authorizePlatformAdmin(user);
+            return true;
         }
 
+        const permissions = this.reflector.getAllAndOverride<Permission[]>(PERMISSIONS_KEY, targets) ?? [];
+        // A route that names service capabilities and nothing for humans is service-to-service only; without
+        // this, a dashboard token would sail through for lack of a human permission to check.
+        if (capabilities.length > 0 && permissions.length === 0) {
+            throw this.denied('This endpoint is reserved for internal services');
+        }
+        for (const permission of permissions) {
+            await this.authorizePermission(user, permission);
+        }
         return true;
     }
 
-    /**
-     * Resolve the Keto object for the permission check.
-     * Priority: explicit object > route param > tenantId
-     */
-    private resolveObject(permission: KetoPermission, req: Request, tenantId: string): string {
-        if (permission.object) {
-            return permission.object;
-        }
-
-        if (permission.objectParam) {
-            const paramValue = (req.params as Record<string, string>)[permission.objectParam];
-            if (paramValue) {
-                return paramValue;
+    private async authorizeService(user: IAuthenticatedUser, capabilities: ServiceCapability[]): Promise<boolean> {
+        const clientId = user.clientId ?? user.userId;
+        for (const capability of capabilities) {
+            if (await this.authorization.serviceHas(clientId, capability)) {
+                return true;
             }
         }
+        this.logger.warn('Service principal denied', { clientId, capabilities });
+        throw this.denied('This service is not authorized to call this endpoint');
+    }
 
-        return tenantId;
+    private async authorizePlatformAdmin(user: IAuthenticatedUser): Promise<void> {
+        if (user.userId && (await this.authorization.isPlatformAdmin(user.userId))) {
+            return;
+        }
+        this.logger.warn('Platform-admin route denied', { userId: user.userId });
+        throw this.denied('Platform administrator access required');
+    }
+
+    private async authorizePermission(user: IAuthenticatedUser, permission: Permission): Promise<void> {
+        if (!user.userId || !user.tenantId) {
+            throw this.denied(`Missing permission: ${permission}`);
+        }
+        const allowed = LIVE_CHECK_PERMISSIONS.has(permission)
+            ? await this.authorization.userHas(user.userId, user.tenantId, permission)
+            : (user.perms ?? []).includes(permission);
+        if (!allowed) {
+            this.logger.warn('Permission denied', { userId: user.userId, tenantId: user.tenantId, permission });
+            throw this.denied(`Missing permission: ${permission}`);
+        }
+    }
+
+    private denied(message: string): BaseException {
+        return new BaseException('authorization_error', message, HttpStatus.FORBIDDEN);
     }
 }

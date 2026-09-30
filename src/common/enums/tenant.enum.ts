@@ -1,11 +1,3 @@
-export enum TenantStatusEnum {
-    ACTIVE = 'active',
-    SUSPENDED = 'suspended',
-    LOCKED = 'locked',
-    PENDING = 'pending',
-    DELETION_SCHEDULED = 'deletion_scheduled'
-}
-
 export enum DomainVerificationStatusEnum {
     UNVERIFIED = 'unverified',
     PENDING = 'pending',

@@ -1,12 +1,14 @@
 import { Module } from '@nestjs/common';
 
+import { PlanLimitModule } from '@app/features/billing/plan-limit.module';
+
 import { ApiKeyService } from './api-key.service';
 import { ApiKeyController } from './api-key.controller';
-import { ApiKeyListener } from './listeners/api-key.listener';
 
 @Module({
+    imports: [PlanLimitModule],
     controllers: [ApiKeyController],
-    providers: [ApiKeyService, ApiKeyListener],
+    providers: [ApiKeyService],
     exports: [ApiKeyService]
 })
 export class ApiKeyModule {}

@@ -100,41 +100,4 @@ export class SqsProducerService {
             }
         });
     }
-
-    async sendBatch<T>(
-        queueName: string,
-        messages: Array<{
-            eventType: string;
-            payload: T;
-            options?: IPublishOptions;
-        }>
-    ): Promise<{ successful: string[]; failed: string[] }> {
-        return this.tracingService.withSpan('sqs.sendBatch', async () => {
-            if (!this.queueMap.has(queueName)) {
-                throw new Error(`Queue not configured: ${queueName}`);
-            }
-
-            const successful: string[] = [];
-            const failed: string[] = [];
-
-            for (const msg of messages) {
-                try {
-                    const id = await this.send(queueName, msg.eventType, msg.payload, msg.options);
-                    successful.push(id);
-                } catch {
-                    failed.push('unknown');
-                }
-            }
-
-            return { successful, failed };
-        });
-    }
-
-    getQueueNames(): string[] {
-        return Array.from(this.queueMap.keys());
-    }
-
-    hasQueue(queueName: string): boolean {
-        return this.queueMap.has(queueName);
-    }
 }

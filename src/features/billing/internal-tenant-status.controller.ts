@@ -1,22 +1,40 @@
 import { Controller, Get, HttpCode, HttpStatus, NotFoundException, Param } from '@nestjs/common';
 import { ApiBearerAuth, ApiOkResponse, ApiTags } from '@nestjs/swagger';
 
-import { RequirePermission } from '@common/auth/require-permission.decorator';
-import { KetoNamespace, KetoRelation } from '@common/auth/keto.constants';
+import { AllowServices } from '@common/auth/require-permission.decorator';
+import { ServiceCapability } from '@common/auth/authz/keto-tuples';
 import { BillingPlanEnum, PaymentStatusEnum, SubscriptionStatusEnum } from '@common/enums/billing.enum';
-import { TenantStatusEnum } from '@common/enums/tenant.enum';
+import { TenantStatus } from '@domains/tenant/tenant.types';
 
 import { DatabaseService } from '@app/database/database.service';
-import { InternalTenantBillingStatusDto } from '@domains/billing';
+import { InternalTenantBillingStatusDto, TenantEntitlementsDto } from '@domains/billing';
+
+import { PlanLimitService } from './plan-limit.service';
 
 @ApiTags('Internal')
 @ApiBearerAuth()
 @Controller('internal/tenants')
 export class InternalTenantStatusController {
-    constructor(private readonly prisma: DatabaseService) {}
+    constructor(
+        private readonly prisma: DatabaseService,
+        private readonly planLimits: PlanLimitService
+    ) {}
+
+    /** Limits, usage and access state — what campaign, ingestion and reward services enforce against. */
+    @ApiOkResponse({ type: TenantEntitlementsDto })
+    @AllowServices(ServiceCapability.TENANT_ENTITLEMENTS_READ)
+    @HttpCode(HttpStatus.OK)
+    @Get(':id/entitlements')
+    async getEntitlements(@Param('id') tenantId: string): Promise<TenantEntitlementsDto> {
+        const entitlements = await this.planLimits.entitlementsOf(tenantId);
+        if (!entitlements) {
+            throw new NotFoundException({ message: `Tenant not found: ${tenantId}`, code: HttpStatus.NOT_FOUND });
+        }
+        return entitlements;
+    }
 
     @ApiOkResponse({ type: InternalTenantBillingStatusDto })
-    @RequirePermission({ namespace: KetoNamespace.TENANT, relation: KetoRelation.READ, allowServiceTokens: true })
+    @AllowServices(ServiceCapability.TENANT_STATUS_READ)
     @HttpCode(HttpStatus.OK)
     @Get(':id/status')
     async getTenantStatus(@Param('id') tenantId: string): Promise<InternalTenantBillingStatusDto> {
@@ -37,7 +55,7 @@ export class InternalTenantStatusController {
 
         return {
             tenantId,
-            tenantStatus: tenant.status as TenantStatusEnum,
+            tenantStatus: tenant.status as TenantStatus,
             paymentStatus: tenant.paymentStatus as PaymentStatusEnum,
             trialStartedAt: tenant.trialStartedAt ?? null,
             trialEndsAt: tenant.trialEndsAt ?? null,

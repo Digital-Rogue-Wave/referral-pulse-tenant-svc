@@ -4,7 +4,8 @@ model Invitation {
   email     String   @db.VarChar(255)
   role      String   @default("OPERATOR") @db.VarChar(50)
   status    String   @default("PENDING") @db.VarChar(50)
-  token     String   @unique @db.VarChar(255)
+  // SHA-256 of the invitation token. The token itself is only ever in the invitee's email link.
+  tokenHash String   @unique @map("token_hash") @db.Char(64)
   expiresAt DateTime @map("expires_at") @db.Timestamptz
 
   createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz

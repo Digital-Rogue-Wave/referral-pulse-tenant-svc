@@ -1,22 +1,26 @@
-import { Module, Controller, Get, Param, Post, HttpCode, HttpStatus } from '@nestjs/common';
+import { Module, Controller, Get, Param, Post, HttpCode, HttpStatus, Version, VERSION_NEUTRAL } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse } from '@nestjs/swagger';
 import { TerminusModule, HealthCheckService, HealthCheck, PrismaHealthIndicator, MemoryHealthIndicator } from '@nestjs/terminus';
 
 import type { CircuitBreakerInfo } from '@app/types';
 
 import { Public } from '@common/auth/public.decorator';
-import { RequirePermission } from '@common/auth/require-permission.decorator';
-import { KetoNamespace, KetoRelation } from '@common/auth/keto.constants';
+import { PlatformAdmin } from '@common/auth/require-permission.decorator';
 import { HttpClientService } from '@common/http/http-client.service';
 import { HttpModule } from '@common/http/http.module';
 import { RedisHealthIndicator } from '@common/redis/redis-health.indicator';
 import { DatabaseService } from '@app/database/database.service';
+
+import { WorkerHealthServer } from './worker-health.server';
 
 /**
  * The database probe used `TypeOrmHealthIndicator`, a leftover from before the
  * platform moved to Prisma. `@nestjs/terminus` ships indicators for several ORMs,
  * so it imported cleanly with no TypeORM installed — and then could never resolve
  * a DataSource, which made `/health/ready` and `/health` 503 permanently.
+ *
+ * The probes answer on the unversioned paths the load balancer and Kubernetes poll (`/health/live`,
+ * `/health/ready`, `/health`); with URI versioning on, they were only reachable under `/v1/health/*`.
  *
  * `@Public()` covers only the three probe endpoints. It used to sit at class level,
  * which also exposed the circuit-breaker routes — internal service topology on the
@@ -35,6 +39,7 @@ export class HealthController {
     ) {}
 
     @Public()
+    @Version(VERSION_NEUTRAL)
     @Get('live')
     @ApiOperation({ summary: 'Liveness probe' })
     @HealthCheck()
@@ -43,6 +48,7 @@ export class HealthController {
     }
 
     @Public()
+    @Version(VERSION_NEUTRAL)
     @Get('ready')
     @ApiOperation({ summary: 'Readiness probe' })
     @HealthCheck()
@@ -51,6 +57,7 @@ export class HealthController {
     }
 
     @Public()
+    @Version(VERSION_NEUTRAL)
     @Get()
     @ApiOperation({ summary: 'Full health check' })
     @HealthCheck()
@@ -63,14 +70,14 @@ export class HealthController {
         ]);
     }
 
-    @RequirePermission({ namespace: KetoNamespace.TENANT, relation: KetoRelation.READ })
+    @PlatformAdmin()
     @Get('circuit-breakers')
     @ApiOperation({ summary: 'Get all circuit breaker states' })
     getCircuitBreakers(): CircuitBreakerInfo[] {
         return this.httpClient.getAllCircuitBreakerStates();
     }
 
-    @RequirePermission({ namespace: KetoNamespace.TENANT, relation: KetoRelation.READ })
+    @PlatformAdmin()
     @Get('circuit-breakers/:serviceName')
     @ApiOperation({ summary: 'Get circuit breaker state for a specific service' })
     getCircuitBreaker(@Param('serviceName') serviceName: string): CircuitBreakerInfo | { error: string } {
@@ -78,7 +85,7 @@ export class HealthController {
         return state ?? { error: 'Circuit breaker not found for service' };
     }
 
-    @RequirePermission({ namespace: KetoNamespace.TENANT, relation: KetoRelation.UPDATE })
+    @PlatformAdmin()
     @Post('circuit-breakers/:serviceName/reset')
     @HttpCode(HttpStatus.NO_CONTENT)
     @ApiOperation({ summary: 'Manually reset a circuit breaker' })
@@ -93,6 +100,7 @@ export class HealthController {
 
 @Module({
     imports: [TerminusModule, HttpModule],
-    controllers: [HealthController]
+    controllers: [HealthController],
+    providers: [WorkerHealthServer]
 })
 export class HealthModule {}

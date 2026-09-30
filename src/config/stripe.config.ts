@@ -1,5 +1,5 @@
 import { registerAs } from '@nestjs/config';
-import { IsOptional, IsString, IsUrl } from 'class-validator';
+import { IsBooleanString, IsOptional, IsString, IsUrl } from 'class-validator';
 import validateConfig from '@common/validators/validate-config';
 import { MaybeType } from '@app/types';
 
@@ -12,6 +12,10 @@ export type StripeConfig = {
     growthPriceId?: MaybeType<string>;
     enterprisePriceId?: MaybeType<string>;
     webhookSecret?: MaybeType<string>;
+    /** Stripe Tax on checkout and invoices (needs Stripe Tax enabled on the account). */
+    automaticTax: boolean;
+    /** Where the Stripe Customer Portal sends the customer back to. */
+    portalReturnUrl?: MaybeType<string>;
 };
 
 class StripeEnvValidator {
@@ -46,6 +50,14 @@ class StripeEnvValidator {
     @IsString()
     @IsOptional()
     STRIPE_WEBHOOK_SECRET?: MaybeType<string>;
+
+    @IsBooleanString()
+    @IsOptional()
+    STRIPE_AUTOMATIC_TAX?: MaybeType<string>;
+
+    @IsUrl({ require_tld: false })
+    @IsOptional()
+    STRIPE_PORTAL_RETURN_URL?: MaybeType<string>;
 }
 
 export default registerAs<StripeConfig>('stripeConfig', () => {
@@ -59,6 +71,8 @@ export default registerAs<StripeConfig>('stripeConfig', () => {
         starterPriceId: process.env.STRIPE_STARTER_PRICE_ID,
         growthPriceId: process.env.STRIPE_GROWTH_PRICE_ID,
         enterprisePriceId: process.env.STRIPE_ENTERPRISE_PRICE_ID,
-        webhookSecret: process.env.STRIPE_WEBHOOK_SECRET
+        webhookSecret: process.env.STRIPE_WEBHOOK_SECRET,
+        automaticTax: process.env.STRIPE_AUTOMATIC_TAX === 'true',
+        portalReturnUrl: process.env.STRIPE_PORTAL_RETURN_URL
     };
 });

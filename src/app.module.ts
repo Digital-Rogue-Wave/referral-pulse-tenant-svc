@@ -2,7 +2,7 @@ import * as path from 'path';
 
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
-import { APP_FILTER, APP_GUARD, APP_INTERCEPTOR } from '@nestjs/core';
+import { APP_FILTER, APP_INTERCEPTOR } from '@nestjs/core';
 import { TerminusModule } from '@nestjs/terminus';
 import { AcceptLanguageResolver, HeaderResolver, I18nModule, QueryResolver } from 'nestjs-i18n';
 
@@ -13,20 +13,26 @@ import { HealthModule } from '@app/health/health.module';
 
 // Feature Modules
 import { ApiKeyModule } from '@app/features/api-key/api-key.module';
+import { AuditLogModule } from '@app/features/audit-log/audit-log.module';
 import { BillingModule } from '@app/features/billing/billing.module';
 
 import { DnsModule } from '@app/features/dns/dns.module';
 import { FilesModule } from '@app/features/files/files.module';
+import { IdentityGatewayModule } from '@app/features/identity-gateway/identity-gateway.module';
 import { InvitationModule } from '@app/features/invitation/invitation.module';
 import { UsersModule } from '@app/features/users/users.module';
 import { TenantModule } from '@app/features/tenant/tenant.module';
+import { TenantDeletionModule } from '@app/features/tenant-deletion/tenant-deletion.module';
+import { RetentionModule } from '@app/features/retention/retention.module';
 import { TenantSettingModule } from '@app/features/tenant-setting/tenant-setting.module';
 import { WebhookModule } from '@app/features/webhook/webhook.module';
 
 import { AlsAuthInterceptor } from '@common/interceptor/als-auth.interceptor';
-import { JwtAuthGuard } from '@common/auth/jwt-auth.guard';
 import { CommonModule } from '@common/common.module';
 import { GlobalExceptionsFilter } from '@common/exceptions/global-exceptions.filter';
+import { HttpContractModule } from '@common/http-contract/http-contract.module';
+import { RequestIdempotencyInterceptor } from '@common/http-contract/request-idempotency.interceptor';
+import { WireCaseInterceptor } from '@common/http-contract/wire-case.interceptor';
 
 @Module({
     imports: [
@@ -47,23 +53,30 @@ import { GlobalExceptionsFilter } from '@common/exceptions/global-exceptions.fil
         }),
         TerminusModule,
         CommonModule,
+        HttpContractModule,
         DatabaseModule,
         HealthModule,
         // Feature Modules
         ApiKeyModule,
+        AuditLogModule,
         BillingModule,
         DnsModule,
         FilesModule,
+        IdentityGatewayModule,
         InvitationModule,
         UsersModule,
         TenantModule,
+        TenantDeletionModule,
+        RetentionModule,
         TenantSettingModule,
         WebhookModule
     ],
     providers: [
         { provide: APP_FILTER, useClass: GlobalExceptionsFilter },
-        // { provide: APP_GUARD, useClass: JwtAuthGuard },
-        { provide: APP_INTERCEPTOR, useClass: AlsAuthInterceptor }
+        // Order matters: idempotency is outermost (fingerprints the raw body, stores the final wire response).
+        { provide: APP_INTERCEPTOR, useClass: RequestIdempotencyInterceptor },
+        { provide: APP_INTERCEPTOR, useClass: AlsAuthInterceptor },
+        { provide: APP_INTERCEPTOR, useClass: WireCaseInterceptor }
     ]
 })
 export class AppModule {}

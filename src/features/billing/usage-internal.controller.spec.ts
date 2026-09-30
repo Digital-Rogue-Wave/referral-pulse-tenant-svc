@@ -1,47 +1,28 @@
 import { Reflector } from '@nestjs/core';
 
 import { UsageInternalController } from './usage-internal.controller';
-import { PERMISSIONS_KEY } from '@common/auth/require-permission.decorator';
-import { KetoNamespace, KetoRelation } from '@common/auth/keto.constants';
-
-import type { KetoPermission } from '@app/types';
+import { PERMISSIONS_KEY, PLATFORM_ADMIN_KEY, SERVICE_CAPABILITIES_KEY } from '@common/auth/require-permission.decorator';
+import { ServiceCapability } from '@common/auth/authz/keto-tuples';
 
 /**
- * These routes take the target tenant from the path and write to that tenant's
- * billing counters. They previously carried no @RequirePermission at all, and
- * PermissionGuard passes through when no permission metadata is present — so any
- * authenticated principal could move any tenant's usage. The assertions below
- * pin the guard metadata that closes that hole.
+ * These routes take the target tenant from the path and write to that tenant's billing counters. They
+ * are service-to-service only: a client-credentials token whose client Keto grants `usage.write`. No
+ * human permission is attached, and PermissionGuard treats a route that lists only service capabilities
+ * as service-only, so no dashboard user — whatever their role — can reach another tenant's counters.
  */
 describe('UsageInternalController authorization', () => {
     const reflector = new Reflector();
 
-    const permissionsFor = (handler: 'incrementUsage' | 'decrementUsage'): KetoPermission[] | undefined =>
-        reflector.get<KetoPermission[]>(PERMISSIONS_KEY, UsageInternalController.prototype[handler]);
+    describe.each(['incrementUsage', 'decrementUsage'] as const)('given the %s route', (handler) => {
+        const metadata = (key: string): unknown => reflector.get(key, UsageInternalController.prototype[handler]);
 
-    describe.each(['incrementUsage', 'decrementUsage'] as const)('%s', (handler) => {
-        it('requires a permission — without one PermissionGuard would pass the request through', () => {
-            expect(permissionsFor(handler)).toBeDefined();
-            expect(permissionsFor(handler)).toHaveLength(1);
+        it('then only services granted the usage.write capability are admitted', () => {
+            expect(metadata(SERVICE_CAPABILITIES_KEY)).toEqual([ServiceCapability.USAGE_WRITE]);
         });
 
-        it('binds the check to the tenant in the path, not to the caller’s own tenant', () => {
-            const [permission] = permissionsFor(handler)!;
-
-            expect(permission.objectParam).toBe('tenantId');
-            expect(permission.namespace).toBe(KetoNamespace.TENANT);
-        });
-
-        it('requires update, since both routes mutate billing counters', () => {
-            const [permission] = permissionsFor(handler)!;
-
-            expect(permission.relation).toBe(KetoRelation.UPDATE);
-        });
-
-        it('still admits service tokens, which are the intended internal callers', () => {
-            const [permission] = permissionsFor(handler)!;
-
-            expect(permission.allowServiceTokens).toBe(true);
+        it('then no tenant-scoped human permission opens it', () => {
+            expect(metadata(PERMISSIONS_KEY)).toBeUndefined();
+            expect(metadata(PLATFORM_ADMIN_KEY)).toBeUndefined();
         });
     });
 });

@@ -5,6 +5,7 @@ export * from './billing.types';
 export * from './dto/create-plan.dto';
 export * from './dto/internal-tenant-billing-status.dto';
 export * from './dto/invoice.dto';
+export * from './dto/tenant-entitlements.dto';
 export * from './dto/payment-method.dto';
 export * from './dto/payment-method-setup-response.dto';
 export * from './dto/plan.dto';
@@ -22,7 +23,6 @@ export * from './dto/usage-update.dto';
 
 // Events
 export * from './events/billing.events';
-export * from './events/referral-usage.event';
 
 // Responses
 export * from './responses/billing.responses';

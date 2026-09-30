@@ -101,6 +101,13 @@ export type EventAction =
     | 'registered'
     | 'role_changed'
     | 'logged_in'
+    | 'removed'
+    | 'rotated'
+    | 'invited'
+    | 'anonymised'
+    | 'action_required'
+    | 'disputed'
+    | 'refunded'
     | 'verification_requested'
     | 'verification_status_changed';
 
@@ -269,6 +276,8 @@ export type ErrorCode =
     | 'duplicate_resource'
     | 'state_conflict'
     | 'idempotency_key_collision'
+    | 'idempotency_key_required'
+    | 'idempotency_key_in_flight'
     | 'foreign_key_violation'
     | 'optimistic_lock_error'
     // 429 - Rate Limit
@@ -323,10 +332,13 @@ export type UserEventType =
     | 'user.deactivated'
     | 'user.deleted'
     | 'user.registered'
-    | 'user.role_changed';
+    | 'user.role_changed'
+    | 'user.removed'
+    | 'user.invited'
+    | 'user.anonymised';
 
 // API Key domain events
-export type ApiKeyEventType = 'api-key.created' | 'api-key.updated' | 'api-key.deleted';
+export type ApiKeyEventType = 'api-key.created' | 'api-key.updated' | 'api-key.deleted' | 'api-key.rotated';
 
 // Tenant Setting domain events
 export type TenantSettingEventType = 'tenant-setting.created' | 'tenant-setting.updated' | 'tenant-setting.deleted';
@@ -429,29 +441,14 @@ export const AnalyticsSqsEvents = {
     EVENT: 'analytics.event' as AnalyticsSqsEventType
 } as const;
 
-// Audit trail events (sent to audit service)
-export type AuditSqsEventType = 'audit.event';
-export const AuditSqsEvents = {
-    EVENT: 'audit.event' as AuditSqsEventType
-} as const;
-
 // Email service events (sent to notification-webhook service)
 export type EmailSqsEventType = 'email.send';
 export const EmailSqsEvents = {
     SEND: 'email.send' as EmailSqsEventType
 } as const;
 
-// API Key SQS events (sent to audit service)
-export type ApiKeySqsEventType = 'api-key.created' | 'api-key.updated' | 'api-key.deleted';
-
 // All SQS events
-export type SqsEventType =
-    | TotoSqsEventType
-    | CampaignSqsEventType
-    | AnalyticsSqsEventType
-    | AuditSqsEventType
-    | EmailSqsEventType
-    | ApiKeySqsEventType;
+export type SqsEventType = TotoSqsEventType | CampaignSqsEventType | AnalyticsSqsEventType | EmailSqsEventType;
 
 // ============================================================================
 // EVENT DELIVERY PRIORITY
@@ -488,9 +485,6 @@ export const REFERRAL_WORKFLOW_SVC_FIFO = 'referral-workflow-svc.fifo' as const;
 export const NOTIFICATION_WEBHOOK_SVC_FIFO = 'notification-webhook-svc.fifo' as const;
 export const AI_INTELLIGENCE_SVC_FIFO = 'ai-intelligence-svc.fifo' as const;
 
-// Dedicated queues (compliance isolation)
-export const AUDIT_TRAIL_FIFO = 'audit-trail.fifo' as const;
-
 export type SqsQueueName =
     | typeof TENANT_SVC_FIFO
     | typeof REWARD_SVC_FIFO
@@ -499,39 +493,17 @@ export type SqsQueueName =
     | typeof SEGMENTATION_SVC_FIFO
     | typeof REFERRAL_WORKFLOW_SVC_FIFO
     | typeof NOTIFICATION_WEBHOOK_SVC_FIFO
-    | typeof AI_INTELLIGENCE_SVC_FIFO
-    | typeof AUDIT_TRAIL_FIFO;
+    | typeof AI_INTELLIGENCE_SVC_FIFO;
 
 /**
- * SNS Topic name constants.
- * Format: {domain}-{purpose}-topic (e.g., 'campaign-events-topic')
- */
-export const TOTO_EVENTS_TOPIC = 'toto-events-topic' as const;
-export const CAMPAIGN_EVENTS_TOPIC = 'campaign-events-topic' as const;
-export const REFERRAL_EVENTS_TOPIC = 'referral-events-topic' as const;
-export const USER_EVENTS_TOPIC = 'user-events-topic' as const;
-export const BILLING_EVENTS_TOPIC = 'billing-events-topic' as const;
-export const SYSTEM_NOTIFICATIONS_TOPIC = 'system-notifications-topic' as const;
-/**
- * Tenant lifecycle events (created/updated/suspended/locked/deleted/…).
- *
- * Note the name breaks the `{domain}-{purpose}-topic` convention above — it is
- * `tenant-events`, not `tenant-events-topic`. That is the name already published
- * to, so it is preserved here rather than renamed; renaming would silently orphan
- * any existing subscription. It was previously a private string literal inside
- * `TenantListener`, which kept it out of this union and therefore out of both
- * type-checking and whatever provisions topics from `SnsTopicName`.
+ * SNS topics tenant-service publishes to. Architecture v1.3 §3.2 gives it exactly one: `tenant-events`
+ * (logical name; the AWS topic is `tenant-events.fifo`, mapped through SNS_TOPICS). Every published event,
+ * identity and billing alike, goes there through the transactional outbox; consumers filter on the
+ * `eventType` message attribute.
  */
 export const TENANT_EVENTS_TOPIC = 'tenant-events' as const;
 
-export type SnsTopicName =
-    | typeof TOTO_EVENTS_TOPIC
-    | typeof CAMPAIGN_EVENTS_TOPIC
-    | typeof REFERRAL_EVENTS_TOPIC
-    | typeof USER_EVENTS_TOPIC
-    | typeof BILLING_EVENTS_TOPIC
-    | typeof SYSTEM_NOTIFICATIONS_TOPIC
-    | typeof TENANT_EVENTS_TOPIC;
+export type SnsTopicName = typeof TENANT_EVENTS_TOPIC;
 
 /**
  * Combined event type for all messaging (SQS/SNS/EventEmitter)
@@ -557,7 +529,7 @@ export type SqsMessageHandlerMeta = {
  * Side effect types for outbox pattern
  * Defines the type of side effect to execute
  */
-export type SideEffectType = 'sqs' | 'sns' | 'email' | 'audit';
+export type SideEffectType = 'sqs' | 'sns' | 'email' | 'audit' | 'keto';
 
 /**
  * Side effect processing status
@@ -609,15 +581,6 @@ export type BillingUsageJobData = {
     metricName: string;
     increment: number;
     timestamp: Date;
-};
-
-/**
- * Tenant deletion job data
- */
-export type TenantDeletionJobData = {
-    tenantId: string;
-    reason?: string;
-    scheduledAt: Date;
 };
 
 /**

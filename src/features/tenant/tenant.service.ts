@@ -1,6 +1,9 @@
 import { BadRequestException, HttpStatus, Injectable, NotFoundException } from '@nestjs/common';
 import { ulid } from 'ulid';
-import type { Tenant } from '@prisma-gen/generated/client';
+import { ConfigService } from '@nestjs/config';
+import type { AllConfigType } from '@config/config.type';
+import type { Prisma, Tenant } from '@prisma-gen/generated/client';
+import type { BaseDomainEvent } from '@domains/common/events';
 
 import type { IAuthenticatedUser } from '@app/types';
 
@@ -15,6 +18,7 @@ import { BaseException } from '@common/exceptions/base.exceptions';
 import { SubdomainService } from '../dns/subdomain.service';
 import { DnsVerificationService } from '../dns/dns-verification.service';
 import { FilesService } from '../files/files.service';
+import { UsersService, MemberIdentity } from '../users/users.service';
 
 import {
     CreateTenantDto,
@@ -31,7 +35,10 @@ import {
     DeletionScheduledResponse,
     tenantResponseMapper,
     TenantStatus,
-    VerificationStatus
+    UpdateVerificationStatusDto,
+    VerificationRecordStatus,
+    VerificationStatus,
+    VerificationType
 } from '@domains/tenant';
 
 import {
@@ -57,6 +64,14 @@ const TRIAL_PERIOD_DAYS = 14;
 /** Default days until deletion after scheduling */
 const DEFAULT_DELETION_DAYS = 30;
 
+/** A company verification's state as the tenant shows it: an open one (pending or in review) is `pending`. */
+const toTenantVerificationStatus = (status: VerificationRecordStatus): VerificationStatus =>
+    status === VerificationRecordStatus.VERIFIED
+        ? VerificationStatus.VERIFIED
+        : status === VerificationRecordStatus.REJECTED
+          ? VerificationStatus.REJECTED
+          : VerificationStatus.PENDING;
+
 @Injectable()
 export class TenantService {
     constructor(
@@ -68,7 +83,9 @@ export class TenantService {
         private readonly subdomainService: SubdomainService,
         private readonly dnsVerificationService: DnsVerificationService,
         private readonly filesService: FilesService,
-        private readonly kratos: KratosService
+        private readonly kratos: KratosService,
+        private readonly usersService: UsersService,
+        private readonly config: ConfigService<AllConfigType>
     ) {
         this.logger.setContext(TenantService.name);
     }
@@ -139,68 +156,95 @@ export class TenantService {
     // =========================================================
 
     /**
-     * Create a new tenant.
-     * Called by the Ory signup webhook and the agnostic controller.
+     * Onboards a new tenant: the tenant, its Owner membership and the role projection are created in one
+     * transaction, so a tenant can never exist without an Owner. Keto grants follow from the
+     * `tenant.created` / `user.registered` events.
+     *
+     * Deduplicated on the Ory identity (one identity, one tenant): a replayed Kratos web hook gets the
+     * existing tenant back (`onExisting: 'return'`); a user who already has a tenant and asks for another
+     * gets a 409 (`'conflict'`).
      */
     async create(
-        data: CreateTenantDto | { name: string; ownerId: string; slug?: string },
-        file?: Express.Multer.File | Express.MulterS3.File
+        data: Pick<CreateTenantDto, 'name'> & { slug?: string },
+        owner: MemberIdentity,
+        options: { file?: Express.Multer.File | Express.MulterS3.File; onExisting: 'return' | 'conflict' }
     ): Promise<TenantResponse> {
-        const id = ulid();
-        const slug = (data as CreateTenantDto).slug ? (data as CreateTenantDto).slug! : this.generateSlug((data as { name: string }).name, id);
-        const ownerId = (data as { ownerId?: string }).ownerId ?? 'system';
+        const existing = await this.prisma.user.findUnique({
+            where: { kratosIdentityId: owner.identityId },
+            select: { tenantId: true, deletedAt: true }
+        });
+        if (existing && !existing.deletedAt) {
+            if (options.onExisting === 'conflict') {
+                throw new BaseException('duplicate_resource', 'You already belong to a tenant', HttpStatus.CONFLICT);
+            }
+            return tenantResponseMapper.toResponse(await this.findOneOrFail(existing.tenantId));
+        }
 
-        // Validate slug uniqueness
-        const slugTaken = await this.prisma.tenant.count({ where: { slug } });
-        if (slugTaken > 0) {
-            throw new BadRequestException(`Slug "${slug}" is already in use`);
+        const id = ulid();
+        const slug = data.slug ?? this.generateSlug(data.name, id);
+        if ((await this.prisma.tenant.count({ where: { slug } })) > 0) {
+            throw new BaseException('duplicate_resource', `Slug "${slug}" is already in use`, HttpStatus.CONFLICT, 'slug');
         }
 
         const trialStartedAt = this.dateService.nowMoment().toDate();
         const trialEndsAt = this.dateService.nowMoment().add(TRIAL_PERIOD_DAYS, 'days').toDate();
+        const imageId = options.file ? await this.uploadLogo(id, options.file) : undefined;
 
-        // Handle optional logo upload. The tenant row does not exist yet, but its id is known — run the
-        // upload under that tenant's context so the file is stored and scoped under the new tenant.
-        let imageId: string | undefined;
-        if (file) {
-            try {
-                const uploaded = await this.tenantContext.runWithContext({ tenantId: id, userId: ownerId }, () => this.filesService.uploadFile(file));
-                imageId = uploaded.id;
-            } catch (err) {
-                this.logger.warn('Failed to upload tenant logo, continuing without image', {
-                    error: err instanceof Error ? err.message : String(err)
-                });
-            }
-        }
-
-        const tenant = await this.prisma.tenant.create({
-            data: {
-                id,
-                name: data.name,
-                slug,
-                imageId: imageId ?? null,
-                status: TenantStatus.ACTIVE,
-                paymentStatus: 'active',
-                trialStartedAt,
-                trialEndsAt
-            }
+        const { tenant, ownerUser } = await this.prisma.$transaction(async (tx) => {
+            const created = await tx.tenant.create({
+                data: {
+                    id,
+                    name: data.name,
+                    slug,
+                    imageId: imageId ?? null,
+                    status: TenantStatus.ACTIVE,
+                    verificationStatus: VerificationStatus.PENDING,
+                    paymentStatus: 'active',
+                    trialStartedAt,
+                    trialEndsAt
+                }
+            });
+            // Company verification at signup: the workflow service runs the account_verification workflow.
+            const verification = await tx.tenantVerification.create({ data: { tenantId: created.id, verificationType: VerificationType.COMPANY } });
+            // Emitted before the owner's user.registered so the tenant's Keto grants are queued first.
+            this.txEventEmitter.emitAfterCommit(
+                TenantEvents.CREATED,
+                new TenantCreatedEvent(created.id, created.id, created.name, created.slug, owner.identityId, trialStartedAt, trialEndsAt, undefined, {
+                    dataRegion: created.dataRegion,
+                    retentionMonths: created.retentionMonths
+                })
+            );
+            const createdOwner = await this.usersService.createOwner(tx, created.id, owner);
+            this.txEventEmitter.emitAfterCommit(
+                TenantEvents.VERIFICATION_REQUESTED,
+                new TenantVerificationRequestedEvent(created.id, created.id, created.name, createdOwner.id, verification.id)
+            );
+            return { tenant: created, ownerUser: createdOwner };
         });
 
-        this.txEventEmitter.emitAfterCommit(
-            TenantEvents.CREATED,
-            new TenantCreatedEvent(tenant.id, tenant.id, tenant.name, tenant.slug, ownerId, trialStartedAt, trialEndsAt)
-        );
-
-        // Company verification at signup (referralai_system_architecture_v1.md §Company Verification):
-        // request verification so the workflow service can run the account_verification workflow.
-        this.txEventEmitter.emitAfterCommit(
-            TenantEvents.VERIFICATION_REQUESTED,
-            new TenantVerificationRequestedEvent(tenant.id, tenant.id, tenant.name, ownerId)
-        );
-
-        this.logger.log(`Tenant created: ${tenant.id}`, { tenantId: tenant.id, slug: tenant.slug });
-
+        this.logger.log('Tenant created', { tenantId: tenant.id, slug: tenant.slug, ownerUserId: ownerUser.id });
         return tenantResponseMapper.toResponse(tenant);
+    }
+
+    /** Self-service tenant creation by a signed-in identity that has no tenant yet. */
+    async createForIdentity(
+        identityId: string,
+        data: Pick<CreateTenantDto, 'name' | 'slug'>,
+        file?: Express.Multer.File | Express.MulterS3.File
+    ): Promise<TenantResponse> {
+        const owner = await this.usersService.identityOf(identityId);
+        return this.create(data, owner, { file, onExisting: 'conflict' });
+    }
+
+    /** The tenant row does not exist yet, but its id is known — upload under that tenant so the file is scoped to it. */
+    private async uploadLogo(tenantId: string, file: Express.Multer.File | Express.MulterS3.File): Promise<string | undefined> {
+        try {
+            const uploaded = await this.tenantContext.runWithContext({ tenantId, userId: 'system' }, () => this.filesService.uploadFile(file));
+            return uploaded.id;
+        } catch (err) {
+            this.logger.warn('Failed to upload tenant logo, continuing without image', { error: err instanceof Error ? err.message : String(err) });
+            return undefined;
+        }
     }
 
     /**
@@ -208,29 +252,60 @@ export class TenantService {
      * account_verification workflow via the internal endpoint). Updates verification_status
      * and emits tenant.verification_status_changed.
      */
-    async setVerificationStatus(tenantId: string, status: VerificationStatus, reason?: string, reviewedBy?: string): Promise<TenantResponse> {
+    /**
+     * Records the account_verification workflow's report in `tenant_verifications` and, for a company
+     * verification, moves `tenants.verification_status` with it — both in one transaction.
+     */
+    async applyVerificationReport(tenantId: string, dto: UpdateVerificationStatusDto): Promise<TenantResponse> {
         const existing = await this.prisma.tenant.findUnique({ where: { id: tenantId } });
         if (!existing) {
             throw new NotFoundException(`Tenant with ID ${tenantId} not found`);
         }
+        const type = dto.verificationType ?? VerificationType.COMPANY;
+        const decided = dto.status === VerificationRecordStatus.VERIFIED || dto.status === VerificationRecordStatus.REJECTED;
+        const tenantStatus = type === VerificationType.COMPANY ? toTenantVerificationStatus(dto.status) : existing.verificationStatus;
 
-        const updated = await this.prisma.tenant.update({
-            where: { id: tenantId },
-            data: { verificationStatus: status }
+        const updated = await this.prisma.$transaction(async (tx) => {
+            const record = await this.openVerification(tx, tenantId, type, dto.verificationId);
+            const data = {
+                status: dto.status,
+                reason: dto.reason ?? null,
+                reviewedBy: dto.reviewedBy ?? null,
+                reviewedAt: decided ? new Date() : null,
+                ...(dto.temporalWorkflowId ? { temporalWorkflowId: dto.temporalWorkflowId } : {}),
+                ...(dto.temporalRunId ? { temporalRunId: dto.temporalRunId } : {}),
+                ...(dto.evidence ? { evidence: dto.evidence as Prisma.InputJsonValue } : {})
+            };
+            await (record
+                ? tx.tenantVerification.update({ where: { id: record.id }, data })
+                : tx.tenantVerification.create({ data: { tenantId, verificationType: type, ...data } }));
+            if (tenantStatus === existing.verificationStatus) {
+                return existing;
+            }
+            this.txEventEmitter.emitAfterCommit(
+                TenantEvents.VERIFICATION_STATUS_CHANGED,
+                new TenantVerificationStatusChangedEvent(tenantId, tenantId, existing.verificationStatus, tenantStatus, dto.reason, dto.reviewedBy)
+            );
+            return tx.tenant.update({ where: { id: tenantId }, data: { verificationStatus: tenantStatus } });
         });
 
-        this.txEventEmitter.emitAfterCommit(
-            TenantEvents.VERIFICATION_STATUS_CHANGED,
-            new TenantVerificationStatusChangedEvent(tenantId, tenantId, existing.verificationStatus, status, reason, reviewedBy)
-        );
-
-        this.logger.log(`Tenant verification status changed: ${tenantId}`, {
-            tenantId,
-            previousStatus: existing.verificationStatus,
-            newStatus: status
-        });
-
+        this.logger.log('Tenant verification report applied', { tenantId, verificationType: type, status: dto.status });
         return tenantResponseMapper.toResponse(updated);
+    }
+
+    /** The verification a report is about: the named one, else the latest still open of that type. */
+    private async openVerification(tx: Prisma.TransactionClient, tenantId: string, type: VerificationType, verificationId?: string) {
+        if (verificationId) {
+            const named = await tx.tenantVerification.findFirst({ where: { id: verificationId, tenantId } });
+            if (!named) {
+                throw new BaseException('resource_not_found', `Verification ${verificationId} not found`, HttpStatus.NOT_FOUND, 'verification_id');
+            }
+            return named;
+        }
+        return tx.tenantVerification.findFirst({
+            where: { tenantId, verificationType: type, status: { in: [VerificationRecordStatus.PENDING, VerificationRecordStatus.IN_REVIEW] } },
+            orderBy: { createdAt: 'desc' }
+        });
     }
 
     // =========================================================
@@ -253,10 +328,16 @@ export class TenantService {
         }
 
         if (dto.customDomain !== undefined && dto.customDomain !== tenant.customDomain) {
+            this.assertCustomDomainsEnabled();
             updateData.customDomain = dto.customDomain;
             updateData.domainVerificationStatus = 'pending';
             updateData.domainVerificationToken = ulid();
             changes.customDomain = { from: tenant.customDomain, to: dto.customDomain };
+        }
+
+        if (dto.retentionMonths !== undefined && dto.retentionMonths !== tenant.retentionMonths) {
+            updateData.retentionMonths = dto.retentionMonths;
+            changes.retentionMonths = { from: tenant.retentionMonths, to: dto.retentionMonths };
         }
 
         if (file) {
@@ -275,12 +356,10 @@ export class TenantService {
             return tenantResponseMapper.toResponse(tenant);
         }
 
-        const updated = await this.prisma.tenant.update({
-            where: { id: tenantId },
-            data: updateData
-        });
-
-        this.txEventEmitter.emitAfterCommit(TenantEvents.UPDATED, new TenantUpdatedEvent(updated.id, updated.id, changes, user.userId));
+        const updated = await this.applyChange(tenantId, updateData, (row) => [
+            TenantEvents.UPDATED,
+            new TenantUpdatedEvent(row.id, row.id, changes, user.userId)
+        ]);
 
         this.logger.log(`Tenant updated: ${tenantId}`, { tenantId, changes: Object.keys(changes) });
 
@@ -291,6 +370,7 @@ export class TenantService {
      * Verify the custom domain TXT record for the current tenant.
      */
     async verifyCustomDomain(): Promise<TenantResponse> {
+        this.assertCustomDomainsEnabled();
         const tenantId = this.tenantContext.getTenantId()!;
         const tenant = await this.findOneOrFail(tenantId);
 
@@ -306,39 +386,21 @@ export class TenantService {
 
         const newStatus = result.verified ? 'verified' : 'failed';
 
-        const updated = await this.prisma.tenant.update({
-            where: { id: tenantId },
-            data: { domainVerificationStatus: newStatus }
-        });
-
-        if (result.verified) {
-            this.txEventEmitter.emitAfterCommit(
-                TenantEvents.DOMAIN_VERIFIED,
-                new TenantDomainVerifiedEvent(updated.id, updated.id, tenant.customDomain, this.dateService.nowMoment().toDate())
-            );
-        }
+        const domain = tenant.customDomain;
+        const updated = await this.applyChange(tenantId, { domainVerificationStatus: newStatus }, (row) =>
+            result.verified
+                ? [TenantEvents.DOMAIN_VERIFIED, new TenantDomainVerifiedEvent(row.id, row.id, domain, this.dateService.nowMoment().toDate())]
+                : null
+        );
 
         return tenantResponseMapper.toResponse(updated);
     }
 
     /**
-     * Transfer ownership of the current tenant to another user.
+     * Transfer ownership of the current tenant to another member (membership change lives in UsersService).
      */
     async transferOwnership(dto: TransferOwnershipDto, user: IAuthenticatedUser): Promise<void> {
-        const tenantId = this.tenantContext.getTenantId()!;
-        await this.findOneOrFail(tenantId);
-
-        // NOTE: actual Keto permission re-assignment happens in TenantListener
-        this.txEventEmitter.emitAfterCommit(
-            TenantEvents.OWNERSHIP_TRANSFERRED,
-            new TenantOwnershipTransferredEvent(tenantId, tenantId, user.userId, dto.newOwnerId, this.dateService.nowMoment().toDate(), user.userId)
-        );
-
-        this.logger.log(`Tenant ownership transferred: ${tenantId}`, {
-            tenantId,
-            from: user.userId,
-            to: dto.newOwnerId
-        });
+        await this.usersService.transferOwnership(user, dto.newOwnerId);
     }
 
     // =========================================================
@@ -357,24 +419,17 @@ export class TenantService {
         const executionDate = this.dateService.nowMoment().add(days, 'days').toDate();
         const reason = dto.reason ?? 'User requested deletion';
 
-        const updated = await this.prisma.tenant.update({
-            where: { id: tenantId },
-            data: {
-                deletionScheduledAt,
-                deletionReason: reason
-            }
-        });
-
-        this.txEventEmitter.emitAfterCommit(
+        const updated = await this.applyChange(tenantId, { deletionScheduledAt, deletionDueAt: executionDate, deletionReason: reason }, () => [
             TenantEvents.DELETION_SCHEDULED,
             new TenantDeletionScheduledEvent(tenantId, tenantId, deletionScheduledAt, executionDate, reason, user.userId)
-        );
+        ]);
 
         this.logger.log(`Tenant deletion scheduled: ${tenantId}`, { tenantId, executionDate });
 
         return {
             tenantId,
             deletionScheduledAt: updated.deletionScheduledAt!,
+            deletionDueAt: updated.deletionDueAt!,
             deletionReason: updated.deletionReason
         };
     }
@@ -386,39 +441,12 @@ export class TenantService {
         const tenantId = this.tenantContext.getTenantId()!;
         await this.findOneOrFail(tenantId);
 
-        await this.prisma.tenant.update({
-            where: { id: tenantId },
-            data: {
-                deletionScheduledAt: null,
-                deletionReason: null
-            }
-        });
-
-        this.txEventEmitter.emitAfterCommit(
+        await this.applyChange(tenantId, { deletionScheduledAt: null, deletionDueAt: null, deletionReason: null }, () => [
             TenantEvents.DELETION_CANCELLED,
             new TenantDeletionCancelledEvent(tenantId, tenantId, this.dateService.nowMoment().toDate(), user.userId)
-        );
+        ]);
 
         this.logger.log(`Tenant deletion cancelled: ${tenantId}`, { tenantId });
-    }
-
-    /**
-     * Execute the actual hard delete of a tenant (called by BullMQ processor).
-     */
-    async executeDeletion(tenantId: string): Promise<void> {
-        const tenant = await this.findOneOrFail(tenantId);
-
-        await this.prisma.tenant.update({
-            where: { id: tenantId },
-            data: {
-                status: TenantStatus.DELETED,
-                deletedAt: new Date()
-            }
-        });
-
-        this.txEventEmitter.emitAfterCommit(TenantEvents.DELETED, new TenantDeletedEvent(tenantId, tenantId, tenant.name, tenant.slug));
-
-        this.logger.log(`Tenant deleted: ${tenantId}`, { tenantId });
     }
 
     // =========================================================
@@ -433,27 +461,46 @@ export class TenantService {
 
         await this.assertPasswordConfirmed(user, tenantId, dto.password);
 
-        const lockUntil = dto.lockUntil ? new Date(dto.lockUntil) : null;
+        return this.lockTenant(tenantId, dto.reason, dto.lockUntil ? new Date(dto.lockUntil) : null, user.userId);
+    }
 
-        const updated = await this.prisma.tenant.update({
-            where: { id: tenantId },
-            data: {
-                status: TenantStatus.LOCKED,
-                lockedAt: new Date(),
-                lockUntil,
-                lockReason: dto.reason
-            }
+    /** Platform-admin lock of any tenant (no password: the platform role is checked live in Keto). */
+    async lockAsAdmin(tenantId: string, reason: string, lockUntil: Date | null, actorId: string): Promise<TenantResponse> {
+        const tenant = await this.findOneOrFail(tenantId);
+        if (tenant.status === TenantStatus.CLOSED) {
+            throw new BaseException('state_conflict', `Tenant ${tenantId} is closed`, HttpStatus.CONFLICT);
+        }
+        return this.lockTenant(tenantId, reason, lockUntil, actorId);
+    }
+
+    async unlockAsAdmin(tenantId: string, actorId: string): Promise<TenantResponse> {
+        const tenant = await this.findOneOrFail(tenantId);
+        if (tenant.status !== TenantStatus.LOCKED) {
+            throw new BaseException('state_conflict', `Tenant ${tenantId} is not locked`, HttpStatus.CONFLICT);
+        }
+        return this.performUnlock(tenantId, actorId);
+    }
+
+    /** Unlocks every tenant whose `lock_until` has passed. Returns how many were unlocked. */
+    async unlockExpired(now = new Date()): Promise<number> {
+        const expired = await this.prisma.tenant.findMany({
+            where: { status: TenantStatus.LOCKED, lockUntil: { lte: now } },
+            select: { id: true },
+            take: 100
         });
+        for (const tenant of expired) {
+            await this.performUnlock(tenant.id);
+        }
+        return expired.length;
+    }
 
-        const lockedAt = updated.lockedAt!;
-
-        this.txEventEmitter.emitAfterCommit(
-            TenantEvents.LOCKED,
-            new TenantLockedEvent(tenantId, tenantId, dto.reason, lockedAt, lockUntil ?? undefined, user.userId)
+    private async lockTenant(tenantId: string, reason: string, lockUntil: Date | null, actorId: string): Promise<TenantResponse> {
+        const updated = await this.applyChange(
+            tenantId,
+            { status: TenantStatus.LOCKED, lockedAt: new Date(), lockUntil, lockReason: reason },
+            (row) => [TenantEvents.LOCKED, new TenantLockedEvent(tenantId, tenantId, reason, row.lockedAt!, lockUntil ?? undefined, actorId)]
         );
-
-        this.logger.log(`Tenant locked: ${tenantId}`, { tenantId, reason: dto.reason });
-
+        this.logger.log(`Tenant locked: ${tenantId}`, { tenantId, reason, lockUntil });
         return tenantResponseMapper.toResponse(updated);
     }
 
@@ -497,10 +544,6 @@ export class TenantService {
     /**
      * Auto-unlock called by the TenantUnlockProcessor (BullMQ job).
      */
-    async autoUnlock(tenantId: string): Promise<void> {
-        await this.performUnlock(tenantId);
-    }
-
     // =========================================================
     // Suspend / Unsuspend (admin)
     // =========================================================
@@ -515,15 +558,10 @@ export class TenantService {
             throw new BadRequestException(`Tenant ${id} is already suspended`);
         }
 
-        const updated = await this.prisma.tenant.update({
-            where: { id },
-            data: {
-                status: TenantStatus.SUSPENDED,
-                suspendedAt: new Date()
-            }
-        });
-
-        this.txEventEmitter.emitAfterCommit(TenantEvents.SUSPENDED, new TenantSuspendedEvent(id, id, reason, updated.suspendedAt!));
+        const updated = await this.applyChange(id, { status: TenantStatus.SUSPENDED, suspendedAt: new Date() }, (row) => [
+            TenantEvents.SUSPENDED,
+            new TenantSuspendedEvent(id, id, reason, row.suspendedAt!)
+        ]);
 
         this.logger.log(`Tenant suspended: ${id}`, { tenantId: id, reason });
 
@@ -540,15 +578,10 @@ export class TenantService {
             throw new BadRequestException(`Tenant ${id} is not suspended`);
         }
 
-        const updated = await this.prisma.tenant.update({
-            where: { id },
-            data: {
-                status: TenantStatus.ACTIVE,
-                suspendedAt: null
-            }
-        });
-
-        this.txEventEmitter.emitAfterCommit(TenantEvents.UNSUSPENDED, new TenantUnsuspendedEvent(id, id, this.dateService.nowMoment().toDate()));
+        const updated = await this.applyChange(id, { status: TenantStatus.ACTIVE, suspendedAt: null }, () => [
+            TenantEvents.UNSUSPENDED,
+            new TenantUnsuspendedEvent(id, id, this.dateService.nowMoment().toDate())
+        ]);
 
         this.logger.log(`Tenant unsuspended: ${id}`, { tenantId: id });
 
@@ -559,21 +592,40 @@ export class TenantService {
     // Private helpers
     // =========================================================
 
-    private async performUnlock(tenantId: string, userId?: string): Promise<TenantResponse> {
-        const updated = await this.prisma.tenant.update({
-            where: { id: tenantId },
-            data: {
-                status: TenantStatus.ACTIVE,
-                lockedAt: null,
-                lockUntil: null,
-                lockReason: null
-            }
-        });
+    /**
+     * A custom domain is accepted only when it can actually be served. Provisioning (ACM certificate and
+     * CloudFront alias) is not built yet, so the feature is off unless FEATURE_CUSTOM_DOMAINS=true.
+     */
+    private assertCustomDomainsEnabled(): void {
+        if (!this.config.get('app.customDomainsEnabled', { infer: true })) {
+            throw new BaseException('state_conflict', 'Custom domains are not available yet', HttpStatus.CONFLICT, 'custom_domain');
+        }
+    }
 
-        this.txEventEmitter.emitAfterCommit(
+    /**
+     * Applies a tenant change and emits its event in one transaction: the published event is written to the
+     * outbox before commit, so it exists exactly when the change does.
+     */
+    private async applyChange(
+        tenantId: string,
+        data: Prisma.TenantUpdateInput,
+        toEvent: (updated: Tenant) => [string, BaseDomainEvent] | null
+    ): Promise<Tenant> {
+        return this.prisma.$transaction(async (tx) => {
+            const updated = await tx.tenant.update({ where: { id: tenantId }, data });
+            const event = toEvent(updated);
+            if (event) {
+                this.txEventEmitter.emitAfterCommit(event[0], event[1]);
+            }
+            return updated;
+        });
+    }
+
+    private async performUnlock(tenantId: string, userId?: string): Promise<TenantResponse> {
+        const updated = await this.applyChange(tenantId, { status: TenantStatus.ACTIVE, lockedAt: null, lockUntil: null, lockReason: null }, () => [
             TenantEvents.UNLOCKED,
             new TenantUnlockedEvent(tenantId, tenantId, userId ?? 'system', this.dateService.nowMoment().toDate(), userId)
-        );
+        ]);
 
         this.logger.log(`Tenant unlocked: ${tenantId}`, { tenantId, unlockedBy: userId ?? 'system' });
 

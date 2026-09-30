@@ -46,7 +46,7 @@ Feature: Team Invitations
     When I send a POST request to "/api/v1/invitations/public/bdd-invite-token/accept" with that token
     Then the response status should be 200
     And the response should contain a "id" field
-    And the response should contain a "tenantId" field
+    And the response should contain a "tenant_id" field
 
   @needs-pending-invitation
   Scenario: Accepting with a non-matching email is forbidden

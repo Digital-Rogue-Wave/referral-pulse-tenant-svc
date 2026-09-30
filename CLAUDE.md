@@ -284,7 +284,11 @@ Check memory-keeper for past decisions about this flow."
 # Service-Specific: Tenant & Billing Service (`referral-pulse-tenant-svc`)
 
 > Everything above is the shared platform standard. This section is what makes THIS service specific.
-> The canonical specs live (read-only) in `docs/`. Editable service docs: `tenant-implementation.md`
+> **Authoritative specs (2026-09-21): `spec/`** (API Contract v1.3, Event Model v3, DB Model v2, Product
+> Spec v4, Architecture, Failure & Observability v3). The older set in `docs/` is history only. The
+> authorization model (Keto namespaces, internal JWT, service capabilities) is recorded in `NOTE.md`
+> "Decisions — batch 2" and implemented in `src/common/auth/authz/`.
+> The previous canonical specs live (read-only) in `docs/`. Editable service docs: `tenant-implementation.md`
 > (whole-service technical reference), `TENANT_GUIDE.md` (beginner walkthrough), `NOTE.md` (decisions +
 > cross-team contract items), and the billing-focused `BILLING.md` / `BILLING_TASKS.md` / `TECH_DOC.md` /
 > `billing_scenarios.md`. `docs/` and `docs/specs/` are READ-ONLY — never edit them.

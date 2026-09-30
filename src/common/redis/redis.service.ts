@@ -4,7 +4,7 @@ import { ConfigService } from '@nestjs/config';
 import Redis, { Cluster, RedisOptions, ClusterOptions } from 'ioredis';
 
 import { TenantContextService } from '@app/common/tenant-aware/tenant-context.service';
-import type { ICacheOptions, ILockOptions, ILockResult } from '@app/types';
+import type { ICacheOptions } from '@app/types';
 
 import { DateService } from '@common/helper/date.service';
 import { JsonService } from '@common/helper/json.service';
@@ -18,10 +18,8 @@ import { ElastiCacheIamAuthProvider } from './elasticache-iam-auth.provider';
 @Injectable()
 export class RedisService implements OnModuleInit, OnModuleDestroy {
     private client!: Redis | Cluster;
-    private subscriber!: Redis | Cluster;
     private readonly keyPrefix: string;
     private readonly defaultTtl: number;
-    private readonly lockTtl: number;
 
     constructor(
         private readonly configService: ConfigService<AllConfigType>,
@@ -39,9 +37,6 @@ export class RedisService implements OnModuleInit, OnModuleDestroy {
         this.defaultTtl = this.configService.getOrThrow('redis.defaultTtl', {
             infer: true
         });
-        this.lockTtl = this.configService.getOrThrow('redis.lockTtl', {
-            infer: true
-        });
     }
 
     async onModuleInit(): Promise<void> {
@@ -49,10 +44,8 @@ export class RedisService implements OnModuleInit, OnModuleDestroy {
 
         if (clusterEnabled) {
             this.client = await this.createClusterClient();
-            this.subscriber = await this.createClusterClient();
         } else {
             this.client = await this.createStandaloneClient();
-            this.subscriber = await this.createStandaloneClient();
         }
 
         // Start IAM auth token refresh if enabled
@@ -71,7 +64,6 @@ export class RedisService implements OnModuleInit, OnModuleDestroy {
     async onModuleDestroy(): Promise<void> {
         this.iamAuthProvider.stopTokenRefresh();
         await this.client?.quit();
-        await this.subscriber?.quit();
     }
 
     private async createStandaloneClient(): Promise<Redis> {
@@ -275,309 +267,6 @@ export class RedisService implements OnModuleInit, OnModuleDestroy {
         } finally {
             const duration = this.dateService.now() - startTime;
             this.metricsService.recordRedisOperation('DEL', duration, success);
-        }
-    }
-
-    async exists(key: string, tenantScoped = true): Promise<boolean> {
-        const fullKey = this.buildKey(key, tenantScoped);
-        const result = await this.client.exists(fullKey);
-        return result > 0;
-    }
-
-    async expire(key: string, seconds: number, tenantScoped = true): Promise<boolean> {
-        const fullKey = this.buildKey(key, tenantScoped);
-        const result = await this.client.expire(fullKey, seconds);
-        return result === 1;
-    }
-
-    async ttl(key: string, tenantScoped = true): Promise<number> {
-        const fullKey = this.buildKey(key, tenantScoped);
-        return this.client.ttl(fullKey);
-    }
-
-    async incr(key: string, tenantScoped = true): Promise<number> {
-        const fullKey = this.buildKey(key, tenantScoped);
-        return this.client.incr(fullKey);
-    }
-
-    async incrBy(key: string, amount: number, tenantScoped = true): Promise<number> {
-        const fullKey = this.buildKey(key, tenantScoped);
-        return this.client.incrby(fullKey, amount);
-    }
-
-    async decrBy(key: string, amount: number, tenantScoped = true): Promise<number> {
-        const startTime = this.dateService.now();
-        let success = true;
-
-        try {
-            const fullKey = this.buildKey(key, tenantScoped);
-            return await this.client.decrby(fullKey, amount);
-        } catch (error) {
-            success = false;
-            throw error;
-        } finally {
-            const duration = this.dateService.now() - startTime;
-            this.metricsService.recordRedisOperation('DECRBY', duration, success);
-        }
-    }
-
-    async sAdd(key: string, member: string, tenantScoped = true): Promise<number> {
-        const startTime = this.dateService.now();
-        let success = true;
-
-        try {
-            const fullKey = this.buildKey(key, tenantScoped);
-            return await this.client.sadd(fullKey, member);
-        } catch (error) {
-            success = false;
-            throw error;
-        } finally {
-            const duration = this.dateService.now() - startTime;
-            this.metricsService.recordRedisOperation('SADD', duration, success);
-        }
-    }
-
-    async sMembers(key: string, tenantScoped = true): Promise<string[]> {
-        const startTime = this.dateService.now();
-        let success = true;
-
-        try {
-            const fullKey = this.buildKey(key, tenantScoped);
-            return await this.client.smembers(fullKey);
-        } catch (error) {
-            success = false;
-            throw error;
-        } finally {
-            const duration = this.dateService.now() - startTime;
-            this.metricsService.recordRedisOperation('SMEMBERS', duration, success);
-        }
-    }
-
-    async getOrSet<T>(key: string, factory: () => Promise<T>, options?: ICacheOptions): Promise<T> {
-        const cached = await this.get<T>(key, options);
-        if (cached !== undefined) {
-            return cached;
-        }
-        const value = await factory();
-        await this.set(key, value, options);
-        return value;
-    }
-
-    async delPattern(pattern: string, tenantScoped = true): Promise<number> {
-        const fullPattern = this.buildKey(pattern, tenantScoped);
-        const keys = await this.client.keys(fullPattern);
-        if (keys.length === 0) {
-            return 0;
-        }
-        return this.client.del(...keys);
-    }
-
-    async acquireLock(lockName: string, options?: ILockOptions): Promise<ILockResult> {
-        const startTime = this.dateService.now();
-        let success = true;
-
-        try {
-            const lockKey = this.buildKey(`lock:${lockName}`, true);
-            const lockId = `${this.dateService.now()}-${Math.random().toString(36).slice(2)}`;
-            const ttl = options?.ttl ?? this.lockTtl;
-            const retryCount = options?.retryCount ?? 3;
-            const retryDelay = options?.retryDelay ?? 100;
-
-            for (let attempt = 0; attempt <= retryCount; attempt++) {
-                const acquired = await this.client.set(lockKey, lockId, 'PX', ttl, 'NX');
-                if (acquired === 'OK') {
-                    return {
-                        acquired: true,
-                        lockId,
-                        release: async () => {
-                            const currentValue = await this.client.get(lockKey);
-                            if (currentValue === lockId) {
-                                await this.client.del(lockKey);
-                            }
-                        }
-                    };
-                }
-                if (attempt < retryCount) {
-                    await new Promise((resolve) => setTimeout(resolve, retryDelay));
-                }
-            }
-
-            success = false; // Failed to acquire lock
-            return { acquired: false, release: async () => {} };
-        } catch (error) {
-            success = false;
-            throw error;
-        } finally {
-            const duration = this.dateService.now() - startTime;
-            this.metricsService.recordRedisOperation('LOCK', duration, success);
-        }
-    }
-
-    async withLock<T>(lockName: string, fn: () => Promise<T>, options?: ILockOptions): Promise<T> {
-        const lock = await this.acquireLock(lockName, options);
-        if (!lock.acquired) {
-            throw new Error(`Failed to acquire lock: ${lockName}`);
-        }
-        try {
-            return await fn();
-        } finally {
-            await lock.release();
-        }
-    }
-
-    async hset(key: string, field: string, value: unknown, tenantScoped = true): Promise<void> {
-        const fullKey = this.buildKey(key, tenantScoped);
-        await this.client.hset(fullKey, field, this.jsonService.stringify(value));
-    }
-
-    async hget<T>(key: string, field: string, tenantScoped = true): Promise<T | undefined> {
-        const fullKey = this.buildKey(key, tenantScoped);
-        const value = await this.client.hget(fullKey, field);
-        if (!value) {
-            return undefined;
-        }
-        return this.jsonService.safeParse<T>(value) ?? (value as unknown as T);
-    }
-
-    async hgetall<T>(key: string, tenantScoped = true): Promise<Record<string, T>> {
-        const fullKey = this.buildKey(key, tenantScoped);
-        const hash = await this.client.hgetall(fullKey);
-        const result: Record<string, T> = {};
-        for (const [field, value] of Object.entries(hash)) {
-            result[field] = this.jsonService.safeParse<T>(value) ?? (value as unknown as T);
-        }
-        return result;
-    }
-
-    async hdel(key: string, field: string, tenantScoped = true): Promise<boolean> {
-        const fullKey = this.buildKey(key, tenantScoped);
-        const result = await this.client.hdel(fullKey, field);
-        return result > 0;
-    }
-
-    async publish<T>(channel: string, data: T): Promise<number> {
-        const message = this.jsonService.stringify({
-            channel,
-            data,
-            timestamp: this.dateService.nowISO(),
-            tenantId: this.tenantContext.getTenantId()
-        });
-        return this.client.publish(channel, message);
-    }
-
-    async subscribe(channel: string, handler: (message: unknown) => void): Promise<void> {
-        await this.subscriber.subscribe(channel);
-        this.subscriber.on('message', (ch, message) => {
-            if (ch === channel) {
-                const parsed = this.jsonService.safeParse(message);
-                handler(parsed ?? message);
-            }
-        });
-    }
-
-    async unsubscribe(channel: string): Promise<void> {
-        await this.subscriber.unsubscribe(channel);
-    }
-
-    // ============================================================================
-    // Usage Tracking (tenant-scoped via ALS)
-    // ============================================================================
-
-    private static readonly USAGE_TTL_SECONDS = 60 * 24 * 60 * 60; // 60 days
-
-    private getCurrentMonth(): string {
-        return this.dateService.nowISO().slice(0, 7); // YYYY-MM
-    }
-
-    async incrementUsage(metric: string, amount = 1): Promise<number> {
-        if (amount <= 0) {
-            return this.getUsage(metric);
-        }
-
-        const usageKey = `usage:${metric}:${this.getCurrentMonth()}`;
-        const metricsKey = 'usage-metrics';
-        const value = await this.incrBy(usageKey, amount);
-        await this.expire(usageKey, RedisService.USAGE_TTL_SECONDS);
-        await this.sAdd(metricsKey, metric);
-        await this.expire(metricsKey, RedisService.USAGE_TTL_SECONDS);
-        return value;
-    }
-
-    async decrementUsage(metric: string, amount = 1): Promise<number> {
-        if (amount <= 0) {
-            return this.getUsage(metric);
-        }
-
-        const usageKey = `usage:${metric}:${this.getCurrentMonth()}`;
-        const value = await this.decrBy(usageKey, amount);
-
-        if (value < 0) {
-            await this.set(usageKey, 0, { ttl: RedisService.USAGE_TTL_SECONDS, serialize: false });
-            return 0;
-        }
-
-        await this.expire(usageKey, RedisService.USAGE_TTL_SECONDS);
-        const metricsKey = 'usage-metrics';
-        await this.sAdd(metricsKey, metric);
-        await this.expire(metricsKey, RedisService.USAGE_TTL_SECONDS);
-        return value;
-    }
-
-    async trackUsage(metric: string, delta: number): Promise<number> {
-        if (delta === 0) {
-            return this.getUsage(metric);
-        }
-        return delta > 0 ? this.incrementUsage(metric, delta) : this.decrementUsage(metric, Math.abs(delta));
-    }
-
-    async getUsage(metric: string, month?: string): Promise<number> {
-        const period = month ?? this.getCurrentMonth();
-        const raw = await this.get<string>(`usage:${metric}:${period}`, { serialize: false });
-        if (raw === undefined) {
-            return 0;
-        }
-        const parsed = Number(raw);
-        return Number.isFinite(parsed) ? parsed : 0;
-    }
-
-    async listMetrics(): Promise<string[]> {
-        return this.sMembers('usage-metrics');
-    }
-
-    async setLimit(metric: string, limit: number | null): Promise<void> {
-        const key = `limits:${metric}`;
-        if (limit === null) {
-            await this.del(key);
-            return;
-        }
-        await this.set(key, String(limit), { ttl: 0, serialize: false });
-    }
-
-    async getLimit(metric: string): Promise<number | null> {
-        const raw = await this.get<string>(`limits:${metric}`, { serialize: false });
-        if (raw === undefined) {
-            return null;
-        }
-        const parsed = Number(raw);
-        return Number.isFinite(parsed) ? parsed : null;
-    }
-
-    async markThresholdTriggered(metric: string, percentage: number): Promise<void> {
-        const key = `thresholds:${metric}:${percentage}`;
-        await this.set(key, '1', { ttl: RedisService.USAGE_TTL_SECONDS, serialize: false });
-    }
-
-    async isThresholdTriggered(metric: string, percentage: number): Promise<boolean> {
-        return this.exists(`thresholds:${metric}:${percentage}`);
-    }
-
-    async clearMonthlyUsage(metric: string, month: string): Promise<void> {
-        await this.del(`usage:${metric}:${month}`);
-    }
-
-    async clearThresholdFlags(metric: string, percentages: number[]): Promise<void> {
-        for (const percentage of percentages) {
-            await this.del(`thresholds:${metric}:${percentage}`);
         }
     }
 

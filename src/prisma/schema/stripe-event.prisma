@@ -1,0 +1,20 @@
+// Every Stripe webhook event received, keyed by Stripe's event id. The row is the durable dedup record
+// (a replayed event is acknowledged without being applied twice) and the processing log: a failed event
+// stays `failed` with its error until Stripe's retry succeeds. The payload is not stored (it can hold PII);
+// Stripe keeps events for 30 days and can resend them.
+model StripeEvent {
+  id              String    @id @db.VarChar(255)
+  type            String    @db.VarChar(100)
+  objectId        String?   @map("object_id") @db.VarChar(255)
+  // Stripe's `created` — the order in which Stripe produced the events.
+  stripeCreatedAt DateTime  @map("stripe_created_at") @db.Timestamptz
+  // received | processed | ignored | failed
+  status          String    @default("received") @db.VarChar(20)
+  attempts        Int       @default(0)
+  lastError       String?   @map("last_error") @db.Text
+  receivedAt      DateTime  @default(now()) @map("received_at") @db.Timestamptz
+  processedAt     DateTime? @map("processed_at") @db.Timestamptz
+
+  @@index([status, receivedAt], map: "idx_stripe_events_status")
+  @@map("stripe_events")
+}

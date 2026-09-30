@@ -5,25 +5,48 @@ import { AllConfigType } from '@config/config.type';
 import { BillingPlanEnum } from '@common/enums/billing.enum';
 import { AppLoggerService } from '@common/logging/app-logger.service';
 import { DateService } from '@common/helper/date.service';
+import { TenantContextService } from '@common/tenant-aware/tenant-context.service';
+
+/** Network retries the SDK makes itself; it sends an idempotency key with each retried write. */
+const STRIPE_NETWORK_RETRIES = 2;
+const STRIPE_TIMEOUT_MS = 20_000;
 
 @Injectable()
 export class StripeService {
+    private client: Stripe | null = null;
+
     constructor(
         private readonly configService: ConfigService<AllConfigType>,
         private readonly logger: AppLoggerService,
-        private readonly dateService: DateService
+        private readonly dateService: DateService,
+        private readonly context: TenantContextService
     ) {
         this.logger.setContext(StripeService.name);
     }
 
     private stripeClient(): Stripe {
+        if (this.client) {
+            return this.client;
+        }
         const secretKey = this.configService.get('stripeConfig.secretKey', {
             infer: true
         });
         if (!secretKey) {
             throw new Error('Stripe secret key is not configured');
         }
-        return new Stripe(secretKey);
+        this.client = new Stripe(secretKey, { maxNetworkRetries: STRIPE_NETWORK_RETRIES, timeout: STRIPE_TIMEOUT_MS });
+        return this.client;
+    }
+
+    /**
+     * Idempotency for a Stripe write made on behalf of an API request: the request's own `Idempotency-Key`,
+     * scoped by operation and subject. A client retrying its request can then never repeat the Stripe side
+     * effect (a second checkout, a second proration invoice). Writes made outside a request rely on the SDK's
+     * own retry keys.
+     */
+    private writeOptions(operation: string, subject: string): Stripe.RequestOptions | undefined {
+        const requestKey = this.context.getIdempotencyKey();
+        return requestKey ? { idempotencyKey: `${operation}:${subject}:${requestKey}`.slice(0, 255) } : undefined;
     }
 
     resolvePlanFromSubscription(subscription: Stripe.Subscription): BillingPlanEnum | null {
@@ -151,11 +174,17 @@ export class StripeService {
         }
     }
 
+    /**
+     * Checkout for a paid plan. The tenant's existing Stripe customer is reused (one customer per tenant), the
+     * subscription carries the tenant id in its metadata, and with Stripe Tax on, the billing address and tax
+     * ids are collected so VAT is computed.
+     */
     async createSubscriptionCheckoutSession(params: {
         tenantId: string;
         plan: BillingPlanEnum;
         userId?: string;
         couponCode?: string;
+        customerId?: string | null;
     }): Promise<{ id: string; url: string | null }> {
         const stripe = this.stripeClient();
 
@@ -201,26 +230,39 @@ export class StripeService {
             metadata.couponCode = params.couponCode;
         }
 
-        const session = await stripe.checkout.sessions.create({
-            mode: 'subscription',
-            line_items: [{ price: priceId, quantity: 1 }],
-            success_url: successUrl,
-            cancel_url: cancelUrl,
-            metadata,
-            ...(promotionCode
-                ? {
-                      discounts: [
-                          {
-                              promotion_code: promotionCode.id
-                          }
-                      ]
-                  }
-                : {})
-        });
+        const automaticTax = this.configService.get('stripeConfig.automaticTax', { infer: true }) === true;
+        const session = await stripe.checkout.sessions.create(
+            {
+                mode: 'subscription',
+                line_items: [{ price: priceId, quantity: 1 }],
+                success_url: successUrl,
+                cancel_url: cancelUrl,
+                client_reference_id: params.tenantId,
+                metadata,
+                subscription_data: { metadata: { tenantId: params.tenantId } },
+                ...(params.customerId ? { customer: params.customerId } : {}),
+                ...(automaticTax
+                    ? {
+                          automatic_tax: { enabled: true },
+                          tax_id_collection: { enabled: true },
+                          billing_address_collection: 'required' as const,
+                          ...(params.customerId ? { customer_update: { address: 'auto' as const, name: 'auto' as const } } : {})
+                      }
+                    : {}),
+                ...(promotionCode ? { discounts: [{ promotion_code: promotionCode.id }] } : {})
+            },
+            this.writeOptions('checkout', `${params.tenantId}:${params.plan}`)
+        );
 
         this.logger.log(`Created Stripe Checkout Session ${session.id} for tenant ${params.tenantId}, plan ${params.plan}`);
 
         return { id: session.id, url: session.url };
+    }
+
+    /** The customer a charge belongs to (dispute events carry only the charge id). */
+    async getChargeCustomerId(chargeId: string): Promise<string | undefined> {
+        const charge = await this.stripeClient().charges.retrieve(chargeId);
+        return typeof charge.customer === 'string' ? charge.customer : (charge.customer?.id ?? undefined);
     }
 
     async getSubscription(stripeSubscriptionId: string): Promise<Stripe.Subscription> {
@@ -292,17 +334,16 @@ export class StripeService {
 
         const newPriceId = this.priceIdForPlan(params.targetPlan);
 
-        await stripe.subscriptions.update(params.stripeSubscriptionId, {
-            items: [
-                {
-                    id: firstItem.id,
-                    price: newPriceId
-                }
-            ],
-            proration_behavior: 'always_invoice',
-            payment_behavior: 'error_if_incomplete',
-            cancel_at_period_end: false
-        });
+        await stripe.subscriptions.update(
+            params.stripeSubscriptionId,
+            {
+                items: [{ id: firstItem.id, price: newPriceId }],
+                proration_behavior: 'always_invoice',
+                payment_behavior: 'error_if_incomplete',
+                cancel_at_period_end: false
+            },
+            this.writeOptions('upgrade', params.stripeSubscriptionId)
+        );
 
         this.logger.log(`Upgraded Stripe subscription ${params.stripeSubscriptionId} to plan ${params.targetPlan} with proration`);
     }
@@ -340,26 +381,24 @@ export class StripeService {
 
         const schedule = scheduleId
             ? await stripe.subscriptionSchedules.retrieve(scheduleId)
-            : await stripe.subscriptionSchedules.create({
-                  from_subscription: params.stripeSubscriptionId
-              });
+            : await stripe.subscriptionSchedules.create(
+                  { from_subscription: params.stripeSubscriptionId },
+                  this.writeOptions('downgrade-schedule', params.stripeSubscriptionId)
+              );
 
         const startDate = schedule.phases?.[0]?.start_date ?? subscription.created;
 
-        await stripe.subscriptionSchedules.update(schedule.id, {
-            end_behavior: 'release',
-            phases: [
-                {
-                    start_date: startDate,
-                    end_date: periodEndTs,
-                    items: [{ price: currentPriceId, quantity: currentQuantity }]
-                },
-                {
-                    start_date: periodEndTs,
-                    items: [{ price: newPriceId, quantity: currentQuantity }]
-                }
-            ]
-        });
+        await stripe.subscriptionSchedules.update(
+            schedule.id,
+            {
+                end_behavior: 'release',
+                phases: [
+                    { start_date: startDate, end_date: periodEndTs, items: [{ price: currentPriceId, quantity: currentQuantity }] },
+                    { start_date: periodEndTs, items: [{ price: newPriceId, quantity: currentQuantity }] }
+                ]
+            },
+            this.writeOptions('downgrade', `${schedule.id}:${params.targetPlan}`)
+        );
 
         this.logger.log(
             `Scheduled Stripe subscription ${params.stripeSubscriptionId} to downgrade to plan ${params.targetPlan} at ${
@@ -381,7 +420,7 @@ export class StripeService {
             return;
         }
 
-        await stripe.subscriptionSchedules.release(scheduleId);
+        await stripe.subscriptionSchedules.release(scheduleId, {}, this.writeOptions('downgrade-release', scheduleId));
         this.logger.log(`Released Stripe subscription schedule ${scheduleId} for subscription ${stripeSubscriptionId}`);
     }
 
@@ -392,15 +431,17 @@ export class StripeService {
         const existingScheduleId = typeof existing.schedule === 'string' ? existing.schedule : existing.schedule?.id;
 
         if (existingScheduleId) {
-            await stripe.subscriptionSchedules.release(existingScheduleId);
+            await stripe.subscriptionSchedules.release(existingScheduleId, {}, this.writeOptions('cancel-release', existingScheduleId));
             this.logger.log(
                 `Released Stripe subscription schedule ${existingScheduleId} before scheduling cancellation for subscription ${stripeSubscriptionId}`
             );
         }
 
-        const subscription = await stripe.subscriptions.update(stripeSubscriptionId, {
-            cancel_at_period_end: true
-        });
+        const subscription = await stripe.subscriptions.update(
+            stripeSubscriptionId,
+            { cancel_at_period_end: true },
+            this.writeOptions('cancel', stripeSubscriptionId)
+        );
 
         const periodEndRaw = subscription.items?.data?.[0]?.current_period_end;
         const periodEndTs = typeof periodEndRaw === 'number' && Number.isFinite(periodEndRaw) ? periodEndRaw : null;
@@ -418,16 +459,26 @@ export class StripeService {
     async reactivateSubscription(stripeSubscriptionId: string): Promise<void> {
         const stripe = this.stripeClient();
 
-        await stripe.subscriptions.update(stripeSubscriptionId, {
-            cancel_at_period_end: false
-        });
+        await stripe.subscriptions.update(
+            stripeSubscriptionId,
+            { cancel_at_period_end: false },
+            this.writeOptions('reactivate', stripeSubscriptionId)
+        );
 
         this.logger.log(`Reactivated Stripe subscription ${stripeSubscriptionId} by clearing cancel_at_period_end`);
     }
 
-    async cancelSubscription(stripeSubscriptionId: string): Promise<void> {
+    /**
+     * Ends a subscription now, without a refund or a final prorated invoice. Idempotent: a subscription that
+     * has already ended is left as it is, so a retried deletion does not fail on it.
+     */
+    async cancelSubscriptionNow(stripeSubscriptionId: string): Promise<void> {
         const stripe = this.stripeClient();
-        await stripe.subscriptions.cancel(stripeSubscriptionId);
+        const subscription = await stripe.subscriptions.retrieve(stripeSubscriptionId);
+        if (subscription.status === 'canceled' || subscription.status === 'incomplete_expired') {
+            return;
+        }
+        await stripe.subscriptions.cancel(stripeSubscriptionId, {}, { idempotencyKey: `tenant-deletion:${stripeSubscriptionId}` });
         this.logger.log(`Canceled Stripe subscription ${stripeSubscriptionId}`);
     }
 
@@ -445,11 +496,10 @@ export class StripeService {
     async createSetupIntent(customerId: string): Promise<Stripe.SetupIntent> {
         const stripe = this.stripeClient();
 
-        const setupIntent = await stripe.setupIntents.create({
-            customer: customerId,
-            usage: 'off_session',
-            payment_method_types: ['card']
-        });
+        const setupIntent = await stripe.setupIntents.create(
+            { customer: customerId, usage: 'off_session', payment_method_types: ['card'] },
+            this.writeOptions('setup-intent', customerId)
+        );
 
         this.logger.log(`Created Stripe SetupIntent ${setupIntent.id} for customer ${customerId}`);
 
@@ -504,7 +554,7 @@ export class StripeService {
             throw new HttpException('Payment method not found for this customer', HttpStatus.NOT_FOUND);
         }
 
-        await stripe.paymentMethods.detach(paymentMethodId);
+        await stripe.paymentMethods.detach(paymentMethodId, {}, this.writeOptions('detach', paymentMethodId));
 
         this.logger.log(`Detached Stripe payment method ${paymentMethodId} from customer ${customerId}`);
     }
@@ -520,17 +570,22 @@ export class StripeService {
             throw new HttpException('Payment method not found for this customer', HttpStatus.NOT_FOUND);
         }
 
-        await stripe.customers.update(customerId, {
-            invoice_settings: {
-                default_payment_method: paymentMethodId
-            }
-        });
+        await stripe.customers.update(
+            customerId,
+            { invoice_settings: { default_payment_method: paymentMethodId } },
+            this.writeOptions('default-payment-method', `${customerId}:${paymentMethodId}`)
+        );
 
         this.logger.log(`Set default payment method ${paymentMethodId} for customer ${customerId}`);
     }
 
-    async listInvoicesForCustomer(customerId: string): Promise<
-        {
+    /** One page of invoices, newest first, paged with Stripe's own cursors (invoice ids). */
+    async listInvoicesForCustomer(
+        customerId: string,
+        page: { limit: number; startingAfter?: string; endingBefore?: string }
+    ): Promise<{
+        hasMore: boolean;
+        data: {
             id: string;
             number: string | null;
             status: string | null;
@@ -542,18 +597,18 @@ export class StripeService {
             periodEnd: Date | null;
             hostedInvoiceUrl: string | null;
             invoicePdfUrl: string | null;
-        }[]
-    > {
+        }[];
+    }> {
         const stripe = this.stripeClient();
 
         const list = await stripe.invoices.list({
             customer: customerId,
-            limit: 100
+            limit: page.limit,
+            ...(page.startingAfter ? { starting_after: page.startingAfter } : {}),
+            ...(page.endingBefore && !page.startingAfter ? { ending_before: page.endingBefore } : {})
         });
 
-        this.logger.log(`Listed ${list.data.length} Stripe invoices for customer ${customerId}`);
-
-        return list.data.map((invoice) => {
+        const data = list.data.map((invoice) => {
             const createdTs = invoice.created ?? 0;
             const periodStartTs = invoice.period_start as number | undefined;
             const periodEndTs = invoice.period_end as number | undefined;
@@ -572,6 +627,23 @@ export class StripeService {
                 invoicePdfUrl: invoice.invoice_pdf ?? null
             };
         });
+        return { hasMore: list.has_more, data };
+    }
+
+    /**
+     * A Stripe Customer Portal session: the Owner manages cards, billing address, tax ids and downloads
+     * invoices on Stripe's hosted page. Returns the one-time URL.
+     */
+    async createPortalSession(customerId: string): Promise<string> {
+        const returnUrl = this.configService.get('stripeConfig.portalReturnUrl', { infer: true });
+        if (!returnUrl) {
+            throw new HttpException('Stripe portal return URL is not configured', HttpStatus.SERVICE_UNAVAILABLE);
+        }
+        const session = await this.stripeClient().billingPortal.sessions.create(
+            { customer: customerId, return_url: returnUrl },
+            this.writeOptions('portal', customerId)
+        );
+        return session.url;
     }
 
     async retrieveUpcomingInvoiceForCustomer(params: { customerId: string; subscriptionId?: string | null }): Promise<{

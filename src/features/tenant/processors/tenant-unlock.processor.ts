@@ -1,11 +1,9 @@
 import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import type { Job } from 'bullmq';
 
-import { TENANT_UNLOCK_QUEUE, TenantUnlockJobData } from '@app/types';
-import type { IJobResult } from '@app/types';
+import { TENANT_UNLOCK_QUEUE, type IBaseJobData, type IJobResult } from '@app/types';
 
-import { BaseWorkerService, BullJobsConnectionFactory } from '@common/bulljobs';
+import { BaseWorkerService, BullJobsConnectionFactory, BullJobsService } from '@common/bulljobs';
 import { DateService } from '@common/helper/date.service';
 import { AppLoggerService } from '@common/logging/app-logger.service';
 import { MetricsService } from '@common/monitoring/metrics.service';
@@ -16,8 +14,12 @@ import type { AllConfigType } from '@config/config.type';
 
 import { TenantService } from '../tenant.service';
 
+/**
+ * Every 5 minutes, unlocks the tenants whose `lock_until` has passed. Driven by the database, so a timed
+ * lock expires even though nothing queued a job for it (nothing ever did: timed locks never expired).
+ */
 @Injectable()
-export class TenantUnlockProcessor extends BaseWorkerService<TenantUnlockJobData> {
+export class TenantUnlockProcessor extends BaseWorkerService<IBaseJobData> {
     constructor(
         connectionFactory: BullJobsConnectionFactory,
         configService: ConfigService<AllConfigType>,
@@ -26,29 +28,20 @@ export class TenantUnlockProcessor extends BaseWorkerService<TenantUnlockJobData
         tracingService: TracingService,
         tenantContext: TenantContextService,
         dateService: DateService,
-        private readonly tenantService: TenantService
+        private readonly tenantService: TenantService,
+        private readonly bullJobs: BullJobsService
     ) {
         super(TENANT_UNLOCK_QUEUE, connectionFactory, configService, logger, metricsService, tracingService, tenantContext, dateService);
     }
 
-    protected async processJob(job: Job<TenantUnlockJobData>): Promise<IJobResult> {
-        const { tenantId, unlockAt } = job.data;
-
-        this.logger.log(`Processing auto-unlock job for tenant ${tenantId}`, {
-            tenantId,
-            unlockAt
-        });
-
-        try {
-            await this.tenantService.autoUnlock(tenantId);
-            this.logger.log(`Successfully unlocked tenant ${tenantId}`, { tenantId });
-            return { success: true };
-        } catch (error) {
-            this.logger.error(`Failed to auto-unlock tenant ${tenantId}`, error instanceof Error ? error.stack : undefined, {
-                tenantId,
-                error: error instanceof Error ? error.message : String(error)
-            });
-            throw error;
+    override onModuleInit(): void {
+        super.onModuleInit();
+        if (this.configService.get<boolean>('app.isWorker', { infer: true })) {
+            void this.bullJobs.addRepeatingJob(TENANT_UNLOCK_QUEUE, 'unlock-expired', { tenantId: 'system' }, { pattern: '*/5 * * * *' });
         }
+    }
+
+    protected async processJob(): Promise<IJobResult> {
+        return { success: true, data: { unlocked: await this.tenantService.unlockExpired() } };
     }
 }

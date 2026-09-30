@@ -1,5 +1,5 @@
 import { HttpStatus, Injectable } from '@nestjs/common';
-import { randomUUID } from 'node:crypto';
+import { ulid } from 'ulid';
 import type { File, Prisma } from '@prisma-gen/generated/client';
 import { I18nContext, I18nService } from 'nestjs-i18n';
 import type { NullableType } from '@app/types';
@@ -11,6 +11,8 @@ import { AppLoggerService } from '@common/logging/app-logger.service';
 import { TenantContextService } from '@common/tenant-aware/tenant-context.service';
 import { BaseException } from '@common/exceptions/base.exceptions';
 import { PresignedUrlResponseDto, FileDto } from '@domains/files';
+
+import { ALLOWED_UPLOAD_TYPES, contentTypeForExtension, MAX_FILE_SIZE_BYTES } from './file-upload.policy';
 
 @Injectable()
 export class FilesService {
@@ -171,11 +173,20 @@ export class FilesService {
         });
     }
 
-    async getPresignedUrl(type: string): Promise<PresignedUrlResponseDto> {
-        const fileName = `${randomUUID()}.${type}`;
-        const presignedUrl = await this.awsS3Service.getPresignedUploadUrl(fileName, {
-            contentType: 'application/octet-stream'
-        });
+    /**
+     * A presigned PUT limited to one allowed type and the declared size: both are signed into the URL,
+     * so S3 rejects any other content type or length. The key is a ULID under the tenant's prefix.
+     */
+    async getPresignedUrl(type: string, size: number): Promise<PresignedUrlResponseDto> {
+        const contentType = contentTypeForExtension(type);
+        if (!contentType) {
+            throw new BaseException('invalid_parameter', `Unsupported file type: ${type}`, HttpStatus.BAD_REQUEST, 'type');
+        }
+        if (!Number.isInteger(size) || size < 1 || size > MAX_FILE_SIZE_BYTES) {
+            throw new BaseException('invalid_parameter', `size must be between 1 and ${MAX_FILE_SIZE_BYTES} bytes`, HttpStatus.BAD_REQUEST, 'size');
+        }
+        const fileName = `${ulid()}.${ALLOWED_UPLOAD_TYPES[contentType]}`;
+        const presignedUrl = await this.awsS3Service.getPresignedUploadUrl(fileName, { contentType, contentLength: size });
         return new PresignedUrlResponseDto({ presignedUrl, fileName });
     }
 
@@ -197,6 +208,6 @@ export class FilesService {
     /** Build a unique, tenant-agnostic object key; S3Service prefixes it with `tenants/{tenantId}/`. */
     private buildFileKey(file: Express.Multer.File | Express.MulterS3.File): string {
         const ext = file.mimetype?.split('/')[1]?.replace(/[^a-z0-9]/gi, '') || 'bin';
-        return `${randomUUID()}.${ext}`;
+        return `${ulid()}.${ext}`;
     }
 }

@@ -1,27 +1,16 @@
-import { Controller, Get, Post, Delete, Body, Param, HttpCode, HttpStatus, Put, UseGuards } from '@nestjs/common';
-import { ApiTags, ApiBearerAuth, ApiCreatedResponse, ApiBody, ApiOkResponse, ApiHeader } from '@nestjs/swagger';
+import { Controller, Get, Post, Delete, Body, Param, HttpCode, HttpStatus, Put, Query } from '@nestjs/common';
+import { ApiTags, ApiBearerAuth, ApiCreatedResponse, ApiBody, ApiOkResponse } from '@nestjs/swagger';
 
 import { CurrentUser } from '@common/auth/current-user.decorator';
 import type { IAuthenticatedUser } from '@app/types';
 import { RequirePermission } from '@common/auth/require-permission.decorator';
-import { KetoNamespace, KetoRelation, KetoResource } from '@common/auth/keto.constants';
-import { Paginate, PaginateQuery, Paginated, ApiPaginationQuery } from '@common/nestjs-prisma-pagination';
-import { Idempotent, IdempotencyScope } from '@common/idempotency';
+import { CursorPage, ListQueryDto } from '@common/http-contract/cursor-page';
 
-import { CreateApiKeyDto, UpdateApiKeyDto, ApiKeyResponse, ApiKeyWithRawKeyResponse } from '@domains/api-key';
+import { CreateApiKeyDto, UpdateApiKeyDto, ApiKeyResponse, ApiKeyWithRawKeyResponse, RevokeApiKeyQueryDto } from '@domains/api-key';
 
 import { ApiKeyService } from './api-key.service';
-import { API_KEY_PAGINATE_CONFIG } from './api-key.pagination';
-import { PaymentRequiredGuard } from '@app/features/billing/guards/payment-required.guard';
 
 @ApiTags('API Keys')
-@ApiHeader({
-    name: 'x-tenant-id',
-    required: true,
-    description: 'Tenant ID header',
-    schema: { type: 'string' }
-})
-@UseGuards(PaymentRequiredGuard)
 @Controller({ path: 'api-keys', version: '1' })
 @ApiBearerAuth()
 export class ApiKeyController {
@@ -32,24 +21,18 @@ export class ApiKeyController {
         description: 'API key created successfully',
         type: ApiKeyWithRawKeyResponse
     })
-    @RequirePermission({ namespace: KetoNamespace.TENANT, object: KetoResource.API_KEY, relation: KetoRelation.CREATE })
+    @RequirePermission('api_keys:manage')
     @HttpCode(HttpStatus.CREATED)
     @Post()
-    @Idempotent({ scope: IdempotencyScope.Tenant, ttl: 3600 })
     async create(@Body() dto: CreateApiKeyDto, @CurrentUser() user: IAuthenticatedUser): Promise<ApiKeyWithRawKeyResponse> {
         return this.apiKeyService.create(user.userId, dto);
     }
 
-    @ApiPaginationQuery(API_KEY_PAGINATE_CONFIG)
-    @ApiOkResponse({
-        description: 'List of API keys',
-        type: ApiKeyResponse,
-        isArray: true
-    })
-    @RequirePermission({ namespace: KetoNamespace.TENANT, object: KetoResource.API_KEY, relation: KetoRelation.READ })
+    @ApiOkResponse({ description: 'A page of API keys, newest first', type: CursorPage })
+    @RequirePermission('api_keys:manage')
     @HttpCode(HttpStatus.OK)
     @Get()
-    async findAll(@Paginate() query: PaginateQuery): Promise<Paginated<ApiKeyResponse>> {
+    async findAll(@Query() query: ListQueryDto): Promise<CursorPage<ApiKeyResponse>> {
         return this.apiKeyService.findAll(query);
     }
 
@@ -57,7 +40,7 @@ export class ApiKeyController {
         description: 'API key details',
         type: ApiKeyResponse
     })
-    @RequirePermission({ namespace: KetoNamespace.TENANT, relation: KetoRelation.READ })
+    @RequirePermission('api_keys:manage')
     @HttpCode(HttpStatus.OK)
     @Get(':id')
     async findOne(@Param('id') id: string): Promise<ApiKeyResponse> {
@@ -69,10 +52,9 @@ export class ApiKeyController {
         description: 'API key updated successfully',
         type: ApiKeyResponse
     })
-    @RequirePermission({ namespace: KetoNamespace.TENANT, object: KetoResource.API_KEY, relation: KetoRelation.UPDATE })
+    @RequirePermission('api_keys:manage')
     @HttpCode(HttpStatus.OK)
     @Put(':id')
-    @Idempotent({ scope: IdempotencyScope.Tenant, ttl: 1800 })
     async update(@Param('id') id: string, @Body() dto: UpdateApiKeyDto, @CurrentUser() user: IAuthenticatedUser): Promise<ApiKeyResponse> {
         return this.apiKeyService.update(id, user.userId, dto);
     }
@@ -81,7 +63,7 @@ export class ApiKeyController {
         description: 'API key rotated; a new secret is returned exactly once',
         type: ApiKeyWithRawKeyResponse
     })
-    @RequirePermission({ namespace: KetoNamespace.TENANT, object: KetoResource.API_KEY, relation: KetoRelation.UPDATE })
+    @RequirePermission('api_keys:manage')
     @HttpCode(HttpStatus.OK)
     @Post(':id/rotate')
     async rotate(@Param('id') id: string, @CurrentUser() user: IAuthenticatedUser): Promise<ApiKeyWithRawKeyResponse> {
@@ -89,11 +71,10 @@ export class ApiKeyController {
     }
 
     @ApiOkResponse({ description: 'API key revoked successfully' })
-    @RequirePermission({ namespace: KetoNamespace.TENANT, object: KetoResource.API_KEY, relation: KetoRelation.DELETE })
+    @RequirePermission('api_keys:manage')
     @HttpCode(HttpStatus.NO_CONTENT)
     @Delete(':id')
-    @Idempotent({ scope: IdempotencyScope.Tenant, ttl: 1800 })
-    async delete(@Param('id') id: string, @CurrentUser() user: IAuthenticatedUser): Promise<void> {
-        await this.apiKeyService.delete(id, user.userId);
+    async delete(@Param('id') id: string, @Query() query: RevokeApiKeyQueryDto, @CurrentUser() user: IAuthenticatedUser): Promise<void> {
+        await this.apiKeyService.delete(id, user.userId, query.reason);
     }
 }

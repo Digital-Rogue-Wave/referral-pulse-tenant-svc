@@ -226,18 +226,4 @@ export abstract class BaseWorkerService<T extends IBaseJobData = IBaseJobData> i
         this.worker.resume();
         this.logger.log(`▶️ Worker resumed for queue: ${this.queueName}`);
     }
-
-    /**
-     * Check if worker is running
-     */
-    isRunning(): boolean {
-        return this.worker.isRunning();
-    }
-
-    /**
-     * Check if worker is paused
-     */
-    isPaused(): boolean {
-        return this.worker.isPaused();
-    }
 }
