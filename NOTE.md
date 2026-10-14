@@ -703,13 +703,28 @@ which would grant across tenants, and `keto-tuples.ts` already departs from it d
 
 | # | v5 says | code has |
 |---|---|---|
-| D1 | `tenants.plan CHECK in ('free','starter','growth','scale','enterprise')` | no `plan` column on `tenants`; `BillingPlanEnum` is title-case and has four values — **`scale` missing** |
+| D1 | `tenants.plan CHECK in ('free','starter','growth','scale','enterprise')` | the column is `billing.plan`, a free `varchar(50)` with no CHECK, default `'Free'`; `BillingPlanEnum` is title-case with four values — **`scale` missing**. v5's DB Model defines no billing tables at all, so `tenants` is the only place it could have put `plan` |
 | D2 | `roles` has `tenant_id` (null for the four standard roles) and `keto_relations jsonb` | no `tenant_id` (so no custom per-tenant roles) and the column is `scopes` |
 | D3 | `api_keys.keto_scope_note text` | missing |
 | D4 | `idx_api_keys_tenant_active (tenant_id) WHERE revoked_at IS NULL` | a plain `(tenant_id, revoked_at)` index |
 | D5 | `oauth2_clients` table | missing |
 | D6 | `sessions` table | missing |
-| D7 | `tenants.verification_status CHECK in ('unverified','pending','verified','rejected')` | the enum's fourth value is `failed` |
+| ~~D7~~ | ~~verification status values~~ | **withdrawn — already correct, see below** |
+
+**D7 withdrawn.** Read from the enum rather than the schema the first time. The migration
+`tenants_verification_status_check` is already `('unverified','pending','verified','rejected')` —
+exactly v5 §3. `DomainVerificationStatusEnum`, whose fourth value is `failed`, governs
+`domain_verification_status`, a different column that v5 does not specify at all.
+
+Two things worth recording while the constraints were open:
+
+- `tenants_status_check` is `('active','suspended','locked','closed')` where v5 §3 says
+  `('active','suspended','closed')`. The extra `locked` is real — the tenant carries
+  `locked_at`/`lock_until`/`lock_reason` and the billing lifecycle drives it. An extension beyond
+  the spec rather than a contradiction, but v5's set is narrower and someone should know.
+- `tenant_verifications_status_check` is `('pending','in_review','verified','rejected')`, matching
+  DB Model §3 exactly. That settles spec defect 2 below: the code follows the DB Model, and
+  Architecture §2.1's `pending_review` is the outlier.
 
 ### Already aligned, no work needed
 
