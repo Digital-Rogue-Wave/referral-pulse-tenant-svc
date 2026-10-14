@@ -870,3 +870,103 @@ change), or a measured need for the sub-ms token validation the Redis mirror in 
 serve. Either makes the table necessary and gives it a writer in the same change.
 *Rejected:* build both now to match the table count (two unread tables, one of them a security
 hazard); build `sessions` only (same problem, half the surface).
+
+## V5.9 T3 — what was done and what was left, with reasons
+
+Scoped down after reading the code. Of the four §3 items, only one had a consumer, and that one was
+a live defect rather than a missing column.
+
+**Done — the role projection was misreporting permissions.** `roles.scopes` held wildcards from an
+older vocabulary (`tenant:*`, `users:*`, `api_keys:*`) that are not Keto relations and appear nowhere
+in `permission-catalog.ts`. §3 names the column `keto_relations` and defines it as the relation set
+the role grants, and also says `roles`/`user_roles` are a display projection, not the authoritative
+store. So anything rendering a role's permissions from that table showed permissions that are not
+granted and omitted ones that are — `ADMIN` projected five wildcards while actually holding every
+relation except billing. Renamed, and the seed now derives it from `ROLE_GRANTS` so the two cannot
+diverge again. Verified by applying the migration inside a transaction against the dev database
+(it renames the column and rewrites the four existing rows) and rolling back.
+
+**Not done, each for a stated reason:**
+
+| Item | Why not |
+|---|---|
+| `roles.tenant_id` | Nothing creates custom per-tenant roles — the seed is the only writer of `roles`. The column would be unread, and YAGNI is the binding rule here. |
+| `api_keys.keto_scope_note` | Nothing reads or writes it. Same reason. |
+| `idx_api_keys_tenant_active` partial index | Two reasons. It is an optimisation for a query that is not hot, and more importantly I cannot verify offline whether Prisma 7 can express a partial index in `@@index`. Creating it in SQL only would leave the declared model and the database disagreeing, and this repo's convention is that every hand-written index is mirrored in the schema with `map:` (see `AuditLog`). Needs the Prisma docs, not a guess. |
+| `roles` unique → `(tenant_id, name)` | Follows `roles.tenant_id`, and it is not free: `users.service.ts` does `role.findUnique({ where: { name } })`, which stops compiling the moment `name` alone is not unique, and with per-tenant roles a name-only lookup is ambiguous anyway. **Also worth knowing before anyone does it:** Postgres treats NULLs as distinct, so a plain unique index on `(tenant_id, name)` would *not* prevent two global roles with the same name — §3's "tenant_id null for the four standard roles" needs a partial unique index on `name WHERE tenant_id IS NULL` to actually hold. |
+
+## V5.10 T5 — new scope, not alignment drift
+
+Worth separating clearly, because "tenant-service is behind the spec" would be the wrong reading.
+Three of the four responsibilities Architecture v5 §2.1 adds are **new features v5 assigned**, not
+code that drifted.
+
+**Already present, verified rather than assumed:**
+
+- **The audit sink's store.** `audit_log` exists with §3's columns and indexes, and there is a
+  writer, a service and a controller behind it.
+- **This service's own erasure handler.** `POST /internal/erasures/operators` erases an operator and
+  returns a receipt, gated on the `dsr.erase` service capability. That is precisely the part
+  R-CPL-01 assigns to "every other service": each one "implements its own erasure handler and
+  returns a receipt". It was built against the older design, where a separate compliance
+  orchestrator drove the fan-out.
+
+**What v5 actually moved here: the coordinator role.** R-CPL-01 now makes the Tenant service the
+single coordinating owner — it "hosts the consent registry, the DSR endpoint and the DSR fan-out
+workflow and the audit sink". The per-service handler exists; the orchestrator does not.
+
+Product Spec §474 states the full contract this implies:
+
+| | |
+|---|---|
+| Sync APIs | `POST /v1/connections` (provider connections), `POST /v1/dsr` |
+| Publishes | `connection.created|revoked`, `consent.recorded`, `dsr.requested`, `erasure.completed`, `audit.logged` |
+| Consumes | **erasure receipts from every service** |
+
+None of those five events is published today, and nothing is consumed. `POST /v1/dsr` is Owner-only
+and gated on `programs:write` (§618), and it "replaces /v1/erasure-requests under referrers:write"
+(§1934).
+
+**Why this stops here rather than being built.** Not because it is large, but because three specific
+things are missing that cannot be invented responsibly:
+
+1. **No tables.** DB Model v5 §3 gives nine, and none of them is a consent registry, a DSR request,
+   or a provider connection. The data shapes would be mine to invent, including retention and
+   residency behaviour for consent records — which is the one area where guessing wrong is a legal
+   problem rather than a bug.
+2. **Provider secrets are a security design, not a schema.** §2.1 says this service holds "webhook
+   signing secrets, tracking-token key" and exposes them "to Event Ingestion through a cache", and
+   Event Ingestion's own §2.4 addendum already depends on it for verifying provider signatures. That
+   needs an encryption-at-rest and rotation design with a security review — inventing one
+   unilaterally for a money path is worse than not having it.
+3. **The fan-out is a cross-service contract.** The coordinator has to know every service's erasure
+   endpoint and aggregate their receipts. This service's own handler is `POST
+   /internal/erasures/operators` with the `dsr.erase` capability; whether the other eight follow that
+   convention is not something this repo can answer, and six of them are not mine.
+
+**Recommended shape, for approval rather than silent implementation** — so the decision is cheap to
+make and the work is unblocked the moment it is:
+
+- `consents` — subject reference (hashed), tenant, `tracking_consent` / `marketing_consent` (the
+  §2.4 enums), `consent_source`, `recorded_at`, `withdrawn_at`. Append-only, so withdrawal is a new
+  row and the history survives; current state is the latest row per subject.
+- `dsr_requests` — tenant, subject reference, `type ∈ (access, erasure, portability)`, status,
+  `temporal_workflow_id`/`run_id` (the same resumability pattern §3 already applies to
+  `tenant_verifications`), `requested_by`, `due_at` (the one-month deadline R-CPL-02 names),
+  `completed_at`.
+- `dsr_receipts` — one row per service per request, with the receipt payload, so `erasure.completed`
+  can carry all of them as R-CPL-02 requires.
+- `provider_connections` — tenant, provider, `connection_id`, config, and a reference to a secret
+  held in a secret manager rather than the column itself. **The secret handling is the part needing
+  review.**
+
+## V5.11 Spec defects — additions
+
+6. **Architecture §2.1 says tenant-service "Consumes: None. It is a dependency of other services
+   (token validation), not an event reactor."** Product Spec §474 says it consumes "erasure receipts
+   from every service", and R-CPL-01 makes it the DSR coordinator, which cannot work without
+   consuming them. The two statements cannot both hold.
+7. **`POST /v1/dsr` is gated on `programs:write`** (§618). It resolves to Owner-only in practice,
+   since no other standard role holds that relation, but gating a data-subject request on a
+   *programs* permission is semantically odd and will read as a copy-paste to the next person. A
+   `dsr:*` relation, or `api_keys:manage`-style owner-scoped relation, would say what it means.
