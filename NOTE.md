@@ -757,7 +757,7 @@ of `participants:`. A Keto namespace is an exact string, so this is not a synony
 | T1 | permission catalog and roles | P1–P7 |
 | T2 | plan / verification value sets | D1, D7 |
 | T3 | `roles.tenant_id` + `keto_relations`, `api_keys.keto_scope_note`, partial index | D2–D4 |
-| T4 | `oauth2_clients` and `sessions` tables | D5, D6 |
+| T4 | ~~`oauth2_clients` and `sessions` tables~~ | **not building — decision T-4, §V5.8** |
 | T5 | the four new v5 responsibilities | §V5.4 — blocked on a DB spec |
 
 ## V5.4 The new responsibilities have nowhere to live
@@ -808,3 +808,65 @@ architecture's own header lists "Still to author" items and notes that the §11.
    same document's revision header says "segmentation-service no longer emits a translated
    conversion.recorded" and Event Model §4.12 says the translation does not happen. Not this
    service's, but it is a contradiction inside one document.
+
+## V5.6 Progress
+
+| Phase | Status |
+|---|---|
+| T1 permission catalog and roles | done — `feat(authz): align the permission catalog and roles to API Contract v5` |
+| T2 plan tier | done — `feat(billing): add the Scale plan tier v5 defines` |
+| T3 `roles.tenant_id` + `keto_relations`, `api_keys.keto_scope_note`, partial index | **needs approval — it is a migration** (§V5.7) |
+| T4 `oauth2_clients` and `sessions` tables | **not building — decision T-4** (§V5.8) |
+| T5 the four new responsibilities | blocked on a DB spec (§V5.4) |
+
+Verified after T2: 51 suites / 495 unit tests green, 28 typecheck errors — the same 28 that were
+there before this pass, none in a file it touched — and no new lint errors.
+
+## V5.7 T3 is a migration, so it stops here for approval
+
+Three of the four items need DDL, and this repo treats migrations as an approval gate rather than a
+detail. What is pending, and why each matters:
+
+1. **`roles.keto_relations`, and the fact that `roles.scopes` currently disagrees with the
+   authoritative catalog.** This is more than a rename. DB Model §3 wants
+   `keto_relations jsonb` holding the relation set a role grants, e.g.
+   `["campaigns:write","rewards:approve"]`. The column today is `scopes`, and the seeded values are
+   wildcards from an older vocabulary — `['tenant:*']`, `['users:*','api_keys:*','billing:read']` —
+   which are not Keto relations and do not match `ROLE_GRANTS` in `permission-catalog.ts`. §3 is
+   explicit that `roles`/`user_roles` are "a projection for dashboard display and bulk assignment,
+   not the authoritative permission store", so the projection is simply stale: a dashboard rendering
+   a role's permissions from this table shows something the guards do not enforce.
+   *Recommended:* rename to `keto_relations` and seed it **from `ROLE_GRANTS`** rather than by hand,
+   so the projection is derived from the single source of truth and cannot drift again — the same
+   shape as the ingestion property manifest.
+2. **`roles.tenant_id`**, null for the four standard roles and set for custom ones. Decision T-1
+   keeps `ADMIN` as a custom role, and v5 scopes custom roles to a tenant; without the column
+   `ADMIN` is a global row, which is the one part of T-1 the schema cannot yet express.
+3. **`api_keys.keto_scope_note text`** — missing. A free-text note on what a key is scoped to.
+4. **`idx_api_keys_tenant_active (tenant_id) WHERE revoked_at IS NULL`** — the index today is a
+   plain `(tenant_id, revoked_at)`. The partial form is what §3 specifies, and it is the better
+   index for the only query that uses it (list a tenant's live keys).
+
+Item 4 alone is a safe, non-breaking index swap. Items 1–3 are additive DDL plus a data backfill for
+`keto_relations`.
+
+## V5.8 Decision T-4 — `oauth2_clients` and `sessions` are not being built
+
+DB Model v5 §3 lists both, so this is a deliberate departure rather than an oversight.
+
+Both are described in the spec as **mirrors of Ory**, not as systems of record: `sessions` is
+"Active dashboard session index (Ory Kratos authoritative; this is a fast local lookup + revocation
+list)" and `oauth2_clients` "Mirrors/augments Ory Hydra". This service delegates both entirely to
+Ory today — `kratos.service.ts` for sessions, Hydra via the credential resolver for clients — and
+nothing reads a local copy.
+
+Building them now would add two tables with no reader, which KISS and YAGNI both rule out, and it
+would be worse than merely unnecessary: a mirror that nothing keeps current goes stale, and a stale
+session index used as a revocation list is actively dangerous — it would answer "is this session
+revoked?" with yesterday's answer on a security path.
+
+*Named trigger for revisiting:* a session-revocation feature (log out everywhere, revoke on role
+change), or a measured need for the sub-ms token validation the Redis mirror in §3 is there to
+serve. Either makes the table necessary and gives it a writer in the same change.
+*Rejected:* build both now to match the table count (two unread tables, one of them a security
+hazard); build `sessions` only (same problem, half the surface).
