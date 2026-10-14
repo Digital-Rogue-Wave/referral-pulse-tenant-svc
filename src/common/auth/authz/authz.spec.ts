@@ -86,6 +86,23 @@ describe('Permission catalog (API Contract v5 §2)', () => {
         }
     });
 
+    it('grants every role a non-empty relation set, so the seeded projection is never empty', () => {
+        // The role catalog in the DB derives `keto_relations` from ROLE_GRANTS (src/prisma/seed.ts).
+        // A role missing from ROLE_GRANTS would seed an empty relation set, and the dashboard would
+        // show a role that grants nothing while the guards grant it plenty.
+        for (const role of Object.values(RoleEnum)) {
+            expect(ROLE_GRANTS[role].length).toBeGreaterThan(0);
+        }
+    });
+
+    it('keeps every granted permission inside the catalog, so no role grants a relation Keto has no namespace for', () => {
+        for (const [role, grants] of Object.entries(ROLE_GRANTS)) {
+            const unknown = grants.filter((permission) => !ALL_PERMISSIONS.includes(permission));
+            expect(unknown).toEqual([]);
+            expect(role).toBeTruthy();
+        }
+    });
+
     it('never trusts the JWT snapshot for money, keys or membership changes', () => {
         for (const permission of [
             'rewards:approve',

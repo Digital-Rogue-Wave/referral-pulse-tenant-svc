@@ -30,11 +30,14 @@ model User {
   @@map("users")
 }
 
+/// Human-readable role catalog (DB Model v5 §3). A projection for dashboard display and bulk
+/// assignment — NOT the authoritative permission store, which is Ory Keto. `keto_relations` is
+/// seeded from ROLE_GRANTS in permission-catalog.ts so the two cannot drift.
 model Role {
-  id          String  @id @default(ulid()) @db.VarChar(26)
-  name        String  @unique @db.VarChar(50)
-  scopes      Json    @default("[]")
-  description String? @db.VarChar(255)
+  id            String  @id @default(ulid()) @db.VarChar(26)
+  name          String  @unique @db.VarChar(50)
+  ketoRelations Json    @default("[]") @map("keto_relations")
+  description   String? @db.VarChar(255)
 
   createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz
   updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz
