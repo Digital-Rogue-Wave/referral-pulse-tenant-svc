@@ -756,9 +756,9 @@ of `participants:`. A Keto namespace is an exact string, so this is not a synony
 |---|---|---|
 | T1 | permission catalog and roles | P1–P7 |
 | T2 | plan / verification value sets | D1, D7 |
-| T3 | `roles.tenant_id` + `keto_relations`, `api_keys.keto_scope_note`, partial index | D2–D4 |
+| T3 | `keto_relations` — the projection fix (the other three §3 items left out, §V5.9) | D2 |
 | T4 | ~~`oauth2_clients` and `sessions` tables~~ | **not building — decision T-4, §V5.8** |
-| T5 | the four new v5 responsibilities | §V5.4 — blocked on a DB spec |
+| T5 | the four new v5 responsibilities | §V5.10 — new scope, not drift |
 
 ## V5.4 The new responsibilities have nowhere to live
 
@@ -815,9 +815,9 @@ architecture's own header lists "Still to author" items and notes that the §11.
 |---|---|
 | T1 permission catalog and roles | done — `feat(authz): align the permission catalog and roles to API Contract v5` |
 | T2 plan tier | done — `feat(billing): add the Scale plan tier v5 defines` |
-| T3 `roles.tenant_id` + `keto_relations`, `api_keys.keto_scope_note`, partial index | **needs approval — it is a migration** (§V5.7) |
+| T3 `keto_relations` — the projection fix | done, scoped down — `fix(authz): derive the role projection from ROLE_GRANTS…` (§V5.9) |
 | T4 `oauth2_clients` and `sessions` tables | **not building — decision T-4** (§V5.8) |
-| T5 the four new responsibilities | blocked on a DB spec (§V5.4) |
+| T5 the four new responsibilities | **new scope, not drift** — proposed shapes awaiting approval (§V5.10) |
 
 Verified after T2: 51 suites / 495 unit tests green, 28 typecheck errors — the same 28 that were
 there before this pass, none in a file it touched — and no new lint errors.
