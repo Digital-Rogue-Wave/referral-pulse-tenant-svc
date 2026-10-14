@@ -659,3 +659,137 @@ removed — it is currently registered in `BillingModule`.
 tenant writes/imports into events) plus moving the Stripe webhook + billing broadcasts + DB. Nothing in
 the identity/tenant core depends on billing internals, so the split is clean once those tendrils are
 event-driven. No code changed in this pass.
+
+---
+
+# V5 spec alignment (2026-10-14)
+
+The spec suite was rewritten. The **only** source of truth is now
+`D:\Projects\Work\REFERRAL\referral-scope-ahmed\referral spec\referral spec` — the ten v5 documents
+plus eleven JSON Schemas. The copies in this repo's `spec/` are superseded and are to be replaced,
+but not in this pass: alignment comes first.
+
+Phases are `T1`…`T5`, one cherry-pickable commit each.
+
+## V5.1 What changed for this service
+
+Two kinds of change. The first is field- and value-level drift against documents that mostly kept
+their shape. The second is new: **Architecture v5 §2.1 assigns tenant-service four responsibilities
+it did not have**, and three of them have nowhere to live (§V5.4).
+
+### Auth and roles — API Contract v5 §2
+
+This is the substance of the alignment, because `permission-catalog.ts` is the single definition the
+tuple writer, the `perms` resolver and the guards all read from, so every gap in it is a gap in
+authorization platform-wide.
+
+| # | v5 says | code has |
+|---|---|---|
+| P1 | `rewards` relations include `adjust` and `resend_email` | neither — so a Support Agent cannot be granted either |
+| P2 | `referrers` relations include `note` | missing |
+| P3 | four standard roles: `owner`, `operator`, `viewer`, **`support`** | `OWNER`, **`ADMIN`**, `OPERATOR`, `VIEWER` — `support` absent, `admin` is not a v5 role |
+| P4 | `operator` also gets `campaigns:complete`, `referrals:read`, `referrals:reject` | all three missing |
+| P5 | `viewer` also gets `programs:read`, `variants:read` | both missing |
+| P6 | `support` gets `referrers:read/note`, `referrals:read`, `rewards:read/adjust/resend_email`, `analytics:read`, and its writes are "live-Keto, reason-mandatory, audit-logged" | the whole role |
+| P7 | the live-check set includes `rewards:adjust` (and §2 marks support's `resend_email` / `note` live-checked too) | missing |
+
+Already correct, checked rather than assumed: the other nine namespaces and their relations; the
+hybrid model (`perms` snapshot in a short JWT, live Keto for money/keys/object-scoped); tenant
+isolation returning 404 rather than 403; `service:{client_id}` subjects for machine callers; and
+tenant-scoped role objects — the spec's own `role:operator#member` example is *not* tenant-scoped,
+which would grant across tenants, and `keto-tuples.ts` already departs from it deliberately.
+
+### Data model — DB Model v5 §3
+
+| # | v5 says | code has |
+|---|---|---|
+| D1 | `tenants.plan CHECK in ('free','starter','growth','scale','enterprise')` | no `plan` column on `tenants`; `BillingPlanEnum` is title-case and has four values — **`scale` missing** |
+| D2 | `roles` has `tenant_id` (null for the four standard roles) and `keto_relations jsonb` | no `tenant_id` (so no custom per-tenant roles) and the column is `scopes` |
+| D3 | `api_keys.keto_scope_note text` | missing |
+| D4 | `idx_api_keys_tenant_active (tenant_id) WHERE revoked_at IS NULL` | a plain `(tenant_id, revoked_at)` index |
+| D5 | `oauth2_clients` table | missing |
+| D6 | `sessions` table | missing |
+| D7 | `tenants.verification_status CHECK in ('unverified','pending','verified','rejected')` | the enum's fourth value is `failed` |
+
+### Already aligned, no work needed
+
+`users`, `user_roles`, `audit_log`, `tenant_verifications`, `event_outbox`, `idempotency_keys` match
+§3 field for field. `tenants` carries `data_region`, `retention_months` and `metadata` as specified.
+`api_keys.key_prefix` is `char(4)` and the full key is returned once — and the DB Model's own
+`char(4)` is what settles the length question against Event Model §2.2.
+
+## V5.2 Decisions
+
+**T-1 — `admin` becomes a custom role, not a deleted one.** v5 names four standard roles and
+`admin` is not among them, but removing a role that may be assigned to live users would orphan them
+mid-session. v5 resolves this itself: `roles.name CHECK in ('owner','operator','viewer','support')
+**or custom**`, with `tenant_id` null only for the standard four. So `admin` stays, reclassified as a
+custom role with its existing grants, and `support` is added as the fourth standard role. Nobody is
+locked out, and the standard set matches the spec.
+*Rejected:* delete `ADMIN` (breaks live assignments for no gain); leave it as a fifth standard role
+(the spec's standard set is closed, and `roles.name`'s CHECK would then disagree with it).
+
+**T-2 — the `referrers` namespace name is correct as-is; the spec's §2 table is the typo.** API
+Contract §2's namespace table calls it `participants`, while its own role mapping, actor table and
+tuple examples all say `referrers` — 31 occurrences of `referrers:` across the v5 suite against zero
+of `participants:`. A Keto namespace is an exact string, so this is not a synonym question: writing
+`participants:note` would produce a tuple nothing checks. No code change; raised as a spec defect.
+
+## V5.3 Phases
+
+| # | Phase | Covers |
+|---|---|---|
+| T1 | permission catalog and roles | P1–P7 |
+| T2 | plan / verification value sets | D1, D7 |
+| T3 | `roles.tenant_id` + `keto_relations`, `api_keys.keto_scope_note`, partial index | D2–D4 |
+| T4 | `oauth2_clients` and `sessions` tables | D5, D6 |
+| T5 | the four new v5 responsibilities | §V5.4 — blocked on a DB spec |
+
+## V5.4 The new responsibilities have nowhere to live
+
+Architecture v5 §2.1 gives tenant-service four responsibilities it did not have in v3:
+
+1. **consent registry**
+2. **data-subject requests — `POST /v1/dsr` and the DSR fan-out Temporal workflow**
+3. **audit sink** (Product Spec R-CPL-01)
+4. **provider connection config and secrets** — billing, payout, CRM, webhook signing secrets and
+   the tracking-token key, "exposed to Event Ingestion through a cache"
+
+DB Model v5 §3 provides tables for exactly one of them. Its table list is nine — `tenants`, `users`,
+`roles`, `user_roles`, `api_keys`, `oauth2_clients`, `sessions`, `tenant_verifications`,
+`audit_log` — and its own summary matrix (§13) repeats that nine. `audit_log` already existed, so
+the audit sink is covered. There is **no table for the consent registry, none for data-subject
+requests, and none for provider connections or their secrets.**
+
+That last one is the sharpest: Architecture §2.1 and the §2.4 addendum both say Event Ingestion reads
+provider connection secrets from a tenant-service cache, and the ingestion service's own revision
+note says the inbound receivers verify "the provider's signature scheme ... against the connection
+secret cached from tenant-service". So another service's documented ingress path depends on a store
+this service is told to own and given no schema for.
+
+This is not something to design unilaterally — it is secret material for a money path, with
+residency and retention consequences, and the DSR fan-out is a cross-service workflow contract. T5
+stays open pending a DB Model section for the three. The documents are mid-revision and say so: the
+architecture's own header lists "Still to author" items and notes that the §11.2/§12/§13 drawings
+"still show the old provider lane — to redraw".
+
+## V5.5 Spec defects found — for the clean-up round
+
+1. **The §2 namespace table says `participants`; everything else says `referrers`.** Decision T-2.
+   A namespace is an exact string, so one of them produces tuples nothing checks.
+2. **Company verification has two different state sets.** Architecture §2.1 says the
+   `account_verification` workflow runs `unverified → pending_review → verified → rejected`; DB Model
+   §3 types `tenant_verifications.status` as `('pending','in_review','verified','rejected')`.
+   `pending_review` vs `in_review`, and the DB has no `unverified` state while `tenants`
+   `verification_status` does.
+3. **API keys cannot be both bcrypt-hashed and looked up by hash.** API Contract §2 says "API keys
+   are bcrypt-hashed" and DB Model §3 says `key_hash text not null (bcrypt/argon2 of full key)` with
+   `Unique: (key_hash)`. bcrypt and argon2 are salted, so the digest is not reproducible from the
+   presented key — a unique index on it can never be probed, and validation would have to scan every
+   row. This service uses HMAC-SHA256 with a pepper, which is deterministic, indexed and still
+   non-reversible. The spec should say keyed-hash, not bcrypt.
+4. **Four responsibilities assigned with tables for one.** §V5.4.
+5. **Architecture §2.3 still lists `conversion.recorded` under segmentation's Publishes**, while the
+   same document's revision header says "segmentation-service no longer emits a translated
+   conversion.recorded" and Event Model §4.12 says the translation does not happen. Not this
+   service's, but it is a contradiction inside one document.
