@@ -9,10 +9,14 @@ import { KetoProvisioningService } from './keto-provisioning.service';
 import { membershipTuple, roleObject, tenantGrantTuples, ServiceCapability } from './keto-tuples';
 import { ALL_PERMISSIONS, LIVE_CHECK_PERMISSIONS, PERMISSION_CATALOG, ROLE_GRANTS } from './permission-catalog';
 
-describe('Permission catalog (API Contract v1.3 §2)', () => {
+describe('Permission catalog (API Contract v5 §2)', () => {
     it('covers every namespace the spec defines, with the spec relations', () => {
         expect(PERMISSION_CATALOG.campaigns).toEqual(['read', 'write', 'activate', 'pause', 'complete']);
-        expect(PERMISSION_CATALOG.rewards).toEqual(['read', 'approve', 'reject', 'clawback']);
+        // v5 adds `adjust` and `resend_email` for the Support Agent.
+        expect(PERMISSION_CATALOG.rewards).toEqual(['read', 'approve', 'reject', 'clawback', 'adjust', 'resend_email']);
+        // v5 adds `note`, the support annotation. The namespace stays `referrers`: v5's own namespace
+        // table calls it `participants` but every other mention says `referrers` (NOTE.md T-2).
+        expect(PERMISSION_CATALOG.referrers).toEqual(['read', 'write', 'block', 'note']);
         expect(PERMISSION_CATALOG.api_keys).toEqual(['manage']);
     });
 
@@ -27,16 +31,59 @@ describe('Permission catalog (API Contract v1.3 §2)', () => {
         expect(admin).toEqual(expect.arrayContaining(['api_keys:manage', 'users:write', 'payouts:confirm']));
     });
 
-    it('matches the spec Operator and Viewer rows (plus reading their own tenant)', () => {
-        expect(ROLE_GRANTS[RoleEnum.OPERATOR]).toEqual(expect.arrayContaining(['campaigns:activate', 'rewards:approve', 'analytics:read']));
+    it('matches the spec Operator row (plus reading their own tenant)', () => {
+        expect([...ROLE_GRANTS[RoleEnum.OPERATOR]].sort()).toEqual([
+            'analytics:read',
+            'campaigns:activate',
+            'campaigns:complete',
+            'campaigns:pause',
+            'campaigns:read',
+            'campaigns:write',
+            'referrals:read',
+            'referrals:reject',
+            'referrers:read',
+            'referrers:write',
+            'rewards:approve',
+            'rewards:read',
+            'rewards:reject',
+            'segments:read',
+            'segments:write',
+            'tenants:read',
+            'variants:read',
+            'variants:write'
+        ]);
         expect(ROLE_GRANTS[RoleEnum.OPERATOR]).not.toContain('payouts:confirm');
+        // Approving a reward is the Operator's; adjusting one is the Support Agent's.
+        expect(ROLE_GRANTS[RoleEnum.OPERATOR]).not.toContain('rewards:adjust');
+    });
+
+    it('matches the spec Viewer row (plus reading their own tenant)', () => {
         expect([...ROLE_GRANTS[RoleEnum.VIEWER]].sort()).toEqual([
             'analytics:read',
             'campaigns:read',
+            'programs:read',
             'referrals:read',
             'rewards:read',
+            'tenants:read',
+            'variants:read'
+        ]);
+    });
+
+    it('matches the spec Support Agent row — read, plus three live-checked writes', () => {
+        expect([...ROLE_GRANTS[RoleEnum.SUPPORT]].sort()).toEqual([
+            'analytics:read',
+            'referrals:read',
+            'referrers:note',
+            'referrers:read',
+            'rewards:adjust',
+            'rewards:read',
+            'rewards:resend_email',
             'tenants:read'
         ]);
+        // v5: "Read on referrers/referrals/rewards; limited write". No approvals, no money movement.
+        for (const denied of ['rewards:approve', 'rewards:clawback', 'payouts:write', 'campaigns:write'] as const) {
+            expect(ROLE_GRANTS[RoleEnum.SUPPORT]).not.toContain(denied);
+        }
     });
 
     it('never trusts the JWT snapshot for money, keys or membership changes', () => {
@@ -46,7 +93,13 @@ describe('Permission catalog (API Contract v1.3 §2)', () => {
             'payouts:confirm',
             'api_keys:manage',
             'users:write',
-            'billing:write'
+            'billing:write',
+            // v5 marks the Support Agent's three writes "all live Keto + audit trail": a resent
+            // reward email or a support note must not be authorized by a token issued before the
+            // agent's access was revoked.
+            'rewards:adjust',
+            'rewards:resend_email',
+            'referrers:note'
         ] as const) {
             expect(LIVE_CHECK_PERMISSIONS.has(permission)).toBe(true);
         }
@@ -147,13 +200,15 @@ describe('KetoProvisioningService', () => {
         expect(patches.filter((p) => p.action === 'insert')).toEqual([
             { action: 'insert', relation_tuple: membershipTuple('t1', RoleEnum.ADMIN, 'u1') }
         ]);
-        expect(patches.filter((p) => p.action === 'delete')).toHaveLength(3);
+        // Every other role is deleted, whatever the role set currently is — derived rather than
+        // hardcoded so adding a role (v5 added `support`) does not need this number edited.
+        expect(patches.filter((p) => p.action === 'delete')).toHaveLength(Object.keys(RoleEnum).length - 1);
     });
 
     it('removes every membership of a removed user', async () => {
         await provisioning.removeMember('t1', 'u1');
         const patches = keto.patchTuples.mock.calls[0]![0] as KetoTuplePatch[];
-        expect(patches).toHaveLength(4);
+        expect(patches).toHaveLength(Object.keys(RoleEnum).length);
         expect(patches.every((p) => p.action === 'delete')).toBe(true);
     });
 
@@ -161,7 +216,7 @@ describe('KetoProvisioningService', () => {
         await provisioning.revokeTenant('t1');
         expect(keto.deleteTuples).toHaveBeenCalledWith({ namespace: 'campaigns', object: 't1' });
         expect(keto.deleteTuples).toHaveBeenCalledWith({ namespace: 'role', object: 't1:owner', relation: 'member' });
-        expect(keto.deleteTuples).toHaveBeenCalledTimes(Object.keys(PERMISSION_CATALOG).length + 4);
+        expect(keto.deleteTuples).toHaveBeenCalledTimes(Object.keys(PERMISSION_CATALOG).length + Object.keys(RoleEnum).length);
     });
 
     it('grants a new tenant its full role matrix', async () => {
