@@ -10,6 +10,7 @@ export type StripeConfig = {
     freePriceId?: MaybeType<string>;
     starterPriceId?: MaybeType<string>;
     growthPriceId?: MaybeType<string>;
+    scalePriceId?: MaybeType<string>;
     enterprisePriceId?: MaybeType<string>;
     webhookSecret?: MaybeType<string>;
     /** Stripe Tax on checkout and invoices (needs Stripe Tax enabled on the account). */
@@ -45,6 +46,10 @@ class StripeEnvValidator {
 
     @IsString()
     @IsOptional()
+    STRIPE_SCALE_PRICE_ID?: MaybeType<string>;
+
+    @IsString()
+    @IsOptional()
     STRIPE_ENTERPRISE_PRICE_ID?: MaybeType<string>;
 
     @IsString()
@@ -70,6 +75,7 @@ export default registerAs<StripeConfig>('stripeConfig', () => {
         freePriceId: process.env.STRIPE_FREE_PRICE_ID,
         starterPriceId: process.env.STRIPE_STARTER_PRICE_ID,
         growthPriceId: process.env.STRIPE_GROWTH_PRICE_ID,
+        scalePriceId: process.env.STRIPE_SCALE_PRICE_ID,
         enterprisePriceId: process.env.STRIPE_ENTERPRISE_PRICE_ID,
         webhookSecret: process.env.STRIPE_WEBHOOK_SECRET,
         automaticTax: process.env.STRIPE_AUTOMATIC_TAX === 'true',

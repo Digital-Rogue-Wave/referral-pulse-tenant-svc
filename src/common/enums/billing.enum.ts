@@ -1,7 +1,17 @@
+/**
+ * Subscription tiers. DB Model v5 §3 names five: free, starter, growth, **scale**, enterprise.
+ *
+ * The values stay title-case. v5 puts `plan` on `tenants` with a lower-case CHECK, but this service
+ * holds it on `billing.plan` — v5's DB Model defines no billing tables at all, so it had nowhere
+ * else to put the column. Re-casing would be a data migration across `billing.plan`, `plans.name`
+ * and the Stripe product metadata keyed to them: a live money path rewritten for a cosmetic
+ * difference against a column that does not exist here. See NOTE.md decision T-3.
+ */
 export enum BillingPlanEnum {
     FREE = 'Free',
     STARTER = 'Starter',
     GROWTH = 'Growth',
+    SCALE = 'Scale',
     ENTERPRISE = 'Enterprise'
 }
 

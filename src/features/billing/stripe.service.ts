@@ -164,6 +164,11 @@ export class StripeService {
                     throw new HttpException('Stripe Growth price ID is not configured', HttpStatus.BAD_REQUEST);
                 }
                 return cfg.growthPriceId;
+            case BillingPlanEnum.SCALE:
+                if (!cfg?.scalePriceId) {
+                    throw new HttpException('Stripe Scale price ID is not configured', HttpStatus.BAD_REQUEST);
+                }
+                return cfg.scalePriceId;
             case BillingPlanEnum.ENTERPRISE:
                 if (!cfg?.enterprisePriceId) {
                     throw new HttpException('Stripe Enterprise price ID is not configured', HttpStatus.BAD_REQUEST);

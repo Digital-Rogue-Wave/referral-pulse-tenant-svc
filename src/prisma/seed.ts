@@ -5,7 +5,7 @@
  * manual testing via Swagger:
  *
  *   1. Currencies       — USD, EUR (required by billing)
- *   2. Plans            — Free / Starter / Growth / Enterprise (public plans with Stripe IDs)
+ *   2. Plans            — Free / Starter / Growth / Scale / Enterprise (public plans with Stripe IDs)
  *   3. Test tenant      — id: AZP-772-OMEGA  (use this in the x-tenant-id / tenant-id header)
  *   4. Test billing row — Free plan, no Stripe customer yet
  *
@@ -45,6 +45,7 @@ const STRIPE_PRICE = {
     Free: process.env.STRIPE_FREE_PRICE_ID ?? '',
     Starter: process.env.STRIPE_STARTER_PRICE_ID ?? '',
     Growth: process.env.STRIPE_GROWTH_PRICE_ID ?? '',
+    Scale: process.env.STRIPE_SCALE_PRICE_ID ?? '',
     Enterprise: process.env.STRIPE_ENTERPRISE_PRICE_ID ?? ''
 };
 
@@ -53,6 +54,7 @@ const STRIPE_PRODUCT = {
     Free: process.env.STRIPE_FREE_PRODUCT_ID ?? '',
     Starter: process.env.STRIPE_STARTER_PRODUCT_ID ?? '',
     Growth: process.env.STRIPE_GROWTH_PRODUCT_ID ?? '',
+    Scale: process.env.STRIPE_SCALE_PRODUCT_ID ?? '',
     Enterprise: process.env.STRIPE_ENTERPRISE_PRODUCT_ID ?? ''
 };
 
@@ -130,6 +132,25 @@ async function seedPlans() {
                 seats: 15,
                 leaderboard_entries: 10_000,
                 email_sends: 50_000
+            }
+        },
+        {
+            // DB Model v5 section 3 names a fifth tier between Growth and Enterprise. Seeded
+            // INACTIVE on purpose: no document specifies its limits or price, and these numbers are
+            // a dev placeholder interpolated on the existing progression, not a commercial
+            // decision. Set real limits and flip isActive before offering it.
+            name: 'Scale',
+            stripePriceId: STRIPE_PRICE.Scale || null,
+            stripeProductId: STRIPE_PRODUCT.Scale || null,
+            interval: 'month',
+            isActive: false,
+            manualInvoicing: false,
+            limits: {
+                campaigns: 150,
+                referred_users: 35_000,
+                seats: 40,
+                leaderboard_entries: 35_000,
+                email_sends: 150_000
             }
         },
         {
