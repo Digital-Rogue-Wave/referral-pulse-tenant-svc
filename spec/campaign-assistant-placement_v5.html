@@ -1,0 +1,280 @@
+<!DOCTYPE html><html lang="en"><head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>ReferralAI — Campaign Creation Assistant: Service Placement v5.0</title><style>
+
+@import url('https://fonts.googleapis.com/css2?family=Instrument+Serif&family=Geist:wght@400;500;600&family=Geist+Mono:wght@400&display=swap');
+:root{
+  --ink:#1c1917;--ink2:#44403c;--ink3:#78716c;--ink4:#a8a29e;
+  --paper:#FDFCFA;--card:#fff;--line:#e7e5e4;--wash:#f5f5f4;
+  --acc:#b45309;--acc2:#92400e;--accbg:#fef3c7;
+  --mint:#047857;--mint2:#065f46;--mintbg:#d1fae5;
+  --slate:#1e40af;--slate2:#1e3a8a;--slatebg:#dbeafe;
+  --rose:#be123c;--rose2:#9f1239;--rosebg:#ffe4e6;
+  --sw:220px
+}
+*{margin:0;padding:0;box-sizing:border-box}
+html{scroll-behavior:smooth;scroll-padding-top:20px}
+body{font-family:Geist,system-ui,sans-serif;background:var(--paper);color:var(--ink);font-size:14.5px;line-height:1.75;display:flex;-webkit-font-smoothing:antialiased}
+
+nav.sd{position:fixed;top:0;left:0;width:var(--sw);height:100vh;border-right:1px solid var(--line);overflow-y:auto;padding:24px 0;background:var(--paper)}
+.sd-b{padding:0 16px 16px}
+.sd-b h2{font-family:'Instrument Serif',serif;font-size:20px;color:var(--acc2);font-weight:400}
+.sd-b small{font-size:11px;color:var(--ink4);display:block;margin-top:2px;letter-spacing:.04em;text-transform:uppercase}
+.sd a{display:block;padding:2px 16px;color:var(--ink3);text-decoration:none;font-size:12px;line-height:1.6;transition:color .1s}
+.sd a:hover{color:var(--ink)}
+.sd a.n1{color:var(--ink2);font-weight:600;margin-top:12px;font-size:12px}
+.sd a.n2{padding-left:28px;font-size:11.5px;color:var(--ink4)}
+
+main{margin-left:var(--sw);max-width:780px;padding:40px 48px 100px}
+h1{font-family:'Instrument Serif',serif;font-size:28px;font-weight:400;color:var(--ink);margin:56px 0 16px;letter-spacing:-.02em}
+h1:first-of-type{margin-top:0}
+h2{font-size:16px;font-weight:600;margin:32px 0 10px;letter-spacing:-.01em}
+h3{font-size:14px;font-weight:600;color:var(--acc2);margin:24px 0 6px}
+h4{font-size:13px;font-weight:600;margin:16px 0 4px}
+p{margin:0 0 12px;color:var(--ink2)}
+strong{color:var(--ink);font-weight:600}
+strong.err{color:var(--rose)}strong.ok{color:var(--mint)}strong.warn{color:var(--acc)}
+em{color:var(--ink3)}
+a{color:var(--acc);text-decoration:none;border-bottom:1px solid var(--accbg)}
+a:hover{border-color:var(--acc)}
+hr{border:none;height:1px;background:var(--line);margin:36px 0}
+ul,ol{margin:0 0 14px 20px;color:var(--ink2)}
+li{margin-bottom:4px}
+code{font-family:'Geist Mono',monospace;font-size:12.5px;background:var(--wash);color:var(--acc2);padding:1px 4px;border-radius:3px}
+
+blockquote{border-left:3px solid var(--acc);padding:10px 16px;margin:14px 0 20px;background:var(--accbg);border-radius:0 6px 6px 0;font-size:13.5px}
+blockquote p{color:var(--acc2)}
+blockquote p:last-child{margin:0}
+
+table{width:100%;border-collapse:collapse;margin:12px 0 20px;font-size:13px}
+th{text-align:left;padding:8px 10px;font-weight:500;font-size:10.5px;text-transform:uppercase;letter-spacing:.08em;color:var(--ink4);border-bottom:2px solid var(--line)}
+td{padding:7px 10px;border-bottom:1px solid var(--wash);color:var(--ink2);vertical-align:top}
+tr:hover td{background:var(--wash)}
+
+figure{margin:22px 0 28px;padding:20px;background:var(--card);border:1px solid var(--line);border-radius:10px}
+figcaption{font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:.14em;color:var(--ink4);margin-bottom:14px}
+figure svg{display:block}
+figure svg text{font-family:Geist,system-ui,sans-serif}
+.s-h{font-size:13px;font-weight:600}
+.s-b{font-size:11.5px}
+.s-t{font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:.1em}
+.z-rose{fill:var(--rose2)}.z-rose2{fill:var(--rose)}
+.z-mint{fill:var(--mint2)}.z-mint2{fill:var(--mint)}
+.z-slate{fill:var(--slate2)}.z-slate2{fill:var(--slate)}
+.z-acc{fill:var(--acc2)}.z-acc2{fill:var(--acc)}
+.z-ink{fill:var(--ink)}.z-ink2{fill:var(--ink2)}.z-ink3{fill:var(--ink3)}.z-ink4{fill:var(--ink4)}
+
+.boundary{font-size:13px;padding:8px 14px;border-radius:6px;line-height:1.5;margin:4px 0}
+.b-must{background:var(--mintbg);border-left:3px solid var(--mint)}
+.b-mustnot{background:var(--rosebg);border-left:3px solid var(--rose)}
+.b-should{background:var(--slatebg);border-left:3px solid var(--slate)}
+.b-can{background:var(--wash);border-left:3px solid var(--ink4)}
+.blab{font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:.1em;display:block;margin:18px 0 6px}
+.blab.must{color:var(--mint)}.blab.mustnot{color:var(--rose)}.blab.should{color:var(--slate)}.blab.can{color:var(--ink3)}
+
+@media(max-width:800px){nav.sd{display:none}main{margin-left:0;padding:20px}}
+@media print{nav.sd{display:none}main{margin-left:0;max-width:100%}figure{break-inside:avoid}}
+::-webkit-scrollbar{width:3px}::-webkit-scrollbar-thumb{background:var(--line);border-radius:2px}
+
+</style></head><body>
+<nav class="sd"><div class="sd-b"><h2>ReferralAI</h2><small>Campaign Creation Assistant — Placement v5.0</small></div>
+<a href="#doc" class="n1">Service Placement</a>
+<a href="#question" class="n2">The Question</a>
+<a href="#verdict" class="n2">Verdict</a>
+<a href="#1-ownership" class="n1">1. Ownership Boundary</a>
+<a href="#ai-owns" class="n2">What the AI Service Owns</a>
+<a href="#ai-derives" class="n2">What It Derives</a>
+<a href="#ai-not" class="n2">What It Must Not Own</a>
+<a href="#owns-diagram" class="n2">Proposes vs Owns</a>
+<a href="#2-profiles" class="n1">2. The Three Profiles</a>
+<a href="#profiles-as-posture" class="n2">Profiles as Posture</a>
+<a href="#profiles-table" class="n2">Posture Matrix</a>
+<a href="#3-conversation" class="n1">3. Conversation Model</a>
+<a href="#stateless" class="n2">Stateless, Single-Turn</a>
+<a href="#loop-diagram" class="n2">The Persisted Loop</a>
+<a href="#4-handoff" class="n1">4. Handoff to Campaign</a>
+<a href="#5-boundaries" class="n1">5. Boundaries</a>
+</nav>
+<main>
+
+<h1 id="doc">Campaign Creation Assistant — Service Placement</h1>
+<p><strong>Version:</strong> 5.0 — suite-wide version alignment (2026-10-09); content of 2.0 (which superseded 1.0). Earlier change-log entries keep the pre-alignment numbering.<br>
+<strong>Status:</strong> Draft for review<br>
+<strong>Last Updated:</strong> June 2026<br>
+<strong>Scope:</strong> Where the assistant's prompts, questions, derivations, profiles, and generated configs live<br>
+<strong>Companion (all v5.0):</strong> Creation Assistant — Interview Script · Architecture (§4, §14) · Product Spec (§11 AI Features) · Responsibility Contract · DB Model (§11)</p>
+
+<blockquote><p><strong>Scope of this document.</strong> This is a placement decision, not an API reference. It fixes which service owns each moving part of the Campaign Creation Assistant — the conversational chatbot that interviews an operator and produces candidate campaign configurations. It deliberately avoids endpoint paths, request shapes, and field-level schemas; those belong in the API Contract and the assistant's behavioural spec. It assumes the established AI discipline: <em>the AI service reasons and proposes; owning services decide and persist.</em></p></blockquote>
+
+<h3 id="question">The Question</h3>
+<p>Should the assistant's <strong>questions</strong>, its <strong>prompts</strong>, and the <strong>three campaign configurations</strong> it generates (Baseline / Balanced / Aggressive) live in the AI service?</p>
+
+<h3 id="verdict">Verdict</h3>
+<p>Yes for the first two, and yes for the <em>generation logic</em> of the third — but with one hard line. Prompts, conversational questions, and the profile <em>posture</em> are all reasoning behaviour and belong in <code>ai-service</code> / <code>ai_db</code> alongside every other agent. The three generated configs, however, are <strong>recommendation artifacts</strong>, not campaign configs. They live in <code>ai_db</code> only as proposals. The authoritative Campaign, Variants, Segments, and Reward configs are owned by the Campaign service and are materialised there — and only there — when an operator accepts. The AI service must never become the system of record for a campaign.</p>
+
+<hr>
+
+<h1 id="1-ownership">1. Ownership Boundary</h1>
+
+<h3 id="ai-owns">What the AI Service Owns</h3>
+<p>The AI service is already the single home for all LLM logic — for cost control, auditability, model management, and the operational simplicity of one log stream for a two-engineer team. The Campaign Creation Assistant introduces a <em>new agent type</em>, nothing structurally new. Three things sit naturally inside it:</p>
+<ul>
+<li><strong>Prompts.</strong> The assistant's system prompts are versioned records, exactly like every other agent — one active version per agent type, captured as a <code>PromptVersion</code> in <code>ai_db</code>, referenced by every decision log so any output traces back to the prompt that produced it.</li>
+<li><strong>Questions.</strong> The conversational questions the assistant asks across its phases are agent behaviour. They are emitted by the agent at invocation time and carry no state of their own.</li>
+<li><strong>Profile posture.</strong> Baseline, Balanced, and Aggressive are generation <em>postures</em> — a bias applied during reasoning, not stored configuration. The meaning of "Aggressive" is reasoning logic, and reasoning logic lives where all reasoning lives.</li>
+</ul>
+
+<h3 id="ai-derives">What It Derives</h3>
+<p>The assistant earns its value by asking little and computing much. The interview sorts every input into <em>ask</em>, <em>infer-and-confirm</em>, and <em>derive</em> — and the derive work is reasoning, so it too lives in the AI service. Using read-only tools over analytics and propensity data, the agent computes the inputs an operator should never be asked for: the CAC/payback ceiling that caps every reward, the saturation pacing that decides which postures a given base size can even sustain, best-referrer targeting from trust tiers and propensity scores, and the give-get framing and hold/clawback defaults that fit the chosen pulse. These derivations are reads — they inform the proposals and never mutate any owning service. They are the substance of "the AI reasons," and they belong beside the prompts, not in <code>campaign_db</code>.</p>
+
+<h3 id="ai-not">What It Must Not Own</h3>
+<p>The configs the assistant hands back are proposals. Each candidate is stored as a <code>Recommendation</code> in <code>ai_db</code> with an accept/reject outcome — the same shape the Campaign Setup Agent already uses. That record is transient by intent: it is the AI's <em>suggestion</em>, captured for audit and for the operator to act on. It is not a Campaign. The moment the assistant tried to hold the authoritative campaign definition, the platform would have two systems of record for the same object, and the advisory discipline that keeps AI reversible would be broken.</p>
+
+<blockquote><p><strong>The discipline that already governs this.</strong> The existing Campaign Setup Agent returns a structured proposal and <em>cannot</em> activate, commit, or approve a budget; the chosen config is applied by the Campaign service through its own API on operator accept. The Creation Assistant inherits that contract unchanged. It proposes three; the operator picks one; Campaign materialises it. AI proposes — Campaign owns.</p></blockquote>
+
+<figure id="owns-diagram">
+<figcaption>Proposes vs Owns — where each part lives</figcaption>
+<svg viewBox="0 0 680 372" width="100%" role="img"><title>Ownership boundary between the AI service and the Campaign service</title><desc>The AI service holds prompts, questions, profile posture, conversation state and three candidate proposals, all advisory. The operator selects one. Only then does the Campaign service materialise the authoritative campaign, variants, segments and reward configs.</desc>
+<defs><marker id="ar" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M2 1L8 5L2 9" fill="none" stroke="context-stroke" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></marker></defs>
+
+<rect x="40" y="44" width="270" height="220" rx="12" fill="#dbeafe" stroke="#1e40af" stroke-width="0.5"/>
+<text class="s-h z-slate" x="56" y="70">ai-service · ai_db</text>
+<text class="s-t z-slate2" x="56" y="88">ADVISORY — PROPOSES ONLY</text>
+<text class="s-b z-slate2" x="56" y="118">Prompts (PromptVersion)</text>
+<text class="s-b z-slate2" x="56" y="140">Conversational questions</text>
+<text class="s-b z-slate2" x="56" y="162">Profile posture · Baseline / Balanced / Aggressive</text>
+<text class="s-b z-slate2" x="56" y="184">Conversation state (answers, phase)</text>
+<rect x="56" y="200" width="238" height="48" rx="8" fill="#fff" stroke="#1e40af" stroke-width="0.5"/>
+<text class="s-b z-slate" x="68" y="220">3 candidate proposals (Recommendation)</text>
+<text class="s-b z-slate2" x="68" y="238">transient · accept/reject outcome</text>
+
+<rect x="370" y="44" width="270" height="220" rx="12" fill="#d1fae5" stroke="#047857" stroke-width="0.5"/>
+<text class="s-h z-mint" x="386" y="70">campaign-service · campaign_db</text>
+<text class="s-t z-mint2" x="386" y="88">SYSTEM OF RECORD</text>
+<text class="s-b z-mint2" x="386" y="124">Campaign</text>
+<text class="s-b z-mint2" x="386" y="146">Variants (incl. default)</text>
+<text class="s-b z-mint2" x="386" y="168">Segment references</text>
+<text class="s-b z-mint2" x="386" y="190">Reward configs</text>
+<text class="s-b z-mint2" x="386" y="212">State machine · budget</text>
+
+<rect x="232" y="296" width="216" height="46" rx="10" fill="#f5f5f4" stroke="#a8a29e" stroke-width="0.5"/>
+<text class="s-h z-ink" x="246" y="318">Operator</text>
+<text class="s-b z-ink3" x="246" y="334">selects one · accepts via dashboard</text>
+
+<line x1="175" y1="264" x2="300" y2="306" stroke="#a8a29e" stroke-width="1.5" marker-end="url(#ar)"/>
+<text class="s-b z-ink3" x="150" y="290">render 3</text>
+<line x1="448" y1="306" x2="520" y2="266" stroke="#047857" stroke-width="1.5" marker-end="url(#ar)"/>
+<text class="s-b z-mint2" x="452" y="296">materialise via Campaign API</text>
+
+<rect x="40" y="358" width="13" height="13" rx="3" fill="#dbeafe" stroke="#1e40af" stroke-width="0.5"/>
+<text class="s-b z-ink2" x="59" y="368">AI — advisory</text>
+<rect x="220" y="358" width="13" height="13" rx="3" fill="#d1fae5" stroke="#047857" stroke-width="0.5"/>
+<text class="s-b z-ink2" x="239" y="368">Campaign — authoritative</text>
+<rect x="450" y="358" width="13" height="13" rx="3" fill="#f5f5f4" stroke="#a8a29e" stroke-width="0.5"/>
+<text class="s-b z-ink2" x="469" y="368">Operator — decides</text>
+</svg>
+</figure>
+
+<hr>
+
+<h1 id="2-profiles">2. The Three Profiles</h1>
+
+<h3 id="profiles-as-posture">Profiles as Posture, Not Records</h3>
+<p>Baseline, Balanced, and Aggressive are not three stored templates. They are three <em>reasoning postures</em> the same agent adopts over the same gathered answers, biasing how it sizes rewards, how broadly it targets, and how hard it leans on the budget. Treating them as posture rather than as persisted config is what keeps them inside the AI service cleanly: a posture is a prompt-and-parameter framing, fully versioned with the agent, and it produces three <code>Recommendation</code> candidates in a single reasoning pass. Nothing about a profile lives in <code>campaign_db</code> until the operator picks one and that one candidate is materialised. Each posture reasons over the full input set — what was asked, what was inferred-and-confirmed, and what was derived — and is bounded by the derived ceilings: no posture may exceed the CAC/payback cap, and Aggressive is only offered when the eligible base is large enough to sustain it without saturating.</p>
+
+<h3 id="profiles-table">Posture Matrix</h3>
+<p>The postures differ along the levers the operator most cares about. The table states intent; the exact numeric framing is a prompt concern, tuned in the agent's versioned template.</p>
+<table>
+<thead><tr><th>Lever</th><th>Baseline</th><th>Balanced</th><th>Aggressive</th></tr></thead>
+<tbody>
+<tr><td><strong>Reward sizing</strong></td><td>Conservative, near vertical floor</td><td>Mid-range, benchmark-aligned</td><td>High, leaning into upside</td></tr>
+<tr><td><strong>Segment breadth</strong></td><td>Narrow, proven audiences</td><td>Moderate, a few targeted variants</td><td>Broad, default-variant-forward reach</td></tr>
+<tr><td><strong>Budget posture</strong></td><td>Cautious, slow burn</td><td>Steady, planned spend</td><td>Front-loaded, growth-first</td></tr>
+<tr><td><strong>Best for</strong></td><td>Cost discipline, first programs</td><td>Default recommendation</td><td>Acquisition pushes, seeding</td></tr>
+</tbody>
+</table>
+
+<blockquote><p><strong>Generation gate still applies.</strong> Whatever posture is in play, each candidate must satisfy the Pulse&times;Reward compatibility matrix as a hard generation gate — an incompatible pairing is never emitted, not flagged after the fact. Posture changes <em>how aggressive</em> a config is, never <em>whether it is valid</em>.</p></blockquote>
+
+<hr>
+
+<h1 id="3-conversation">3. Conversation Model</h1>
+
+<h3 id="stateless">Stateless, Single-Turn — and What That Forces</h3>
+<p>The platform's agents are invoked, not continuously running: single-turn, stateless per invocation, bounded to five tool calls, with any state between invocations reconstructed from <code>ai_db</code>. A multi-phase <em>chat</em> does not fit a single invocation. So the assistant is not one long-lived conversation — it is a <strong>sequence of persisted single-turn calls</strong>.</p>
+<p>Each turn reads the accumulated answers and current phase from <code>ai_db</code>, replays them into a fresh stateless invocation, emits either the next question or — on the final phase — the three proposals, then persists the updated state back. The questions are produced by the agent; the answers-so-far are <strong>conversation state in <code>ai_db</code></strong>, never agent memory. This is the single most important structural consequence of the placement decision: the chat feels continuous to the operator, but every turn is independent and reconstructable.</p>
+
+<figure id="loop-diagram">
+<figcaption>The persisted loop — a chat built from stateless turns</figcaption>
+<svg viewBox="0 0 680 320" width="100%" role="img"><title>The Campaign Creation Assistant conversation as a loop of persisted single-turn invocations</title><desc>Conversation state in ai_db is replayed into a stateless single-turn agent invocation; the agent emits the next question for phases one through three or three proposals on the final phase, and the updated state is persisted back to ai_db, closing the loop.</desc>
+<defs><marker id="ar2" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M2 1L8 5L2 9" fill="none" stroke="context-stroke" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></marker></defs>
+
+<rect x="40" y="120" width="190" height="90" rx="12" fill="#fef3c7" stroke="#b45309" stroke-width="0.5"/>
+<text class="s-h z-acc" x="56" y="146">ai_db</text>
+<text class="s-b z-acc2" x="56" y="166">Conversation state</text>
+<text class="s-b z-acc2" x="56" y="184">answers · phase · prompt ver.</text>
+<text class="s-b z-acc2" x="56" y="202">+ proposals on completion</text>
+
+<rect x="270" y="120" width="180" height="90" rx="12" fill="#dbeafe" stroke="#1e40af" stroke-width="0.5"/>
+<text class="s-h z-slate" x="286" y="146">Single-turn agent</text>
+<text class="s-b z-slate2" x="286" y="166">stateless invocation</text>
+<text class="s-b z-slate2" x="286" y="184">&le; 5 tool calls</text>
+<text class="s-b z-slate2" x="286" y="202">reads-only tools</text>
+
+<rect x="490" y="70" width="150" height="76" rx="12" fill="#f5f5f4" stroke="#a8a29e" stroke-width="0.5"/>
+<text class="s-h z-ink" x="504" y="94">Next question</text>
+<text class="s-b z-ink3" x="504" y="114">phases 1–3</text>
+<text class="s-b z-ink3" x="504" y="132">→ operator answers</text>
+
+<rect x="490" y="186" width="150" height="76" rx="12" fill="#d1fae5" stroke="#047857" stroke-width="0.5"/>
+<text class="s-h z-mint" x="504" y="210">3 proposals</text>
+<text class="s-b z-mint2" x="504" y="230">final phase</text>
+<text class="s-b z-mint2" x="504" y="248">→ handoff</text>
+
+<line x1="230" y1="150" x2="266" y2="155" stroke="#a8a29e" stroke-width="1.5" marker-end="url(#ar2)"/>
+<text class="s-b z-ink3" x="232" y="142">replay</text>
+<line x1="450" y1="150" x2="486" y2="120" stroke="#a8a29e" stroke-width="1.5" marker-end="url(#ar2)"/>
+<line x1="450" y1="180" x2="486" y2="210" stroke="#a8a29e" stroke-width="1.5" marker-end="url(#ar2)"/>
+<text class="s-b z-ink3" x="452" y="172">emit</text>
+
+<path d="M560 146 C560 166 560 176 560 186" fill="none" stroke="#a8a29e" stroke-width="0" />
+<path d="M504 100 C300 30 135 40 135 114" fill="none" stroke="#b45309" stroke-width="1.5" stroke-dasharray="4 3" marker-end="url(#ar2)"/>
+<text class="s-b z-acc2" x="250" y="34">persist updated state → next turn</text>
+</svg>
+</figure>
+
+<hr>
+
+<h1 id="4-handoff">4. Handoff to Campaign</h1>
+<p>The boundary at the end of the conversation is the same one the Campaign Setup Agent already respects. When the operator selects one of the three proposals, the AI service does not write the campaign. The selection is applied by the <strong>Campaign service through its own API</strong>: the Campaign, its Variants (including the auto-created default), the referenced Segments, and the Reward configs are created in <code>campaign_db</code> as first-class records, subject to the campaign state machine, budget controls, and the compatibility gate. The <code>Recommendation</code> in <code>ai_db</code> is marked accepted and retained for audit — it records <em>what the AI suggested and that a human took it</em>, which is exactly the explainability the AI service exists to preserve. The rejected two are retained as rejected.</p>
+
+<blockquote><p><strong>Why the split holds under load.</strong> Because the authoritative config never lived in <code>ai_db</code>, regenerating, re-running, or discarding a conversation has zero blast radius on real campaigns. A proposal is cheap and disposable; a Campaign is governed. Keeping them in different services is what makes that true by construction.</p></blockquote>
+
+<hr>
+
+<h1 id="5-boundaries">5. Boundaries</h1>
+<p>Stated as hard rules, in the contract style used across the platform's responsibility documents.</p>
+
+<span class="blab must">The AI service MUST</span>
+<div class="boundary b-must">Hold the assistant's prompts as versioned <code>PromptVersion</code> records, one active version per agent type.</div>
+<div class="boundary b-must">Emit conversational questions from the agent at invocation time, and persist all gathered answers and the current phase as conversation state in <code>ai_db</code>.</div>
+<div class="boundary b-must">Reconstruct full conversation state from <code>ai_db</code> on every turn, treating each turn as an independent stateless invocation.</div>
+<div class="boundary b-must">Store the three generated configs as <code>Recommendation</code> records with accept/reject outcomes, and reference the prompt version that produced them.</div>
+<div class="boundary b-must">Compute derived inputs (CAC/payback ceiling, saturation pacing, best-referrer targeting, hold/clawback defaults) from read-only analytics and propensity tools, using them to shape proposals only — never to mutate an owning service.</div>
+<div class="boundary b-must">Enforce the Pulse&times;Reward compatibility matrix as a generation gate before any candidate is emitted.</div>
+
+<span class="blab mustnot">The AI service MUST NOT</span>
+<div class="boundary b-mustnot">Become the system of record for any Campaign, Variant, Segment, or Reward config.</div>
+<div class="boundary b-mustnot">Activate, commit, approve a budget, or otherwise mutate campaign state — it holds no write tool over Campaign.</div>
+<div class="boundary b-mustnot">Hold conversation state in agent memory across turns, or assume continuity between invocations.</div>
+<div class="boundary b-mustnot">Treat a profile as a stored template; posture is reasoning framing, not a persisted record.</div>
+
+<span class="blab should">The Campaign service SHOULD</span>
+<div class="boundary b-should">Materialise the selected proposal as authoritative records through its own API on operator accept, subject to the state machine, budget controls, and compatibility gate.</div>
+<div class="boundary b-should">Remain the sole owner of campaign configuration, unaware of the proposals it was not given.</div>
+
+<span class="blab can">The operator</span>
+<div class="boundary b-can">Reviews all three proposals, selects at most one, and is the only path to a real campaign. No proposal becomes a campaign without an explicit human accept.</div>
+
+</main>
+</body></html>

@@ -284,8 +284,11 @@ Check memory-keeper for past decisions about this flow."
 # Service-Specific: Tenant & Billing Service (`referral-pulse-tenant-svc`)
 
 > Everything above is the shared platform standard. This section is what makes THIS service specific.
-> **Authoritative specs (2026-09-21): `spec/`** (API Contract v1.3, Event Model v3, DB Model v2, Product
-> Spec v4, Architecture, Failure & Observability v3). The older set in `docs/` is history only. The
+> **Authoritative specs (2026-10-16): `spec/`** — the v5 suite, replaced wholesale from the lead's
+> source of truth (`referral spec/referral_spec_repo`): Product Spec, Architecture, Event Model,
+> Responsibility Contract, API Contract, per-Pulse Event Flows, Failure & Observability, DB Model,
+> and the two Campaign Assistant documents, plus eleven `event.*.schema.json` files. The v1.3 / v2 /
+> v3 / v4 set it replaced is gone; anything citing those versions is describing history. The
 > authorization model (Keto namespaces, internal JWT, service capabilities) is recorded in `NOTE.md`
 > "Decisions — batch 2" and implemented in `src/common/auth/authz/`.
 > The previous canonical specs live (read-only) in `docs/`. Editable service docs: `tenant-implementation.md`

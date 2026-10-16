@@ -1,0 +1,1023 @@
+<!DOCTYPE html><html lang="en"><head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>ReferralAI — Event Model v5.0</title><style>
+
+@import url('https://fonts.googleapis.com/css2?family=Instrument+Serif&family=Geist:wght@400;500;600&family=Geist+Mono:wght@400&display=swap');
+:root{
+  --ink:#1c1917;--ink2:#44403c;--ink3:#78716c;--ink4:#a8a29e;
+  --paper:#FDFCFA;--card:#fff;--line:#e7e5e4;--wash:#f5f5f4;
+  --acc:#b45309;--acc2:#92400e;--accbg:#fef3c7;
+  --mint:#047857;--mintbg:#d1fae5;
+  --slate:#1e40af;--slatebg:#dbeafe;
+  --rose:#be123c;--rosebg:#ffe4e6;
+  --sw:220px
+}
+*{margin:0;padding:0;box-sizing:border-box}
+html{scroll-behavior:smooth;scroll-padding-top:20px}
+body{font-family:Geist,system-ui,sans-serif;background:var(--paper);color:var(--ink);font-size:14.5px;line-height:1.75;display:flex;-webkit-font-smoothing:antialiased}
+
+/* SIDEBAR */
+nav.sd{position:fixed;top:0;left:0;width:var(--sw);height:100vh;border-right:1px solid var(--line);overflow-y:auto;padding:24px 0;background:var(--paper)}
+.sd-b{padding:0 16px 16px}
+.sd-b h2{font-family:'Instrument Serif',serif;font-size:20px;color:var(--acc2);font-weight:400}
+.sd-b small{font-size:11px;color:var(--ink4);display:block;margin-top:2px;letter-spacing:.04em;text-transform:uppercase}
+.sd a{display:block;padding:2px 16px;color:var(--ink3);text-decoration:none;font-size:12px;line-height:1.6;transition:color .1s}
+.sd a:hover{color:var(--ink)}
+.sd a.n1{color:var(--ink2);font-weight:600;margin-top:12px;font-size:12px}
+.sd a.n2{padding-left:28px;font-size:11.5px;color:var(--ink4)}
+.sd a.active{color:var(--acc);font-weight:500}
+
+/* MAIN */
+main{margin-left:var(--sw);max-width:780px;padding:40px 48px 100px}
+h1{font-family:'Instrument Serif',serif;font-size:28px;font-weight:400;color:var(--ink);margin:56px 0 16px;letter-spacing:-.02em}
+h1:first-of-type{margin-top:0}
+h2{font-size:16px;font-weight:600;margin:32px 0 10px;letter-spacing:-.01em}
+h3{font-size:14px;font-weight:600;color:var(--acc2);margin:24px 0 6px}
+h4{font-size:13px;font-weight:600;margin:16px 0 4px}
+p{margin:0 0 12px;color:var(--ink2)}
+strong{color:var(--ink);font-weight:600}
+em{color:var(--ink3)}
+a{color:var(--acc);text-decoration:none;border-bottom:1px solid var(--accbg)}
+a:hover{border-color:var(--acc)}
+hr{border:none;height:1px;background:var(--line);margin:36px 0}
+ul,ol{margin:0 0 12px 20px;color:var(--ink2)}
+li{margin-bottom:3px}
+
+table{width:100%;border-collapse:collapse;margin:12px 0 20px;font-size:13px}
+th{text-align:left;padding:8px 10px;font-weight:500;font-size:10.5px;text-transform:uppercase;letter-spacing:.08em;color:var(--ink4);border-bottom:2px solid var(--line)}
+td{padding:7px 10px;border-bottom:1px solid var(--wash);color:var(--ink2)}
+tr:hover td{background:var(--wash)}
+
+code{font-family:'Geist Mono',monospace;font-size:12.5px;background:var(--wash);color:var(--acc2);padding:1px 4px;border-radius:3px}
+pre{background:var(--wash);border-radius:8px;padding:16px 20px;overflow-x:auto;margin:12px 0 20px;line-height:1.6;border:1px solid var(--line)}
+pre code{background:none;padding:0;color:var(--ink2);font-size:12px}
+pre.asc{border-left:3px solid var(--acc);background:var(--accbg)}
+
+blockquote{border-left:3px solid var(--acc);padding:10px 16px;margin:12px 0 20px;background:var(--accbg);border-radius:0 6px 6px 0}
+blockquote p:last-child{margin:0}
+
+/* ═══ DIAGRAMS ═══ */
+figure{margin:20px 0 28px;padding:20px;background:var(--card);border:1px solid var(--line);border-radius:10px}
+figure.fig-sm{padding:14px 20px}
+figcaption{font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:.14em;color:var(--ink4);margin-bottom:14px}
+
+.node{text-align:center;padding:8px 20px;border-radius:6px;font-weight:600;font-size:13px;display:inline-block}
+.nd-root{background:var(--ink);color:var(--paper);margin:0 auto;display:block;width:fit-content}
+.nd-root span{font-weight:400;opacity:.7;margin-left:6px;font-size:12px}
+.nd-mid{background:var(--slatebg);color:var(--slate);margin:0 auto;display:block;width:fit-content}
+
+.edge{width:2px;height:16px;background:var(--line);margin:0 auto}
+.edge.lg{height:24px}
+
+.tags{display:flex;flex-wrap:wrap;gap:6px;justify-content:center;margin:8px 0;font-size:12px;color:var(--ink3)}
+
+.cols{display:flex;gap:10px;flex-wrap:wrap}
+.trio{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}
+.leaf{flex:1;min-width:140px;padding:12px;border-radius:8px;font-size:13px;line-height:1.5;border:1px solid var(--line);background:var(--wash)}
+.lf-a{border-left:3px solid var(--mint);background:var(--mintbg)}
+.lf-b{border-left:3px solid var(--acc);background:var(--accbg)}
+.lf-c{border-left:3px solid var(--ink4);background:var(--wash)}
+
+.grid8{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin-bottom:6px}
+.grid6{display:grid;grid-template-columns:repeat(3,1fr);gap:6px}
+.cell{padding:12px;border-radius:6px;font-size:12.5px;text-align:center;background:var(--wash);border:1px solid var(--line);line-height:1.4}
+.cell small{color:var(--ink3);font-size:11px}
+.cell-w{margin-top:4px}
+
+.duo{display:flex;gap:10px}
+.duo-col{flex:1;border-radius:8px;overflow:hidden;border:1px solid var(--line)}
+.duo-h{padding:8px 14px;font-weight:600;font-size:12.5px;color:var(--paper)}
+.dh-l{background:var(--ink)}
+.dh-r{background:var(--mint)}
+.dh-r2{background:var(--mint)}
+.dh-r3{background:var(--rose)}
+.duo-b{padding:10px 14px}
+
+.step-list div{font-size:13px;padding:4px 0;border-bottom:1px solid var(--wash);color:var(--ink2)}
+.step-list div:last-child{border:none}
+.step-list.compact div{padding:2px 0;font-size:12.5px}
+.step-list .hl,.hl{background:var(--accbg);padding:3px 8px;border-radius:4px;border-bottom-color:transparent}
+.verdict{margin-top:8px;padding:6px 10px;border-radius:4px;font-size:12px;font-weight:600}
+.verdict.ok{background:var(--mintbg);color:var(--mint)}
+.verdict.bad{background:var(--rosebg);color:var(--rose)}
+
+.pipe{display:flex;align-items:center;gap:4px;flex-wrap:wrap}
+.pk{padding:6px 14px;border-radius:6px;font-weight:500;font-size:12px;color:var(--paper);position:relative}
+.pk::after{content:'→';position:absolute;right:-12px;color:var(--ink4);font-size:12px}
+.pk:last-child::after{content:''}
+.pk-0{background:#a8a29e}.pk-1{background:var(--slate)}.pk-2{background:var(--mint)}
+.pk-3{background:var(--acc)}.pk-4{background:var(--rose)}.pk-5{background:var(--ink3)}
+
+.waterfall{display:flex;flex-direction:column;gap:6px}
+.waterfall.numbered{counter-reset:wf}
+.waterfall.numbered .wf{counter-increment:wf}
+.waterfall.numbered .wf::before{content:counter(wf)'.';font-weight:600;margin-right:6px;color:var(--acc)}
+.wf{padding:10px 16px;border-radius:6px;font-size:13px;background:var(--wash);border-left:3px solid var(--line);line-height:1.5;color:var(--ink2)}
+.wf-w{border-left-color:var(--acc);background:var(--accbg)}
+.wf-d{border-left-color:var(--rose);background:var(--rosebg)}
+.wf-ok2{border-left-color:var(--mint);background:var(--mintbg)}
+.wf-branch{display:flex;flex-wrap:wrap;gap:6px}
+.wf-r{flex:1;min-width:120px;padding:8px 12px;border-radius:6px;font-size:12.5px;background:var(--wash);border:1px solid var(--line)}
+.wf-ok{border-left:3px solid var(--mint);background:var(--mintbg)}
+.wf-warn{border-left:3px solid var(--acc);background:var(--accbg)}
+.wf-err{border-left:3px solid var(--rose);background:var(--rosebg)}
+
+.checklist{display:flex;flex-direction:column;gap:4px}
+.cl-ok,.cl-no,.cl-warn{padding:8px 14px;border-radius:6px;font-size:13px;line-height:1.5}
+.cl-ok{background:var(--mintbg);border-left:3px solid var(--mint)}
+.cl-no{background:var(--rosebg);border-left:3px solid var(--rose)}
+.cl-warn{background:var(--accbg);border-left:3px solid var(--acc)}
+
+.box-nest{display:flex;flex-direction:column;align-items:center;gap:4px}
+.bn-outer{border:1px solid var(--line);border-radius:10px;padding:14px;width:100%;background:var(--wash)}
+.bn-inner{border:1px solid var(--slatebg);border-radius:8px;padding:12px;background:var(--slatebg)}
+.bn-label{font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:.08em;color:var(--ink4);margin-bottom:8px;display:block}
+.bn-label.accent{color:var(--slate)}
+.sm .cell{min-width:0}
+
+.note{font-size:12px;color:var(--ink3);margin-top:8px;font-style:italic;text-align:center}
+.mt-sm{margin-top:8px}.mb-sm{margin-bottom:10px}
+strong.err{color:var(--rose)}
+strong.ok{color:var(--mint)}
+strong.warn{color:var(--acc)}
+
+@media(max-width:800px){nav.sd{display:none}main{margin-left:0;padding:20px}
+.grid8{grid-template-columns:repeat(2,1fr)}.grid6{grid-template-columns:repeat(2,1fr)}
+.duo,.cols,.trio{flex-direction:column}}
+@media print{nav.sd{display:none}main{margin-left:0;max-width:100%}figure{break-inside:avoid;box-shadow:none}}
+::-webkit-scrollbar{width:3px}::-webkit-scrollbar-thumb{background:var(--line);border-radius:2px}
+</style></head><body>
+<nav class="sd"><div class="sd-b"><h2>ReferralAI</h2><small>Event Model v5.0</small></div>
+<a href="#event-model" class="n1">Formal Event Model — Ingestion &amp; Intra-Service</a>
+<a href="#document-purpose" class="n2">Document Purpose</a>
+<a href="#hard-constraints" class="n2">Hard Constraints</a>
+<a href="#changes-from-v21" class="n2">Changes from v2.1</a>
+<a href="#table-of-contents" class="n2">Table of Contents</a>
+
+<a href="#1-event-philosophy" class="n1">1. Event Philosophy</a>
+<a href="#two-event-worlds" class="n2">The Two Event Worlds</a>
+<a href="#what-qualifies" class="n2">What Qualifies as an Event</a>
+<a href="#not-an-event" class="n2">What Is Not an Event</a>
+<a href="#why-immutability" class="n2">Why Immutability Matters</a>
+
+<a href="#2-envelope" class="n1">2. Canonical Event Envelope</a>
+<a href="#envelope-identity" class="n2">Identity &amp; Type Fields</a>
+<a href="#envelope-source" class="n2">Source &amp; Trust</a>
+<a href="#envelope-tenant-actor" class="n2">Tenant, Actor &amp; Object</a>
+<a href="#envelope-context" class="n2">Context &amp; Consent</a>
+<a href="#envelope-payload" class="n2">Payload &amp; Metadata</a>
+<a href="#envelope-stability" class="n2">Stability Rules</a>
+
+<a href="#3-taxonomy" class="n1">3. Ingestion vs Intra-Service</a>
+<a href="#taxonomy-tracked" class="n2">Tracked Ingestion Events</a>
+<a href="#taxonomy-domain" class="n2">Domain / Intra-Service Events</a>
+<a href="#taxonomy-trust" class="n2">Trust Boundaries</a>
+
+<a href="#4-tracked" class="n1">4. Tracked Ingestion Events</a>
+<a href="#touch-link-clicked" class="n2">referral.link.clicked</a>
+<a href="#touch-link-shared" class="n2">referral.link.shared</a>
+<a href="#touch-page-viewed" class="n2">referral.page.viewed</a>
+<a href="#touch-email-invitation-opened" class="n2">referral.email.opened</a>
+<a href="#touch-email-link-clicked" class="n2">referral.email.clicked</a>
+<a href="#conversion-signup-completed" class="n2">signup.completed</a>
+<a href="#conversion-payment-completed" class="n2">payment.completed</a>
+<a href="#conversion-subscription-renewed" class="n2">subscription.renewed</a>
+<a href="#conversion-feedback-submitted" class="n2">feedback.submitted</a>
+<a href="#custom-recorded" class="n2">custom.recorded</a>
+
+<a href="#5-domain" class="n1">5. Domain / Intra-Service Events</a>
+<a href="#domain-referral" class="n2">Referral Lifecycle</a>
+<a href="#domain-reward" class="n2">Reward Lifecycle</a>
+<a href="#domain-fraud" class="n2">Fraud &amp; Trust</a>
+<a href="#domain-link" class="n2">Link Lifecycle</a>
+<a href="#domain-payout" class="n2">Payouts</a>
+
+<a href="#6-attribution-context" class="n1">6. Attribution Context</a>
+<a href="#attr-structure" class="n2">Structure</a>
+<a href="#attr-enrichment" class="n2">Progressive Enrichment</a>
+<a href="#attr-propagation" class="n2">Cross-Event Propagation</a>
+
+<a href="#7-identity" class="n1">7. Identity &amp; Actor Modeling</a>
+<a href="#identity-actors" class="n2">Actor Types</a>
+<a href="#identity-invitee" class="n2">Invitee Resolution</a>
+<a href="#identity-stitching" class="n2">Identity Stitching</a>
+
+<a href="#8-versioning" class="n1">8. Versioning &amp; Evolution</a>
+<a href="#ver-scope" class="n2">Scope of schema_version</a>
+<a href="#ver-compat" class="n2">Compatibility Rules</a>
+<a href="#ver-consumer" class="n2">Consumer Obligations</a>
+<a href="#ver-ai" class="n2">AI Readiness</a>
+</nav>
+<main>
+<h1 id="event-model">Formal Event Model — Ingestion &amp; Intra-Service Event Schema</h1><div style="border:1px solid #fde68a;background:#fffbeb;border-radius:8px;padding:12px 16px;margin:0 0 24px;font-size:13px;line-height:1.6">
+<strong>Revision 2026-10-12 — applied from the product-spec rework (Product Spec Appendix A #25–#46).</strong> Mechanical changes applied in this file: Program Admin → <strong>Owner</strong>; referee / referee_* → <strong>invitee / invitee_*</strong>; referrer (prose) → <strong>participant</strong> (wire names <code>/v1/referrers</code>, Keto <code>referrers</code> unchanged); Method A / Method B → <strong>events from backend / events from billing provider</strong>; touch events renamed <code>referral.link.clicked</code>, <code>referral.link.shared</code>, <code>referral.page.viewed</code>, <code>referral.email.opened|clicked</code>, <code>referral.widget.viewed</code>; <code>reward.calculated</code> → <code>reward.earned</code>; Partner actor removed from V1; payout partner → payout provider. <strong>Structural changes applied below:</strong> twelve tracked event types (§4.11 <code>referral.widget.viewed</code>, §4.12 <code>subscription.cancelled</code>); Qualified defined per Pulse and <code>referral.completed{reason}</code> added to the referral family; <code>reward.earned</code> carries <code>cycle_number</code>; custom-event Pulse triggers are recognised by the Referral Workflow (no translated <code>conversion.recorded</code>); <code>referral.email.clicked</code> never opens a referral. <strong>Still to author:</strong> §5.6–§5.10 for the campaign, segmentation, attribution, identity, compliance and AI families (currently delegated to the superseded v2.1); invitation events <code>invitation.sent|bounced</code>.<br><strong>Addendum 2026-10-12 (receivers move, Product Spec #47 / R-DOM-05 / R-SDK-07):</strong> <code>source.origin</code> enum is now <code>js_sdk · client_backend · provider_receiver · tracking_endpoint · platform_service</code> (<code>webhook_relay</code> retired); email touches are observed by Event Ingestion's tracking endpoints, not relayed.
+</div>
+<p><strong>Document Version:</strong> 5.0 — suite-wide version alignment (2026-10-09); content of 3.0 (which finalized and refactored v2.1) + the October 2026 coherence pass. Earlier change-log entries keep the pre-alignment numbering (2.1 → 3.0).<br>
+<strong>Classification:</strong> Internal — Architecture<br>
+<strong>Status:</strong> Implementation-Ready Schema Specification<br>
+<strong>Last Updated:</strong> June 2026<br>
+<strong>Author:</strong> Data Architecture &amp; Event Modeling<br>
+<strong>Companion Documents (all v5.0):</strong> Product Specification · API Contract · DB Model · Architecture · Failure &amp; Observability Model · Responsibility Contract · Event Model v2.1 (superseded, pre-alignment numbering)<br>
+<strong>Audience:</strong> Backend engineers, data engineers, ML engineers, integration architects</p>
+<hr>
+
+<h2 id="document-purpose">Document Purpose</h2>
+<p>This document is the authoritative, schema-level contract for two and only two event populations: <strong>tracked ingestion events</strong> that enter the platform through the Event Ingestion API, and <strong>domain (intra-service) events</strong> that flow on the internal bus between platform services. It supersedes Event Model v2.1, narrows the model to the ingestion and intra-service surfaces, and resolves the open inconsistencies identified during v2.1 implementation review.</p>
+<p>Every externally produced event type defined here in Section 4 has a companion machine-readable JSON Schema describing its <code>properties</code> block. Those schemas are maintained as separate artifacts and are normatively bound to the field tables in this document: the schema files and these tables must never disagree.</p>
+
+<h2 id="hard-constraints">Hard Constraints</h2>
+<ol>
+<li><strong>Append-only.</strong> Events are never deleted, modified, or overwritten once accepted.</li>
+<li><strong>Immutable once ingested.</strong> Correction is expressed as a <em>new</em> compensating event, never as an edit.</li>
+<li><strong>Idempotent by identity.</strong> Deduplication is keyed on <code>tenant_id</code> + <code>external_id</code>; consumers may safely receive the same event more than once.</li>
+<li><strong>Source compatibility.</strong> The model accepts JS SDK events (publishable <code>rai_pub_</code> keys), backend events (secret <code>rai_live_</code> keys), and webhook-relayed events (billing, email, payout providers) under a single envelope.</li>
+</ol>
+
+<h2 id="changes-from-v21">Changes from v2.1</h2>
+<p>This revision is a finalization, not a redesign. No immutable platform constraint is altered. The substantive changes are:</p>
+<table>
+<thead><tr><th>#</th><th>Change</th><th>Rationale</th></tr></thead>
+<tbody>
+<tr><td>1</td><td><strong>Revenue is flattened.</strong> The v2.1 nested <code>revenue</code> sub-object on conversion events is replaced by flat scalar fields (<code>revenue_amount</code>, <code>revenue_currency</code>, <code>revenue_type</code>, <code>revenue_mrr</code>, <code>revenue_arr</code>, <code>revenue_ltv_estimate</code>).</td><td>v2.1 §2.1 forbids nested objects in <code>properties</code>; v2.1 §7.8 requires flat structure for ML feature extraction. The nested sub-object contradicted both. Flattening reconciles the envelope rule with AI-readiness.</td></tr>
+<tr><td>2</td><td><strong>Scope narrowed</strong> to ingestion events and intra-service domain events. Compliance, identity-access, campaign/program, segmentation, attribution-analytics and AI domain events from v2.1 §4 are referenced but not re-specified here.</td><td>Keeps the contract focused on the two surfaces the task targets; the omitted families remain governed by v2.1 §4 until separately finalized.</td></tr>
+<tr><td>3</td><td><strong>External schema set fixed</strong> at twelve tracked event types, each with a companion JSON Schema. <code>referral.widget.viewed</code> (v2.1 §3.3) is retained on the bus but documented as a link_shared-shaped participant-engagement touch, not re-specified, to keep the JSON file set aligned.</td><td>Avoids an undocumented eleventh schema and keeps the file set deterministic.</td></tr>
+<tr><td>5</td><td><strong>Coherence pass (2026-10-06).</strong> <code>context.click_id</code> and <code>attribution_context.click_id</code> defined (they were used in five documents and specified in none); conversion-to-referral precedence (§6.3, §7.3) replaced by the platform's single six-key ladder; <code>reward.pending_approval</code> renamed <code>reward.held</code> with a <code>hold_reason</code> enum and a single cross-document state/event/webhook mapping (§5.2); <code>participant.trust_changed</code> tiers aligned to Product Spec §7 (<code>new/established/trusted/advocate</code>, no <code>unknown</code>/<code>ambassador</code>); participant-state and trust events attributed to the Referral Workflow Service; <code>participant.self_converted</code> added (Product Spec §7 clock 2); additive <code>product_id</code>, <code>is_reactivation</code>, <code>switched_from</code> on <code>payment.completed</code> so the Cross-Sell, Reactivation and Switch-Up pulses bind to a tracked event.</td><td>Five documents referenced keys and events this contract did not define; the fixes are additive (no <code>schema_version</code> bump) except the <code>reward.pending_approval</code> rename and the tier enum, which were not yet implemented.</td></tr>
+<tr><td>4</td><td><strong>Conditional requirements made explicit.</strong> The "email or external id" identity anchor and the "MRR required when recurring" rule are stated as schema-level conditionals.</td><td>Removes ambiguity for validator implementers.</td></tr>
+</tbody>
+</table>
+
+<h2 id="table-of-contents">Table of Contents</h2>
+<ol>
+<li><a href="#1-event-philosophy">Event Philosophy</a></li>
+<li><a href="#2-envelope">Canonical Event Envelope</a></li>
+<li><a href="#3-taxonomy">Event Taxonomy: Ingestion vs Intra-Service</a></li>
+<li><a href="#4-tracked">Tracked Ingestion Event Types</a></li>
+<li><a href="#5-domain">Domain / Intra-Service Event Types</a></li>
+<li><a href="#6-attribution-context">Attribution Context Object</a></li>
+<li><a href="#7-identity">Identity &amp; Actor Modeling</a></li>
+<li><a href="#8-versioning">Versioning &amp; Evolution</a></li>
+</ol>
+<hr>
+
+<h1 id="1-event-philosophy">1. Event Philosophy</h1>
+
+<h2 id="two-event-worlds">1.1 The Two Event Worlds</h2>
+<p>The event model separates events into two categories by origin, trust, and purpose. The separation is structural, not cosmetic: it governs validation, trust enforcement, storage strategy, and which processing pipelines may consume an event.</p>
+<p><strong>Tracked events</strong> are produced outside the platform. They arrive from the client's JS SDK in a browser, from the client's backend, or from external integration relays (email tracking, billing webhooks). They enter through the Event Ingestion API, are authenticated by API keys, and represent raw signals about the client's ecosystem. They are the platform's only window into the external world.</p>
+<p><strong>Domain events</strong> are produced inside the platform by its own services as they validate tracked events, execute workflow logic, compute attribution, evaluate fraud, or perform any internal state transition. They are never submitted by external callers; they are emitted onto the internal bus (SNS/SQS) by the service that performed the action.</p>
+
+<figure>
+<figcaption>Ingestion and Intra-Service Event Flow</figcaption><svg viewBox="0 0 680 360" width="100%" xmlns="http://www.w3.org/2000/svg" font-family="Geist,system-ui,sans-serif" role="img"><defs><marker id="ahf" markerWidth="9" markerHeight="9" refX="6.5" refY="3" orient="auto"><path d="M0,0 L7,3 L0,6 Z" fill="#a8a29e"/></marker><marker id="ahdf" markerWidth="9" markerHeight="9" refX="6.5" refY="3" orient="auto"><path d="M0,0 L7,3 L0,6 Z" fill="#be123c"/></marker></defs><text x="74" y="18" text-anchor="middle" font-size="10.5" font-weight="600" fill="#a8a29e">SOURCES</text><text x="238" y="18" text-anchor="middle" font-size="10.5" font-weight="600" fill="#a8a29e">INGESTION</text><text x="396" y="18" text-anchor="middle" font-size="10.5" font-weight="600" fill="#a8a29e">EVENT BUS</text><text x="578" y="18" text-anchor="middle" font-size="10.5" font-weight="600" fill="#a8a29e">CONSUMERS</text><rect x="10" y="44" width="128" height="32" rx="6" fill="#dbeafe" stroke="#1e40af" stroke-width="1"/><text x="74" y="64" text-anchor="middle" font-size="11.5" font-weight="500" fill="#1e40af">JS SDK (browser)</text><rect x="10" y="86" width="128" height="32" rx="6" fill="#dbeafe" stroke="#1e40af" stroke-width="1"/><text x="74" y="106" text-anchor="middle" font-size="11.5" font-weight="500" fill="#1e40af">Client Backend</text><rect x="10" y="128" width="128" height="32" rx="6" fill="#dbeafe" stroke="#1e40af" stroke-width="1"/><text x="74" y="148" text-anchor="middle" font-size="11.5" font-weight="500" fill="#1e40af">Billing Webhook</text><rect x="10" y="170" width="128" height="32" rx="6" fill="#dbeafe" stroke="#1e40af" stroke-width="1"/><text x="74" y="190" text-anchor="middle" font-size="11.5" font-weight="500" fill="#1e40af">Email Relay</text><rect x="176" y="70" width="124" height="118" rx="8" fill="#fef3c7" stroke="#b45309" stroke-width="1"/><text x="238" y="92" text-anchor="middle" font-size="12.5" font-weight="600" fill="#92400e">Event Ingestion</text><text x="238" y="110" text-anchor="middle" font-family="'Geist Mono',ui-monospace,monospace" font-size="11" font-weight="400" fill="#92400e">/v1/events</text><text x="238" y="130" text-anchor="middle" font-size="11" font-weight="400" fill="#92400e">validate · enrich</text><text x="238" y="147" text-anchor="middle" font-size="11" font-weight="400" fill="#92400e">deduplicate</text><text x="238" y="164" text-anchor="middle" font-size="11" font-weight="400" fill="#92400e">trust enforce</text><rect x="344" y="44" width="96" height="250" rx="8" fill="#1c1917" stroke="#1c1917" stroke-width="1"/><text x="392" y="72" text-anchor="middle" font-size="13" font-weight="600" fill="#FDFCFA">Event Bus</text><text x="392" y="90" text-anchor="middle" font-family="'Geist Mono',ui-monospace,monospace" font-size="11" font-weight="400" fill="#a8a29e">SNS · SQS</text><text x="392" y="288" text-anchor="middle" font-size="9.5" font-weight="400" fill="#a8a29e">durable · ordered</text><rect x="480" y="44" width="190" height="30" rx="6" fill="#d1fae5" stroke="#047857" stroke-width="1"/><text x="575" y="63" text-anchor="middle" font-size="11.5" font-weight="500" fill="#047857">Workflow Runtime</text><rect x="480" y="82" width="190" height="30" rx="6" fill="#d1fae5" stroke="#047857" stroke-width="1"/><text x="575" y="101" text-anchor="middle" font-size="11.5" font-weight="500" fill="#047857">Rewards &amp; Payouts</text><rect x="480" y="120" width="190" height="30" rx="6" fill="#d1fae5" stroke="#047857" stroke-width="1"/><text x="575" y="139" text-anchor="middle" font-size="11.5" font-weight="500" fill="#047857">Analytics</text><rect x="480" y="158" width="190" height="30" rx="6" fill="#d1fae5" stroke="#047857" stroke-width="1"/><text x="575" y="177" text-anchor="middle" font-size="11.5" font-weight="500" fill="#047857">AI Subsystems</text><rect x="480" y="196" width="190" height="30" rx="6" fill="#d1fae5" stroke="#047857" stroke-width="1"/><text x="575" y="215" text-anchor="middle" font-size="11.5" font-weight="500" fill="#047857">Fraud · Compliance</text><line x1="138" y1="60" x2="176" y2="60" stroke="#a8a29e" stroke-width="1.5" marker-end="url(#ahf)"/><line x1="138" y1="102" x2="176" y2="102" stroke="#a8a29e" stroke-width="1.5" marker-end="url(#ahf)"/><line x1="138" y1="144" x2="176" y2="150" stroke="#a8a29e" stroke-width="1.5" marker-end="url(#ahf)"/><line x1="138" y1="186" x2="176" y2="150" stroke="#a8a29e" stroke-width="1.5" marker-end="url(#ahf)"/><line x1="300" y1="150" x2="344" y2="150" stroke="#a8a29e" stroke-width="1.5" marker-end="url(#ahf)"/><text x="340" y="142" text-anchor="end" font-size="10" font-weight="600" fill="#78716c">tracked</text><text x="12" y="212" text-anchor="start" font-family="'Geist Mono',ui-monospace,monospace" font-size="9.5" font-weight="400" fill="#78716c">touch.recorded · conversion.recorded · custom.recorded</text><rect x="176" y="248" width="124" height="44" rx="8" fill="#f5f5f4" stroke="#78716c" stroke-width="1"/><text x="238" y="268" text-anchor="middle" font-size="12" font-weight="600" fill="#44403c">Internal Services</text><text x="238" y="283" text-anchor="middle" font-size="10" font-weight="400" fill="#78716c">domain producers</text><path d="M300,270 H392 V294" fill="none" stroke="#a8a29e" stroke-width="1.5" marker-end="url(#ahf)"/><text x="330" y="238" text-anchor="middle" font-size="10" font-weight="600" fill="#78716c">domain events</text><text x="176" y="318" text-anchor="start" font-family="'Geist Mono',ui-monospace,monospace" font-size="9.5" font-weight="400" fill="#78716c">referral.* · reward.* · fraud.* · link.* · payout.*</text><line x1="440" y1="150" x2="480" y2="59" stroke="#a8a29e" stroke-width="1.5" marker-end="url(#ahf)"/><line x1="440" y1="150" x2="480" y2="97" stroke="#a8a29e" stroke-width="1.5" marker-end="url(#ahf)"/><line x1="440" y1="150" x2="480" y2="135" stroke="#a8a29e" stroke-width="1.5" marker-end="url(#ahf)"/><line x1="440" y1="150" x2="480" y2="173" stroke="#a8a29e" stroke-width="1.5" marker-end="url(#ahf)"/><line x1="440" y1="150" x2="480" y2="211" stroke="#a8a29e" stroke-width="1.5" marker-end="url(#ahf)"/><text x="460" y="128" text-anchor="middle" font-size="10" font-weight="600" fill="#78716c">fan-out</text></svg></figure>
+
+<h2 id="what-qualifies">1.2 What Qualifies as an Event</h2>
+<p>An event is an immutable, timestamped record of a discrete occurrence that has already happened. An occurrence qualifies when it meets all four tests:</p>
+<table>
+<thead><tr><th>Test</th><th>Meaning</th></tr></thead>
+<tbody>
+<tr><td><strong>Occurred in the past</strong></td><td><code>occurred_at</code> reflects the moment of occurrence in the originating system — set by the external source for tracked events, by the producing service for domain events.</td></tr>
+<tr><td><strong>Domain-significant</strong></td><td>It advances a referral workflow, produces attribution or analytics data, represents a business-relevant state change, or generates a signal at least one downstream service consumes.</td></tr>
+<tr><td><strong>Self-describing</strong></td><td>Read in isolation with its full payload, it conveys what happened without requiring prior events to decode it.</td></tr>
+<tr><td><strong>Idempotent by identity</strong></td><td>It carries identifiers (<code>event_id</code> from the platform, <code>external_id</code> from the source) that let any consumer safely receive it more than once.</td></tr>
+</tbody>
+</table>
+
+<h2 id="not-an-event">1.3 What Is Explicitly Not an Event</h2>
+<div class="checklist">
+<div class="cl-no"><strong>Current state.</strong> A referral's status, a participant's trust score, or a pending balance are projections derived from events — materialized views, not events.</div>
+<div class="cl-no"><strong>Configuration mutations.</strong> Renaming a campaign or editing segment rules are audit-log entries. The exception is when a change produces an observable effect on active workflows (e.g. <code>campaign.activated</code>); then the <em>effect</em> is the event.</div>
+<div class="cl-no"><strong>Queries and reads.</strong> Listing referrals or viewing a dashboard produces no event.</div>
+<div class="cl-no"><strong>Intentions and commands.</strong> A request to approve a reward is a command; it may fail. The event <code>reward.approved</code> occurs only after validation and execution.</div>
+<div class="cl-no"><strong>Forecasts and predictions.</strong> Propensity and fraud scores are derived signals. When such a signal triggers an action, the <em>action</em> is the event.</div>
+<div class="cl-no"><strong>Processing artifacts.</strong> Queue entries, retry bookkeeping, and dedup cache lookups are infrastructure, not events.</div>
+</div>
+
+<h2 id="why-immutability">1.4 Why Immutability Matters</h2>
+<p>The model is append-only. Once accepted, an event is never modified, deleted, or overwritten. This is load-bearing for four reasons, plus a correction discipline:</p>
+<div class="trio">
+<div class="leaf lf-b"><strong>Attribution integrity</strong><br>Attribution is computed from the historical sequence of touch and conversion events. A client disputing a reward must be able to audit the exact, unchanged chain that produced the decision.</div>
+<div class="leaf lf-b"><strong>Audit &amp; GDPR</strong><br>GDPR requires a verifiable processing record. Erasure is handled by <em>anonymizing</em> PII within events (replacing values with opaque tokens), never by deleting events.</div>
+<div class="leaf lf-b"><strong>Deterministic replay</strong><br>The pipeline reprocesses event ranges to rebuild derived state and backfill analytics. Immutability guarantees identical results on replay.</div>
+</div>
+<div class="trio">
+<div class="leaf lf-a"><strong>AI training stability</strong><br>Propensity, fraud, and optimization models train on historical events. Post-hoc mutation would destroy model reproducibility.</div>
+<div class="leaf lf-c"><strong>Correction model</strong><br>When reality contradicts a recorded event (a chargeback reverses a payment), the platform emits a <em>new</em> event — e.g. <code>reward.reversed</code>. The original stands. Both are facts.</div>
+</div>
+<hr>
+
+<h1 id="2-envelope">2. Canonical Event Envelope</h1>
+<p>Every event — tracked or domain — conforms to a single top-level envelope. This is the contract between producers and consumers: a consumer routes, filters, and begins processing any event from envelope fields alone, without parsing the domain-specific <code>properties</code>. The <code>properties</code> block is the only section whose structure varies by <code>event_type</code>; it is specified per event type in Sections 4 and 5.</p>
+
+<h2 id="envelope-identity">2.1 Identity &amp; Type Fields</h2>
+<table>
+<thead><tr><th>Field</th><th>Type</th><th>Required</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td><code>event_id</code></td><td>String (ULID)</td><td>Platform</td><td>Globally unique, platform-authoritative identifier. Assigned at ingestion (tracked) or emission (domain). Time-ordered ULID, 26-char Crockford Base32. Primary key in all stores. Assigned once, never changes.</td></tr>
+<tr><td><code>external_id</code></td><td>String (≤256)</td><td>Yes</td><td>Source-authoritative deduplication key, scoped to tenant. A second event with the same <code>tenant_id</code> + <code>external_id</code> inside the 90-day window is a duplicate. Clients set it on tracked events; producing services derive it deterministically for domain events.</td></tr>
+<tr><td><code>schema_version</code></td><td>Integer</td><td>Yes</td><td>Version of the <code>properties</code> schema for this specific <code>event_type</code>. Starts at 1. Governs <code>properties</code> only — never the envelope. See Section 8.</td></tr>
+<tr><td><code>event_type</code></td><td>String (dot-notation)</td><td>Yes</td><td>Fully qualified type, pattern <code>{domain}.{action_past_tense}</code>. Primary routing key; consumers subscribe to types or prefixes (e.g. <code>reward.*</code>). Max 128 chars.</td></tr>
+<tr><td><code>event_class</code></td><td>Enum: <code>tracked</code> · <code>domain</code></td><td>Yes</td><td>Declares external (tracked) vs internal (domain) origin. Authoritative, set by the platform, never overridable by callers.</td></tr>
+<tr><td><code>occurred_at</code></td><td>ISO 8601 ms UTC</td><td>Yes</td><td>Moment of occurrence in the source system. Tracked: client timestamp (clock-skew tolerated). Domain: producing-service timestamp. Tracked-event bounds: not &gt;5min future; not older than 7d (touch) or 30d (conversion).</td></tr>
+<tr><td><code>ingested_at</code></td><td>ISO 8601 ms UTC</td><td>Platform</td><td>Operational timestamp: when a tracked event cleared validation, or when a domain event was emitted. Used for monitoring, latency, and replay windowing — never for attribution or business logic.</td></tr>
+</tbody>
+</table>
+
+<h2 id="envelope-source">2.2 Source &amp; Trust</h2>
+<p>The <code>source</code> object identifies where an event originated and its trust context. It is the basis for trust-differentiated processing.</p>
+<table>
+<thead><tr><th>Field</th><th>Type</th><th>Required</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td><code>source.origin</code></td><td>Enum</td><td>Yes</td><td><code>js_sdk</code>, <code>client_backend</code>, <code>provider_receiver</code>, <code>tracking_endpoint</code>, <code>platform_service</code>. The producing system.</td></tr>
+<tr><td><code>source.trust_level</code></td><td>Enum</td><td>Yes</td><td><code>high</code> for secret keys (<code>rai_live_</code>), internal services, provider receivers (signature-verified) and tracking endpoints (signed token); <code>low</code> for publishable keys (<code>rai_pub_</code>, browser SDK). Domain events always inherit <code>high</code>.</td></tr>
+<tr><td><code>source.api_key_prefix</code></td><td>String</td><td>Conditional</td><td>Last four characters of the authenticating key. Present on tracked events, absent on domain events. Full key never stored.</td></tr>
+<tr><td><code>source.sdk_version</code></td><td>String</td><td>No</td><td>JS SDK version, for debugging and compatibility.</td></tr>
+<tr><td><code>source.producing_service</code></td><td>String</td><td>Conditional</td><td>For domain events: the internal service that produced it (e.g. <code>workflow-runtime</code>, <code>reward-evaluator</code>, <code>fraud-detector</code>). Absent on tracked events.</td></tr>
+<tr><td><code>source.integration_id</code></td><td>String</td><td>No</td><td>If relayed from a third-party integration (Stripe, Paddle, Chargebee, CRM), the configured integration identifier.</td></tr>
+</tbody>
+</table>
+
+<h2 id="envelope-tenant-actor">2.3 Tenant, Actor &amp; Object</h2>
+<p>Every event belongs to exactly one tenant; tenant isolation is absolute. The <code>actor</code> is the entity that caused or is the primary subject of the event; the <code>object</code> is the primary domain entity the event pertains to.</p>
+<table>
+<thead><tr><th>Field</th><th>Type</th><th>Required</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td><code>tenant.tenant_id</code></td><td>String (ULID)</td><td>Yes</td><td>The Client Account. Derived from the authenticating key (tracked) or set by the producing service (domain).</td></tr>
+<tr><td><code>actor.actor_type</code></td><td>Enum</td><td>Yes</td><td><code>participant</code>, <code>invitee</code>, <code>operator</code>, <code>system</code>, <code>ai_agent</code> (Section 7).</td></tr>
+<tr><td><code>actor.actor_id</code></td><td>String</td><td>Conditional</td><td>Platform identifier. Present once the actor is identified; absent for anonymous touch events.</td></tr>
+<tr><td><code>actor.actor_external_id</code></td><td>String</td><td>No</td><td>The client's own identifier for the actor. Used for stitching.</td></tr>
+<tr><td><code>actor.actor_email_hash</code></td><td>String</td><td>No</td><td>SHA-256 of the actor's email. Cross-event linking key before <code>actor_id</code> resolution. Raw email never stored in the envelope.</td></tr>
+<tr><td><code>actor.anonymous_id</code></td><td>String</td><td>No</td><td>Transient identifier for anonymous actors (session, fingerprint, or cookie token).</td></tr>
+<tr><td><code>object.object_type</code></td><td>Enum</td><td>Yes</td><td><code>referral</code>, <code>reward</code>, <code>touch</code>, <code>campaign</code>, <code>program</code>, <code>participant</code>, <code>segment</code>, <code>payout</code>, <code>recommendation</code>, <code>variant</code>.</td></tr>
+<tr><td><code>object.object_id</code></td><td>String (ULID)</td><td>Conditional</td><td>Present when the entity exists at event time; may be absent on creation events (enriched during processing).</td></tr>
+</tbody>
+</table>
+<p><strong>Terminology note.</strong> The Product Spec uses "Participant" for the external advocate; the API Contract names the resource <code>/v1/referrers</code>. This model uses <code>participant</code> in the <code>actor_type</code> enum; both refer to the same entity. Outbound webhooks use the API Contract's term: a blocked participant surfaces as <code>participant.suspended</code> (API Contract §6.1, trigger "Participant blocked") — there is no <code>participant.blocked</code> webhook.</p>
+
+<h2 id="envelope-context">2.4 Context &amp; Consent</h2>
+<p>The <code>context</code> object carries environmental metadata at event time. For <code>low</code>-trust tracked events, security-sensitive fields are overridden by server-derived values to prevent client spoofing. The <code>consent</code> object records the data subject's consent status, which gates downstream processing.</p>
+<table>
+<thead><tr><th>Field</th><th>Type</th><th>Required</th><th>Trust</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td><code>context.ip_hash</code></td><td>String</td><td>No</td><td>Server-derived (low)</td><td>SHA-256 of originating IP. Raw IP never stored.</td></tr>
+<tr><td><code>context.user_agent</code></td><td>String</td><td>No</td><td>Server-derived (low)</td><td>Full user-agent string.</td></tr>
+<tr><td><code>context.device_type</code></td><td>Enum</td><td>No</td><td>Derived</td><td><code>desktop</code>, <code>mobile</code>, <code>tablet</code>, <code>unknown</code>.</td></tr>
+<tr><td><code>context.country</code> / <code>region</code></td><td>String</td><td>No</td><td>Server-derived</td><td>ISO 3166-1 alpha-2 country and sub-national region, geo-resolved from IP.</td></tr>
+<tr><td><code>context.page_url</code> / <code>referrer_url</code></td><td>String</td><td>No</td><td>Client-provided</td><td>Page URL (query preserved, fragment stripped) and HTTP participant.</td></tr>
+<tr><td><code>context.session_id</code></td><td>String</td><td>No</td><td>Client-provided</td><td>SDK session identifier (<code>_rr_sess</code> cookie). Used for touch grouping, secondary dedup, and stitching.</td></tr>
+<tr><td><code>context.click_id</code></td><td>String</td><td>No</td><td>Client-provided (platform-minted)</td><td>Click identifier minted by <code>GET /v1/sdk/resolve-link</code> when a referral link is resolved. The SDK echoes it on touches and exposes it through <code>RefRev.getAttribution()</code>; the backend echoes it on conversions (and may place it in payment-provider metadata). Attribution key 4 (Section 6.3): joins a conversion to its originating <code>referral.link.clicked</code> when no <code>referral_code</code> or linked identity is present.</td></tr>
+<tr><td><code>context.locale</code></td><td>String</td><td>No</td><td>Client-provided</td><td>Browser or system locale (e.g. <code>de-DE</code>).</td></tr>
+<tr><td><code>consent.tracking_consent</code></td><td>Enum</td><td>Yes (tracked)</td><td>—</td><td><code>granted</code>, <code>denied</code>, <code>pending</code>. Required on all tracked events. Domain events inherit it from their triggering tracked event.</td></tr>
+<tr><td><code>consent.marketing_consent</code></td><td>Enum</td><td>No</td><td>—</td><td><code>granted</code>, <code>denied</code>, <code>pending</code>.</td></tr>
+<tr><td><code>consent.consent_source</code></td><td>Enum</td><td>No</td><td>—</td><td><code>cmp_banner</code>, <code>signup_form</code>, <code>api</code>, <code>widget</code>, <code>inherited</code>.</td></tr>
+<tr><td><code>consent.consent_recorded_at</code></td><td>ISO 8601</td><td>No</td><td>—</td><td>When the consent signal was captured.</td></tr>
+</tbody>
+</table>
+<p>When <code>tracking_consent</code> is <code>denied</code>, the event is accepted but processed in restricted mode: no cookies, no fingerprints, no PII linkage, best-effort attribution only.</p>
+
+<h2 id="envelope-payload">2.5 Payload &amp; Metadata</h2>
+<table>
+<thead><tr><th>Field</th><th>Type</th><th>Required</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td><code>attribution_context</code></td><td>Object (nullable)</td><td>Conditional</td><td>The referral chain connecting this event to its Campaign, Variant, Participant, and link. Present on all events within a referral workflow; absent otherwise. Specified in Section 6.</td></tr>
+<tr><td><code>properties</code></td><td>Object (flat)</td><td>Yes</td><td>The domain-specific payload. Schema varies by <code>event_type</code> (Sections 4 &amp; 5). Max 50 keys, 10&nbsp;KB. Keys match <code>^[a-z][a-z0-9_]{0,63}$</code>. Values are JSON primitives or flat arrays of primitives — <strong>no nested objects</strong>, keeping events queryable in ClickHouse and trivially vectorizable for ML.</td></tr>
+<tr><td><code>metadata</code></td><td>Object</td><td>No</td><td>Client-supplied opaque pass-through. Not indexed, not queried, not used for platform logic. Max 20 keys, 5&nbsp;KB.</td></tr>
+</tbody>
+</table>
+
+<h2 id="envelope-stability">2.6 Envelope Stability Rules</h2>
+<p>The top-level envelope is stable. Within an API version, new top-level fields may be <strong>added</strong> (additive change), but existing fields are never removed, renamed, or retyped. Consumers must tolerate unknown top-level fields (open-world assumption). The <code>properties</code> section is the sole exception: it is governed by <code>schema_version</code> and evolves per event type per Section 8.</p>
+<hr>
+
+<h1 id="3-taxonomy">3. Event Taxonomy: Ingestion vs Intra-Service</h1>
+
+<h2 id="taxonomy-tracked">3.1 Tracked Ingestion Events</h2>
+<p>Tracked events are submitted to the Event Ingestion API as one of three <code>type</code> values. Once an event passes validation, deduplication, trust enforcement, business-rule guards, and enrichment, it is normalized and emitted to the bus as one of three validated forms. These validated forms are the only tracked events downstream services consume.</p>
+<figure>
+<figcaption>Raw Submission → Validated Bus Form</figcaption><svg viewBox="0 0 680 160" width="100%" xmlns="http://www.w3.org/2000/svg" font-family="Geist,system-ui,sans-serif" role="img"><defs><marker id="ahm" markerWidth="9" markerHeight="9" refX="6.5" refY="3" orient="auto"><path d="M0,0 L7,3 L0,6 Z" fill="#a8a29e"/></marker><marker id="ahdm" markerWidth="9" markerHeight="9" refX="6.5" refY="3" orient="auto"><path d="M0,0 L7,3 L0,6 Z" fill="#be123c"/></marker></defs><rect x="20" y="20" width="210" height="34" rx="7" fill="#dbeafe" stroke="#1e40af" stroke-width="1"/><text x="125" y="42" text-anchor="middle" font-family="'Geist Mono',ui-monospace,monospace" font-size="12.5" font-weight="500" fill="#1e40af">type: touch</text><line x1="238" y1="37" x2="300" y2="37" stroke="#a8a29e" stroke-width="1.5" marker-end="url(#ahm)"/><text x="269" y="28" text-anchor="middle" font-size="9" font-weight="500" fill="#a8a29e">normalize</text><rect x="308" y="20" width="352" height="34" rx="7" fill="#fef3c7" stroke="#b45309" stroke-width="1"/><text x="484" y="42" text-anchor="middle" font-family="'Geist Mono',ui-monospace,monospace" font-size="12.5" font-weight="500" fill="#92400e">event_type: touch.recorded</text><rect x="20" y="68" width="210" height="34" rx="7" fill="#dbeafe" stroke="#1e40af" stroke-width="1"/><text x="125" y="90" text-anchor="middle" font-family="'Geist Mono',ui-monospace,monospace" font-size="12.5" font-weight="500" fill="#1e40af">type: conversion</text><line x1="238" y1="85" x2="300" y2="85" stroke="#a8a29e" stroke-width="1.5" marker-end="url(#ahm)"/><text x="269" y="76" text-anchor="middle" font-size="9" font-weight="500" fill="#a8a29e">normalize</text><rect x="308" y="68" width="352" height="34" rx="7" fill="#fef3c7" stroke="#b45309" stroke-width="1"/><text x="484" y="90" text-anchor="middle" font-family="'Geist Mono',ui-monospace,monospace" font-size="12.5" font-weight="500" fill="#92400e">event_type: conversion.recorded</text><rect x="20" y="116" width="210" height="34" rx="7" fill="#dbeafe" stroke="#1e40af" stroke-width="1"/><text x="125" y="138" text-anchor="middle" font-family="'Geist Mono',ui-monospace,monospace" font-size="12.5" font-weight="500" fill="#1e40af">type: custom</text><line x1="238" y1="133" x2="300" y2="133" stroke="#a8a29e" stroke-width="1.5" marker-end="url(#ahm)"/><text x="269" y="124" text-anchor="middle" font-size="9" font-weight="500" fill="#a8a29e">normalize</text><rect x="308" y="116" width="352" height="34" rx="7" fill="#fef3c7" stroke="#b45309" stroke-width="1"/><text x="484" y="138" text-anchor="middle" font-family="'Geist Mono',ui-monospace,monospace" font-size="12.5" font-weight="500" fill="#92400e">event_type: custom.recorded</text></svg></figure>
+<p>Within each form, the original <code>event_name</code> (e.g. <code>referral.link.clicked</code>, <code>payment.completed</code>) is preserved so consumers can dispatch precisely. Section 4 specifies the ten event_names and their JSON Schemas.</p>
+
+<h2 id="taxonomy-domain">3.2 Domain / Intra-Service Events</h2>
+<p>Domain events are emitted by internal services onto the bus and consumed by other services. They decouple domains (the Workflow Runtime emits <code>referral.converted</code>; the Reward service reacts), provide a complete audit trail of platform decisions, feed analytics, and serve as the payload for outbound webhooks. Section 5 specifies the referral, reward, fraud/trust, link, and payout families. Other domain families — campaign/program, segmentation, attribution-analytics, identity-access, compliance, and AI — remain governed by Event Model v2.1 §4 and are out of scope for this finalization. Their outbound webhook names are catalogued in API Contract §6.1 (e.g. <code>campaign.*</code>, <code>recommendation.created</code>).</p>
+
+<h2 id="taxonomy-trust">3.3 Trust Boundaries</h2>
+<p>Trust enforcement at the ingestion boundary is the platform's primary security control for tracked events. The rules are non-negotiable.</p>
+<table>
+<thead><tr><th>Source</th><th>Key Type</th><th>Permitted <code>type</code></th><th>Trust</th><th>Context Handling</th></tr></thead>
+<tbody>
+<tr><td>JS SDK / Browser</td><td>Publishable <code>rai_pub_</code></td><td><code>touch</code> only</td><td><code>low</code></td><td><code>ip_hash</code> and <code>user_agent</code> derived server-side; body values ignored. No revenue, no conversion events.</td></tr>
+<tr><td>Client Backend</td><td>Secret <code>rai_live_</code></td><td><code>touch</code>, <code>conversion</code>, <code>custom</code></td><td><code>high</code></td><td>All fields trusted, including revenue and full context.</td></tr>
+<tr><td>Webhook Relay</td><td>Secret (integration)</td><td><code>conversion</code>, <code>custom</code></td><td><code>high</code></td><td>Relayed from Stripe / Paddle / Chargebee. Webhook signature verified before processing.</td></tr>
+</tbody>
+</table>
+<p>A publishable key submitting a <code>conversion</code> event receives <strong>403 Forbidden</strong>. Conversion events determine reward payouts and must originate from a trusted backend.</p>
+<hr>
+
+<h1 id="4-tracked">4. Tracked Ingestion Event Types</h1>
+<p>This section defines the twelve externally produced tracked events. On the wire each is submitted as the envelope <code>type</code> (<code>touch</code>, <code>conversion</code>, or <code>custom</code>) plus an <code>event_name</code> in dot-notation, per API Contract §5.1 — the subsection titles below are the <code>event_name</code> values. Sections 4.1–4.5 are <code>touch</code>, 4.6–4.9 are <code>conversion</code>, and 4.10 is the <code>custom</code> envelope; on the bus all three normalize to <code>touch.recorded</code> / <code>conversion.recorded</code> / <code>custom.recorded</code> (Section 3.1) with the <code>event_name</code> preserved for precise dispatch. Each event has a companion JSON Schema file (<code>event.&lt;event_name&gt;.schema.json</code>) describing exactly the <code>properties</code> in its table, with mandatory fields in <code>required</code> and all other fields implicitly optional. The tables here are normative; the schema files must match them field-for-field. Field groups shared across events — the Invitee identity anchor (<code>invitee_email</code>/<code>invitee_external_id</code>) and the revenue block — are factored into a common <code>event._defs.schema.json</code> and pulled in by <code>$ref</code>; each event keeps its property set closed with <code>unevaluatedProperties</code> rather than <code>additionalProperties</code>, so composition does not break closed-content validation.</p>
+<p><strong>Conditional identity anchor.</strong> Every conversion event must identify the Invitee by <em>at least one</em> of <code>invitee_email</code> or <code>invitee_external_id</code>. Neither alone is unconditionally required, but their disjunction is. In the JSON Schemas this is expressed as an <code>anyOf</code> over the two single-field <code>required</code> sets, alongside the always-required fields.</p>
+
+<h2 id="touch-link-clicked">4.1 referral.link.clicked</h2>
+<p><strong>Purpose.</strong> A Invitee interacted with a Participant's referral link. The foundational touch event: it opens the attribution window, may instantiate a Referral workflow, and is the primary input to the Attribution Engine.</p>
+<p><strong>Source &amp; trust.</strong> JS SDK (browser, <code>low</code>) or client backend via server-side redirect tracking (<code>high</code>).</p>
+<table>
+<thead><tr><th>Field</th><th>Type</th><th>Required</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td><code>referral_code</code></td><td>String</td><td>Yes</td><td>The code embedded in the link. Resolves to a Participant and Campaign.</td></tr>
+<tr><td><code>link_url</code></td><td>String (uri)</td><td>Yes</td><td>The full referral link URL that was clicked.</td></tr>
+<tr><td><code>landing_url</code></td><td>String (uri)</td><td>No</td><td>Destination URL after redirect.</td></tr>
+<tr><td><code>channel</code></td><td>Enum</td><td>No</td><td><code>organic_link</code>, <code>email</code>, <code>social_share</code>, <code>widget</code>, <code>qr_code</code>, <code>api</code>. Defaults to <code>organic_link</code>.</td></tr>
+<tr><td><code>utm_source</code></td><td>String</td><td>No</td><td>UTM parameter, if present on the link.</td></tr>
+<tr><td><code>utm_medium</code></td><td>String</td><td>No</td><td>UTM parameter, if present.</td></tr>
+<tr><td><code>utm_campaign</code></td><td>String</td><td>No</td><td>UTM parameter, if present.</td></tr>
+<tr><td><code>utm_content</code></td><td>String</td><td>No</td><td>UTM parameter, if present.</td></tr>
+<tr><td><code>utm_term</code></td><td>String</td><td>No</td><td>UTM parameter, if present on the link.</td></tr>
+<tr><td><code>is_repeat_visit</code></td><td>Boolean</td><td>No</td><td>Whether the Invitee clicked this code before (session/cookie-detected).</td></tr>
+</tbody>
+</table>
+<p><strong>Validation &amp; dedup.</strong> <code>referral_code</code> must resolve to an active or recently-expired campaign (grace-period attribution). Envelope <code>consent</code> required. For publishable keys, <code>ip_hash</code>/<code>user_agent</code> are server-overridden. Secondary dedup key: <code>referral_code + session_id + 5min_bucket</code>.</p>
+<p><strong>Feeds.</strong> Workflow Runtime (route/create Referral), Attribution Engine (touch recording), Fraud Detection (velocity/IP), Analytics (funnel top), Segmentation.</p>
+
+<h2 id="touch-link-shared">4.2 referral.link.shared</h2>
+<p><strong>Purpose.</strong> A Participant actively shared their referral link through a trackable channel. Sharing is the Participant's action (clicking is the Invitee's); it powers engagement analytics and propensity modeling. The participant-side <code>referral.widget.viewed</code> event (v2.1 §3.3) shares this event's shape and trust profile and travels on the bus, but is not re-specified here.</p>
+<p><strong>Source &amp; trust.</strong> JS SDK widget share button (<code>low</code>) or client backend programmatic share tracking (<code>high</code>).</p>
+<table>
+<thead><tr><th>Field</th><th>Type</th><th>Required</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td><code>referral_code</code></td><td>String</td><td>Yes</td><td>The code that was shared.</td></tr>
+<tr><td><code>share_channel</code></td><td>Enum</td><td>Yes</td><td><code>email</code>, <code>twitter</code>, <code>linkedin</code>, <code>facebook</code>, <code>whatsapp</code>, <code>copy_link</code>, <code>sms</code>, <code>custom</code>.</td></tr>
+<tr><td><code>share_url</code></td><td>String (uri)</td><td>No</td><td>The full URL shared, if it differs from the canonical link.</td></tr>
+<tr><td><code>recipient_count</code></td><td>Integer (≥0)</td><td>No</td><td>Number of recipients, if determinable.</td></tr>
+</tbody>
+</table>
+<p><strong>Feeds.</strong> Analytics (participant engagement), AI (propensity, channel effectiveness), Participant Lifecycle, Segmentation.</p>
+
+<h2 id="touch-page-viewed">4.3 referral.page.viewed</h2>
+<p><strong>Purpose.</strong> A Invitee viewed a page on the client's site while a referral session is active. Provides engagement-depth signal for multi-touch attribution and propensity modeling — weaker than a click, but a valid sequence member when a referral code is in session. Retained as a first-class tracked event.</p>
+<p><strong>Source &amp; trust.</strong> JS SDK (browser, <code>low</code>) or client backend (<code>high</code>).</p>
+<table>
+<thead><tr><th>Field</th><th>Type</th><th>Required</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td><code>referral_code</code></td><td>String</td><td>Yes</td><td>From the active session cookie (<code>_rr_ref</code>).</td></tr>
+<tr><td><code>page_url</code></td><td>String (uri)</td><td>Yes</td><td>The URL viewed.</td></tr>
+<tr><td><code>page_title</code></td><td>String</td><td>No</td><td>The HTML page title.</td></tr>
+<tr><td><code>time_on_page_ms</code></td><td>Integer (≥0)</td><td>No</td><td>Milliseconds on the previous page, set on navigation away.</td></tr>
+</tbody>
+</table>
+<p><strong>Feeds.</strong> Attribution Engine (engagement depth for AI-weighted model), Analytics (funnel depth), Fraud Detection (session-pattern analysis).</p>
+
+<h2 id="touch-email-invitation-opened">4.4 referral.email.opened</h2>
+<p><strong>Purpose.</strong> A Invitee opened an email invitation sent by, or on behalf of, a Participant. Mid-funnel engagement signal that strengthens the attribution chain. Captured via tracking pixel.</p>
+<p><strong>Source &amp; trust.</strong> Event Ingestion tracking endpoint <code>/t/o/{token}</code>, authenticated by the token the notification service signed at send time (Product Spec R-SDK-04). <code>high</code>.</p>
+<table>
+<thead><tr><th>Field</th><th>Type</th><th>Required</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td><code>referral_code</code></td><td>String</td><td>Yes</td><td>The code associated with the invitation.</td></tr>
+<tr><td><code>invitation_id</code></td><td>String</td><td>Yes</td><td>Platform identifier for the specific invitation.</td></tr>
+<tr><td><code>email_template_id</code></td><td>String</td><td>No</td><td>The template used.</td></tr>
+<tr><td><code>open_count</code></td><td>Integer (≥1)</td><td>No</td><td>Cumulative open count. Only the first open is attribution-significant.</td></tr>
+</tbody>
+</table>
+<p><strong>Feeds.</strong> Attribution Engine (weighted touch), Analytics (email funnel), Participant Lifecycle.</p>
+
+<h2 id="touch-email-link-clicked">4.5 referral.email.clicked</h2>
+<p><strong>Purpose.</strong> A Invitee clicked a link inside an email invitation — a stronger engagement signal than an open. Captured via redirect through a tracking URL.</p>
+<p><strong>Source &amp; trust.</strong> Platform email service (redirect handler). <code>high</code>.</p>
+<table>
+<thead><tr><th>Field</th><th>Type</th><th>Required</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td><code>referral_code</code></td><td>String</td><td>Yes</td><td>The code associated with the invitation.</td></tr>
+<tr><td><code>invitation_id</code></td><td>String</td><td>Yes</td><td>Platform identifier for the invitation.</td></tr>
+<tr><td><code>link_id</code></td><td>String</td><td>Yes</td><td>Identifier for the specific link within the email.</td></tr>
+<tr><td><code>destination_url</code></td><td>String (uri)</td><td>Yes</td><td>The URL the link resolved to.</td></tr>
+</tbody>
+</table>
+<p><strong>Feeds.</strong> Attribution Engine (weighted touch — higher weight than an open), Analytics (email funnel conversion), Participant Lifecycle.</p>
+
+<h2 id="conversion-signup-completed">4.6 signup.completed</h2>
+<p><strong>Purpose.</strong> A Invitee completed signup in the client's product. Primary conversion for the Signup Pulse and entry event for the Conversion Pulse (trial-to-paid).</p>
+<p><strong>Source &amp; trust.</strong> Client backend only (secret key). <code>high</code>, mandatory.</p>
+<table>
+<thead><tr><th>Field</th><th>Type</th><th>Required</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td><code>invitee_email</code></td><td>String (email)</td><td>Conditional</td><td>Required unless <code>invitee_external_id</code> is provided. Links the conversion to the Referral via prior touches.</td></tr>
+<tr><td><code>invitee_external_id</code></td><td>String</td><td>Conditional</td><td>Client's identifier for the Invitee. Required unless <code>invitee_email</code> is provided.</td></tr>
+<tr><td><code>referral_code</code></td><td>String</td><td>No</td><td>If known, enables direct attribution without matching.</td></tr>
+<tr><td><code>signup_method</code></td><td>Enum</td><td>No</td><td><code>email</code>, <code>google_oauth</code>, <code>saml_sso</code>, <code>github</code>, <code>custom</code>.</td></tr>
+<tr><td><code>plan_type</code></td><td>String</td><td>No</td><td>Plan or tier signed up for (e.g. <code>free</code>, <code>trial</code>, <code>starter</code>).</td></tr>
+<tr><td><code>account_type</code></td><td>Enum</td><td>No</td><td><code>individual</code>, <code>team</code>, <code>enterprise</code>.</td></tr>
+</tbody>
+</table>
+<p><strong>Feeds.</strong> Workflow Runtime (state transition), Eligibility Engine, Fraud Detection, Reward Evaluator, Analytics (conversion funnel), Segmentation.</p>
+
+<h2 id="conversion-payment-completed">4.7 payment.completed</h2>
+<p><strong>Purpose.</strong> A Invitee completed a payment, moving from free/trial to paying. Primary conversion for the Conversion Pulse; enrichment for the Signup Pulse when rewards depend on payment.</p>
+<p><strong>Source &amp; trust.</strong> Client backend (secret key) or the billing provider via the Event Ingestion receiver <code>/inbound/{provider}/{connection_id}</code> (signature-verified). <code>high</code>, mandatory.</p>
+<p><strong>Revenue is flat.</strong> Revenue is expressed as flat <code>revenue_*</code> scalar fields, not a nested object, per the envelope's no-nested-objects rule and AI-readiness requirements.</p>
+<table>
+<thead><tr><th>Field</th><th>Type</th><th>Required</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td><code>invitee_email</code></td><td>String (email)</td><td>Conditional</td><td>Required unless <code>invitee_external_id</code> is provided.</td></tr>
+<tr><td><code>invitee_external_id</code></td><td>String</td><td>Conditional</td><td>Required unless <code>invitee_email</code> is provided.</td></tr>
+<tr><td><code>referral_code</code></td><td>String</td><td>No</td><td>For direct attribution.</td></tr>
+<tr><td><code>revenue_amount</code></td><td>Integer (≥0)</td><td>Yes</td><td>Payment amount in minor currency units (cents).</td></tr>
+<tr><td><code>revenue_currency</code></td><td>String (ISO 4217)</td><td>Yes</td><td>Three-letter currency code (<code>^[A-Z]{3}$</code>).</td></tr>
+<tr><td><code>revenue_type</code></td><td>Enum</td><td>Yes</td><td><code>one_time</code>, <code>recurring</code>.</td></tr>
+<tr><td><code>revenue_mrr</code></td><td>Integer (≥0)</td><td>Conditional</td><td>Monthly recurring revenue in minor units. <strong>Required when <code>revenue_type</code> is <code>recurring</code></strong>. Annual payments: annual ÷ 12, rounded down.</td></tr>
+<tr><td><code>revenue_arr</code></td><td>Integer (≥0)</td><td>No</td><td>Annual recurring revenue in minor units.</td></tr>
+<tr><td><code>revenue_ltv_estimate</code></td><td>Integer (≥0)</td><td>No</td><td>Client-provided lifetime-value estimate in minor units. Used by AI for reward optimization.</td></tr>
+<tr><td><code>payment_provider</code></td><td>Enum</td><td>No</td><td><code>stripe</code>, <code>paddle</code>, <code>chargebee</code>, <code>paypal</code>, <code>wire</code>, <code>custom</code>.</td></tr>
+<tr><td><code>payment_external_id</code></td><td>String</td><td>No</td><td>Payment identifier in the client's billing system.</td></tr>
+<tr><td><code>plan_id</code></td><td>String</td><td>No</td><td>The plan the payment is for.</td></tr>
+<tr><td><code>plan_name</code></td><td>String</td><td>No</td><td>Human-readable plan name.</td></tr>
+<tr><td><code>billing_interval</code></td><td>Enum</td><td>No</td><td><code>monthly</code>, <code>quarterly</code>, <code>annual</code>, <code>one_time</code>, <code>custom</code>.</td></tr>
+<tr><td><code>is_first_payment</code></td><td>Boolean</td><td>No</td><td>Whether this is the Invitee's first-ever payment.</td></tr>
+<tr><td><code>trial_converted</code></td><td>Boolean</td><td>No</td><td>Whether this represents a trial-to-paid conversion.</td></tr>
+<tr><td><code>product_id</code></td><td>String</td><td>No</td><td>Client identifier of the product purchased. Discriminator for the Cross-Sell Pulse (a payment for a product the Invitee did not already hold). Additive — schema_version unchanged.</td></tr>
+<tr><td><code>is_reactivation</code></td><td>Boolean</td><td>No</td><td>The client asserts this payment re-activates a churned customer. Discriminator for the Reactivation Pulse.</td></tr>
+<tr><td><code>switched_from</code></td><td>String</td><td>No</td><td>Competitor the Invitee asserts they switched from. Discriminator for the Switch-Up Pulse; the reward is held until the claim is verified.</td></tr>
+</tbody>
+</table>
+<p><strong>Feeds.</strong> Workflow Runtime, Reward Evaluator (revenue-based calculation), Attribution Engine (revenue attribution), Analytics (revenue KPIs), AI (LTV modeling, incentive optimization), Segmentation.</p>
+
+<h2 id="conversion-subscription-renewed">4.8 subscription.renewed</h2>
+<p><strong>Purpose.</strong> An existing subscriber renewed. Primary conversion for the Renewal Pulse; can trigger rewards when referred-customer retention is a rewarded outcome. Uses the same flat <code>revenue_*</code> fields as §4.7.</p>
+<p><strong>Source &amp; trust.</strong> Client backend (secret key) or the billing provider via the Event Ingestion receiver <code>/inbound/{provider}/{connection_id}</code> (signature-verified). <code>high</code>, mandatory.</p>
+<table>
+<thead><tr><th>Field</th><th>Type</th><th>Required</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td><code>invitee_email</code></td><td>String (email)</td><td>Conditional</td><td>Required unless <code>invitee_external_id</code> is provided.</td></tr>
+<tr><td><code>invitee_external_id</code></td><td>String</td><td>Conditional</td><td>Required unless <code>invitee_email</code> is provided.</td></tr>
+<tr><td><code>referral_code</code></td><td>String</td><td>No</td><td>If known.</td></tr>
+<tr><td><code>revenue_amount</code></td><td>Integer (≥0)</td><td>Yes</td><td>Renewal amount in minor units.</td></tr>
+<tr><td><code>revenue_currency</code></td><td>String (ISO 4217)</td><td>Yes</td><td>Three-letter currency code.</td></tr>
+<tr><td><code>revenue_type</code></td><td>Enum</td><td>Yes</td><td><code>one_time</code>, <code>recurring</code>.</td></tr>
+<tr><td><code>revenue_mrr</code></td><td>Integer (≥0)</td><td>Conditional</td><td>Required when <code>revenue_type</code> is <code>recurring</code>.</td></tr>
+<tr><td><code>revenue_arr</code></td><td>Integer (≥0)</td><td>No</td><td>Annual recurring revenue in minor units.</td></tr>
+<tr><td><code>revenue_ltv_estimate</code></td><td>Integer (≥0)</td><td>No</td><td>Lifetime-value estimate in minor units.</td></tr>
+<tr><td><code>renewal_number</code></td><td>Integer (≥1)</td><td>No</td><td>Times renewed (1 for first renewal).</td></tr>
+<tr><td><code>previous_plan_id</code></td><td>String</td><td>No</td><td>Plan before renewal, if changed.</td></tr>
+<tr><td><code>new_plan_id</code></td><td>String</td><td>No</td><td>Plan after renewal.</td></tr>
+<tr><td><code>retention_days</code></td><td>Integer (≥0)</td><td>No</td><td>Days continuously active.</td></tr>
+</tbody>
+</table>
+<p><strong>Feeds.</strong> Workflow Runtime, Reward Evaluator (renewal-linked rewards, revenue-share duration), Attribution Engine (recurring revenue), Analytics, AI (churn propensity), Segmentation.</p>
+
+<h2 id="conversion-feedback-submitted">4.9 feedback.submitted</h2>
+<p><strong>Purpose.</strong> A user submitted a review, rating, NPS response, or testimonial. Conversion for the Feedback Pulse; non-monetary or low-value rewards expected.</p>
+<p><strong>Source &amp; trust.</strong> Client backend only. <code>high</code>.</p>
+<table>
+<thead><tr><th>Field</th><th>Type</th><th>Required</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td><code>invitee_email</code></td><td>String (email)</td><td>Conditional</td><td>Required unless <code>invitee_external_id</code> is provided.</td></tr>
+<tr><td><code>invitee_external_id</code></td><td>String</td><td>Conditional</td><td>Required unless <code>invitee_email</code> is provided.</td></tr>
+<tr><td><code>feedback_type</code></td><td>Enum</td><td>Yes</td><td><code>review</code>, <code>rating</code>, <code>nps</code>, <code>testimonial</code>, <code>survey</code>, <code>custom</code>.</td></tr>
+<tr><td><code>rating_value</code></td><td>Number</td><td>No</td><td>Numeric rating (e.g. 4.5).</td></tr>
+<tr><td><code>rating_scale_max</code></td><td>Number</td><td>Conditional</td><td>Maximum scale value. <strong>Required when <code>rating_value</code> is present.</strong></td></tr>
+<tr><td><code>nps_score</code></td><td>Integer (0–10)</td><td>No</td><td>NPS score. Present only for <code>feedback_type: nps</code>.</td></tr>
+<tr><td><code>feedback_platform</code></td><td>String</td><td>No</td><td>Where submitted (e.g. <code>g2</code>, <code>capterra</code>, <code>trustpilot</code>, <code>in_app</code>).</td></tr>
+<tr><td><code>has_text_content</code></td><td>Boolean</td><td>No</td><td>Whether feedback includes written text. Text itself is not stored in the event.</td></tr>
+<tr><td><code>is_verified_purchase</code></td><td>Boolean</td><td>No</td><td>Whether the reviewer is a verified customer.</td></tr>
+</tbody>
+</table>
+<p><strong>Feeds.</strong> Workflow Runtime, Reward Evaluator, Analytics (engagement KPIs), AI (quality/spam signals), Segmentation.</p>
+
+<h2 id="custom-recorded">4.10 custom.recorded</h2>
+<p><strong>Purpose.</strong> A generic behavioral signal that feeds segmentation, propensity models, and analytics but does not directly drive referral workflow transitions. The mechanism by which clients communicate product usage, lifecycle changes, and other activity.</p>
+<p><strong>Source &amp; trust.</strong> Client backend only (secret key). <code>high</code>.</p>
+<table>
+<thead><tr><th>Field</th><th>Type</th><th>Required</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td><code>event_name</code></td><td>String (dot-notation)</td><td>Yes</td><td>Client-defined behavioral name (e.g. <code>session.started</code>, <code>plan.upgraded</code>, <code>subscription.cancelled</code>). Pattern <code>^[a-z][a-z0-9_]*(\.[a-z][a-z0-9_]*){1,3}$</code>.</td></tr>
+<tr><td><code>actor_email</code></td><td>String (email)</td><td>No</td><td>Email of the user who performed the action. Used for identity linking.</td></tr>
+<tr><td><code>actor_external_id</code></td><td>String</td><td>No</td><td>Client's identifier for the actor.</td></tr>
+<tr><td colspan="4"><em>Additional client-defined keys</em> — flat primitives or primitive arrays — are permitted alongside the above, subject to the envelope <code>properties</code> limits (50 keys, 10&nbsp;KB). No nested objects.</td></tr>
+</tbody>
+</table>
+<p><strong>Feeds.</strong> Segmentation (rule evaluation, membership), Analytics (ClickHouse), AI (feature engineering). Custom events do <strong>not</strong> reach the Workflow Runtime directly; when a custom event matches a running Pulse trigger, the Segmentation service emits a separate <code>conversion.recorded</code> domain event — the translation is explicit.</p>
+<hr>
+
+<h2 id="4-11-referral-widget-viewed">4.11 referral.widget.viewed</h2>
+<p><strong>Purpose.</strong> A Participant's widget rendered in the client's app. Participant-engagement touch (Product Spec R-ATT-01): funnel and propensity signal, never an attribution input. Publishable key; low trust. Required: <code>referral_code</code>, <code>mode</code> (inline | modal | floating), <code>variant_id</code>; optional: <code>page_url</code>. Schema file: <code>event_referral_widget_viewed_schema.json</code>.</p>
+<h2 id="4-12-subscription-cancelled">4.12 subscription.cancelled</h2>
+<p><strong>Purpose.</strong> An Invitee's subscription ended. Conversion-class tracked event from the client backend (secret key) or the billing-provider receiver (Stripe <code>customer.subscription.deleted</code>, Paddle <code>subscription.canceled</code>, Chargebee <code>subscription_cancelled</code>). It never converts a referral: on a recurring-structure referral it stops reward cycles and moves the referral to <code>completed</code> with <code>completion_reason = cancelled</code> (Product Spec R-RWD-03). Required: invitee anchor (<code>invitee_external_id</code> or <code>invitee_email</code>), <code>cancelled_at</code>; optional: <code>subscription_id</code>, <code>reason</code>, <code>provider_customer_id</code>. Schema file: <code>event_subscription_cancelled_schema.json</code>.</p>
+<p><strong>Qualified, per Pulse (Product Spec R-CON-04).</strong> A Referral is Qualified when the Invitee is identified, the Pulse's entry condition is confirmed and the dedup passed; Signup qualifies and converts in one step (both events emitted); Newsletter qualifies on <code>custom.recorded{subscription.requested}</code> and converts on <code>subscription.confirmed</code>. <strong>Custom-event triggers.</strong> <code>custom.recorded</code> is consumed by the Referral Workflow Service, which recognises a running Pulse's trigger and signals the workflow; no translated <code>conversion.recorded</code> is published. <strong>referral.completed</strong> (new, referral family): emitted when a recurring-structure referral reaches <code>cycles_cap</code> or receives <code>subscription.cancelled</code>; fields <code>referral_id</code>, <code>reason ∈ cap_reached | cancelled</code>, <code>cycles_earned</code>. <strong>reward.earned</strong> gains <code>cycle_number</code> (integer ≥ 1). <strong>referral.email.clicked</strong> never opens a Referral; only <code>referral.link.clicked</code> does (R-CON-07).</p>
+<h1 id="5-domain">5. Domain / Intra-Service Event Types</h1>
+<p>Domain events are produced by internal services and flow on the bus. They are never submitted by external callers. Each definition states its purpose, producing service, consuming domains, and <code>properties</code>. They carry the shared envelope; <code>event_class</code> is always <code>domain</code> and <code>source.trust_level</code> is always <code>high</code>. No JSON Schema files are produced for these — schema files are required only for externally produced ingestion events.</p>
+
+<h2 id="domain-referral">5.1 Referral Lifecycle</h2>
+<p><strong>Producing service:</strong> Referral Workflow Runtime (Temporal). <strong>State machine:</strong> <code>created → qualified → converted → rewarded</code>, with branches to <code>rejected</code> and <code>expired</code>. (Product Spec §2 names these lifecycle states <em>Pending → Qualified → Converted → Rewarded | Expired | Rejected</em>; <code>referral.created</code> enters the <em>Pending</em> state. Reward reversal is modelled at the reward level as <code>reward.reversed</code>, not as a referral state.)</p>
+<figure class="fig-sm">
+<figcaption>Referral State Machine</figcaption><svg viewBox="0 0 680 200" width="100%" xmlns="http://www.w3.org/2000/svg" font-family="Geist,system-ui,sans-serif" role="img"><defs><marker id="ahr" markerWidth="9" markerHeight="9" refX="6.5" refY="3" orient="auto"><path d="M0,0 L7,3 L0,6 Z" fill="#a8a29e"/></marker><marker id="ahdr" markerWidth="9" markerHeight="9" refX="6.5" refY="3" orient="auto"><path d="M0,0 L7,3 L0,6 Z" fill="#be123c"/></marker></defs><rect x="2" y="40" width="155" height="40" rx="7" fill="#fef3c7" stroke="#b45309" stroke-width="1"/><text x="79.5" y="64" text-anchor="middle" font-family="'Geist Mono',ui-monospace,monospace" font-size="11.5" font-weight="500" fill="#92400e">created</text><rect x="175" y="40" width="155" height="40" rx="7" fill="#fef3c7" stroke="#b45309" stroke-width="1"/><text x="252.5" y="64" text-anchor="middle" font-family="'Geist Mono',ui-monospace,monospace" font-size="11.5" font-weight="500" fill="#92400e">qualified</text><rect x="348" y="40" width="155" height="40" rx="7" fill="#fef3c7" stroke="#b45309" stroke-width="1"/><text x="425.5" y="64" text-anchor="middle" font-family="'Geist Mono',ui-monospace,monospace" font-size="11.5" font-weight="500" fill="#92400e">converted</text><rect x="521" y="40" width="155" height="40" rx="7" fill="#d1fae5" stroke="#047857" stroke-width="1"/><text x="598.5" y="64" text-anchor="middle" font-family="'Geist Mono',ui-monospace,monospace" font-size="11.5" font-weight="500" fill="#047857">rewarded</text><line x1="157" y1="60.0" x2="175" y2="60.0" stroke="#a8a29e" stroke-width="1.5" marker-end="url(#ahr)"/><text x="166.0" y="34" text-anchor="middle" font-size="9" font-weight="500" fill="#78716c">eligible</text><line x1="330" y1="60.0" x2="348" y2="60.0" stroke="#a8a29e" stroke-width="1.5" marker-end="url(#ahr)"/><text x="339.0" y="34" text-anchor="middle" font-size="9" font-weight="500" fill="#78716c">conversion</text><line x1="503" y1="60.0" x2="521" y2="60.0" stroke="#a8a29e" stroke-width="1.5" marker-end="url(#ahr)"/><text x="512.0" y="34" text-anchor="middle" font-size="9" font-weight="500" fill="#78716c">reward</text><rect x="2.0" y="158" width="155" height="32" rx="7" fill="#ffe4e6" stroke="#be123c" stroke-width="1"/><text x="79.5" y="178" text-anchor="middle" font-family="'Geist Mono',ui-monospace,monospace" font-size="11" font-weight="500" fill="#be123c">expired</text><line x1="79.5" y1="80" x2="79.5" y2="158" stroke="#be123c" stroke-width="1.5" stroke-dasharray="4 3" marker-end="url(#ahdr)"/><text x="86.5" y="122.0" text-anchor="start" font-size="9" font-weight="500" fill="#be123c">window</text><rect x="175.0" y="158" width="155" height="32" rx="7" fill="#ffe4e6" stroke="#be123c" stroke-width="1"/><text x="252.5" y="178" text-anchor="middle" font-family="'Geist Mono',ui-monospace,monospace" font-size="11" font-weight="500" fill="#be123c">rejected</text><line x1="252.5" y1="80" x2="252.5" y2="158" stroke="#be123c" stroke-width="1.5" stroke-dasharray="4 3" marker-end="url(#ahdr)"/><text x="259.5" y="122.0" text-anchor="start" font-size="9" font-weight="500" fill="#be123c">ineligible / fraud</text></svg></figure>
+
+<h3>referral.created</h3>
+<p>A new Referral workflow instance was created — on the first touch for a new Participant→Invitee→Campaign combination, or explicitly via server-side API. <strong>Consumers:</strong> Analytics, Segmentation, Webhook Delivery.</p>
+<table>
+<thead><tr><th>Field</th><th>Type</th><th>Required</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td><code>referral_id</code></td><td>String (ULID)</td><td>Yes</td><td>The new Referral identifier.</td></tr>
+<tr><td><code>participant_id</code></td><td>String</td><td>Yes</td><td>The owning Participant.</td></tr>
+<tr><td><code>campaign_id</code></td><td>String (ULID)</td><td>Yes</td><td>The Campaign this referral belongs to.</td></tr>
+<tr><td><code>variant_id</code></td><td>String (ULID)</td><td>No</td><td>Resolved variant (typically pre-resolved at link generation).</td></tr>
+<tr><td><code>invitee_email_hash</code></td><td>String</td><td>No</td><td>SHA-256 of Invitee email, if known at creation.</td></tr>
+<tr><td><code>invitee_external_id</code></td><td>String</td><td>No</td><td>Client's Invitee identifier, if known.</td></tr>
+<tr><td><code>referral_code</code></td><td>String</td><td>Yes</td><td>The code that initiated this referral.</td></tr>
+<tr><td><code>first_touch_at</code></td><td>ISO 8601</td><td>Yes</td><td>Timestamp of the initiating touch.</td></tr>
+<tr><td><code>creation_source</code></td><td>Enum</td><td>Yes</td><td><code>touch_event</code>, <code>api_explicit</code>, <code>provider_receiver</code>.</td></tr>
+</tbody>
+</table>
+
+<h3>referral.qualified</h3>
+<p>The Referral passed eligibility at a checkpoint. <strong>Consumers:</strong> Analytics, Webhook Delivery.</p>
+<table>
+<thead><tr><th>Field</th><th>Type</th><th>Required</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td><code>referral_id</code></td><td>String (ULID)</td><td>Yes</td><td>The Referral that passed.</td></tr>
+<tr><td><code>eligibility_result</code></td><td>Enum</td><td>Yes</td><td><code>eligible</code>.</td></tr>
+<tr><td><code>checkpoint</code></td><td>Enum</td><td>Yes</td><td><code>campaign_entry</code>, <code>referral_creation</code>, <code>conversion_validation</code>, <code>reward_approval</code>, <code>payout</code>.</td></tr>
+<tr><td><code>rules_evaluated</code></td><td>Array</td><td>Yes</td><td>Per-rule evaluation trace for audit (rule name, pass/fail, detail).</td></tr>
+<tr><td><code>evaluated_at</code></td><td>ISO 8601</td><td>Yes</td><td>When eligibility was computed.</td></tr>
+</tbody>
+</table>
+
+<h3>referral.converted</h3>
+<p>A conversion was matched and validated against this Referral; triggers reward evaluation. <strong>Consumers:</strong> Rewards &amp; Payouts, Fraud Detection, Analytics, AI, Segmentation, Webhook Delivery.</p>
+<table>
+<thead><tr><th>Field</th><th>Type</th><th>Required</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td><code>referral_id</code></td><td>String (ULID)</td><td>Yes</td><td>The Referral that converted.</td></tr>
+<tr><td><code>conversion_event_id</code></td><td>String (ULID)</td><td>Yes</td><td><code>event_id</code> of the triggering <code>conversion.recorded</code> event.</td></tr>
+<tr><td><code>conversion_type</code></td><td>String</td><td>Yes</td><td>The concrete conversion type (e.g. <code>payment.completed</code>).</td></tr>
+<tr><td><code>revenue_amount</code></td><td>Integer (≥0)</td><td>No</td><td>Attributed revenue in minor units, if the conversion carried revenue.</td></tr>
+<tr><td><code>revenue_currency</code></td><td>String (ISO 4217)</td><td>Conditional</td><td>Required when <code>revenue_amount</code> is present.</td></tr>
+<tr><td><code>converted_at</code></td><td>ISO 8601</td><td>Yes</td><td>Timestamp of conversion.</td></tr>
+<tr><td><code>attribution_model_used</code></td><td>Enum</td><td>No</td><td><code>first_touch</code>, <code>last_touch</code>, <code>linear</code>, <code>time_decay</code>, <code>position_based</code>, <code>ai_weighted</code>.</td></tr>
+</tbody>
+</table>
+
+<h3>referral.rejected</h3>
+<p>The Referral was rejected — failed eligibility, confirmed fraud, or manual operator action. <strong>Consumers:</strong> Analytics, Webhook Delivery, AI (fraud feedback).</p>
+<table>
+<thead><tr><th>Field</th><th>Type</th><th>Required</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td><code>referral_id</code></td><td>String (ULID)</td><td>Yes</td><td>The rejected Referral.</td></tr>
+<tr><td><code>rejection_reason</code></td><td>String</td><td>Yes</td><td>Human-readable reason.</td></tr>
+<tr><td><code>rejection_source</code></td><td>Enum</td><td>Yes</td><td><code>eligibility_engine</code>, <code>fraud_detection</code>, <code>operator_manual</code>.</td></tr>
+<tr><td><code>rejected_by_id</code></td><td>String</td><td>No</td><td>Operator ID, if <code>operator_manual</code>.</td></tr>
+</tbody>
+</table>
+
+<h3>referral.expired</h3>
+<p>The attribution window passed without a matching conversion; the Referral is closed. <strong>Consumers:</strong> Analytics, Webhook Delivery, AI (negative examples).</p>
+<table>
+<thead><tr><th>Field</th><th>Type</th><th>Required</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td><code>referral_id</code></td><td>String (ULID)</td><td>Yes</td><td>The expired Referral.</td></tr>
+<tr><td><code>window_days</code></td><td>Integer</td><td>Yes</td><td>Attribution window duration in effect.</td></tr>
+<tr><td><code>first_touch_at</code></td><td>ISO 8601</td><td>Yes</td><td>When the window opened.</td></tr>
+<tr><td><code>last_touch_at</code></td><td>ISO 8601</td><td>No</td><td>Most recent touch before expiry.</td></tr>
+<tr><td><code>touch_count</code></td><td>Integer</td><td>Yes</td><td>Total touches recorded before expiry.</td></tr>
+</tbody>
+</table>
+
+<h2 id="domain-reward">5.2 Reward Lifecycle</h2>
+<p><strong>Producing service:</strong> Rewards &amp; Payouts. <strong>State machine:</strong> <code>earned → held → approved → processing → paid</code>, with branches to <code>rejected</code> and <code>reversed</code>; <code>held</code> is skipped by auto-approved rewards.</p>
+<figure class="fig-sm">
+<figcaption>Reward State Machine</figcaption><svg viewBox="0 0 680 200" width="100%" xmlns="http://www.w3.org/2000/svg" font-family="Geist,system-ui,sans-serif" role="img"><defs><marker id="ahw" markerWidth="9" markerHeight="9" refX="6.5" refY="3" orient="auto"><path d="M0,0 L7,3 L0,6 Z" fill="#a8a29e"/></marker><marker id="ahdw" markerWidth="9" markerHeight="9" refX="6.5" refY="3" orient="auto"><path d="M0,0 L7,3 L0,6 Z" fill="#be123c"/></marker></defs><rect x="2" y="40" width="120" height="40" rx="7" fill="#fef3c7" stroke="#b45309" stroke-width="1"/><text x="62.0" y="64" text-anchor="middle" font-family="'Geist Mono',ui-monospace,monospace" font-size="11.5" font-weight="500" fill="#92400e">earned</text><rect x="140" y="40" width="120" height="40" rx="7" fill="#fef3c7" stroke="#b45309" stroke-width="1"/><text x="200.0" y="58" text-anchor="middle" font-family="'Geist Mono',ui-monospace,monospace" font-size="11" font-weight="500" fill="#92400e">pending</text><text x="200.0" y="72" text-anchor="middle" font-family="'Geist Mono',ui-monospace,monospace" font-size="11" font-weight="500" fill="#92400e">approval</text><rect x="278" y="40" width="120" height="40" rx="7" fill="#fef3c7" stroke="#b45309" stroke-width="1"/><text x="338.0" y="64" text-anchor="middle" font-family="'Geist Mono',ui-monospace,monospace" font-size="11.5" font-weight="500" fill="#92400e">approved</text><rect x="416" y="40" width="120" height="40" rx="7" fill="#fef3c7" stroke="#b45309" stroke-width="1"/><text x="476.0" y="64" text-anchor="middle" font-family="'Geist Mono',ui-monospace,monospace" font-size="11.5" font-weight="500" fill="#92400e">processing</text><rect x="554" y="40" width="120" height="40" rx="7" fill="#d1fae5" stroke="#047857" stroke-width="1"/><text x="614.0" y="64" text-anchor="middle" font-family="'Geist Mono',ui-monospace,monospace" font-size="11.5" font-weight="500" fill="#047857">paid</text><line x1="122" y1="60.0" x2="140" y2="60.0" stroke="#a8a29e" stroke-width="1.5" marker-end="url(#ahw)"/><line x1="260" y1="60.0" x2="278" y2="60.0" stroke="#a8a29e" stroke-width="1.5" marker-end="url(#ahw)"/><text x="269.0" y="34" text-anchor="middle" font-size="9" font-weight="500" fill="#78716c">approve</text><line x1="398" y1="60.0" x2="416" y2="60.0" stroke="#a8a29e" stroke-width="1.5" marker-end="url(#ahw)"/><text x="407.0" y="34" text-anchor="middle" font-size="9" font-weight="500" fill="#78716c">dispatch</text><line x1="536" y1="60.0" x2="554" y2="60.0" stroke="#a8a29e" stroke-width="1.5" marker-end="url(#ahw)"/><text x="545.0" y="34" text-anchor="middle" font-size="9" font-weight="500" fill="#78716c">delivered</text><rect x="140.0" y="158" width="120" height="32" rx="7" fill="#ffe4e6" stroke="#be123c" stroke-width="1"/><text x="200.0" y="178" text-anchor="middle" font-family="'Geist Mono',ui-monospace,monospace" font-size="11" font-weight="500" fill="#be123c">rejected</text><line x1="200.0" y1="80" x2="200.0" y2="158" stroke="#be123c" stroke-width="1.5" stroke-dasharray="4 3" marker-end="url(#ahdw)"/><text x="207.0" y="122.0" text-anchor="start" font-size="9" font-weight="500" fill="#be123c">denied</text><rect x="554.0" y="158" width="120" height="32" rx="7" fill="#ffe4e6" stroke="#be123c" stroke-width="1"/><text x="614.0" y="178" text-anchor="middle" font-family="'Geist Mono',ui-monospace,monospace" font-size="11" font-weight="500" fill="#be123c">reversed</text><line x1="614.0" y1="80" x2="614.0" y2="158" stroke="#be123c" stroke-width="1.5" stroke-dasharray="4 3" marker-end="url(#ahdw)"/><text x="621.0" y="122.0" text-anchor="start" font-size="9" font-weight="500" fill="#be123c">chargeback</text></svg></figure>
+
+<p><em>State/term mapping (single, cross-document): <code>earned</code> = Product Spec §8 <em>Pending</em> = webhook <code>reward.earned</code> (the only renamed pair); <code>held</code> = <em>Held</em> = <code>reward.held</code>; <code>approved</code> = <em>Approved</em> = <code>reward.approved</code>; <code>processing</code> = <em>Processing</em> (no event — dispatch in flight); <code>paid</code> = <em>Paid</em> = <code>reward.paid</code>; <code>rejected</code> = <em>Rejected</em> = <code>reward.rejected</code>; <code>reversed</code> = <em>Reversed</em> = <code>reward.reversed</code>. The DB Model stores exactly these seven values.</em></p>
+<h3>reward.earned</h3>
+<p>A Reward instance was created from the Variant's Reward Configuration; conversion validated and amount computed. <strong>Consumers:</strong> Approval Engine, Analytics, Dashboard, Webhook Delivery.</p>
+<table>
+<thead><tr><th>Field</th><th>Type</th><th>Required</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td><code>reward_id</code></td><td>String (ULID)</td><td>Yes</td><td>The new Reward.</td></tr>
+<tr><td><code>referral_id</code></td><td>String (ULID)</td><td>Yes</td><td>The triggering Referral.</td></tr>
+<tr><td><code>recipient_type</code></td><td>Enum</td><td>Yes</td><td><code>participant</code>, <code>invitee</code>.</td></tr>
+<tr><td><code>recipient_id</code></td><td>String</td><td>Yes</td><td>Platform ID of the recipient.</td></tr>
+<tr><td><code>reward_type</code></td><td>Enum</td><td>Yes</td><td><code>cash</code>, <code>gift_card</code>, <code>account_credit</code>, <code>feature_unlock</code>, <code>extended_trial</code>, <code>discount_code</code>, <code>custom</code>. <em>What</em> the participant receives (Product Spec §8, DB Model).</td></tr>
+<tr><td><code>reward_structure</code></td><td>Enum</td><td>Yes</td><td><code>fixed</code>, <code>percentage</code>, <code>tiered</code>, <code>recurring</code>, <code>milestone</code>, <code>capped</code>. <em>How</em> the amount is computed (Product Spec §8, DB Model).</td></tr>
+<tr><td><code>amount</code></td><td>Integer (≥0)</td><td>Yes</td><td>Calculated value in minor units. Zero for non-monetary.</td></tr>
+<tr><td><code>currency</code></td><td>String (ISO 4217)</td><td>Conditional</td><td>Required when <code>amount</code> &gt; 0.</td></tr>
+<tr><td><code>approval_mode</code></td><td>Enum</td><td>Yes</td><td><code>auto</code>, <code>manual</code>, <code>auto_below_threshold</code>, <code>ai_assisted</code>.</td></tr>
+<tr><td><code>auto_approval_eligible</code></td><td>Boolean</td><td>Yes</td><td>Whether it qualifies for automatic approval.</td></tr>
+<tr><td><code>triggering_conversion_event_id</code></td><td>String (ULID)</td><td>Yes</td><td><code>event_id</code> of the triggering conversion.</td></tr>
+</tbody>
+</table>
+
+<h3>reward.held</h3>
+<p>The Reward entered the <em>Held</em> state — the manual or AI-assisted approval queue — because the fraud score is in the review band, the amount exceeds the participant's trust ceiling, the participant is flagged/suspended, the variant is in manual approval mode, or the AI placed a reversible hold (auto-approved rewards skip this state). Consumers: Dashboard, Webhook Delivery (surfaced as <code>reward.held</code>).</p>
+<table>
+<thead><tr><th>Field</th><th>Type</th><th>Required</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td><code>reward_id</code></td><td>String (ULID)</td><td>Yes</td><td>The Reward awaiting approval.</td></tr>
+<tr><td><code>referral_id</code></td><td>String (ULID)</td><td>Yes</td><td>Associated Referral.</td></tr>
+<tr><td><code>approval_mode</code></td><td>Enum</td><td>Yes</td><td><code>manual</code>, <code>ai_assisted</code>.</td></tr>
+<tr><td><code>hold_reason</code></td><td>Enum</td><td>Yes</td><td><code>fraud_review_band</code>, <code>over_trust_ceiling</code>, <code>participant_flagged</code>, <code>manual_mode</code>, <code>ai_hold</code>, <code>self_conversion_gate</code>.</td></tr>
+<tr><td><code>cooling_period_ends_at</code></td><td>ISO 8601</td><td>No</td><td>When the reward becomes eligible for approval, if a cooling period is configured.</td></tr>
+<tr><td><code>fraud_score_at_submission</code></td><td>Number (0–1)</td><td>No</td><td>Participant fraud score on entering the queue.</td></tr>
+</tbody>
+</table>
+
+<h3>reward.approved</h3>
+<p>The Reward was approved for fulfillment — automatically, via AI assessment, or by an operator. <strong>Consumers:</strong> Fulfillment Engine, Analytics, AI (feedback), Webhook Delivery.</p>
+<table>
+<thead><tr><th>Field</th><th>Type</th><th>Required</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td><code>reward_id</code></td><td>String (ULID)</td><td>Yes</td><td>The approved Reward.</td></tr>
+<tr><td><code>referral_id</code></td><td>String (ULID)</td><td>Yes</td><td>Associated Referral.</td></tr>
+<tr><td><code>approved_by_type</code></td><td>Enum</td><td>Yes</td><td><code>system_auto</code>, <code>ai_assisted</code>, <code>operator</code>.</td></tr>
+<tr><td><code>approved_by_id</code></td><td>String</td><td>No</td><td>Operator ID, if <code>operator</code>.</td></tr>
+<tr><td><code>approval_reason</code></td><td>String</td><td>No</td><td>Human or AI-generated explanation.</td></tr>
+<tr><td><code>fraud_score_at_approval</code></td><td>Number (0–1)</td><td>No</td><td>Fraud score at approval; recorded for audit and AI training.</td></tr>
+<tr><td><code>amount</code></td><td>Integer (≥0)</td><td>Yes</td><td>Approved amount (may differ from earned if adjusted).</td></tr>
+<tr><td><code>currency</code></td><td>String (ISO 4217)</td><td>Conditional</td><td>Required when <code>amount</code> &gt; 0.</td></tr>
+</tbody>
+</table>
+
+<h3>reward.rejected</h3>
+<p>The Reward was rejected during approval; the Participant is not paid. <strong>Consumers:</strong> Analytics, AI (feedback), Webhook Delivery.</p>
+<table>
+<thead><tr><th>Field</th><th>Type</th><th>Required</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td><code>reward_id</code></td><td>String (ULID)</td><td>Yes</td><td>The rejected Reward.</td></tr>
+<tr><td><code>referral_id</code></td><td>String (ULID)</td><td>Yes</td><td>Associated Referral.</td></tr>
+<tr><td><code>rejected_by_type</code></td><td>Enum</td><td>Yes</td><td><code>system_auto</code>, <code>ai_assisted</code>, <code>operator</code>.</td></tr>
+<tr><td><code>rejected_by_id</code></td><td>String</td><td>No</td><td>Operator ID, if manual.</td></tr>
+<tr><td><code>rejection_reason</code></td><td>String</td><td>Yes</td><td>Logged in the immutable audit trail.</td></tr>
+</tbody>
+</table>
+
+<h3>reward.paid</h3>
+<p>The payout was successfully disbursed. <strong>Consumers:</strong> Analytics, Participant Lifecycle, Webhook Delivery.</p>
+<table>
+<thead><tr><th>Field</th><th>Type</th><th>Required</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td><code>reward_id</code></td><td>String (ULID)</td><td>Yes</td><td>The fulfilled Reward.</td></tr>
+<tr><td><code>referral_id</code></td><td>String (ULID)</td><td>Yes</td><td>Associated Referral.</td></tr>
+<tr><td><code>fulfillment_method</code></td><td>Enum</td><td>Yes</td><td><code>paypal</code>, <code>wise</code>, <code>sepa</code>, <code>gift_card</code>, <code>credit</code>, <code>discount_code</code>, <code>manual</code>.</td></tr>
+<tr><td><code>external_transfer_id</code></td><td>String</td><td>No</td><td>Transfer identifier from the provider.</td></tr>
+<tr><td><code>fulfilled_at</code></td><td>ISO 8601</td><td>Yes</td><td>When disbursement completed.</td></tr>
+<tr><td><code>amount</code></td><td>Integer (≥0)</td><td>Yes</td><td>Fulfilled amount in minor units.</td></tr>
+<tr><td><code>currency</code></td><td>String (ISO 4217)</td><td>Conditional</td><td>Required when <code>amount</code> &gt; 0.</td></tr>
+</tbody>
+</table>
+
+<h3>reward.reversed</h3>
+<p>A previously fulfilled Reward was reversed — chargeback, refund within the clawback window, or confirmed post-payout fraud. <strong>Consumers:</strong> Analytics, Participant Lifecycle, Payout (negative balance), Webhook Delivery.</p>
+<table>
+<thead><tr><th>Field</th><th>Type</th><th>Required</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td><code>reward_id</code></td><td>String (ULID)</td><td>Yes</td><td>The clawed-back Reward.</td></tr>
+<tr><td><code>referral_id</code></td><td>String (ULID)</td><td>Yes</td><td>Associated Referral.</td></tr>
+<tr><td><code>clawback_reason</code></td><td>String</td><td>Yes</td><td>Mandatory. Logged in the immutable audit trail.</td></tr>
+<tr><td><code>clawback_amount</code></td><td>Integer (≥0)</td><td>Yes</td><td>Amount clawed back in minor units; may be less than fulfilled for partial.</td></tr>
+<tr><td><code>currency</code></td><td>String (ISO 4217)</td><td>Yes</td><td>Currency of the clawback.</td></tr>
+<tr><td><code>initiated_by_type</code></td><td>Enum</td><td>Yes</td><td><code>system_auto</code>, <code>operator</code>.</td></tr>
+<tr><td><code>initiated_by_id</code></td><td>String</td><td>No</td><td>Operator ID, if manual.</td></tr>
+</tbody>
+</table>
+
+<h2 id="domain-fraud">5.3 Fraud &amp; Trust</h2>
+<p>Fraud events are <em>signals</em>, not verdicts: they trigger review flows and inform reward approval. Fraud detection is per-event/per-referral (risk score 0.0–1.0); the trust model is per-participant (cumulative score 0–100). <strong>Producing service:</strong> AI &amp; Optimization (fraud detection) for signals; the Referral Workflow Service — owner of the Participant aggregate — for participant-state, self-conversion and trust-tier changes.</p>
+
+<h3>fraud.flagged</h3>
+<p>The fraud subsystem identified a suspicious pattern; may auto-hold pending rewards. <strong>Consumers:</strong> Workflow Runtime, Rewards &amp; Payouts, Dashboard, Webhook Delivery.</p>
+<table>
+<thead><tr><th>Field</th><th>Type</th><th>Required</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td><code>signal_type</code></td><td>Enum</td><td>Yes</td><td><code>self_referral</code>, <code>velocity_abuse</code>, <code>disposable_email</code>, <code>vpn_proxy</code>, <code>device_fingerprint_match</code>, <code>payment_reversal</code>, <code>geographic_mismatch</code>, <code>bot_pattern</code>, <code>collusion_pattern</code>, <code>reward_harvesting</code>.</td></tr>
+<tr><td><code>severity</code></td><td>Enum</td><td>Yes</td><td><code>low</code>, <code>medium</code>, <code>high</code>, <code>critical</code>.</td></tr>
+<tr><td><code>referral_id</code></td><td>String (ULID)</td><td>No</td><td>The Referral under suspicion, if applicable.</td></tr>
+<tr><td><code>participant_id</code></td><td>String</td><td>No</td><td>The Participant under suspicion, if applicable.</td></tr>
+<tr><td><code>detection_layer</code></td><td>Enum</td><td>Yes</td><td><code>rule_based</code>, <code>ml_based</code>, <code>aggregate_analysis</code>.</td></tr>
+<tr><td><code>evidence</code></td><td>Array</td><td>Yes</td><td>Flat key/value evidence pairs (e.g. <code>device_count=15</code>, <code>referrals_last_hour=47</code>).</td></tr>
+<tr><td><code>fraud_checkpoint</code></td><td>Enum</td><td>No</td><td><code>referral_creation</code>, <code>qualification</code>, <code>reward_approval</code>, <code>payout</code>.</td></tr>
+<tr><td><code>auto_action_taken</code></td><td>Enum</td><td>No</td><td><code>reward_held</code>, <code>participant_flagged</code>, <code>auto_blocked</code>, <code>none</code>.</td></tr>
+</tbody>
+</table>
+
+<h3>participant.state_changed</h3>
+<p>A Participant transitioned between lifecycle states. <strong>Consumers:</strong> Workflow Runtime, Analytics, Segmentation, Webhook Delivery.</p>
+<table>
+<thead><tr><th>Field</th><th>Type</th><th>Required</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td><code>participant_id</code></td><td>String</td><td>Yes</td><td>The Participant.</td></tr>
+<tr><td><code>previous_state</code></td><td>Enum</td><td>Yes</td><td>Prior state.</td></tr>
+<tr><td><code>new_state</code></td><td>Enum</td><td>Yes</td><td><code>active</code>, <code>dormant</code>, <code>flagged</code>, <code>suspended</code>, <code>banned</code> — the operational axis (API Contract §3.5). <code>candidate</code> is a client-side journey stage and <code>reactivated</code> is the Dormant→Active transition, not operational states.</td></tr>
+<tr><td><code>reason</code></td><td>String</td><td>No</td><td>Human-readable reason.</td></tr>
+<tr><td><code>changed_by</code></td><td>String</td><td>No</td><td>Operator or system identifier.</td></tr>
+</tbody>
+</table>
+
+<h3>participant.self_converted</h3>
+<p>The Participant completed their own qualifying action for a campaign they are enrolled in (clock 2 of Product Spec §7 — it gates nothing by default; it feeds the optional payout-on-self-conversion lever and the enrolled-but-never-converted cohort). Consumers: Rewards &amp; Payouts (release of <code>self_conversion_gate</code> holds), Analytics, Segmentation.</p>
+<table>
+<thead><tr><th>Field</th><th>Type</th><th>Required</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td><code>participant_id</code></td><td>String</td><td>Yes</td><td>The Participant.</td></tr>
+<tr><td><code>campaign_id</code></td><td>String (ULID)</td><td>Yes</td><td>The enrollment the self-conversion applies to.</td></tr>
+<tr><td><code>conversion_event_id</code></td><td>String (ULID)</td><td>Yes</td><td><code>event_id</code> of the participant's own <code>conversion.recorded</code>.</td></tr>
+<tr><td><code>self_converted_at</code></td><td>ISO 8601</td><td>Yes</td><td>When clock 2 fired.</td></tr>
+</tbody>
+</table>
+
+<h3>participant.trust_changed</h3>
+<p>A Participant's trust tier was updated from cumulative behavior. <strong>Consumers:</strong> Segmentation (trust-based eligibility), Analytics, Webhook Delivery.</p>
+<table>
+<thead><tr><th>Field</th><th>Type</th><th>Required</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td><code>participant_id</code></td><td>String</td><td>Yes</td><td>The Participant.</td></tr>
+<tr><td><code>previous_tier</code></td><td>Enum</td><td>Yes</td><td>Prior tier (same enum as <code>new_tier</code>).</td></tr>
+<tr><td><code>new_tier</code></td><td>Enum</td><td>Yes</td><td><code>new</code> (0–25), <code>established</code> (26–50), <code>trusted</code> (51–75), <code>advocate</code> (76–100) — the Product Spec §7 trust levels. A participant starts at <code>new</code> with score 0; there is no <code>unknown</code> tier.</td></tr>
+<tr><td><code>trust_score</code></td><td>Integer (0–100)</td><td>Yes</td><td>New cumulative trust score.</td></tr>
+<tr><td><code>contributing_factors</code></td><td>Array</td><td>No</td><td>Flat factor weights contributing to the change.</td></tr>
+</tbody>
+</table>
+
+<p><em>Outbound mapping (API Contract §6.1): <code>fraud.flagged</code>, <code>participant.trust_changed</code>, and the <code>suspended</code> transition of <code>participant.state_changed</code> (surfaced as <code>participant.suspended</code>) are the webhook-delivered names; the internal bus carries the events as specified above.</em></p>
+<h2 id="domain-link">5.4 Link Lifecycle</h2>
+<p><strong>Producing service:</strong> Referral Workflow Service. Each link binds a <code>referral_code</code> to a Participant, Campaign, and Variant.</p>
+
+<h3>link.generated</h3>
+<p>A new referral link was created — usually at enrollment, or by operator API call. <strong>Consumers:</strong> Analytics, Dashboard, Webhook Delivery.</p>
+<table>
+<thead><tr><th>Field</th><th>Type</th><th>Required</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td><code>link_id</code></td><td>String (ULID)</td><td>Yes</td><td>The unique link identifier.</td></tr>
+<tr><td><code>referral_code</code></td><td>String</td><td>Yes</td><td>The generated code. Unique within tenant.</td></tr>
+<tr><td><code>participant_id</code></td><td>String</td><td>Yes</td><td>The owning Participant.</td></tr>
+<tr><td><code>campaign_id</code></td><td>String (ULID)</td><td>Yes</td><td>Associated Campaign.</td></tr>
+<tr><td><code>variant_id</code></td><td>String (ULID)</td><td>Yes</td><td>Variant resolved at generation.</td></tr>
+<tr><td><code>link_url</code></td><td>String (uri)</td><td>Yes</td><td>The full referral link URL.</td></tr>
+<tr><td><code>channel</code></td><td>Enum</td><td>No</td><td><code>link</code>, <code>email</code>, <code>widget</code>, <code>api</code>.</td></tr>
+<tr><td><code>custom_slug</code></td><td>String</td><td>No</td><td>Vanity slug, if requested.</td></tr>
+<tr><td><code>expires_at</code></td><td>ISO 8601</td><td>No</td><td>When the link expires. Null if it does not expire.</td></tr>
+<tr><td><code>generation_source</code></td><td>Enum</td><td>Yes</td><td><code>enrollment</code>, <code>api_explicit</code>, <code>sdk_widget</code>, <code>bulk_generation</code>.</td></tr>
+</tbody>
+</table>
+
+<h3>link.expired</h3>
+<p>A link passed its <code>expires_at</code> and is no longer valid for new touches; existing Referrals are unaffected. <strong>Consumers:</strong> Analytics, Dashboard.</p>
+<table>
+<thead><tr><th>Field</th><th>Type</th><th>Required</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td><code>link_id</code></td><td>String (ULID)</td><td>Yes</td><td>The expired link.</td></tr>
+<tr><td><code>referral_code</code></td><td>String</td><td>Yes</td><td>The code that expired.</td></tr>
+<tr><td><code>participant_id</code></td><td>String</td><td>Yes</td><td>The owning Participant.</td></tr>
+<tr><td><code>campaign_id</code></td><td>String (ULID)</td><td>Yes</td><td>Associated Campaign.</td></tr>
+<tr><td><code>expired_at</code></td><td>ISO 8601</td><td>Yes</td><td>When the link expired.</td></tr>
+<tr><td><code>total_clicks</code></td><td>Integer (≥0)</td><td>No</td><td>Total clicks before expiry.</td></tr>
+<tr><td><code>total_referrals_created</code></td><td>Integer (≥0)</td><td>No</td><td>Referrals created from this link.</td></tr>
+</tbody>
+</table>
+
+<h3>link.revoked</h3>
+<p>A link was explicitly revoked before natural expiry; immediate and irreversible. <strong>Consumers:</strong> Analytics, Dashboard, Webhook Delivery.</p>
+<table>
+<thead><tr><th>Field</th><th>Type</th><th>Required</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td><code>link_id</code></td><td>String (ULID)</td><td>Yes</td><td>The revoked link.</td></tr>
+<tr><td><code>referral_code</code></td><td>String</td><td>Yes</td><td>The code that was revoked.</td></tr>
+<tr><td><code>participant_id</code></td><td>String</td><td>Yes</td><td>The owning Participant.</td></tr>
+<tr><td><code>campaign_id</code></td><td>String (ULID)</td><td>Yes</td><td>Associated Campaign.</td></tr>
+<tr><td><code>revocation_reason</code></td><td>String</td><td>Yes</td><td>Human-readable reason. Audit-logged.</td></tr>
+<tr><td><code>revocation_source</code></td><td>Enum</td><td>Yes</td><td><code>operator_manual</code>, <code>participant_blocked</code>, <code>participant_banned</code>, <code>fraud_auto</code>, <code>campaign_completed</code>.</td></tr>
+<tr><td><code>revoked_by_id</code></td><td>String</td><td>No</td><td>Operator ID, if <code>operator_manual</code>.</td></tr>
+<tr><td><code>revoked_at</code></td><td>ISO 8601</td><td>Yes</td><td>When revocation occurred.</td></tr>
+</tbody>
+</table>
+
+<h2 id="domain-payout">5.5 Payouts</h2>
+<p><strong>Producing service:</strong> Rewards &amp; Payouts. Payouts use a two-step create→confirm process. <strong>Consumers:</strong> Dashboard, Analytics, Webhook Delivery.</p>
+<table>
+<thead><tr><th>Event</th><th>Key Properties</th></tr></thead>
+<tbody>
+<tr><td><code>payout.created</code></td><td><code>payout_id</code> (req), <code>total_amount</code> (req, minor units), <code>currency</code> (req), <code>item_count</code> (req), <code>fulfillment_method</code> (req)</td></tr>
+<tr><td><code>payout.confirmed</code></td><td><code>payout_id</code> (req), <code>confirmed_by</code> (req)</td></tr>
+<tr><td><code>payout.completed</code></td><td><code>payout_id</code> (req), <code>completed_at</code> (req), <code>total_disbursed</code> (req, minor units)</td></tr>
+<tr><td><code>payout.failed</code></td><td><code>payout_id</code> (req), <code>failed_items_count</code> (req), <code>failure_reason</code> (req)</td></tr>
+</tbody>
+</table>
+<p><em>Outbound mapping (API Contract §6.1): <code>payout.created</code> surfaces as the <code>payout.sent</code> webhook; <code>payout.completed</code> reflects provider confirmation; <code>payout.failed</code> maps directly; <code>payout.confirmed</code> is internal-only.</em></p>
+<hr>
+
+<h1 id="6-attribution-context">6. Attribution Context Object</h1>
+<p>The Attribution Context is a structured object in the envelope that situates an event within a referral motion — which Participant, Campaign, Variant, link, and attribution window. Without it an event is an isolated fact; with it the event is a node in a chain traceable from first click to reward fulfillment. It is present on all events within a referral workflow (tracked and domain) and absent on events outside any referral chain.</p>
+
+<h2 id="attr-structure">6.1 Structure</h2>
+<table>
+<thead><tr><th>Field</th><th>Type</th><th>Required</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td><code>referral_id</code></td><td>String (ULID)</td><td>Conditional</td><td>The Referral instance this event belongs to. Present once the Referral exists; absent on the initial <code>referral.link.clicked</code> before instantiation (enriched during processing).</td></tr>
+<tr><td><code>referral_code</code></td><td>String</td><td>Yes</td><td>The code from the link. Primary linking key between touches and their Referral. Always present within a referral flow.</td></tr>
+<tr><td><code>click_id</code></td><td>String</td><td>No</td><td>Identifier of the originating click (minted at link resolution), when known. Lets a conversion be joined to its click without a <code>referral_code</code>.</td></tr>
+<tr><td><code>participant_id</code></td><td>String</td><td>Conditional</td><td>Resolved from <code>referral_code</code>; present once resolution completes.</td></tr>
+<tr><td><code>campaign_id</code></td><td>String (ULID)</td><td>Yes</td><td>The Campaign the code belongs to. Resolved at ingestion.</td></tr>
+<tr><td><code>variant_id</code></td><td>String (ULID)</td><td>Conditional</td><td>The Variant the Participant was allocated to. Resolved at enrollment (link generation), not per touch.</td></tr>
+<tr><td><code>program_id</code></td><td>String (ULID)</td><td>Yes</td><td>The Program owning the Campaign. Derived from <code>campaign_id</code>.</td></tr>
+<tr><td><code>attribution_window_opens_at</code></td><td>ISO 8601</td><td>No</td><td>First touch in the window. Set once, never changed.</td></tr>
+<tr><td><code>attribution_window_closes_at</code></td><td>ISO 8601</td><td>No</td><td><code>opens_at</code> + the Campaign's configured window duration.</td></tr>
+<tr><td><code>attribution_model</code></td><td>Enum</td><td>No</td><td><code>first_touch</code>, <code>last_touch</code>, <code>linear</code>, <code>time_decay</code>, <code>position_based</code>, <code>ai_weighted</code>. Included for audit convenience.</td></tr>
+<tr><td><code>touch_sequence_number</code></td><td>Integer (≥1)</td><td>No</td><td>1-indexed ordinal within the Referral's touch sequence. Present on touch events; enables sequence-based AI models.</td></tr>
+</tbody>
+</table>
+
+<h2 id="attr-enrichment">6.2 Progressive Enrichment</h2>
+<p>The context is not fully populated at creation; it is enriched as the workflow advances.</p>
+<div class="waterfall numbered">
+<div class="wf wf-w"><strong>First touch.</strong> <code>referral_code</code> extracted from the link; platform resolves <code>campaign_id</code>, <code>program_id</code>, <code>participant_id</code> from the code registry. <code>attribution_window_opens_at</code> set to <code>occurred_at</code>; <code>closes_at</code> computed. <code>variant_id</code> typically already resolved from the link. <code>referral_id</code> may not yet exist.</div>
+<div class="wf"><strong>Referral creation.</strong> The workflow instance is created in Temporal; <code>referral_id</code> is assigned. From here, all events carry the full context.</div>
+<div class="wf wf-ok2"><strong>Conversion and beyond.</strong> The context is frozen on the Referral. Conversion, reward, and fulfillment events inherit it unchanged; <code>touch_sequence_number</code> continues to increment on additional touches.</div>
+</div>
+
+<figure class="fig-sm">
+<figcaption>Attribution Context Following a Referral Through Its Lifecycle</figcaption><svg viewBox="0 0 680 170" width="100%" xmlns="http://www.w3.org/2000/svg" font-family="Geist,system-ui,sans-serif" role="img"><defs><marker id="aha" markerWidth="9" markerHeight="9" refX="6.5" refY="3" orient="auto"><path d="M0,0 L7,3 L0,6 Z" fill="#a8a29e"/></marker><marker id="ahda" markerWidth="9" markerHeight="9" refX="6.5" refY="3" orient="auto"><path d="M0,0 L7,3 L0,6 Z" fill="#be123c"/></marker></defs><rect x="12" y="18" width="210" height="30" rx="6" fill="#dbeafe" stroke="#1e40af" stroke-width="1"/><text x="117.0" y="37" text-anchor="middle" font-family="'Geist Mono',ui-monospace,monospace" font-size="11" font-weight="500" fill="#1e40af">referral.link.clicked</text><line x1="222" y1="33" x2="240" y2="33" stroke="#a8a29e" stroke-width="1.5" marker-end="url(#aha)"/><rect x="240" y="18" width="210" height="30" rx="6" fill="#f5f5f4" stroke="#44403c" stroke-width="1"/><text x="345.0" y="37" text-anchor="middle" font-family="'Geist Mono',ui-monospace,monospace" font-size="11" font-weight="500" fill="#44403c">referral.created</text><line x1="450" y1="33" x2="468" y2="33" stroke="#a8a29e" stroke-width="1.5" marker-end="url(#aha)"/><rect x="468" y="18" width="210" height="30" rx="6" fill="#d1fae5" stroke="#047857" stroke-width="1"/><text x="573.0" y="37" text-anchor="middle" font-family="'Geist Mono',ui-monospace,monospace" font-size="11" font-weight="500" fill="#047857">signup.completed</text><rect x="12" y="60" width="210" height="30" rx="6" fill="#d1fae5" stroke="#047857" stroke-width="1"/><text x="117.0" y="79" text-anchor="middle" font-family="'Geist Mono',ui-monospace,monospace" font-size="11" font-weight="500" fill="#047857">payment.completed</text><line x1="222" y1="75" x2="240" y2="75" stroke="#a8a29e" stroke-width="1.5" marker-end="url(#aha)"/><rect x="240" y="60" width="210" height="30" rx="6" fill="#fef3c7" stroke="#92400e" stroke-width="1"/><text x="345.0" y="79" text-anchor="middle" font-family="'Geist Mono',ui-monospace,monospace" font-size="11" font-weight="500" fill="#92400e">reward.approved</text><line x1="450" y1="75" x2="468" y2="75" stroke="#a8a29e" stroke-width="1.5" marker-end="url(#aha)"/><rect x="468" y="60" width="210" height="30" rx="6" fill="#fef3c7" stroke="#92400e" stroke-width="1"/><text x="573.0" y="79" text-anchor="middle" font-family="'Geist Mono',ui-monospace,monospace" font-size="11" font-weight="500" fill="#92400e">reward.paid</text><path d="M680,33 q14,0 14,14 v6 q0,14 -14,14 H112 M112,67 q-14,0 -14,-14 v-6 q0,-14 14,-14 H678" fill="none" stroke="#a8a29e" stroke-width="1.5"/><path d="M114,53 q-16,0 -16,16" fill="none" stroke="#a8a29e" stroke-width="1.5" marker-end="url(#aha)"/><rect x="12" y="108" width="656" height="46" rx="8" fill="#f5f5f4" stroke="#e7e5e4" stroke-width="1"/><text x="24" y="127" text-anchor="start" font-size="11" font-weight="600" fill="#44403c">Carried context — copied unchanged onto every event above:</text><text x="24" y="144" text-anchor="start" font-family="'Geist Mono',ui-monospace,monospace" font-size="11" font-weight="500" fill="#92400e">referral_id · referral_code · campaign_id · participant_id</text></svg></figure>
+
+<h2 id="attr-propagation">6.3 Cross-Event Propagation &amp; Window Expiry</h2>
+<p>Touch events carry the context from the moment the code resolves. Conversion events link to a Referral by the platform's single six-key ladder (Product Spec §9/§10), in order: (1) explicit <code>referral_code</code> — including payment-provider metadata (events from billing provider) carrying the code in Stripe/Paddle/Chargebee customer metadata; (2) <code>provider_customer_id</code> already linked to a Invitee holding an open Referral (events from billing provider); (3) <code>invitee_external_id</code> already linked to a Invitee holding an open Referral (events from backend); (4) <code>click_id</code> correlation to the originating click; (5) same-session matching via <code>session_id</code>; (6) <code>actor_email_hash</code> matched to a prior email-identified touch or invitation with an open window; (7) no match — recorded as organic. Domain events inherit the context from the Referral they pertain to; they never perform their own attribution.</p>
+<p>When a conversion's <code>occurred_at</code> falls outside every candidate Referral's window, no attribution is assigned: the conversion is recorded as organic and no reward is created. When multiple Referrals have overlapping windows for the same Invitee, the configured attribution model assigns credit.</p>
+<hr>
+
+<h1 id="7-identity">7. Identity &amp; Actor Modeling</h1>
+
+<h2 id="identity-actors">7.1 Actor Types</h2>
+<table>
+<thead><tr><th>Actor Type</th><th>Description</th><th>Identity Stability</th><th>Primary Event Role</th></tr></thead>
+<tbody>
+<tr><td><code>participant</code></td><td>External advocate sharing links. No platform login; interacts via links, widgets, emails, QR codes.</td><td>Stable once registered (<code>email</code> + <code>external_id</code> within tenant).</td><td>Subject of <code>referral.link.shared</code>; recipient of reward events.</td></tr>
+<tr><td><code>invitee</code></td><td>Person arriving via a referral link. Initially anonymous.</td><td>Unstable initially (anonymous → tracked → identified).</td><td>Subject of <code>referral.link.clicked</code> and conversion events.</td></tr>
+<tr><td><code>operator</code></td><td>Client team member (admin, marketer, analyst, support).</td><td>Stable (authenticated platform user).</td><td>Actor on manual approval, rejection, clawback, configuration.</td></tr>
+<tr><td><code>system</code></td><td>Platform service performing automated actions.</td><td>N/A (identified by <code>producing_service</code>).</td><td>Actor on derived domain events.</td></tr>
+<tr><td><code>ai_agent</code></td><td>AI subsystem producing recommendations or decisions.</td><td>N/A (identified by model version).</td><td>Actor on AI-generated events.</td></tr>
+</tbody>
+</table>
+
+<h2 id="identity-invitee">7.2 Invitee Identity: The Resolution Problem</h2>
+<p>Invitees are the hardest identity case: they arrive anonymous and are progressively identified through the funnel.</p>
+<figure class="fig-sm">
+<figcaption>Invitee Identity Lifecycle</figcaption><svg viewBox="0 0 680 130" width="100%" xmlns="http://www.w3.org/2000/svg" font-family="Geist,system-ui,sans-serif" role="img"><defs><marker id="ahi" markerWidth="9" markerHeight="9" refX="6.5" refY="3" orient="auto"><path d="M0,0 L7,3 L0,6 Z" fill="#a8a29e"/></marker><marker id="ahdi" markerWidth="9" markerHeight="9" refX="6.5" refY="3" orient="auto"><path d="M0,0 L7,3 L0,6 Z" fill="#be123c"/></marker></defs><rect x="2" y="34" width="154" height="52" rx="8" fill="#f5f5f4" stroke="#a8a29e" stroke-width="1"/><text x="79.0" y="56" text-anchor="middle" font-size="12" font-weight="600" fill="#44403c">Anonymous</text><text x="79.0" y="74" text-anchor="middle" font-family="'Geist Mono',ui-monospace,monospace" font-size="9.5" font-weight="400" fill="#44403c">session_id · anonymous_id</text><rect x="176" y="34" width="154" height="52" rx="8" fill="#dbeafe" stroke="#1e40af" stroke-width="1"/><text x="253.0" y="56" text-anchor="middle" font-size="12" font-weight="600" fill="#1e40af">Email-identified</text><text x="253.0" y="74" text-anchor="middle" font-family="'Geist Mono',ui-monospace,monospace" font-size="9.5" font-weight="400" fill="#1e40af">actor_id + email_hash</text><rect x="350" y="34" width="154" height="52" rx="8" fill="#d1fae5" stroke="#047857" stroke-width="1"/><text x="427.0" y="56" text-anchor="middle" font-size="12" font-weight="600" fill="#047857">Externally-identified</text><text x="427.0" y="74" text-anchor="middle" font-family="'Geist Mono',ui-monospace,monospace" font-size="9.5" font-weight="400" fill="#047857">+ external_id</text><rect x="524" y="34" width="154" height="52" rx="8" fill="#fef3c7" stroke="#b45309" stroke-width="1"/><text x="601.0" y="56" text-anchor="middle" font-size="12" font-weight="600" fill="#92400e">Linked to Referral</text><text x="601.0" y="74" text-anchor="middle" font-family="'Geist Mono',ui-monospace,monospace" font-size="9.5" font-weight="400" fill="#92400e">resolved invitee_id</text><line x1="156" y1="60.0" x2="176" y2="60.0" stroke="#a8a29e" stroke-width="1.5" marker-end="url(#ahi)"/><line x1="330" y1="60.0" x2="350" y2="60.0" stroke="#a8a29e" stroke-width="1.5" marker-end="url(#ahi)"/><line x1="504" y1="60.0" x2="524" y2="60.0" stroke="#a8a29e" stroke-width="1.5" marker-end="url(#ahi)"/><text x="340.0" y="18" text-anchor="middle" font-size="10" font-weight="600" fill="#a8a29e">PROGRESSIVE  IDENTIFICATION  THROUGH  THE  FUNNEL</text></svg></figure>
+<div class="trio">
+<div class="leaf lf-c"><strong>Anonymous.</strong> Click with no PII. Signals: <code>session_id</code> (<code>_rr_sess</code>), <code>anonymous_id</code> (fingerprint, if consented), IP hash, referral code. Events carry <code>actor.anonymous_id</code>, no <code>actor.actor_id</code>.</div>
+<div class="leaf lf-b"><strong>Email-identified.</strong> Invitee provides email (form, widget, conversion). Platform creates or matches a Invitee on <code>email</code> + <code>tenant_id</code>. Events now carry <code>actor.actor_id</code> and <code>actor.actor_email_hash</code>.</div>
+<div class="leaf lf-a"><strong>Externally-identified.</strong> Backend sends a conversion with <code>invitee_external_id</code>. Platform links it to the Invitee; events can reference either <code>actor_id</code> or <code>actor_external_id</code>.</div>
+</div>
+
+<h2 id="identity-stitching">7.3 Identity Stitching &amp; Self-Referral</h2>
+<p>Stitching links anonymous pre-identification events to the identified Invitee — essential because the first touch may be anonymous while the conversion is identified. Rules, in priority order:</p>
+<div class="waterfall numbered">
+<div class="wf wf-ok2"><strong>Referral-code-based.</strong> A conversion carrying a <code>referral_code</code> links to that code's Referral regardless of session. Handles cross-device/cross-session and payment-provider-metadata (events from billing provider) flows.</div>
+<div class="wf"><strong>Linked-identity-based.</strong> A conversion whose <code>provider_customer_id</code> (events from billing provider) or <code>invitee_external_id</code> (events from backend) already resolves to a Invitee holding an open Referral links to that Referral. Keys 2–3 of the ladder.</div>
+<div class="wf"><strong>Click-ID-based.</strong> A <code>click_id</code> on the conversion correlates to the originating click event, linking cross-context conversions when no <code>referral_code</code> is echoed. Key 4 of the ladder (Product Spec §10).</div>
+<div class="wf"><strong>Session-based.</strong> When a Invitee identifies, all prior events in the same <code>session_id</code> link to the Invitee's <code>actor_id</code>. Highest confidence for same-session attribution.</div>
+<div class="wf"><strong>Email-based.</strong> <code>actor_email_hash</code> links touches (email collected via form) to conversions (email confirmed). Fallback when code, linked identity, click and session are all insufficient — key 6, lowest confidence.</div>
+<div class="wf wf-d"><strong>No probabilistic stitching.</strong> No device-fingerprint, IP-correlation, or behavioral-similarity matching without an explicit shared identifier. A small share of unstitched events is an accepted trade-off for attribution integrity and GDPR compliance.</div>
+</div>
+<p><strong>Stitching is immutable.</strong> It never modifies existing events — the Referral record is updated with the resolved <code>invitee_id</code>, and downstream processing operates on that resolved identity. Original events keep their original <code>actor</code> state, preserving the audit trail.</p>
+<p><strong>Self-referral detection.</strong> When Participant and Invitee are the same person (matching <code>email</code>, IP, or device at conversion), the platform raises a <code>fraud.flagged</code> with <code>signal_type: self_referral</code> and routes to review. It does not modify events.</p>
+<hr>
+
+<h1 id="8-versioning">8. Versioning &amp; Evolution</h1>
+<p>The schema must evolve — new conversion types, new AI fields, deprecations — while consumers of historical events keep working and new consumers process old events.</p>
+
+<h2 id="ver-scope">8.1 Scope of schema_version</h2>
+<p><code>schema_version</code> governs the <code>properties</code> of a specific <code>event_type</code> only. It does not govern the envelope (Section 2.6). Each event type has its own independent lineage: <code>schema_version: 3</code> on <code>payment.completed</code> is unrelated to <code>schema_version: 3</code> on <code>referral.link.clicked</code>.</p>
+
+<h2 id="ver-compat">8.2 Compatibility &amp; Deprecation</h2>
+<div class="duo">
+<div class="duo-col"><div class="duo-h dh-r2">Additive — version unchanged</div>
+<div class="duo-b step-list"><div>Add a new optional <code>properties</code> field</div><div>Add a value to an existing enum</div><div>Increase a string's maximum length</div></div></div>
+<div class="duo-col"><div class="duo-h dh-r3">Breaking — increment version</div>
+<div class="duo-b step-list"><div>Add a new required field</div><div>Remove a field</div><div>Change a field's type or semantics</div><div>Rename a field</div></div></div>
+</div>
+<p>On a breaking change the platform keeps producing the old version for a deprecation period of at least six months. Deprecation runs: annotate the field as deprecated → emit the superseding field/type → coexist ≥6 months → stop emitting the old field on new events. Historical events retain deprecated fields permanently (immutability).</p>
+
+<h2 id="ver-consumer">8.3 Consumer Obligations</h2>
+<div class="checklist">
+<div class="cl-ok">Tolerate unknown fields in <code>properties</code> without failure.</div>
+<div class="cl-ok">Dispatch deserialization on <code>event_type</code> + <code>schema_version</code>.</div>
+<div class="cl-ok">Handle missing optional fields gracefully.</div>
+<div class="cl-ok">Never assume an enum set is closed.</div>
+<div class="cl-ok">Handle unknown <code>event_type</code> values gracefully (log and skip) — critical for wildcard subscribers like <code>conversion.*</code>.</div>
+</div>
+<p><strong>Tracked vs domain evolution.</strong> The two evolve independently. A change to <code>payment.completed</code> (tracked) does not imply a change to <code>referral.converted</code> (domain); they are linked by reference (<code>conversion_event_id</code>), not by structural inheritance. Domain events may add fields that reference new tracked fields, but always additively.</p>
+
+<h2 id="ver-ai">8.4 AI-Readiness</h2>
+<table>
+<thead><tr><th>Design choice</th><th>Why it matters for AI</th></tr></thead>
+<tbody>
+<tr><td>Flat <code>properties</code> (no nested objects)</td><td>Trivial feature-vector extraction; no JSON-path flattening in ML pipelines. This is the reason revenue is now flat <code>revenue_*</code> fields.</td></tr>
+<tr><td>Explicit revenue / LTV fields</td><td><code>revenue_mrr</code>, <code>revenue_arr</code>, <code>revenue_ltv_estimate</code> feed incentive optimization directly.</td></tr>
+<tr><td>Per-event consent</td><td>Models respect data-use boundaries at feature-engineering time, not post-hoc.</td></tr>
+<tr><td><code>touch_sequence_number</code></td><td>Sequence models (LSTM, transformer) for AI-weighted attribution without reconstructing order from timestamps.</td></tr>
+<tr><td>Fraud-score snapshots on rewards</td><td><code>fraud_score_at_approval</code> + later clawbacks yield labeled training data.</td></tr>
+<tr><td><code>detection_layer</code> on fraud signals</td><td>Cost analysis across rule-based, ML-based, and aggregate detection.</td></tr>
+</tbody>
+</table>
+<hr>
+
+<blockquote><p><strong>Document status.</strong> Living document. All schemas are working design hypotheses subject to implementation discovery. This v3.0 finalization narrows v2.1 to the ingestion and intra-service surfaces and resolves the nested-revenue and conditional-requirement inconsistencies; no immutable platform constraint is altered.</p></blockquote>
+<p style="font-size:12px;color:var(--ink4)"><strong>Version:</strong> 5.0 · <strong>Date:</strong> October 2026 · <strong>Companion (all v5.0):</strong> Product Specification · API Contract · Event Model v2.1 (superseded)</p>
+</main>
+<script>
+const o=new IntersectionObserver(e=>{e.forEach(e=>{if(e.isIntersecting){document.querySelectorAll('.sd a').forEach(a=>a.classList.remove('active'));const l=document.querySelector(`.sd a[href="#${e.target.id}"]`);l&&l.classList.add('active')}})},{rootMargin:'-20% 0px -75% 0px'});
+document.querySelectorAll('h1[id],h2[id]').forEach(h=>o.observe(h));
+</script></body></html>

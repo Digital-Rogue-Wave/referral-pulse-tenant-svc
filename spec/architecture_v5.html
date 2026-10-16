@@ -1,0 +1,1351 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>ReferralAI — System &amp; Application Architecture v5.0</title><style>
+@import url('https://fonts.googleapis.com/css2?family=Instrument+Serif&family=Geist:wght@400;500;600&family=Geist+Mono:wght@400&display=swap');
+:root{
+  --ink:#1c1917;--ink2:#44403c;--ink3:#78716c;--ink4:#a8a29e;
+  --paper:#FDFCFA;--card:#fff;--line:#e7e5e4;--wash:#f5f5f4;
+  --acc:#b45309;--acc2:#92400e;--accbg:#fef3c7;
+  --mint:#047857;--mintbg:#d1fae5;
+  --slate:#1e40af;--slatebg:#dbeafe;
+  --rose:#be123c;--rosebg:#ffe4e6;
+  --sw:220px
+}
+*{margin:0;padding:0;box-sizing:border-box}
+html{scroll-behavior:smooth;scroll-padding-top:20px}
+body{font-family:Geist,system-ui,sans-serif;background:var(--paper);color:var(--ink);font-size:14.5px;line-height:1.75;display:flex;-webkit-font-smoothing:antialiased}
+
+/* SIDEBAR */
+nav.sd{position:fixed;top:0;left:0;width:var(--sw);height:100vh;border-right:1px solid var(--line);overflow-y:auto;padding:24px 0;background:var(--paper)}
+.sd-b{padding:0 16px 16px}
+.sd-b h2{font-family:'Instrument Serif',serif;font-size:20px;color:var(--acc2);font-weight:400}
+.sd-b small{font-size:11px;color:var(--ink4);display:block;margin-top:2px;letter-spacing:.04em;text-transform:uppercase}
+.sd a{display:block;padding:2px 16px;color:var(--ink3);text-decoration:none;font-size:12px;line-height:1.6;transition:color .1s}
+.sd a:hover{color:var(--ink)}
+.sd a.n1{color:var(--ink2);font-weight:600;margin-top:12px;font-size:12px}
+.sd a.n2{padding-left:28px;font-size:11.5px;color:var(--ink4)}
+.sd a.active{color:var(--acc);font-weight:500}
+
+/* MAIN */
+main{margin-left:var(--sw);max-width:780px;padding:40px 48px 100px}
+h1{font-family:'Instrument Serif',serif;font-size:28px;font-weight:400;color:var(--ink);margin:56px 0 16px;letter-spacing:-.02em}
+h1:first-of-type{margin-top:0}
+h2{font-size:16px;font-weight:600;margin:32px 0 10px;letter-spacing:-.01em}
+h3{font-size:14px;font-weight:600;color:var(--acc2);margin:24px 0 6px}
+h4{font-size:13px;font-weight:600;margin:16px 0 4px}
+p{margin:0 0 12px;color:var(--ink2)}
+strong{color:var(--ink);font-weight:600}
+em{color:var(--ink3)}
+a{color:var(--acc);text-decoration:none;border-bottom:1px solid var(--accbg)}
+a:hover{border-color:var(--acc)}
+hr{border:none;height:1px;background:var(--line);margin:36px 0}
+ul,ol{margin:0 0 12px 20px;color:var(--ink2)}
+li{margin-bottom:3px}
+
+table{width:100%;border-collapse:collapse;margin:12px 0 20px;font-size:13px}
+th{text-align:left;padding:8px 10px;font-weight:500;font-size:10.5px;text-transform:uppercase;letter-spacing:.08em;color:var(--ink4);border-bottom:2px solid var(--line)}
+td{padding:7px 10px;border-bottom:1px solid var(--wash);color:var(--ink2)}
+tr:hover td{background:var(--wash)}
+
+code{font-family:'Geist Mono',monospace;font-size:12.5px;background:var(--wash);color:var(--acc2);padding:1px 4px;border-radius:3px}
+pre{background:var(--wash);border-radius:8px;padding:16px 20px;overflow-x:auto;margin:12px 0 20px;line-height:1.6;border:1px solid var(--line)}
+pre code{background:none;padding:0;color:var(--ink2);font-size:12px}
+pre.asc{border-left:3px solid var(--acc);background:var(--accbg)}
+
+blockquote{border-left:3px solid var(--acc);padding:10px 16px;margin:12px 0 20px;background:var(--accbg);border-radius:0 6px 6px 0}
+blockquote p:last-child{margin:0}
+
+/* ═══ DIAGRAMS ═══ */
+figure{margin:20px 0 28px;padding:20px;background:var(--card);border:1px solid var(--line);border-radius:10px}
+figure.fig-sm{padding:14px 20px}
+figcaption{font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:.14em;color:var(--ink4);margin-bottom:14px}
+
+.node{text-align:center;padding:8px 20px;border-radius:6px;font-weight:600;font-size:13px;display:inline-block}
+.nd-root{background:var(--ink);color:var(--paper);margin:0 auto;display:block;width:fit-content}
+.nd-root span{font-weight:400;opacity:.7;margin-left:6px;font-size:12px}
+.nd-mid{background:var(--slatebg);color:var(--slate);margin:0 auto;display:block;width:fit-content}
+
+.edge{width:2px;height:16px;background:var(--line);margin:0 auto}
+.edge.lg{height:24px}
+
+.tags{display:flex;flex-wrap:wrap;gap:6px;justify-content:center;margin:8px 0;font-size:12px;color:var(--ink3)}
+
+.cols{display:flex;gap:10px;flex-wrap:wrap}
+.trio{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}
+.leaf{flex:1;min-width:140px;padding:12px;border-radius:8px;font-size:13px;line-height:1.5;border:1px solid var(--line);background:var(--wash)}
+.lf-a{border-left:3px solid var(--mint);background:var(--mintbg)}
+.lf-b{border-left:3px solid var(--acc);background:var(--accbg)}
+.lf-c{border-left:3px solid var(--ink4);background:var(--wash)}
+
+.grid8{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin-bottom:6px}
+.grid6{display:grid;grid-template-columns:repeat(3,1fr);gap:6px}
+.cell{padding:12px;border-radius:6px;font-size:12.5px;text-align:center;background:var(--wash);border:1px solid var(--line);line-height:1.4}
+.cell small{color:var(--ink3);font-size:11px}
+.cell-w{margin-top:4px}
+
+.duo{display:flex;gap:10px}
+.duo-col{flex:1;border-radius:8px;overflow:hidden;border:1px solid var(--line)}
+.duo-h{padding:8px 14px;font-weight:600;font-size:12.5px;color:var(--paper)}
+.dh-l{background:var(--ink)}
+.dh-r{background:var(--mint)}
+.dh-r2{background:var(--mint)}
+.dh-r3{background:var(--rose)}
+.duo-b{padding:10px 14px}
+
+.step-list div{font-size:13px;padding:4px 0;border-bottom:1px solid var(--wash);color:var(--ink2)}
+.step-list div:last-child{border:none}
+.step-list.compact div{padding:2px 0;font-size:12.5px}
+.step-list .hl,.hl{background:var(--accbg);padding:3px 8px;border-radius:4px;border-bottom-color:transparent}
+.verdict{margin-top:8px;padding:6px 10px;border-radius:4px;font-size:12px;font-weight:600}
+.verdict.ok{background:var(--mintbg);color:var(--mint)}
+.verdict.bad{background:var(--rosebg);color:var(--rose)}
+
+.pipe{display:flex;align-items:center;gap:4px;flex-wrap:wrap}
+.pk{padding:6px 14px;border-radius:6px;font-weight:500;font-size:12px;color:var(--paper);position:relative}
+.pk::after{content:'→';position:absolute;right:-12px;color:var(--ink4);font-size:12px}
+.pk:last-child::after{content:''}
+.pk-0{background:#a8a29e}.pk-1{background:var(--slate)}.pk-2{background:var(--mint)}
+.pk-3{background:var(--acc)}.pk-4{background:var(--rose)}.pk-5{background:var(--ink3)}
+
+.waterfall{display:flex;flex-direction:column;gap:6px}
+.waterfall.numbered{counter-reset:wf}
+.waterfall.numbered .wf{counter-increment:wf}
+.waterfall.numbered .wf::before{content:counter(wf)'.';font-weight:600;margin-right:6px;color:var(--acc)}
+.wf{padding:10px 16px;border-radius:6px;font-size:13px;background:var(--wash);border-left:3px solid var(--line);line-height:1.5;color:var(--ink2)}
+.wf-w{border-left-color:var(--acc);background:var(--accbg)}
+.wf-d{border-left-color:var(--rose);background:var(--rosebg)}
+.wf-ok2{border-left-color:var(--mint);background:var(--mintbg)}
+.wf-branch{display:flex;flex-wrap:wrap;gap:6px}
+.wf-r{flex:1;min-width:120px;padding:8px 12px;border-radius:6px;font-size:12.5px;background:var(--wash);border:1px solid var(--line)}
+.wf-ok{border-left:3px solid var(--mint);background:var(--mintbg)}
+.wf-warn{border-left:3px solid var(--acc);background:var(--accbg)}
+.wf-err{border-left:3px solid var(--rose);background:var(--rosebg)}
+
+.checklist{display:flex;flex-direction:column;gap:4px}
+.cl-ok,.cl-no,.cl-warn{padding:8px 14px;border-radius:6px;font-size:13px;line-height:1.5}
+.cl-ok{background:var(--mintbg);border-left:3px solid var(--mint)}
+.cl-no{background:var(--rosebg);border-left:3px solid var(--rose)}
+.cl-warn{background:var(--accbg);border-left:3px solid var(--acc)}
+
+.box-nest{display:flex;flex-direction:column;align-items:center;gap:4px}
+.bn-outer{border:1px solid var(--line);border-radius:10px;padding:14px;width:100%;background:var(--wash)}
+.bn-inner{border:1px solid var(--slatebg);border-radius:8px;padding:12px;background:var(--slatebg)}
+.bn-label{font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:.08em;color:var(--ink4);margin-bottom:8px;display:block}
+.bn-label.accent{color:var(--slate)}
+.sm .cell{min-width:0}
+
+.note{font-size:12px;color:var(--ink3);margin-top:8px;font-style:italic;text-align:center}
+.mt-sm{margin-top:8px}.mb-sm{margin-bottom:10px}
+strong.err{color:var(--rose)}
+strong.ok{color:var(--mint)}
+strong.warn{color:var(--acc)}
+
+@media(max-width:800px){nav.sd{display:none}main{margin-left:0;padding:20px}
+.grid8{grid-template-columns:repeat(2,1fr)}.grid6{grid-template-columns:repeat(2,1fr)}
+.duo,.cols,.trio{flex-direction:column}}
+@media print{nav.sd{display:none}main{margin-left:0;max-width:100%}figure{break-inside:avoid;box-shadow:none}}
+::-webkit-scrollbar{width:3px}::-webkit-scrollbar-thumb{background:var(--line);border-radius:2px}
+
+</style></head><body>
+<nav class="sd"><div class="sd-b"><h2>ReferralAI</h2><small>Architecture v5.0</small></div>
+<a href="#s1" class="n1">1. System Overview</a>
+<a href="#s1-1" class="n2">External Actors</a>
+<a href="#s1-2" class="n2">Internal Services</a>
+<a href="#s1-3" class="n2">Why This Architecture</a>
+<a href="#s2" class="n1">2. Service Decomposition (9)</a>
+<a href="#s2-1" class="n2">2.1 Tenant</a>
+<a href="#s2-2" class="n2">2.2 Program & Campaign</a>
+<a href="#s2-3" class="n2">2.3 Segmentation & Eligibility</a>
+<a href="#s2-4" class="n2">2.4 Event Ingestion</a>
+<a href="#s2-5" class="n2">2.5 Referral Workflow</a>
+<a href="#s2-6" class="n2">2.6 Reward & Payout</a>
+<a href="#s2-7" class="n2">2.7 Analytics</a>
+<a href="#s2-8" class="n2">2.8 Notification & Webhook</a>
+<a href="#s2-9" class="n2">2.9 AI Intelligence</a>
+<a href="#s3" class="n1">3. Communication Flows</a>
+<a href="#s3-1" class="n2">Synchronous (HTTP)</a>
+<a href="#s3-2" class="n2">Asynchronous (SNS/SQS)</a>
+<a href="#s4" class="n1">4. AI & Agentic Architecture</a>
+<a href="#s4-1" class="n2">Design & LangChain</a>
+<a href="#s4-2" class="n2">Tool Registry</a>
+<a href="#s4-3" class="n2">Tiers, Agents & Boundaries</a>
+<a href="#s5" class="n1">5. Workflows & Temporal.io</a>
+<a href="#s6" class="n1">6. Data & Analytics</a>
+<a href="#s7" class="n1">7. Observability</a>
+<a href="#s8" class="n1">8. Security, Privacy & Trust</a>
+<a href="#s9" class="n1">9. Overall Architecture Diagram</a>
+<a href="#s10" class="n1">10. System & Application Overview</a>
+<a href="#s10-1" class="n2">Definitions</a>
+<a href="#s10-2" class="n2">Use-case → System Mapping</a>
+<a href="#s11" class="n1">11. Core End-to-End Flows</a>
+<a href="#s11-1" class="n2">Flow 1 — Signup & Conversion (events from backend)</a>
+<a href="#s11-2" class="n2">Flow 2 — Billing Webhooks (events from billing provider)</a>
+<a href="#s11-3" class="n2">Flow 3 — Reward Earned → Paid</a>
+<a href="#s11-4" class="n2">Flow 4 — Campaign Setup & Optimization</a>
+<a href="#s11-5" class="n2">Flow 5 — Fraud Escalation & Review</a>
+<a href="#s12" class="n1">12. Service-Internal Architecture</a>
+<a href="#s12-1" class="n2">Event Ingestion</a>
+<a href="#s12-2" class="n2">Referral Workflow</a>
+<a href="#s12-3" class="n2">AI Intelligence</a>
+<a href="#s12-4" class="n2">Reward & Payout</a>
+<a href="#s13" class="n1">13. Cross-Cutting Concerns</a>
+<a href="#s13-1" class="n2">Auth & Tenant</a>
+<a href="#s13-2" class="n2">Validation & Errors</a>
+<a href="#s13-3" class="n2">Idempotency</a>
+<a href="#s13-4" class="n2">Observability</a>
+<a href="#s13-5" class="n2">Eligibility — Rules &amp; Checkpoints</a>
+<a href="#s14" class="n1">14. AI in the Application Layer</a>
+<a href="#s15" class="n1">15. System & App Tradeoffs</a>
+</nav>
+<main>
+<h1 id="referralai-system-application-architecture">ReferralAI — System &amp; Application Architecture</h1><div style="border:1px solid #fde68a;background:#fffbeb;border-radius:8px;padding:12px 16px;margin:0 0 24px;font-size:13px;line-height:1.6">
+<strong>Revision 2026-10-12 — applied from the product-spec rework (Product Spec Appendix A #25–#46).</strong> Mechanical changes applied in this file: Program Admin → <strong>Owner</strong>; referee / referee_* → <strong>invitee / invitee_*</strong>; referrer (prose) → <strong>participant</strong> (wire names <code>/v1/referrers</code>, Keto <code>referrers</code> unchanged); Method A / Method B → <strong>events from backend / events from billing provider</strong>; touch events renamed <code>referral.link.clicked</code>, <code>referral.link.shared</code>, <code>referral.page.viewed</code>, <code>referral.email.opened|clicked</code>, <code>referral.widget.viewed</code>; <code>reward.calculated</code> → <code>reward.earned</code>; Partner actor removed from V1; payout partner → payout provider. <strong>Structural changes applied below:</strong> Partners row removed from §1.1; tenant-service owns the consent registry, <code>POST /v1/dsr</code>, the DSR fan-out workflow and the audit sink; segmentation-service no longer emits a translated <code>conversion.recorded</code>; referral-service recognises custom-event Pulse triggers inside the running workflow and owns Invitations; Program Health Score computed by ai-service only, stored in analytics_db. <strong>Still to author:</strong> §11 flow for invitations; §12 diagrams reflecting the matcher move.<br><strong>Addendum 2026-10-12 (receivers move, Product Spec #47 / R-DOM-05 / R-SDK-07):</strong> billing- and payout-provider receivers moved from notification-service to ingestion-service (<code>/inbound/{provider}/{connection_id}</code>, two deployments); email-tracking endpoints <code>/t/o</code>, <code>/t/c</code> hosted by ingestion-service with a token signed by notification-service; notification-service is outbound only and never calls Ingestion; connection config and secrets owned by tenant-service. §11.2 and the §12/§13 flow drawings still show the old provider lane — to redraw.
+</div>
+<p><strong>Classification:</strong> Internal — Architecture<br>
+<strong>Status:</strong> Implementation-ready architecture specification<br>
+<strong>Document Version:</strong> 5.0 — suite-wide version alignment (2026-10-09); previously unversioned (cited as 1.3 by companion documents) + the October 2026 coherence passes.<br>
+<strong>Companion Documents (all v5.0):</strong> Product Specification, API Contract, Event Model, DB Model, Responsibility Contract, Failure &amp; Observability Model, Campaign Creation Assistant (Placement, Interview Script)<br>
+<strong>Target Runtime:</strong> 2-senior-engineer team, EU-hosted, cost-controlled</p>
+<p>This specification covers both the <strong>system architecture</strong> — the deployed services, data stores, event bus, and workflows (§1–§9) — and the <strong>application architecture</strong> — how user-visible behaviour flows across them (§10–§15). §1–§9 establish the nine services and their boundaries and responsibilities; §10–§15 show how requests and events traverse them end to end.</p>
+<hr>
+
+<h1 id="s1">1. High-Level System Overview</h1>
+<p>The platform is an AI-first, API-first referral marketing SaaS. It is decomposed into exactly nine NestJS microservices on AWS, wired together by a synchronous REST surface and an asynchronous SNS/SQS event bus, with Temporal.io for durable workflows. This section establishes the actors, the service set, and the rationale; §2 details each service's boundaries and responsibilities.</p>
+
+<h2 id="s1-1">1.1 External Actors</h2>
+<p>Five categories of external actor interact with the platform, each at a distinct trust level:</p>
+<table>
+<thead><tr><th>Actor</th><th>Auth</th><th>Trust &amp; surface</th></tr></thead>
+<tbody>
+<tr><td><strong>Client Operators</strong></td><td>Ory Kratos session → OAuth2 JWT</td><td>Configure programs, campaigns, variants; review AI recommendations via the dashboard. Human-in-the-loop for medium/high-risk AI decisions. All mutations audited. API keys cannot reach config endpoints.</td></tr>
+<tr><td><strong>Client Backends</strong></td><td>Secret API key (<code>rai_live_</code>)</td><td>Trusted server-side source for money-moving events: conversions, revenue. Restricted to event ingestion. Two attribution methods: events from backend (invitee_id via conversion events) and events from billing provider (provider metadata via billing webhooks).</td></tr>
+<tr><td><strong>Participants &amp; Invitees (JS SDK)</strong></td><td>Publishable API key (<code>rai_pub_</code>)</td><td>Browser actors. Participants (API: <code>/v1/referrers</code>) have no platform login and no platform-hosted page — they interact only via referral links, the in-app SDK widget, and emails. The browser never enrolls anyone; the widget renders only for already-enrolled participants. All SDK traffic is untrusted; IP/UA/geo are derived server-side.</td></tr>
+
+<tr><td><strong>Webhook Consumers</strong></td><td>HMAC-signed deliveries</td><td>Client HTTP endpoints receiving outbound notifications. Passive — cannot mutate platform state.</td></tr>
+</tbody>
+</table>
+
+<h2 id="s1-2">1.2 Internal Services</h2>
+<p>Exactly nine microservices. Each owns its data, exposes one REST API (OpenAPI/Swagger), and communicates via HTTP (sync) or SNS/SQS (async). There are no shared databases and no hidden internal APIs.</p>
+<p>The most notable decomposition decision is the split between the <strong>Event Ingestion Service</strong> and the <strong>Referral Workflow Service</strong>. Ingestion is the most internet-exposed surface — stateless, horizontally scalable, hardened against abuse. The Referral Workflow Service is heavier and stateful, running long-running Temporal workflows and consuming events from the bus rather than from external traffic. The split means ingestion failures (DDoS, spikes, validation bugs) do not affect running workflows, and vice versa.</p>
+<p>The <strong>AI Intelligence Service</strong> consumes domain events selectively, not as a blanket stream. Deterministic rules and statistical models run as code with no LLM call; LLM reasoning is reserved for batched, scheduled, or human-triggered work. Other services request AI decisions — they never embed LLM logic. This isolation is the primary control for AI cost, auditability, and safety.</p>
+
+<h2 id="s1-3">1.3 Why This Architecture</h2>
+<p><strong>AI-first.</strong> Every referral lifecycle stage has an AI touchpoint (setup, optimization, fraud, health, segmentation). The AI service processes events through three tiers — deterministic rules (zero LLM, real-time), statistical models (zero LLM, batch), and LLM reasoning (expensive, batched/triggered) — producing scored, explainable outputs that feed operational services. AI is a first-class participant, not a bolt-on.</p>
+<p><strong>API-first.</strong> The public REST API is the single integration surface for dashboard, SDK, client backends, and integrations. Privilege separation is by authentication: API keys for ingestion + SDK, OAuth2 JWT for all CRUD, OAuth2 client-credentials for service-to-service. Identifiers are opaque ULIDs (time-ordered, sortable, 26-char Crockford Base32).</p>
+<p><strong>Event-driven.</strong> The SNS/SQS bus is the nervous system. Services emit domain events on state transitions; downstream services (including AI) consume asynchronously. This decouples lifecycles, enables replay for recovery, and provides the immutable stream AI requires. The event model separates <strong>Tracked Events</strong> (external, ingested via API) from <strong>Domain Events</strong> (internal, produced by services).</p>
+<p><strong>Cost-controlled scaling.</strong> Sized for a 2-engineer team. Service count is capped at nine; AI uses a multi-model strategy (primary, verification, fallback) via LangChain. 95%+ of event-driven AI work runs as deterministic rules and statistical models with zero LLM cost. ClickHouse handles analytics without real-time streaming infrastructure; Redis handles hot-path caching; SQS/SNS and Temporal are managed. The stack deploys on AWS <code>eu-central-1</code> with <code>eu-west-1</code> failover.</p>
+<p><strong>Tradeoffs accepted:</strong></p>
+<ul>
+<li>The nine-service cap means most services carry broader responsibilities than pure single-responsibility would dictate (Program/Campaign and Segmentation/Eligibility are each combined). The only split beyond the original eight is Ingestion vs Referral Workflow, justified by opposite scaling profiles and blast-radius isolation.</li>
+<li>REST over GraphQL trades query flexibility for debugging simplicity, caching predictability, and wider client compatibility.</li>
+<li>Multi-model AI adds operational complexity (three keys, three cost dashboards, routing config) but removes single-vendor dependency and enables validation on high-stakes decisions.</li>
+<li>A single AI service scales vertically per model, not horizontally per domain — acceptable at projected volume; revisit near ~10k inferences/minute.</li>
+<li>ClickHouse analytics is eventually consistent (seconds, not milliseconds); Redis counters bridge real-time dashboards.</li>
+</ul>
+<hr>
+
+<h1 id="s2">2. Service Decomposition (9 Services)</h1>
+<p>Each service is given with its name, responsibilities, what it <strong>owns</strong>, what it explicitly <strong>does not own</strong>, its database, sync APIs, and the events it publishes and consumes. The "does not own" rows are the load-bearing boundaries — they are what keep the nine services from leaking into each other.</p>
+
+<h2 id="s2-1">2.1 Tenant Service</h2>
+<table><tbody>
+<tr><td><strong>Service</strong></td><td><code>tenant-service</code></td></tr>
+<tr><td><strong>Responsibilities</strong></td><td>Authentication (Ory Kratos), authorization (Ory Keto), tenant isolation, role management (Keto roles <code>owner</code> / <code>operator</code> / <code>viewer</code> / <code>support</code> = Owner / Campaign Manager / Analyst / Support Agent; Super Admin is platform-side), API-key lifecycle, session management, OAuth2 token issuance (Ory Hydra), provider connection config and secrets (billing, payout, CRM; webhook signing secrets; tracking-token key) exposed to Event Ingestion through a cache; three-tier auth resolution (keys → internal JWT at the gateway); consent registry; data-subject requests (POST /v1/dsr) and the DSR fan-out Temporal workflow; audit sink (Product Spec R-CPL-01)</td></tr>
+<tr><td><strong>Owns</strong></td><td>User accounts, roles, API keys, tenant records, OAuth2 clients, session tokens</td></tr>
+<tr><td><strong>Does NOT own</strong></td><td>Participant identity (Referral Workflow Service); program/campaign permissions (derived from roles per request)</td></tr>
+<tr><td><strong>Database</strong></td><td>RDS PostgreSQL — <code>tenant_db</code> (user profiles, key hashes, role assignments, tenant metadata)</td></tr>
+<tr><td><strong>Sync APIs</strong></td><td><code>POST /v1/api-keys</code>, <code>DELETE /v1/api-keys/{id}</code>, <code>GET /v1/users/me</code>, <code>PUT /v1/users/{id}/roles</code>; internal <code>GET /internal/validate-token</code> (resolves keys and JWTs to a uniform internal JWT)</td></tr>
+<tr><td><strong>Publishes</strong></td><td><code>user.registered</code>, <code>user.logged_in</code>, <code>user.role_changed</code>, <code>api_key.created</code>, <code>api_key.revoked</code></td></tr>
+<tr><td><strong>Consumes</strong></td><td>None. It is a dependency of other services (token validation), not an event reactor.</td></tr>
+</tbody></table>
+<p>Ory Kratos handles identity and self-service flows; Ory Keto provides relationship-based access control (membership, roles, resource permissions as relation tuples); Ory Hydra issues OAuth2 tokens. API keys are bcrypt-hashed; the full value is shown once at creation. Keys — secret or publishable — cannot reach CRUD endpoints (<code>403 authorization_error</code>). Company verification runs as the <code>account_verification</code> Temporal workflow (<code>unverified → pending_review → verified → rejected</code>) with a 7-day SLA, gating payout capability.</p>
+
+<h2 id="s2-2">2.2 Program &amp; Campaign Service</h2>
+<table><tbody>
+<tr><td><strong>Service</strong></td><td><code>campaign-service</code></td></tr>
+<tr><td><strong>Responsibilities</strong></td><td>Program CRUD; Campaign lifecycle (Draft → Scheduled → Active → Paused → Ended → Archived); Variant configuration (incl. Default Variant); Pulse selection; Playbook instantiation; scheduling; enrollment is selective-only (no <code>open</code>/self-enrollment — Product Spec, API Contract); serves variant configuration (priority, segment ref, reward config, allocation weight) to the enrollment-time resolution, which Referral performs through the Segmentation PDP</td></tr>
+<tr><td><strong>Owns</strong></td><td>Programs, Campaigns, Variants (incl. Reward Configuration, <code>is_default</code>, <code>priority</code>, <code>allocation_weight</code>), Pulses, Playbook templates</td></tr>
+<tr><td><strong>Does NOT own</strong></td><td>Runtime Referrals (Referral Workflow Service), Reward instances (Reward Service), Segments (Segmentation Service), AI recommendations (AI Service)</td></tr>
+<tr><td><strong>Database</strong></td><td>RDS PostgreSQL — <code>campaign_db</code></td></tr>
+<tr><td><strong>Sync APIs</strong></td><td>CRUD on <code>/v1/programs</code>, <code>/programs/{id}/campaigns</code>, <code>/campaigns/{id}/variants</code>; actions <code>/campaigns/{id}/activate|pause|complete</code>; <code>GET /v1/playbooks</code></td></tr>
+<tr><td><strong>Publishes</strong></td><td><code>program.created</code>, <code>campaign.activated|paused|completed|archived</code>, <code>variant.created|updated</code></td></tr>
+<tr><td><strong>Consumes</strong></td><td><code>ai.recommendation_generated</code> (store proposals), <code>analytics.goal_reached</code> (auto-complete)</td></tr>
+</tbody></table>
+<p>The Campaign State Machine is enforced as a finite state machine in the service layer; invalid transitions return <code>409</code>. <code>campaign.activated</code> tells Ingestion to begin accepting referrals (via its availability cache) and Referral to begin processing. Variant resolution happens at enrollment (link-generation) time, not at invitee click, so a participant's reward is fixed and known when they share.</p>
+
+<h2 id="s2-3">2.3 Segmentation &amp; Eligibility Service</h2>
+<p>This service is the platform's single <strong>Policy Decision Point (PDP)</strong> for eligibility. It owns the rule <em>definitions</em> and the rule <em>evaluation</em>; it does not own the moments where rules are enforced — those are distributed as <strong>checkpoints</strong> across Campaign, Referral, and Reward (the Policy Enforcement Points). Centralize the judgment, distribute the moment. See §13.5 for the checkpoint chain and the call contract.</p>
+<table><tbody>
+<tr><td><strong>Service</strong></td><td><code>segmentation-service</code></td></tr>
+<tr><td><strong>Responsibilities</strong></td><td>Segment definition (rule-based, AI-generated, random, behavioral, temporal, composite); segment evaluation (real-time and batch); the <strong>6-step eligibility rule engine</strong> and the five-checkpoint Eligibility Chain definitions; hash-based A/B variant assignment; audience computation. Three operations are exposed and kept semantically distinct: <strong>resolve-variant</strong> (fails open → Default Variant), <strong>check-eligibility</strong> (fail-closed gate), <strong>assign-ab</strong> (deterministic).</td></tr>
+<tr><td><strong>Owns</strong></td><td>Segment definitions, membership records, eligibility rule sets (incl. <code>rule_version</code>), A/B allocation state</td></tr>
+<tr><td><strong>Does NOT own</strong></td><td>Actor profiles (derived from events); campaign/variant definitions (Campaign); <strong>cap counters</strong> (Reward); <strong>fraud scores</strong> (AI); <strong>trust tier / consent</strong> (Referral). These are <em>pushed in</em> by the calling checkpoint (§13.5), never read by this service — otherwise it becomes a god-service.</td></tr>
+<tr><td><strong>Database</strong></td><td>RDS PostgreSQL — <code>segmentation_db</code>; Redis for real-time eligibility, stable-decision caching, and hash-based assignment</td></tr>
+<tr><td><strong>Sync APIs</strong></td><td><code>POST /v1/segments</code>, <code>GET /v1/segments</code>, <code>GET /v1/segments/{id}/members</code>; internal <code>POST /internal/eligibility/evaluate</code> (the PDP entry point; takes a versioned <code>EligibilityContext</code>, returns a decision)</td></tr>
+<tr><td><strong>Publishes</strong></td><td><code>segment.member_added|removed</code>, <code>conversion.recorded</code> (translated from a <code>custom.recorded</code> whose <code>event_name</code> matches a running Pulse trigger — Event Model §4.10), <code>eligibility.evaluated</code> (carries <code>decision</code>, <code>denied_reasons[]</code>, <code>rule_version</code>, <code>decision_id</code>; denial is an outcome field, not a separate event)</td></tr>
+<tr><td><strong>Consumes</strong></td><td><code>custom.recorded</code> (behavioral signals), <code>referral.*</code>, <code>participant.*</code> (membership updates); <code>campaign.*</code> / <code>participant.*</code> also invalidate cached decisions</td></tr>
+</tbody></table>
+<p>Because eligibility is a synchronous hard dependency on four lifecycle paths (§13.5), this service receives the same availability treatment as Event Ingestion: 3+ replicas across ≥2 AZs, a PodDisruptionBudget, per-caller circuit breakers (open → reject, never proceed), and Redis caching of stable decisions (membership) with event-driven invalidation.</p>
+
+<h2 id="s2-4">2.4 Event Ingestion Service</h2><p><strong>Revision 2026-10-12 — ingress families (Product Spec R-DOM-05).</strong> This service hosts three ingress families with three credentials: the public API (<code>POST /v1/events</code>, <code>/v1/sdk/*</code> — API keys), the billing- and payout-provider receivers (<code>/inbound/{provider}/{connection_id}</code> — the provider\'s signature scheme verified against the connection secret cached from tenant-service; no API key, no validate-token) and the email-tracking endpoints (<code>/t/o/{token}</code>, <code>/t/c/{token}</code> — a token signed by notification-service, verified here; the redirect mints <code>click_id</code> and 302s with <code>?rr_click</code>, which <code>resolve-link</code> honours). All three run the same admission pipeline (dedup on the provider\'s event id or token, Rules Guard, consent, enrichment, publish-before-ack) and the same stateless Redis-only profile. Deployment: one codebase, two deployments — <code>ingestion-public</code> and <code>ingestion-inbound</code> — with separate ingress routes, rate limits and autoscaling, so a spike on the public edge never delays a provider webhook. Receiver adapters translate protocol only (revenue normalisation, <code>provider_customer_id</code>, <code>ref_code</code> from metadata, raw discriminators such as <code>billing_reason</code>); <code>is_first_payment</code> / <code>is_reactivation</code> are decided by the running Pulse workflow in referral-service.</p>
+<table><tbody>
+<tr><td><strong>Service</strong></td><td><code>ingestion-service</code></td></tr>
+<tr><td><strong>Responsibilities</strong></td><td>Receive touch/conversion events from SDK and backends; schema validation; rate limiting; campaign-availability check; deduplication; consent gating; server-side context derivation; publish validated events to SNS</td></tr>
+<tr><td><strong>Owns</strong></td><td>Nothing persistent. Stateless gateway. Redis only — dedup cache + rate-limit counters + campaign-availability cache.</td></tr>
+<tr><td><strong>Does NOT own</strong></td><td>Referral records, participant profiles, links (Referral Workflow Service); campaign config (Campaign Service); eligibility decisions (Segmentation Service)</td></tr>
+<tr><td><strong>Database</strong></td><td>No RDS. Redis (ElastiCache) only.</td></tr>
+<tr><td><strong>Sync APIs</strong></td><td><code>POST /v1/events</code>; SDK endpoints <code>GET /v1/sdk/widget-config</code>, <code>GET /v1/sdk/resolve-link</code>, <code>POST /v1/sdk/attribution</code> (publishable-key only). No SDK enroll endpoint — enrollment is selective-only and backend-owned; the browser cannot enroll anyone.</td></tr>
+<tr><td><strong>Publishes</strong></td><td><code>touch.recorded</code> (typed subtypes), <code>conversion.recorded</code>, <code>custom.recorded</code></td></tr>
+<tr><td><strong>Consumes</strong></td><td><code>campaign.activated|paused|completed</code> (availability cache)</td></tr>
+</tbody></table>
+<p>The most internet-exposed surface. Stateless and horizontally scalable (5+ replicas). If Redis is unavailable it falls back to accepting events without dedup (consumers are idempotent) and without rate limiting (SQS absorbs the burst). The validation pipeline is detailed in §12.1; its blast radius is isolated from referral workflows.</p>
+
+<h2 id="s2-5">2.5 Referral Workflow Service</h2>
+<table><tbody>
+<tr><td><strong>Service</strong></td><td><code>referral-service</code></td></tr>
+<tr><td><strong>Responsibilities</strong></td><td>Link generation; referral workflow instantiation (Temporal); referral state machine; recognition of custom-event Pulse triggers inside the running workflow (Product Spec R-CMP-09); Invitations (create, cap, suppression); variant resolution; identity stitching (the six-key ladder: code → linked identity → click_id → session → email); participant/invitee profiles; participant lifecycle, self-conversion &amp; trust-tier tracking (owner of the Participant aggregate); <strong>attribution computation</strong> (6 models); attribution of events from billing provider conversions (received as <code>conversion.recorded</code> from the Event Ingestion provider receivers — Referral never receives the provider webhook itself)</td></tr>
+<tr><td><strong>Owns</strong></td><td>Referral links, Referral records (Temporal instances), Participant profiles (trust tier), Invitee profiles, tracking sessions, identity-stitching state, immutable <strong>Attribution records</strong></td></tr>
+<tr><td><strong>Does NOT own</strong></td><td>Event ingestion (Ingestion), campaign config (Campaign), segment evaluation (Segmentation), reward creation (Reward)</td></tr>
+<tr><td><strong>Database</strong></td><td>RDS PostgreSQL — <code>referral_db</code>; Redis for hot referral state</td></tr>
+<tr><td><strong>Sync APIs</strong></td><td><code>GET /v1/referrals</code>, <code>GET /v1/referrals/{id}</code>, <code>POST /v1/referrers/{id}/links</code>, <code>GET /v1/referrers/{id}</code>, <code>POST /v1/referrers/{id}/block</code>, <code>POST /v1/referrers</code>, <code>POST /v1/referrers/batch</code> (backend-owned enrollment, API §3.5). No participant-facing portal — removed in v4.</td></tr>
+<tr><td><strong>Publishes</strong></td><td><code>referral.created|qualified|converted|expired|rejected</code>, <code>attribution.computed</code>, <code>participant.enrolled|state_changed|trust_changed</code></td></tr>
+<tr><td><strong>Consumes</strong></td><td><code>touch.recorded</code>, <code>conversion.recorded</code>, <code>campaign.*</code>, <code>consent.granted|revoked</code>, <code>eligibility.evaluated</code>, <code>fraud.flagged</code></td></tr>
+</tbody></table>
+<p>The operational core for referral lifecycle. It consumes validated events from the bus (never raw HTTP) and orchestrates each Referral as a Temporal workflow. Identity stitching is deterministic (code → linked identity → click_id → session → email, Product Spec §9/§10); probabilistic stitching is explicitly not performed. Attribution is computed inside the workflow, between conversion validation and reward creation — first/last-touch from <code>referral_db</code> (&lt;100ms), multi-touch via a targeted point-query to ClickHouse (1–5s) — never competing with dashboard aggregations.</p>
+
+<h2 id="s2-6">2.6 Reward &amp; Payout Service</h2>
+<table><tbody>
+<tr><td><strong>Service</strong></td><td><code>reward-service</code></td></tr>
+<tr><td><strong>Responsibilities</strong></td><td>Reward instance creation (from a Variant's Reward Configuration); approval workflows (auto/manual/AI); cap enforcement (per-referrer, -campaign, -program); fulfillment orchestration; clawback processing; payout batching</td></tr>
+<tr><td><strong>Owns</strong></td><td>Reward records (Pending → Held → Approved → Processing → Paid | Rejected | Reversed), payout batches, cap ledgers, clawback records</td></tr>
+<tr><td><strong>Does NOT own</strong></td><td>Reward Configuration (lives on the Variant in Campaign), referral lifecycle (Referral Workflow Service), fraud verdicts (AI Service)</td></tr>
+<tr><td><strong>Database</strong></td><td>RDS PostgreSQL — <code>reward_db</code></td></tr>
+<tr><td><strong>Sync APIs</strong></td><td><code>GET /v1/rewards</code>, <code>GET /v1/rewards/{id}</code>, <code>POST /v1/rewards/{id}/approve|reject|clawback</code>, <code>POST /v1/payouts</code>, <code>POST /v1/payouts/{id}/confirm</code></td></tr>
+<tr><td><strong>Publishes</strong></td><td><code>reward.earned|held|approved|rejected|paid|reversed</code>, <code>payout.created|confirmed</code></td></tr>
+<tr><td><strong>Consumes</strong></td><td><code>referral.converted</code> (create reward), <code>fraud.flagged</code> (hold), <code>participant.state_changed</code> (flagged/suspended → hold earned rewards; banned → forfeit), <code>participant.self_converted</code> (release <code>self_conversion_gate</code> holds), <code>eligibility.evaluated</code> (gate approval)</td></tr>
+</tbody></table>
+<p>Clawbacks are immutable corrections, not deletions. Payouts are two-step: <code>POST /v1/payouts</code> creates the batch; <code>/confirm</code> disburses. Cap enforcement is atomic via a PostgreSQL advisory lock so concurrent conversions cannot over-pay.</p>
+
+<h2 id="s2-7">2.7 Analytics Service</h2>
+<table><tbody>
+<tr><td><strong>Service</strong></td><td><code>analytics-service</code></td></tr>
+<tr><td><strong>Responsibilities</strong></td><td>Funnel analytics; KPI computation (Business → Program → Campaign → Variant → Participant); variant comparison; statistical significance testing; dashboard data; revenue analytics (MRR/ARR/LTV); read-only attribution serving</td></tr>
+<tr><td><strong>Owns</strong></td><td>Computed KPIs, funnel data, experiment results, ClickHouse materialized views. Does <em>not</em> own attribution records (owned by Referral Workflow Service, replicated to ClickHouse for reporting).</td></tr>
+<tr><td><strong>Does NOT own</strong></td><td>Raw events (consumed via SNS/SQS), campaign config (Campaign), AI models (AI)</td></tr>
+<tr><td><strong>Database</strong></td><td>ClickHouse (primary OLAP), RDS PostgreSQL — <code>analytics_db</code> (KPI snapshots), Redis (real-time counters)</td></tr>
+<tr><td><strong>Sync APIs</strong></td><td><code>GET /v1/analytics/kpis</code>, <code>/analytics/funnel</code>, <code>/analytics/revenue</code>, <code>/analytics/referrers/leaderboard</code>, <code>/analytics/insights</code>, <code>POST /v1/analytics/query</code>, <code>GET /v1/variants/{id}/stats</code>, <code>GET /v1/attributions</code> (API §3.9/§3.13)</td></tr>
+<tr><td><strong>Publishes</strong></td><td><code>kpi.computed</code>, <code>analytics.goal_reached</code>, <code>analytics.anomaly_detected</code></td></tr>
+<tr><td><strong>Consumes</strong></td><td>All reporting-relevant events into ClickHouse (touch, referral, reward, attribution)</td></tr>
+</tbody></table>
+<p>A pure reporting and aggregation engine. It does <strong>not</strong> compute attribution. ClickHouse ingestion is via a dedicated batch consumer (every 5s), introducing 5–30s analytics lag — fine for dashboards, never used for real-time eligibility (Redis counters serve that).</p>
+
+<h2 id="s2-8">2.8 Notification &amp; Webhook Service</h2>
+<table><tbody>
+<tr><td><strong>Service</strong></td><td><code>notification-service</code></td></tr>
+<tr><td><strong>Responsibilities</strong></td><td>Outbound webhook delivery; transactional email; in-app dispatch; webhook signing (HMAC-SHA256); retry with backoff; endpoint health monitoring; per-config event filtering; <strong>composes invitations and signs their tracking tokens</strong> (opens and clicks are observed by Event Ingestion, never relayed by this service)</td></tr>
+<tr><td><strong>Owns</strong></td><td>Webhook endpoint configs, delivery logs, notification templates, delivery state</td></tr>
+<tr><td><strong>Does NOT own</strong></td><td>Event content (consumed from SNS), user preferences (Tenant Service)</td></tr>
+<tr><td><strong>Database</strong></td><td>RDS PostgreSQL — <code>notification_db</code></td></tr>
+<tr><td><strong>Sync APIs</strong></td><td><code>POST/GET/PUT/DELETE /v1/webhooks</code>, <code>GET /v1/webhooks/{id}/deliveries</code></td></tr>
+<tr><td><strong>Publishes</strong></td><td><code>webhook.delivered|failed</code>, <code>notification.sent</code></td></tr>
+<tr><td><strong>Consumes</strong></td><td>All domain events (filtered SQS), per webhook configuration</td></tr>
+</tbody></table>
+<p>Signing: <code>HMAC-SHA256(secret, "{timestamp}.{body}")</code>. Retry: 1m → 5m → 30m → 2h → 12h → 24h (7 attempts); 50 consecutive failures auto-disables the endpoint with owner notification. Webhook payloads are pinned to the subscription's <code>api_version</code>. Email via AWS SES. Inbound provider receivers and the email-tracking endpoints live in the Event Ingestion Service (§2.4); this service is outbound only and never calls Ingestion.</p>
+
+<h2 id="s2-9">2.9 AI Intelligence Service</h2>
+<table><tbody>
+<tr><td><strong>Service</strong></td><td><code>ai-service</code></td></tr>
+<tr><td><strong>Responsibilities</strong></td><td>All LLM reasoning and agent orchestration; fraud scoring (rules + ML); propensity scoring; campaign optimization; incentive optimization; segmentation suggestions; program health score; insight generation</td></tr>
+<tr><td><strong>Owns</strong></td><td>AI decision logs, versioned prompt templates, agent configs, fraud/propensity models, the Tool Registry, recommendation records (with accept/reject outcomes)</td></tr>
+<tr><td><strong>Does NOT own</strong></td><td>Operational data (read via tools), campaign/reward/referral state (owned by their services)</td></tr>
+<tr><td><strong>Database</strong></td><td>RDS PostgreSQL — <code>ai_db</code>; Redis for inference caching</td></tr>
+<tr><td><strong>Sync APIs</strong></td><td>internal <code>POST /internal/ai/fraud-score</code>, <code>/recommendations/{type}</code>, <code>/health-score</code>; <code>GET /v1/recommendations</code>, <code>POST /v1/recommendations/{id}/accept|dismiss</code>, <code>/v1/ai/campaign-assistant/*</code> (API §3.12/§3.14; insights are served under <code>/v1/analytics/insights</code>, §3.13)</td></tr>
+<tr><td><strong>Publishes</strong></td><td><code>ai.recommendation_generated</code>, <code>ai.fraud_score_updated</code>, <code>ai.health_score_computed</code>, <code>ai.insight_generated</code>, <code>fraud.flagged</code></td></tr>
+<tr><td><strong>Consumes</strong></td><td>Selective, filtered SQS — not a blanket subscriber (see §4 for the tiered routing)</td></tr>
+</tbody></table>
+<hr>
+<h1 id="s3">3. Communication Flows</h1>
+<h2 id="s3-1">3.1 Synchronous (HTTP)</h2>
+<p>Synchronous calls are used only when the caller needs the response before it can proceed. The platform minimizes them to reduce coupling and latency chains.</p>
+<table>
+<thead><tr><th>Caller → Callee</th><th>Path</th><th>Purpose</th></tr></thead>
+<tbody>
+<tr><td>All → Tenant</td><td><code>GET /internal/validate-token</code></td><td>Authentication on every inbound request (gateway).</td></tr>
+<tr><td>Referral → Segmentation</td><td><code>POST /internal/eligibility/evaluate</code></td><td>Entry checkpoint at enrollment — <code>POST /v1/referrers</code> (gate + variant resolution + A/B).</td></tr>
+<tr><td>Referral → Segmentation</td><td><code>POST /internal/eligibility/evaluate</code></td><td>Referral &amp; Conversion checkpoints (blocking gate).</td></tr>
+<tr><td>Reward → Segmentation</td><td><code>POST /internal/eligibility/evaluate</code></td><td>Reward &amp; Payout checkpoints (gate; called inside Temporal).</td></tr>
+<tr><td>Reward → Campaign</td><td><code>GET /internal/variants/{id}/reward-config</code></td><td>Blocking read of reward config at reward creation.</td></tr>
+<tr><td>Referral → AI</td><td><code>POST /internal/ai/fraud-score</code></td><td>Semi-blocking Tier A score (no LLM); proceeds with null on timeout.</td></tr>
+<tr><td>Analytics → AI</td><td><code>POST /internal/ai/health-score</code></td><td>Non-critical; failures serve a stale score.</td></tr>
+</tbody></table>
+<table>
+<thead><tr><th>Call</th><th>Timeout</th><th>Retries</th><th>Circuit breaker / fallback</th></tr></thead>
+<tbody>
+<tr><td>Token validation</td><td>500ms</td><td>1 (100ms)</td><td>Open after 5 fails/10s → reject (fail-closed)</td></tr>
+<tr><td>Eligibility — interactive (Entry, Referral)</td><td>2s</td><td>2 (exp)</td><td><strong>Hard dependency, fail-closed.</strong> Open after 10/30s → reject <code>eligibility_unavailable</code>; caller (client backend / invitee) retries.</td></tr>
+<tr><td>Eligibility — in-workflow (Conversion, Reward, Payout)</td><td>3s</td><td>activity retry</td><td><strong>Fail-closed → durable retry.</strong> The Temporal activity retries with backoff until the PDP answers — no reward is approved un-checked, and none is lost (delayed, not dropped).</td></tr>
+<tr><td>Reward config</td><td>1s</td><td>2 (exp)</td><td>Open after 5/10s → fail creation, retry via SQS</td></tr>
+<tr><td>AI fraud score</td><td>3s</td><td>0</td><td>Open after 5/10s → proceed null, queue async re-score</td></tr>
+<tr><td>AI health score</td><td>5s</td><td>1</td><td>No breaker (non-critical) → serve cached</td></tr>
+</tbody></table>
+<p>Eligibility is a synchronous <strong>must</strong>, not best-effort: every checkpoint either gets a fresh decision or the action does not proceed. On interactive paths that means a <code>4xx</code> the caller retries; on workflow paths the Temporal activity retries durably until the PDP responds. The one part of eligibility that is <em>not</em> fail-closed is <strong>variant resolution</strong>, which falls through to the Default Variant on a missing-attribute non-match — a rule-evaluation semantic, decided per rule, never a reason to block enrollment (§13.5).</p>
+<p>The only sync AI call in the critical path is fraud scoring, and it invokes Tier A deterministic rules — not an LLM — returning in &lt;100ms. LLM-based fraud analysis runs only in daily batch, never in the request path.</p>
+
+<h2 id="s3-2">3.2 Asynchronous (SNS / SQS)</h2>
+<p>SNS topics are the event bus. Each service publishes to one topic per event category; each consuming service has exactly one inbound FIFO SQS queue named for the destination service. Subscription filters route the right events to the right queue. FIFO guarantees ordering within a message group and exactly-once delivery.</p>
+<figure><figcaption>Event fan-out — one publisher, filtered per-consumer queues</figcaption>
+<svg viewBox="0 0 700 250" xmlns="http://www.w3.org/2000/svg" style="width:100%;height:auto;font-family:Geist,system-ui,sans-serif" role="img">
+<defs><marker id="f-arr" markerWidth="8" markerHeight="8" refX="7" refY="3" orient="auto"><path d="M0,0 L7,3 L0,6 Z" fill="#78716c"/></marker></defs>
+<rect x="12" y="98" width="150" height="44" rx="8" fill="#dbeafe" stroke="#cfcbc6"/><rect x="12" y="98" width="5" height="44" rx="2.5" fill="#1e40af"/>
+<text x="87" y="118" text-anchor="middle" font-size="11" font-weight="700" fill="#1e40af">Publisher service</text>
+<text x="87" y="133" text-anchor="middle" font-size="9" fill="#44403c">emits domain event</text>
+<line x1="162" y1="120" x2="232" y2="120" stroke="#78716c" stroke-width="1.4" marker-end="url(#f-arr)"/>
+<rect x="234" y="98" width="160" height="44" rx="8" fill="#fef3c7" stroke="#cfcbc6"/><rect x="234" y="98" width="5" height="44" rx="2.5" fill="#b45309"/>
+<text x="314" y="118" text-anchor="middle" font-size="11" font-weight="700" fill="#b45309">SNS topic (category)</text>
+<text x="314" y="133" text-anchor="middle" font-size="9" fill="#44403c">subscription filters route</text>
+<g font-size="9.5" fill="#1c1917">
+<line x1="394" y1="120" x2="470" y2="40" stroke="#78716c" stroke-width="1.2" marker-end="url(#f-arr)"/>
+<line x1="394" y1="120" x2="470" y2="90" stroke="#78716c" stroke-width="1.2" marker-end="url(#f-arr)"/>
+<line x1="394" y1="120" x2="470" y2="140" stroke="#78716c" stroke-width="1.2" marker-end="url(#f-arr)"/>
+<line x1="394" y1="120" x2="470" y2="200" stroke="#be123c" stroke-width="1.2" stroke-dasharray="5 3" marker-end="url(#f-arr)"/>
+<rect x="472" y="26" width="216" height="28" rx="6" fill="#fff" stroke="#047857"/><text x="580" y="44" text-anchor="middle">reward-svc.fifo · campaign-svc.fifo …</text>
+<rect x="472" y="76" width="216" height="28" rx="6" fill="#fff" stroke="#047857"/><text x="580" y="94" text-anchor="middle">analytics-svc.fifo · ai-intelligence-svc.fifo</text>
+<rect x="472" y="126" width="216" height="28" rx="6" fill="#fff" stroke="#047857"/><text x="580" y="144" text-anchor="middle">notification-webhook-svc.fifo …</text>
+<rect x="472" y="186" width="216" height="28" rx="6" fill="#ffe4e6" stroke="#be123c"/><text x="580" y="204" text-anchor="middle">audit-trail.fifo → S3 (compliance sink)</text>
+</g>
+<text x="350" y="240" text-anchor="middle" font-size="9" font-style="italic" fill="#78716c">Each consumer queue has a DLQ (maxReceiveCount 5). Ingestion has no inbound queue — it is a pure publisher.</text>
+</svg></figure>
+<p><strong>SNS topics</strong> (publisher → key subscribers): <code>ingestion-events</code> (Ingestion → Referral, AI, Analytics, Segmentation); <code>referral-events</code> incl. <code>attribution.computed</code> (Referral → AI, Analytics, Reward, Segmentation); <code>participant-events</code> (Referral → Analytics, Notification, Segmentation, AI); <code>campaign-events</code> (Campaign → Ingestion, Referral, AI, Analytics); <code>reward-events</code> (Reward → AI, Analytics, Notification); <code>ai-events</code> (AI → Campaign, Referral, Reward, Notification); <code>segmentation-events</code> (Segmentation → Referral, AI); <code>analytics-events</code> (Analytics → Campaign, AI, Notification); <code>tenant-events</code> (Tenant → Notification).</p>
+<p><strong>Idempotency.</strong> All consumers are idempotent: Ingestion dedups on <code>tenant_id + external_id</code> (90-day Redis window); Referral and Reward on <code>referral_id + event_type</code>; AI on <code>event_id</code> (24h); Analytics via ClickHouse <code>ReplacingMergeTree</code> on <code>event_id</code>; Notification on <code>event_id + webhook_id</code>. SQS visibility timeout is 6× expected processing time; failed messages move to a DLQ after 5 attempts.</p>
+<hr>
+
+<h1 id="s4">4. AI &amp; Agentic Architecture</h1>
+<h2 id="s4-1">4.1 Why AI is isolated, and how LangChain is used</h2>
+<p>The AI Intelligence Service is the single home for LLM logic for five reasons: <strong>cost control</strong> (one monitoring point, one rate limiter, one budget alarm; the three tiers ensure only high-value reasoning incurs LLM cost), <strong>auditability</strong> (every prompt, response, tool call, and reasoning chain logged in one <code>ai_db</code>), <strong>safety</strong> (AI outputs are suggestions; other services decide whether to act), <strong>model management</strong> (prompt versioning, model routing, fallback in one codebase), and <strong>operational simplicity</strong> (one log stream and dashboard set for a 2-engineer team).</p>
+<p>LangChain is the abstraction between business logic and providers: <code>ChatModel</code> abstracts the provider (primary/verification/fallback by env config); each agent is an <code>AgentExecutor</code> with a versioned system prompt and a toolset; tools are <code>StructuredTool</code> classes wrapping authenticated HTTP calls; an <code>OutputParser</code> enforces typed JSON (one correction retry on failure). Agents are <strong>invoked, not continuously running</strong> — single-turn, stateless per invocation, bounded to a maximum of 5 tool calls. State between invocations is reconstructed from <code>ai_db</code>. Prompts are versioned records (one active version per agent type); every decision log references the prompt version used, enabling full reproducibility.</p>
+
+<h2 id="s4-2">4.2 Tool Registry</h2>
+<p>The Tool Registry is the boundary between what AI can <em>see</em> and what it can <em>do</em>. Every tool is registered with read/write classification, tenant scope, and audit requirements.</p>
+<table>
+<thead><tr><th>Read-only tools (the AI can see)</th><th>Source service</th></tr></thead>
+<tbody>
+<tr><td><code>read_programs</code>, <code>read_playbooks</code></td><td>Campaign</td></tr>
+<tr><td><code>read_campaign_kpis</code>, <code>read_variant_comparison</code>, <code>read_funnel_data</code>, <code>read_program_health</code>, <code>read_benchmarks</code></td><td>Analytics</td></tr>
+<tr><td><code>read_referrer_history</code>, <code>read_touch_events</code>, <code>read_ip_cluster_data</code>, <code>read_velocity_metrics</code></td><td>Referral Workflow</td></tr>
+<tr><td><code>read_reward_costs</code></td><td>Reward</td></tr>
+<tr><td><code>read_segment_definitions</code></td><td>Segmentation</td></tr>
+</tbody></table>
+<table>
+<thead><tr><th>Write tools (the AI can act — guarded)</th><th>Target · risk</th></tr></thead>
+<tbody>
+<tr><td><code>hold_reward</code></td><td>Reward · 🟢 reversible, logged</td></tr>
+<tr><td><code>flag_referrer</code></td><td>Referral Workflow · 🟡 notifies human review</td></tr>
+<tr><td><code>create_segment_suggestion</code></td><td>Segmentation · 🟡 proposal only</td></tr>
+</tbody></table>
+<p>No write tool exists for banning a participant, rejecting a referral, clawing back a reward, or modifying fraud rules — 🔴 actions are not exposed as tools at all, so the agent layer cannot reach them. Tool calls are tenant-scoped (mandatory <code>tenant_id</code>; cross-tenant → <code>403</code>) and rate-limited to 100 calls/min per tenant.</p>
+
+<h2 id="s4-3">4.3 Processing tiers, agents &amp; decision boundaries</h2>
+<p>Work flows through three cost tiers — this is the primary mechanism keeping LLM cost bounded (95%+ of event-driven work is zero-LLM):</p>
+<figure class="fig-sm"><figcaption>AI processing tiers</figcaption>
+<div class="trio">
+<div class="leaf lf-a"><strong>Tier A · Rules</strong><br>velocity, IP clustering, self-referral, disposable-email, geo checks<br><small>real-time · &lt;100ms · no LLM</small></div>
+<div class="leaf lf-b"><strong>Tier B · Statistical</strong><br>behavioral anomaly (gradient boosting), propensity (logistic regression), health components<br><small>daily batch · no LLM</small></div>
+<div class="leaf lf-c"><strong>Tier C · LLM</strong><br>campaign setup, daily optimization, daily insights, fraud Layer-3 narrative<br><small>batched/triggered · ~50–200 calls/day</small></div>
+</div></figure>
+<table>
+<thead><tr><th>Agent</th><th>Triggered by</th><th>Can suggest</th><th>Cannot do</th></tr></thead>
+<tbody>
+<tr><td><strong>Campaign Setup</strong></td><td>Dashboard "AI Setup" / Playbook customization</td><td>Complete proposals: Pulse, Variants, Segments, Reward Config, schedule</td><td>Activate, commit, approve budgets, modify live campaigns</td></tr>
+<tr><td><strong>Optimization</strong></td><td>Daily schedule + <code>analytics.anomaly_detected</code></td><td>Reward/timing changes, variant promotion, segment refinement, budget reallocation</td><td>Modify campaigns directly, change rewards, pause, approve payouts</td></tr>
+<tr><td><strong>Fraud Detection</strong></td><td>Tier A real-time · Tier B batch · Tier C on escalation</td><td>Fraud scores &amp; signal types; auto-hold rewards (🟢); flag participants (🟡)</td><td>Ban participants, clawback, auto-reject referrals (🔴 — human only)</td></tr>
+<tr><td><strong>Insight Generation</strong></td><td>Daily + health-score threshold crossings</td><td>Categorized insights (Anomaly/Opportunity/Quick Win/Benchmark/Risk/Trend)</td><td>Anything — purely informational, no write tools</td></tr>
+</tbody></table>
+<table>
+<thead><tr><th>Agent</th><th>🟢 Auto-execute</th><th>🟡 Recommend (human review)</th><th>🔴 Cannot do</th></tr></thead>
+<tbody>
+<tr><td>Campaign Setup</td><td>—</td><td>Campaign proposals, Playbook customizations</td><td>Activate, approve budgets</td></tr>
+<tr><td>Optimization</td><td>—</td><td>Reward adjustments, variant promotion, timing</td><td>Modify live campaigns, change rewards, approve payouts</td></tr>
+<tr><td>Fraud Detection</td><td>Hold rewards, create flags, score referrals</td><td>Participant flagging</td><td>Ban, clawback, auto-reject</td></tr>
+<tr><td>Insight Generation</td><td>Publish insights</td><td>—</td><td>Any write action</td></tr>
+</tbody></table>
+<hr>
+
+<h1 id="s5">5. Workflows &amp; Temporal.io</h1>
+<p>Temporal orchestrates all long-running, stateful processes — durable across restarts, network failures, and deploys. Each Pulse maps to a workflow definition; each Referral is a workflow execution. Attribution is a step inside the referral workflow, between conversion validation and reward creation.</p>
+<table>
+<thead><tr><th>Workflow</th><th>AI role</th></tr></thead>
+<tbody>
+<tr><td><strong>Referral Lifecycle</strong> (per Pulse)</td><td>Fraud score at create/convert. Advisory — proceeds without a score if AI is down; if score &gt; threshold, transitions to <code>Held</code> and waits for a human signal.</td></tr>
+<tr><td><strong>Campaign Optimization</strong> (scheduled)</td><td>Daily recommendations per active campaign. Purely advisory — published as events, never mutating campaigns.</td></tr>
+<tr><td><strong>Reward Approval</strong></td><td>Waits for fraud scoring before auto-approving. <code>auto</code> + clean → AI decisive within guardrails; <code>manual</code> → always waits for a human signal.</td></tr>
+<tr><td><strong>Fraud Review Escalation</strong></td><td>Surfaces evidence + recommendation; human decides approve/reject/ban. 72h reminder, 7d escalate.</td></tr>
+<tr><td><strong>Health Score</strong> (scheduled)</td><td>Daily Insight Agent per program; informational, no state mutation.</td></tr>
+</tbody></table>
+<pre class="asc"><code>Reward Approval (trigger: referral.converted)
+  1 create_reward_instance(referral_id, variant_reward_config)   -> EARNED/Pending
+  2 request_fraud_score(referral_id)                             -> 30s; null on timeout
+  decision:
+    auto  &amp; score &lt; 0.3   -> auto_approve_reward            -> Approved
+    auto  &amp; score &gt;= 0.3  -> hold_reward_for_review         -> Held; wait human (7d escalate)
+    manual               -> queue_for_manual_approval        -> Held; wait human (no timeout)
+  3 publish reward.approved | reward.rejected</code></pre>
+<pre class="asc"><code>Fraud Review (trigger: fraud.flagged)
+  1 gather_fraud_evidence(referrer_id, signal_type)   (Referral + AI reasoning chain)
+  2 create_review_ticket -> notify_operator
+  wait operator_decision:  72h -> reminder ;  7d -> escalate_to_owner
+    approve -> clear_fraud_flag
+    reject  -> reject_pending_rewards
+    ban     -> block_referrer        # human-only; AI cannot reach this path</code></pre>
+<hr>
+
+<h1 id="s6">6. Data &amp; Analytics Architecture</h1>
+<p><strong>Operational vs analytics.</strong> Operational data lives in per-service PostgreSQL (source of truth for current state; point lookups; ACID). Analytics data lives in ClickHouse (historical aggregation; denormalized; eventual, 5–30s behind). Redis bridges the two with real-time counters for live dashboard indicators.</p>
+<table>
+<thead><tr><th></th><th>Operational</th><th>Analytics</th></tr></thead>
+<tbody>
+<tr><td>Source</td><td>Service PostgreSQL</td><td>ClickHouse</td></tr>
+<tr><td>Latency</td><td>&lt;50ms (point lookups)</td><td>5–30s (eventual)</td></tr>
+<tr><td>Query</td><td><code>WHERE id = X</code></td><td><code>GROUP BY campaign_id, date</code></td></tr>
+<tr><td>Use for</td><td>Eligibility, fraud gates</td><td>KPIs, funnels, A/B results</td></tr>
+<tr><td>Consistency</td><td>Strong (ACID)</td><td>Eventual (Redis bridges)</td></tr>
+</tbody></table>
+<p>All domain events flow into ClickHouse via the Analytics Service's dedicated FIFO queue; a worker batch-inserts (1000 events or 5s). The table is a <code>ReplacingMergeTree</code> ordered by <code>(tenant_id, event_type, occurred_at, event_id)</code>, deduplicating replays on merge.</p>
+<pre class="asc"><code>events (ReplacingMergeTree, PARTITION BY toYYYYMM(occurred_at), TTL 24 months)
+  event_id, external_id, tenant_id, event_type, schema_version, occurred_at, ingested_at,
+  actor_type, actor_id, actor_email_hash,
+  campaign_id?, variant_id?, referrer_id?, referral_id?,
+  revenue_amount?, revenue_currency?, revenue_mrr?, revenue_arr?,   -- flat, minor units
+  properties (JSON string), source, trust_level</code></pre>
+<p>The flat structure is deliberate: ClickHouse performs best on flat columns, and the event model uses flat properties for ML feature extraction. The AI service reads ClickHouse for batch features and Redis for real-time signals. Multi-touch attribution issues a targeted point-query (not a wide aggregation), so it completes in 1–5s even under dashboard load.</p>
+<hr>
+
+<h1 id="s7">7. Observability &amp; AI Traceability</h1>
+<p><strong>Trace propagation.</strong> OpenTelemetry spans every service, queue, and Temporal workflow. <code>traceparent</code>/<code>tracestate</code> ride HTTP headers and SQS message attributes, so a single trace runs from "SDK touch ingested" through "SQS consumed by AI" through "fraud score" to "reward held." Temporal's OTel interceptor propagates context across workflow and activity executions. All spans export to Grafana Cloud (Tempo traces, Loki logs, dashboards).</p>
+<p><strong>AI decision logs.</strong> Every agent invocation writes an entry in <code>ai_db</code> keyed by the trace id, so any dashboard recommendation ties back to the exact prompt, model, inputs, and reasoning that produced it:</p>
+<pre class="asc"><code>decision: decision_id, agent_type, prompt_id, prompt_version,
+          model_identifier, model_role (primary|verification|fallback),
+          verification_result?, tenant_id, trigger_event_id,
+          input_context (sanitized, no raw PII), tool_calls[], parsed_output (incl. reasoning),
+          latency_ms, token_count, cost_estimate</code></pre>
+<p>Grafana dashboards cover AI cost/spend per model per tenant per day, tier distribution, agent latency and token counts, recommendation accept/reject rates, and platform-wide latency/error/throughput.</p>
+<hr>
+
+<h1 id="s8">8. Security, Privacy &amp; Trust Model</h1>
+<p><strong>AI access control.</strong> The Tool Registry is the AI access layer. The AI service authenticates to other services with a service-to-service JWT (<code>service_id: ai-service</code>, scope <code>internal_read</code>/<code>internal_write</code>). Every tool call carries <code>tenant_id</code>; cross-tenant access returns <code>403</code>. Write tools require <code>internal_write</code> and are further gated by risk: 🟢 execute directly, 🟡 execute + notify for review, 🔴 are not exposed as tools. Tool calls are rate-limited to 100/min per tenant.</p>
+<blockquote><p><strong>Why this is scope-based and not a Keto check.</strong> §13.1 establishes that <em>operator</em> permissions are a Keto-resolved snapshot in a short-lived token, and that every money-moving or object-scoped dashboard request is re-evaluated live against Ory Keto. The AI service is the deliberate exception, and the distinction is the principal, not the mechanism. Keto answers &ldquo;may <em>this user</em> perform this action on this resource right now?&rdquo; — a per-subject, per-resource, fast-changing question. The AI service is not a subject with per-resource permissions; it is a fixed internal component whose entire authority is the static, code-reviewed Tool Registry. A coarse <code>internal_write</code> scope plus the risk gate (🟢/🟡/🔴) expresses that authority exactly: the set of write tools is what the AI may ever do, and it changes only by a code change, not by a runtime grant. Crucially, no AI write tool reaches a money- or config-mutating endpoint that an operator would need <code>rewards:approve</code> / <code>rewards:reject</code> / <code>rewards:clawback</code> for — the single reversible <code>hold_reward</code> pauses money movement without moving or denying it, so the AI path never bypasses the operator's Keto gate. Put differently: Keto governs <em>who decides</em>; the Tool Registry governs <em>what the AI may propose or reversibly stage</em>, and the irreversible decision still routes through a Keto-gated human.</p></blockquote>
+<table>
+<thead><tr><th>Layer</th><th>Tenant-isolation mechanism</th></tr></thead>
+<tbody>
+<tr><td>API Gateway</td><td>API-key/JWT validation extracts <code>tenant_id</code>; carried downstream.</td></tr>
+<tr><td>Service layer</td><td>Every query includes <code>WHERE tenant_id = ?</code>, enforced by middleware that rejects queries without tenant context.</td></tr>
+<tr><td>Database</td><td>Per-service DBs, row-partitioned by <code>tenant_id</code> (no per-tenant DBs at this stage).</td></tr>
+<tr><td>ClickHouse</td><td><code>tenant_id</code> in all WHERE clauses; per-tenant materialized views where needed.</td></tr>
+<tr><td>SQS/SNS</td><td><code>tenant_id</code> in the envelope; consumers filter where applicable.</td></tr>
+<tr><td>AI service</td><td>Tool Registry always passes <code>tenant_id</code>; prompts never contain other tenants' data.</td></tr>
+<tr><td>Redis</td><td>Keys prefixed <code>tenant:{tenant_id}:</code>; no global keys hold per-tenant data.</td></tr>
+</tbody></table>
+<p><strong>GDPR &amp; AI.</strong> Data minimization — tools return summaries, not raw streams; raw events are filtered to the specific participant under investigation. On an erasure request, PII in events and in AI decision logs is replaced with hashed tokens while the decision structure is preserved for audit. <strong>No model training on tenant data</strong> — inference only, via pre-trained models under provider data-processing agreements; the consent gate keeps non-consented invitees out of individual-level AI analysis. AI decisions are explainable (the reasoning field) and never fully automated — high-risk actions require human confirmation, and even 🟢 auto-actions are logged, auditable, and reversible.</p>
+<table>
+<thead><tr><th>Concern</th><th>Boundary</th></tr></thead>
+<tbody>
+<tr><td>Model training</td><td>No. The platform uses pre-trained LLMs via API. Fraud ML models are trained offline on anonymized, aggregated data by engineering — not in production.</td></tr>
+<tr><td>Fine-tuning</td><td>No. Versioned prompt engineering is the customization mechanism.</td></tr>
+<tr><td>Inference</td><td>Yes, inference-only. Tenant data enters the context window for the call duration and is not retained.</td></tr>
+<tr><td>Statistical-model features</td><td>Behavioral (velocity, conversion rate, timing) — no PII features.</td></tr>
+<tr><td>AI data retention</td><td>Decision logs 24 months; prompt versions indefinite; model artifacts versioned in S3.</td></tr>
+</tbody></table>
+<hr>
+
+<h1 id="s9">9. Overall Architecture Diagram</h1>
+<p>The whole platform on one page: external actors enter through the gateway; nine services own their data and exchange domain events on the bus; Temporal, ClickHouse, Redis, and S3 sit beneath; OpenTelemetry feeds Grafana Cloud.</p>
+<figure><figcaption>ReferralAI — system map</figcaption>
+<svg viewBox="0 0 700 476" xmlns="http://www.w3.org/2000/svg" style="width:100%;height:auto;font-family:Geist,system-ui,sans-serif" role="img">
+<defs><marker id="s-arr" markerWidth="9" markerHeight="9" refX="4.5" refY="7" orient="auto"><path d="M0,0 L9,0 L4.5,7 Z" fill="#78716c"/></marker></defs>
+<!-- A actors -->
+<rect x="12" y="8" width="676" height="58" rx="8" fill="#dbeafe" stroke="#cfcbc6"/><rect x="12" y="8" width="5" height="58" rx="2.5" fill="#1e40af"/>
+<text x="24" y="26" font-size="11" font-weight="700" fill="#1e40af">External Actors</text>
+<g font-size="8.5" fill="#1c1917">
+<rect x="24" y="34" width="124" height="24" rx="5" fill="#fff" stroke="#1e40af"/><text x="86" y="49" text-anchor="middle">Client Operators</text>
+<rect x="156" y="34" width="124" height="24" rx="5" fill="#fff" stroke="#1e40af"/><text x="218" y="49" text-anchor="middle">Client Backends</text>
+<rect x="288" y="34" width="148" height="24" rx="5" fill="#fff" stroke="#1e40af"/><text x="362" y="49" text-anchor="middle">JS SDK · Participants/Invitees</text>
+<rect x="444" y="34" width="100" height="24" rx="5" fill="#fff" stroke="#1e40af"/><text x="494" y="49" text-anchor="middle">Integrations</text>
+<rect x="552" y="34" width="124" height="24" rx="5" fill="#fff" stroke="#1e40af"/><text x="614" y="49" text-anchor="middle">Webhook Consumers</text>
+</g>
+<line x1="350" y1="66" x2="350" y2="82" stroke="#78716c" stroke-width="1.4" marker-end="url(#s-arr)"/>
+<!-- B gateway -->
+<rect x="12" y="84" width="676" height="40" rx="8" fill="#ece9e6" stroke="#cfcbc6"/><rect x="12" y="84" width="5" height="40" rx="2.5" fill="#1c1917"/>
+<text x="350" y="108" text-anchor="middle" font-size="11" font-weight="700" fill="#1c1917">API Gateway — ALB + Traefik + NestJS Auth Guard  (keys → internal JWT · per-request Keto)</text>
+<line x1="350" y1="124" x2="350" y2="140" stroke="#78716c" stroke-width="1.4" marker-end="url(#s-arr)"/>
+<!-- C services grid -->
+<rect x="12" y="142" width="676" height="172" rx="8" fill="#faf9f7" stroke="#cfcbc6"/>
+<text x="24" y="160" font-size="11" font-weight="700" fill="#44403c">Nine Microservices — each owns its data</text>
+<g font-size="9.5">
+<!-- row1 -->
+<rect x="24" y="168" width="208" height="40" rx="6" fill="#f5f5f4" stroke="#78716c"/><text x="128" y="186" text-anchor="middle" font-weight="600" fill="#1c1917">Tenant</text><text x="128" y="199" text-anchor="middle" font-size="8" fill="#78716c">Ory · tenant_db</text>
+<rect x="246" y="168" width="208" height="40" rx="6" fill="#ece9e6" stroke="#1c1917"/><text x="350" y="186" text-anchor="middle" font-weight="600" fill="#1c1917">Program &amp; Campaign</text><text x="350" y="199" text-anchor="middle" font-size="8" fill="#78716c">campaign_db</text>
+<rect x="468" y="168" width="208" height="40" rx="6" fill="#f5f5f4" stroke="#78716c"/><text x="572" y="186" text-anchor="middle" font-weight="600" fill="#1c1917">Segmentation &amp; Eligibility</text><text x="572" y="199" text-anchor="middle" font-size="8" fill="#78716c">segmentation_db</text>
+<!-- row2 -->
+<rect x="24" y="212" width="208" height="40" rx="6" fill="#dbeafe" stroke="#1e40af"/><text x="128" y="230" text-anchor="middle" font-weight="600" fill="#1e40af">Event Ingestion</text><text x="128" y="243" text-anchor="middle" font-size="8" fill="#78716c">Redis only · stateless</text>
+<rect x="246" y="212" width="208" height="40" rx="6" fill="#ece9e6" stroke="#1c1917"/><text x="350" y="230" text-anchor="middle" font-weight="600" fill="#1c1917">Referral Workflow</text><text x="350" y="243" text-anchor="middle" font-size="8" fill="#78716c">referral_db · attribution</text>
+<rect x="468" y="212" width="208" height="40" rx="6" fill="#d1fae5" stroke="#047857"/><text x="572" y="230" text-anchor="middle" font-weight="600" fill="#047857">Reward &amp; Payout</text><text x="572" y="243" text-anchor="middle" font-size="8" fill="#78716c">reward_db</text>
+<!-- row3 -->
+<rect x="24" y="256" width="208" height="40" rx="6" fill="#f5f5f4" stroke="#78716c"/><text x="128" y="274" text-anchor="middle" font-weight="600" fill="#1c1917">Analytics</text><text x="128" y="287" text-anchor="middle" font-size="8" fill="#78716c">ClickHouse · analytics_db</text>
+<rect x="246" y="256" width="208" height="40" rx="6" fill="#f5f5f4" stroke="#78716c"/><text x="350" y="274" text-anchor="middle" font-weight="600" fill="#1c1917">Notification &amp; Webhook</text><text x="350" y="287" text-anchor="middle" font-size="8" fill="#78716c">notification_db · outbound only</text>
+<rect x="468" y="256" width="208" height="40" rx="6" fill="#fef3c7" stroke="#b45309"/><text x="572" y="274" text-anchor="middle" font-weight="600" fill="#b45309">AI Intelligence</text><text x="572" y="287" text-anchor="middle" font-size="8" fill="#78716c">ai_db · Tiers A/B/C · Tool Registry</text>
+</g>
+<line x1="350" y1="314" x2="350" y2="330" stroke="#78716c" stroke-width="1.4" marker-end="url(#s-arr)"/>
+<!-- D bus -->
+<rect x="12" y="332" width="676" height="40" rx="8" fill="#fef3c7" stroke="#cfcbc6"/><rect x="12" y="332" width="5" height="40" rx="2.5" fill="#b45309"/>
+<text x="350" y="356" text-anchor="middle" font-size="11" font-weight="700" fill="#b45309">Event Bus — SNS topics → per-service SQS FIFO (+ DLQ) · audit-trail → S3</text>
+<line x1="350" y1="372" x2="350" y2="388" stroke="#78716c" stroke-width="1.4" marker-end="url(#s-arr)"/>
+<!-- E infra -->
+<rect x="12" y="390" width="676" height="58" rx="8" fill="#d1fae5" stroke="#cfcbc6"/><rect x="12" y="390" width="5" height="58" rx="2.5" fill="#047857"/>
+<text x="24" y="408" font-size="11" font-weight="700" fill="#047857">Platform Infrastructure</text>
+<g font-size="8.5" fill="#1c1917">
+<rect x="24" y="416" width="124" height="24" rx="5" fill="#fff" stroke="#047857"/><text x="86" y="431" text-anchor="middle">Temporal.io</text>
+<rect x="156" y="416" width="124" height="24" rx="5" fill="#fff" stroke="#047857"/><text x="218" y="431" text-anchor="middle">ClickHouse (OLAP)</text>
+<rect x="288" y="416" width="124" height="24" rx="5" fill="#fff" stroke="#047857"/><text x="350" y="431" text-anchor="middle">Redis (cache/counters)</text>
+<rect x="420" y="416" width="124" height="24" rx="5" fill="#fff" stroke="#047857"/><text x="482" y="431" text-anchor="middle">S3 (assets/archives)</text>
+<rect x="552" y="416" width="124" height="24" rx="5" fill="#fff" stroke="#047857"/><text x="614" y="431" text-anchor="middle">OTel → Grafana Cloud</text>
+</g>
+</svg></figure>
+<p class="note">Arrows show the request path top-to-bottom. Every service also publishes to and consumes from the Event Bus, and exports traces/logs/metrics to OpenTelemetry → Grafana Cloud. Colors match the rest of the document: slate = external/entry, dark = core domain services, amber = AI / bus, mint = money &amp; infrastructure, grey = supporting services.</p>
+<hr>
+
+<h1 id="s10">10. System &amp; Application Architecture Overview</h1>
+<p>The system is a set of nine NestJS services on AWS. This section separates that into two views that are deliberately not the same diagram: the <strong>system view</strong> (what is deployed and how it is wired) and the <strong>application view</strong> (what a user-visible action does as it crosses the system). The system view is stable and slow-changing; the application view is where product behaviour lives and where most of the reasoning here happens.</p>
+
+<h2 id="s10-1">10.1 Definitions used in this document</h2>
+<p><strong>System architecture</strong> means the deployed topology: the nine services, their owned RDS databases, the SNS/SQS event bus, Temporal.io, ElastiCache Redis, ClickHouse, S3, the Ory stack, and the OpenTelemetry → Grafana Cloud pipeline. It answers &ldquo;what runs, what owns which data, what talks to what.&rdquo; It is not changed here.</p>
+<p><strong>Application architecture</strong> means the use-case layer: how a concrete user action (&ldquo;a invitee signs up via a link&rdquo;, &ldquo;a reward is paid&rdquo;, &ldquo;an operator accepts an AI recommendation&rdquo;) becomes a path through controllers, application services, domain models, Temporal workflows, and events. It answers &ldquo;what happens, in what order, in which service, with which guarantees.&rdquo; The application view is an <em>emergent</em> property of the system view plus the event and workflow wiring.</p>
+<p>The two views meet at three seams: the <strong>HTTP edge</strong> (dashboard, SDK, backend requests), the <strong>event bus</strong> (SNS topics → per-destination FIFO SQS queues), and <strong>Temporal</strong> (durable orchestration of anything that waits, retries, or spans services). Every flow in §11 is described in terms of those three seams.</p>
+
+<h2 id="s10-2">10.2 Use-case → system mapping</h2>
+<p>This maps the core user journeys to the services they traverse, the Temporal workflows they touch, and where (if anywhere) AI participates. AI involvement is always one of: <em>none</em>, <em>advisory</em> (recommendation surfaced to a human), or <em>auto-execute-within-guardrails</em> (a reversible 🟢 action). No flow lets AI take an irreversible 🔴 action.</p>
+<table>
+<thead><tr><th>Use-case</th><th>Participating services</th><th>Temporal workflow(s)</th><th>AI involvement</th></tr></thead>
+<tbody>
+<tr><td><strong>Participant enrolled &amp; link generated</strong></td><td>Tenant (auth), Campaign (variant config), Segmentation (variant resolution), Referral (link + profile)</td><td>None (synchronous)</td><td>None</td></tr>
+<tr><td><strong>Invitee signs up via link (events from backend)</strong></td><td>Ingestion, Referral, Segmentation, Reward, Analytics, Notification, AI</td><td>Referral Lifecycle (per Pulse)</td><td>Advisory + 🟢 (Tier A fraud score; can auto-hold reward)</td></tr>
+<tr><td><strong>Conversion via billing webhook (events from billing provider)</strong></td><td>Ingestion (provider receiver), Referral, Reward, Analytics, AI</td><td>Referral Lifecycle (resumed on conversion)</td><td>Advisory + 🟢 (same fraud path as events from backend)</td></tr>
+<tr><td><strong>Reward earned → approved → paid</strong></td><td>Reward, Campaign (reward-config read), AI (fraud), Notification, Analytics</td><td>Reward Approval; Fraud Review (if held)</td><td>🟢 auto-hold; advisory for approve/reject; 🔴 ban/clawback human-only</td></tr>
+<tr><td><strong>Campaign set up / optimized by AI</strong></td><td>AI, Campaign, Segmentation, Analytics, Notification</td><td>Campaign Optimization (scheduled)</td><td>Advisory only (proposals; no live mutation by AI)</td></tr>
+<tr><td><strong>Fraud escalation &amp; review</strong></td><td>AI, Referral, Reward, Notification, Tenant (operator identity)</td><td>Fraud Review Escalation</td><td>Advisory (evidence + recommendation); human decides</td></tr>
+</tbody>
+</table>
+<p>The rest of this document is a zoom-in on these rows: §11 walks the flows, §12 looks inside the services that carry them, §13 covers the concerns that cut across all rows, and §14 isolates the AI column.</p>
+<hr>
+
+<h1 id="s11">11. Application Architecture: Core End-to-End Flows</h1>
+<p>Each flow is given as a narrative, a stepwise table (step → service → events/workflow), and one swimlane. Conventions: <code>SDK</code> = browser JS SDK (publishable key); <code>CB</code> = client backend (secret key); the nine services use their short names. Events in <code>code</code> are SNS-published unless marked <em>(sync)</em>. The reward lifecycle runs <code>Pending → Held → Approved → Processing → Paid</code>, with <code>Rejected</code> and <code>Reversed</code> as terminal off-ramps.</p>
+<p class="note" style="text-align:left">How to read the flow diagrams: <strong>solid arrow</strong> = synchronous call · <strong>dashed arrow</strong> = async event · numbered badges = step order · <span style="color:#b45309;font-weight:600">amber</span> = sync gate / human step · <span style="color:#047857;font-weight:600">mint</span> = money path · <span style="color:#be123c;font-weight:600">rose</span> = error / reversal.</p>
+
+<h2 id="s11-1">11.1 Flow 1 — Referral Signup &amp; Conversion (events from backend)</h2>
+<p>A Participant (Alice) has enrolled and holds a variant-bound link. A invitee (Bob) clicks it, browses, signs up, and later pays. events from backend means the <strong>client backend sends conversion events</strong> keyed by <code>invitee_external_id</code> (or <code>invitee_email</code>) — at least one identity anchor is mandatory, or the conversion is rejected at schema validation.</p>
+<p><strong>What the SDK does:</strong> on link landing it calls <code>GET /v1/sdk/resolve-link</code> for campaign context and cookie TTL, sets the attribution cookie, and emits <code>touch.referral_link_clicked</code> / <code>touch.referral_page_viewed</code> via <code>POST /v1/events</code>. The SDK never claims IP/geo/device — those are derived server-side at ingestion. The SDK cannot send conversion or custom events; those are publishable-key-forbidden.</p>
+<p><strong>What the client backend does:</strong> at signup and at payment it calls <code>POST /v1/events</code> under the <em>secret</em> key with <code>conversion.signup_completed</code> then <code>conversion.payment_completed</code>, carrying the invitee identity anchor, a deterministic <code>external_id</code> for dedup, and revenue as flat minor-unit scalars + ISO currency (recurring conversions must include <code>revenue_mrr</code>).</p>
+<p><strong>Where attribution is computed:</strong> inside the Referral Lifecycle Temporal workflow, between conversion validation and reward creation — never in Analytics. Attribution uses the campaign&rsquo;s configured model (<code>first_touch</code>, <code>last_touch</code>, <code>linear</code>, <code>time_decay</code>, <code>position_based</code>, <code>ai_weighted</code>).</p>
+<p><strong>Where fraud &amp; eligibility apply:</strong> eligibility is a blocking sync call to Segmentation at referral creation; fraud is the AI Tier A deterministic score (sync, &lt;100ms, no LLM) at creation and again at conversion. Both degrade gracefully — eligibility failure rejects the referral with <code>eligibility_unavailable</code>; fraud-unavailable proceeds with <code>fraud_score: null</code> and queues async re-scoring.</p>
+<table>
+<thead><tr><th>#</th><th>Step</th><th>Service</th><th>Events / Workflow</th></tr></thead>
+<tbody>
+<tr><td>1</td><td>Bob clicks link; SDK resolves link, sets cookie, emits touch</td><td>Ingestion</td><td><code>touch.referral_link_clicked</code>, <code>touch.referral_page_viewed</code></td></tr>
+<tr><td>2</td><td>Ingestion validates, dedups, enforces Business Rules Guard, derives context, publishes</td><td>Ingestion</td><td>publish to <code>ingestion-events</code></td></tr>
+<tr><td>3</td><td>Referral consumes touch, creates Referral (<code>Pending</code>), calls eligibility</td><td>Referral → Segmentation <em>(sync)</em></td><td><code>referral.created</code>; <code>POST /internal/eligibility/evaluate</code></td></tr>
+<tr><td>4</td><td>Referral requests Tier A fraud score at creation</td><td>Referral → AI <em>(sync)</em></td><td><code>POST /internal/ai/fraud-score</code></td></tr>
+<tr><td>5</td><td>Bob signs up; CB sends signup conversion (secret key)</td><td>Ingestion</td><td><code>conversion.recorded</code> (<code>signup_completed</code>)</td></tr>
+<tr><td>6</td><td>Referral matches conversion via identity anchor; state → <code>Qualified</code></td><td>Referral</td><td><code>referral.qualified</code></td></tr>
+<tr><td>7</td><td>Bob pays; CB sends payment conversion with revenue</td><td>Ingestion</td><td><code>conversion.recorded</code> (<code>payment_completed</code>)</td></tr>
+<tr><td>8</td><td>Workflow validates conversion, re-scores fraud, computes attribution; state → <code>Converted</code></td><td>Referral (Temporal)</td><td>Referral Lifecycle WF; <code>attribution.computed</code>, <code>referral.converted</code></td></tr>
+<tr><td>9</td><td>Reward consumes <code>referral.converted</code>, reads variant reward-config, creates reward (<code>Pending</code>)</td><td>Reward → Campaign <em>(sync)</em></td><td><code>reward.earned</code>; <code>GET /internal/variants/{id}/reward-config</code></td></tr>
+<tr><td>10</td><td>Reward Approval workflow runs the decision function (see Flow 3)</td><td>Reward (Temporal), AI</td><td>Reward Approval WF</td></tr>
+<tr><td>11</td><td>Analytics ingests every event into ClickHouse (5–30s lag); Notification fires client webhooks</td><td>Analytics, Notification</td><td>consumes all above; outbound <code>reward.*</code></td></tr>
+</tbody>
+</table>
+<figure><figcaption>Flow 1 — events from backend: click → signup → payment</figcaption>
+<svg viewBox="0 0 774 444" xmlns="http://www.w3.org/2000/svg" style="width:100%;height:auto;font-family:Geist,system-ui,sans-serif" role="img"><defs>
+<marker id="a-ink" markerWidth="8" markerHeight="8" refX="7" refY="3" orient="auto"><path d="M0,0 L7,3 L0,6 Z" fill="#1c1917"/></marker>
+<marker id="a-acc" markerWidth="8" markerHeight="8" refX="7" refY="3" orient="auto"><path d="M0,0 L7,3 L0,6 Z" fill="#b45309"/></marker>
+<marker id="a-mint" markerWidth="8" markerHeight="8" refX="7" refY="3" orient="auto"><path d="M0,0 L7,3 L0,6 Z" fill="#047857"/></marker>
+<marker id="a-slate" markerWidth="8" markerHeight="8" refX="7" refY="3" orient="auto"><path d="M0,0 L7,3 L0,6 Z" fill="#1e40af"/></marker>
+<marker id="a-rose" markerWidth="8" markerHeight="8" refX="7" refY="3" orient="auto"><path d="M0,0 L7,3 L0,6 Z" fill="#be123c"/></marker>
+<marker id="a-ink3" markerWidth="8" markerHeight="8" refX="7" refY="3" orient="auto"><path d="M0,0 L7,3 L0,6 Z" fill="#78716c"/></marker>
+<marker id="a-line" markerWidth="8" markerHeight="8" refX="7" refY="3" orient="auto"><path d="M0,0 L7,3 L0,6 Z" fill="#e7e5e4"/></marker>
+<marker id="a-paper" markerWidth="8" markerHeight="8" refX="7" refY="3" orient="auto"><path d="M0,0 L7,3 L0,6 Z" fill="#FDFCFA"/></marker>
+<marker id="a-wash" markerWidth="8" markerHeight="8" refX="7" refY="3" orient="auto"><path d="M0,0 L7,3 L0,6 Z" fill="#f5f5f4"/></marker>
+<marker id="a-accbg" markerWidth="8" markerHeight="8" refX="7" refY="3" orient="auto"><path d="M0,0 L7,3 L0,6 Z" fill="#fef3c7"/></marker>
+<marker id="a-mintbg" markerWidth="8" markerHeight="8" refX="7" refY="3" orient="auto"><path d="M0,0 L7,3 L0,6 Z" fill="#d1fae5"/></marker>
+<marker id="a-rosebg" markerWidth="8" markerHeight="8" refX="7" refY="3" orient="auto"><path d="M0,0 L7,3 L0,6 Z" fill="#ffe4e6"/></marker>
+</defs>
+<rect x="34" y="4" width="106" height="22" rx="5" fill="#1e40af"/>
+<text x="87" y="19" text-anchor="middle" font-size="10.5" font-weight="600" fill="#fff">Client</text>
+<line x1="87" y1="30" x2="87" y2="436" stroke="#e7e5e4" stroke-width="1" stroke-dasharray="3 3"/>
+<rect x="156" y="4" width="106" height="22" rx="5" fill="#78716c"/>
+<text x="209" y="19" text-anchor="middle" font-size="10.5" font-weight="600" fill="#fff">Ingestion</text>
+<line x1="209" y1="30" x2="209" y2="436" stroke="#e7e5e4" stroke-width="1" stroke-dasharray="3 3"/>
+<rect x="278" y="4" width="106" height="22" rx="5" fill="#1c1917"/>
+<text x="331" y="19" text-anchor="middle" font-size="10.5" font-weight="600" fill="#fff">Referral</text>
+<line x1="331" y1="30" x2="331" y2="436" stroke="#e7e5e4" stroke-width="1" stroke-dasharray="3 3"/>
+<rect x="400" y="4" width="106" height="22" rx="5" fill="#78716c"/>
+<text x="453" y="19" text-anchor="middle" font-size="10.5" font-weight="600" fill="#fff">Segment.</text>
+<line x1="453" y1="30" x2="453" y2="436" stroke="#e7e5e4" stroke-width="1" stroke-dasharray="3 3"/>
+<rect x="522" y="4" width="106" height="22" rx="5" fill="#b45309"/>
+<text x="575" y="19" text-anchor="middle" font-size="10.5" font-weight="600" fill="#fff">AI</text>
+<line x1="575" y1="30" x2="575" y2="436" stroke="#e7e5e4" stroke-width="1" stroke-dasharray="3 3"/>
+<rect x="644" y="4" width="106" height="22" rx="5" fill="#047857"/>
+<text x="697" y="19" text-anchor="middle" font-size="10.5" font-weight="600" fill="#fff">Reward</text>
+<line x1="697" y1="30" x2="697" y2="436" stroke="#e7e5e4" stroke-width="1" stroke-dasharray="3 3"/>
+<circle cx="12" cy="54" r="8" fill="#b45309"/><text x="12" y="57" text-anchor="middle" font-size="9" font-weight="700" fill="#fff">1</text>
+<line x1="87" y1="54" x2="209" y2="54" stroke="#1e40af" stroke-width="1.6" stroke-dasharray="5 3" marker-end="url(#a-slate)"/>
+<rect x="112" y="37" width="73" height="13" fill="#FDFCFA" opacity="0.92"/>
+<text x="148" y="47" text-anchor="middle" font-size="9.5" fill="#1c1917">click + touch</text>
+<circle cx="12" cy="96" r="8" fill="#b45309"/><text x="12" y="99" text-anchor="middle" font-size="9" font-weight="700" fill="#fff">2</text>
+<line x1="209" y1="96" x2="331" y2="96" stroke="#78716c" stroke-width="1.6" marker-end="url(#a-ink3)"/>
+<rect x="184" y="79" width="173" height="13" fill="#FDFCFA" opacity="0.92"/>
+<text x="270" y="89" text-anchor="middle" font-size="9.5" fill="#1c1917">validated touch → create Referral</text>
+<circle cx="12" cy="138" r="8" fill="#b45309"/><text x="12" y="141" text-anchor="middle" font-size="9" font-weight="700" fill="#fff">3</text>
+<line x1="331" y1="138" x2="453" y2="138" stroke="#b45309" stroke-width="1.6" marker-end="url(#a-acc)"/>
+<rect x="318" y="121" width="148" height="13" fill="#FDFCFA" opacity="0.92"/>
+<text x="392" y="131" text-anchor="middle" font-size="9.5" fill="#1c1917">eligibility (sync, blocking)</text>
+<circle cx="12" cy="180" r="8" fill="#b45309"/><text x="12" y="183" text-anchor="middle" font-size="9" font-weight="700" fill="#fff">4</text>
+<line x1="331" y1="180" x2="575" y2="180" stroke="#b45309" stroke-width="1.6" marker-end="url(#a-acc)"/>
+<rect x="404" y="163" width="98" height="13" fill="#FDFCFA" opacity="0.92"/>
+<text x="453" y="173" text-anchor="middle" font-size="9.5" fill="#1c1917">fraud score (sync)</text>
+<circle cx="12" cy="222" r="8" fill="#b45309"/><text x="12" y="225" text-anchor="middle" font-size="9" font-weight="700" fill="#fff">5</text>
+<line x1="87" y1="222" x2="209" y2="222" stroke="#1e40af" stroke-width="1.6" stroke-dasharray="5 3" marker-end="url(#a-slate)"/>
+<rect x="102" y="205" width="93" height="13" fill="#FDFCFA" opacity="0.92"/>
+<text x="148" y="215" text-anchor="middle" font-size="9.5" fill="#1c1917">signup conversion</text>
+<circle cx="12" cy="264" r="8" fill="#b45309"/><text x="12" y="267" text-anchor="middle" font-size="9" font-weight="700" fill="#fff">6</text>
+<line x1="209" y1="264" x2="331" y2="264" stroke="#78716c" stroke-width="1.6" marker-end="url(#a-ink3)"/>
+<rect x="224" y="247" width="93" height="13" fill="#FDFCFA" opacity="0.92"/>
+<text x="270" y="257" text-anchor="middle" font-size="9.5" fill="#1c1917">match → Qualified</text>
+<circle cx="12" cy="306" r="8" fill="#b45309"/><text x="12" y="309" text-anchor="middle" font-size="9" font-weight="700" fill="#fff">7</text>
+<line x1="87" y1="306" x2="209" y2="306" stroke="#1e40af" stroke-width="1.6" stroke-dasharray="5 3" marker-end="url(#a-slate)"/>
+<rect x="74" y="289" width="148" height="13" fill="#FDFCFA" opacity="0.92"/>
+<text x="148" y="299" text-anchor="middle" font-size="9.5" fill="#1c1917">payment conversion + revenue</text>
+<circle cx="12" cy="348" r="8" fill="#b45309"/><text x="12" y="351" text-anchor="middle" font-size="9" font-weight="700" fill="#fff">8</text>
+<rect x="275" y="326" width="113" height="44" rx="5" fill="#d1fae5" stroke="#047857" stroke-width="1"/>
+<text x="331" y="346" text-anchor="middle" font-size="9" fill="#1c1917">compute attribution</text>
+<text x="331" y="358" text-anchor="middle" font-size="9" fill="#1c1917">→ Converted</text>
+<circle cx="12" cy="390" r="8" fill="#b45309"/><text x="12" y="393" text-anchor="middle" font-size="9" font-weight="700" fill="#fff">9</text>
+<line x1="331" y1="390" x2="697" y2="390" stroke="#047857" stroke-width="1.6" marker-end="url(#a-mint)"/>
+<rect x="425" y="373" width="178" height="13" fill="#FDFCFA" opacity="0.92"/>
+<text x="514" y="383" text-anchor="middle" font-size="9.5" fill="#1c1917">referral.converted → reward.earned</text>
+</svg>
+<p class="note">Then: Reward Approval workflow runs (Flow 3) · Analytics batch-inserts to ClickHouse · Notification fires client webhooks.</p></figure>
+<p><strong>Happens here / never here:</strong> attribution is computed only inside the Referral Lifecycle workflow; it never happens in Analytics or Reward. The conversion→reward link is established only by <code>referral.converted</code>; Reward never reads raw conversion events directly.</p>
+
+<h2 id="s11-2">11.2 Flow 2 — Referral Attribution via Billing Webhooks (events from billing provider)</h2>
+<p>The client never sends conversion events. At customer-creation time the client backend writes <code>refrev_ref_code</code> (and optionally a click id) into the billing provider&rsquo;s customer metadata (Stripe <code>customer.metadata</code>, Paddle <code>custom_data</code>, Chargebee <code>meta_data</code>). Thereafter the provider&rsquo;s payment webhooks drive attribution automatically. This metadata write is the client backend&rsquo;s <em>single</em> events from billing provider obligation; forgetting it is a high silent-failure-risk case — payments arrive but attribute to nothing.</p>
+<blockquote><p><strong>Inbound receivers.</strong> events from billing provider does not enter through <code>POST /v1/events</code>. The Event Ingestion Service hosts <strong>provider-specific inbound receivers</strong> (<code>/inbound/{provider}/{connection_id}</code>, deployed as <code>ingestion-inbound</code>) that verify the provider&rsquo;s own signature scheme, then translate the callback into an internal <code>conversion.recorded</code> (+ revenue) or a payout-state transition. The public ingestion API trusts platform keys and a uniform schema; provider callbacks use foreign signatures and payloads, so they need a dedicated, hardened translation surface. <strong>Inbound callbacks are data, never commands</strong> — a payload can advance a referral or payout but can never change configuration.</p></blockquote>
+<p><strong>Guarantees:</strong> idempotent by the provider&rsquo;s native event id, mapped onto the platform <code>external_id</code>; a signature failure returns <code>401</code> and the payload is <em>dropped, not queued</em>; a callback for an unknown tenant/connection returns <code>404</code>. A refund or chargeback that arrives <em>after</em> payout does not reverse inline — it enters the reversal/clawback path (negative ledger entry + trust penalty) and emits <code>reward.reversed</code>.</p>
+<table>
+<thead><tr><th>#</th><th>Step</th><th>Service</th><th>Events / Workflow</th></tr></thead>
+<tbody>
+<tr><td>1</td><td>Click + cookie + touch (identical to events from backend steps 1–4)</td><td>Ingestion, Referral, Segmentation, AI</td><td><code>touch.*</code>, <code>referral.created</code></td></tr>
+<tr><td>2</td><td>Client backend creates the billing customer with <code>refrev_ref_code</code> in metadata</td><td>(client side)</td><td>none on platform</td></tr>
+<tr><td>3</td><td>Provider sends payment webhook to the platform inbound receiver</td><td>Ingestion (provider receiver)</td><td>verify provider signature</td></tr>
+<tr><td>4</td><td>Receiver reads <code>refrev_ref_code</code>, maps native event id → <code>external_id</code>, translates</td><td>Notification → Ingestion path</td><td>internal <code>conversion.recorded</code> + revenue</td></tr>
+<tr><td>5</td><td>Referral resumes the Lifecycle workflow on the synthesized conversion; computes attribution</td><td>Referral (Temporal)</td><td><code>attribution.computed</code>, <code>referral.converted</code></td></tr>
+<tr><td>6</td><td>Reward / Analytics / Notification proceed exactly as events from backend from <code>referral.converted</code> onward</td><td>Reward, Analytics, Notification</td><td><code>reward.earned</code> → Approval WF</td></tr>
+<tr><td>7</td><td>Late refund/chargeback callback → reversal path</td><td>Notification → Reward</td><td><code>reward.reversed</code> (+ trust penalty)</td></tr>
+</tbody>
+</table>
+<figure><figcaption>Flow 2 — events from billing provider: provider webhook → attribution</figcaption>
+<svg viewBox="0 0 530 360" xmlns="http://www.w3.org/2000/svg" style="width:100%;height:auto;font-family:Geist,system-ui,sans-serif" role="img"><defs>
+<marker id="a-ink" markerWidth="8" markerHeight="8" refX="7" refY="3" orient="auto"><path d="M0,0 L7,3 L0,6 Z" fill="#1c1917"/></marker>
+<marker id="a-acc" markerWidth="8" markerHeight="8" refX="7" refY="3" orient="auto"><path d="M0,0 L7,3 L0,6 Z" fill="#b45309"/></marker>
+<marker id="a-mint" markerWidth="8" markerHeight="8" refX="7" refY="3" orient="auto"><path d="M0,0 L7,3 L0,6 Z" fill="#047857"/></marker>
+<marker id="a-slate" markerWidth="8" markerHeight="8" refX="7" refY="3" orient="auto"><path d="M0,0 L7,3 L0,6 Z" fill="#1e40af"/></marker>
+<marker id="a-rose" markerWidth="8" markerHeight="8" refX="7" refY="3" orient="auto"><path d="M0,0 L7,3 L0,6 Z" fill="#be123c"/></marker>
+<marker id="a-ink3" markerWidth="8" markerHeight="8" refX="7" refY="3" orient="auto"><path d="M0,0 L7,3 L0,6 Z" fill="#78716c"/></marker>
+<marker id="a-line" markerWidth="8" markerHeight="8" refX="7" refY="3" orient="auto"><path d="M0,0 L7,3 L0,6 Z" fill="#e7e5e4"/></marker>
+<marker id="a-paper" markerWidth="8" markerHeight="8" refX="7" refY="3" orient="auto"><path d="M0,0 L7,3 L0,6 Z" fill="#FDFCFA"/></marker>
+<marker id="a-wash" markerWidth="8" markerHeight="8" refX="7" refY="3" orient="auto"><path d="M0,0 L7,3 L0,6 Z" fill="#f5f5f4"/></marker>
+<marker id="a-accbg" markerWidth="8" markerHeight="8" refX="7" refY="3" orient="auto"><path d="M0,0 L7,3 L0,6 Z" fill="#fef3c7"/></marker>
+<marker id="a-mintbg" markerWidth="8" markerHeight="8" refX="7" refY="3" orient="auto"><path d="M0,0 L7,3 L0,6 Z" fill="#d1fae5"/></marker>
+<marker id="a-rosebg" markerWidth="8" markerHeight="8" refX="7" refY="3" orient="auto"><path d="M0,0 L7,3 L0,6 Z" fill="#ffe4e6"/></marker>
+</defs>
+<rect x="34" y="4" width="106" height="22" rx="5" fill="#1e40af"/>
+<text x="87" y="19" text-anchor="middle" font-size="10.5" font-weight="600" fill="#fff">Provider</text>
+<line x1="87" y1="30" x2="87" y2="352" stroke="#e7e5e4" stroke-width="1" stroke-dasharray="3 3"/>
+<rect x="156" y="4" width="106" height="22" rx="5" fill="#78716c"/>
+<text x="209" y="19" text-anchor="middle" font-size="10.5" font-weight="600" fill="#fff">Receiver</text>
+<line x1="209" y1="30" x2="209" y2="352" stroke="#e7e5e4" stroke-width="1" stroke-dasharray="3 3"/>
+<rect x="278" y="4" width="106" height="22" rx="5" fill="#1c1917"/>
+<text x="331" y="19" text-anchor="middle" font-size="10.5" font-weight="600" fill="#fff">Referral</text>
+<line x1="331" y1="30" x2="331" y2="352" stroke="#e7e5e4" stroke-width="1" stroke-dasharray="3 3"/>
+<rect x="400" y="4" width="106" height="22" rx="5" fill="#047857"/>
+<text x="453" y="19" text-anchor="middle" font-size="10.5" font-weight="600" fill="#fff">Reward</text>
+<line x1="453" y1="30" x2="453" y2="352" stroke="#e7e5e4" stroke-width="1" stroke-dasharray="3 3"/>
+<circle cx="12" cy="54" r="8" fill="#b45309"/><text x="12" y="57" text-anchor="middle" font-size="9" font-weight="700" fill="#fff">1</text>
+<line x1="87" y1="54" x2="209" y2="54" stroke="#1e40af" stroke-width="1.6" stroke-dasharray="5 3" marker-end="url(#a-slate)"/>
+<rect x="107" y="37" width="83" height="13" fill="#FDFCFA" opacity="0.92"/>
+<text x="148" y="47" text-anchor="middle" font-size="9.5" fill="#1c1917">payment webhook</text>
+<circle cx="12" cy="96" r="8" fill="#b45309"/><text x="12" y="99" text-anchor="middle" font-size="9" font-weight="700" fill="#fff">2</text>
+<rect x="156" y="74" width="106" height="44" rx="5" fill="#f5f5f4" stroke="#e7e5e4" stroke-width="1"/>
+<text x="209" y="94" text-anchor="middle" font-size="9" fill="#1c1917">verify signature</text>
+<text x="209" y="106" text-anchor="middle" font-size="9" fill="#1c1917">· read ref_code</text>
+<circle cx="12" cy="138" r="8" fill="#b45309"/><text x="12" y="141" text-anchor="middle" font-size="9" font-weight="700" fill="#fff">3</text>
+<line x1="209" y1="138" x2="331" y2="138" stroke="#047857" stroke-width="1.6" marker-end="url(#a-mint)"/>
+<rect x="196" y="121" width="148" height="13" fill="#FDFCFA" opacity="0.92"/>
+<text x="270" y="131" text-anchor="middle" font-size="9.5" fill="#1c1917">internal conversion.recorded</text>
+<circle cx="12" cy="180" r="8" fill="#b45309"/><text x="12" y="183" text-anchor="middle" font-size="9" font-weight="700" fill="#fff">4</text>
+<rect x="278" y="158" width="106" height="44" rx="5" fill="#d1fae5" stroke="#047857" stroke-width="1"/>
+<text x="331" y="178" text-anchor="middle" font-size="9" fill="#1c1917">resume Lifecycle</text>
+<text x="331" y="190" text-anchor="middle" font-size="9" fill="#1c1917">· attribution</text>
+<circle cx="12" cy="222" r="8" fill="#b45309"/><text x="12" y="225" text-anchor="middle" font-size="9" font-weight="700" fill="#fff">5</text>
+<line x1="331" y1="222" x2="453" y2="222" stroke="#047857" stroke-width="1.6" marker-end="url(#a-mint)"/>
+<rect x="303" y="205" width="178" height="13" fill="#FDFCFA" opacity="0.92"/>
+<text x="392" y="215" text-anchor="middle" font-size="9.5" fill="#1c1917">referral.converted → reward.earned</text>
+<circle cx="12" cy="264" r="8" fill="#b45309"/><text x="12" y="267" text-anchor="middle" font-size="9" font-weight="700" fill="#fff">6</text>
+<line x1="87" y1="264" x2="209" y2="264" stroke="#be123c" stroke-width="1.6" marker-end="url(#a-rose)"/>
+<rect x="84" y="247" width="128" height="13" fill="#FDFCFA" opacity="0.92"/>
+<text x="148" y="257" text-anchor="middle" font-size="9.5" fill="#1c1917">late refund / chargeback</text>
+<circle cx="12" cy="306" r="8" fill="#b45309"/><text x="12" y="309" text-anchor="middle" font-size="9" font-weight="700" fill="#fff">7</text>
+<line x1="209" y1="306" x2="453" y2="306" stroke="#be123c" stroke-width="1.6" marker-end="url(#a-rose)"/>
+<rect x="262" y="289" width="138" height="13" fill="#FDFCFA" opacity="0.92"/>
+<text x="331" y="299" text-anchor="middle" font-size="9.5" fill="#1c1917">reversal → reward.reversed</text>
+</svg>
+<p class="note">Prerequisite: the client backend has written refrev_ref_code into the provider's customer metadata. A bad signature → 401, dropped (never queued).</p></figure>
+<p><strong>Happens here / never here:</strong> attribution still happens only in the Referral Lifecycle workflow — events from billing provider changes <em>how the conversion enters</em>, not where it is computed. The AI fraud path is identical to events from backend. A provider payload with a bad signature is never queued and never reaches the bus.</p>
+<hr>
+<h2 id="s11-3">11.3 Flow 3 — Reward Earned → Approved → Paid</h2>
+<p>From <code>referral.converted</code> to a paid reward. The Reward Approval workflow is where the <strong>approval decision function</strong> runs. It joins three already-known inputs: the AI fraud score, the Participant trust tier, and the reward amount versus the trust ceiling and remaining budget. <code>Held</code> is a first-class state: it fires when the fraud score lands in the review band or the amount exceeds the trust ceiling.</p>
+<figure class="fig-sm"><figcaption>Reward Lifecycle</figcaption>
+<div class="pipe"><span class="pk pk-0">Pending</span><span class="pk pk-3">Held</span><span class="pk pk-1">Approved</span><span class="pk pk-5">Processing</span><span class="pk pk-2">Paid</span></div>
+<div class="pipe mt-sm"><span class="pk pk-4">Rejected</span><span class="pk pk-4">Reversed</span></div></figure>
+<p>Internal event mapping: <code>reward.earned</code> on creation (→ <code>Pending</code>), <code>reward.held</code>, <code>reward.approved</code>, <code>reward.paid</code> (→ <code>Paid</code>), <code>reward.reversed</code> (clawback/refund). Outbound webhooks carry the names <code>reward.earned/held/approved/paid/reversed</code>.</p>
+<p>The decision function is deterministic and auditable:</p>
+<pre class="asc"><code>approve(reward):
+  if   fraud_score &gt; checkpoint_block_threshold   -> BLOCK + fraud alert      (reversible)
+  elif fraud_score in [0.3, 0.7]                  -> HELD  (human review)
+  elif amount &gt; trust.auto_approve_ceiling        -> HELD  (human review)
+  elif budget_remaining &lt; amount                  -> BLOCK ("budget depleted")
+  elif trust == Advocate                          -> APPROVED (instant)
+  else                                            -> APPROVED then hold-period timer
+  # MVP override: ALL rewards -> HELD + manual review + 7d hold + EUR1000/mo cap</code></pre>
+<table>
+<thead><tr><th>#</th><th>Step</th><th>Service</th><th>Events / Workflow</th></tr></thead>
+<tbody>
+<tr><td>1</td><td><code>referral.converted</code> triggers Reward Approval workflow</td><td>Reward (Temporal)</td><td>Reward Approval WF start</td></tr>
+<tr><td>2</td><td>Create reward from variant reward-config; cap check under advisory lock</td><td>Reward → Campaign <em>(sync)</em></td><td><code>reward.earned</code> (<code>Pending</code>)</td></tr>
+<tr><td>3</td><td>Request fraud score (30s timeout; null on timeout)</td><td>Reward → AI <em>(sync)</em></td><td><code>POST /internal/ai/fraud-score</code></td></tr>
+<tr><td>4</td><td>Run decision function (fraud band, trust ceiling, budget)</td><td>Reward (Temporal)</td><td>—</td></tr>
+<tr><td>5a</td><td><em>Clean + under ceiling + Advocate</em> → auto-approve</td><td>Reward</td><td><code>reward.approved</code></td></tr>
+<tr><td>5b</td><td><em>Fraud in [0.3,0.7] or amount over ceiling</em> → hold, wait for human signal (7d → escalate)</td><td>Reward (Temporal)</td><td><code>reward.held</code>; signal <code>human_decision</code></td></tr>
+<tr><td>5c</td><td><em>Fraud over block threshold</em> → block + fraud alert (reversible)</td><td>Reward, AI</td><td><code>fraud.flagged</code> (→ Flow 5)</td></tr>
+<tr><td>6</td><td>On Approved → Processing → payout batching → Paid</td><td>Reward (Temporal)</td><td><code>reward.paid</code>; <code>payout.created/confirmed</code></td></tr>
+<tr><td>7</td><td>Notification delivers reward + payout webhooks; Analytics records the ledger</td><td>Notification, Analytics</td><td>outbound <code>reward.*</code>, <code>payout.sent</code></td></tr>
+</tbody>
+</table>
+<figure><figcaption>Flow 3 — Reward approval, then one of three outcomes</figcaption>
+<svg viewBox="0 0 408 234" xmlns="http://www.w3.org/2000/svg" style="width:100%;height:auto;font-family:Geist,system-ui,sans-serif" role="img"><defs>
+<marker id="a-ink" markerWidth="8" markerHeight="8" refX="7" refY="3" orient="auto"><path d="M0,0 L7,3 L0,6 Z" fill="#1c1917"/></marker>
+<marker id="a-acc" markerWidth="8" markerHeight="8" refX="7" refY="3" orient="auto"><path d="M0,0 L7,3 L0,6 Z" fill="#b45309"/></marker>
+<marker id="a-mint" markerWidth="8" markerHeight="8" refX="7" refY="3" orient="auto"><path d="M0,0 L7,3 L0,6 Z" fill="#047857"/></marker>
+<marker id="a-slate" markerWidth="8" markerHeight="8" refX="7" refY="3" orient="auto"><path d="M0,0 L7,3 L0,6 Z" fill="#1e40af"/></marker>
+<marker id="a-rose" markerWidth="8" markerHeight="8" refX="7" refY="3" orient="auto"><path d="M0,0 L7,3 L0,6 Z" fill="#be123c"/></marker>
+<marker id="a-ink3" markerWidth="8" markerHeight="8" refX="7" refY="3" orient="auto"><path d="M0,0 L7,3 L0,6 Z" fill="#78716c"/></marker>
+<marker id="a-line" markerWidth="8" markerHeight="8" refX="7" refY="3" orient="auto"><path d="M0,0 L7,3 L0,6 Z" fill="#e7e5e4"/></marker>
+<marker id="a-paper" markerWidth="8" markerHeight="8" refX="7" refY="3" orient="auto"><path d="M0,0 L7,3 L0,6 Z" fill="#FDFCFA"/></marker>
+<marker id="a-wash" markerWidth="8" markerHeight="8" refX="7" refY="3" orient="auto"><path d="M0,0 L7,3 L0,6 Z" fill="#f5f5f4"/></marker>
+<marker id="a-accbg" markerWidth="8" markerHeight="8" refX="7" refY="3" orient="auto"><path d="M0,0 L7,3 L0,6 Z" fill="#fef3c7"/></marker>
+<marker id="a-mintbg" markerWidth="8" markerHeight="8" refX="7" refY="3" orient="auto"><path d="M0,0 L7,3 L0,6 Z" fill="#d1fae5"/></marker>
+<marker id="a-rosebg" markerWidth="8" markerHeight="8" refX="7" refY="3" orient="auto"><path d="M0,0 L7,3 L0,6 Z" fill="#ffe4e6"/></marker>
+</defs>
+<rect x="34" y="4" width="106" height="22" rx="5" fill="#1c1917"/>
+<text x="87" y="19" text-anchor="middle" font-size="10.5" font-weight="600" fill="#fff">Referral</text>
+<line x1="87" y1="30" x2="87" y2="226" stroke="#e7e5e4" stroke-width="1" stroke-dasharray="3 3"/>
+<rect x="156" y="4" width="106" height="22" rx="5" fill="#047857"/>
+<text x="209" y="19" text-anchor="middle" font-size="10.5" font-weight="600" fill="#fff">Reward</text>
+<line x1="209" y1="30" x2="209" y2="226" stroke="#e7e5e4" stroke-width="1" stroke-dasharray="3 3"/>
+<rect x="278" y="4" width="106" height="22" rx="5" fill="#b45309"/>
+<text x="331" y="19" text-anchor="middle" font-size="10.5" font-weight="600" fill="#fff">AI</text>
+<line x1="331" y1="30" x2="331" y2="226" stroke="#e7e5e4" stroke-width="1" stroke-dasharray="3 3"/>
+<circle cx="12" cy="54" r="8" fill="#b45309"/><text x="12" y="57" text-anchor="middle" font-size="9" font-weight="700" fill="#fff">1</text>
+<line x1="87" y1="54" x2="209" y2="54" stroke="#1e40af" stroke-width="1.6" stroke-dasharray="5 3" marker-end="url(#a-slate)"/>
+<rect x="34" y="37" width="228" height="13" fill="#FDFCFA" opacity="0.92"/>
+<text x="148" y="47" text-anchor="middle" font-size="9.5" fill="#1c1917">referral.converted → create reward (Pending)</text>
+<circle cx="12" cy="96" r="8" fill="#b45309"/><text x="12" y="99" text-anchor="middle" font-size="9" font-weight="700" fill="#fff">2</text>
+<rect x="155" y="74" width="108" height="44" rx="5" fill="#f5f5f4" stroke="#e7e5e4" stroke-width="1"/>
+<text x="209" y="94" text-anchor="middle" font-size="9" fill="#1c1917">read reward-config</text>
+<text x="209" y="106" text-anchor="middle" font-size="9" fill="#1c1917">· cap check</text>
+<circle cx="12" cy="138" r="8" fill="#b45309"/><text x="12" y="141" text-anchor="middle" font-size="9" font-weight="700" fill="#fff">3</text>
+<line x1="209" y1="138" x2="331" y2="138" stroke="#b45309" stroke-width="1.6" marker-end="url(#a-acc)"/>
+<rect x="209" y="121" width="123" height="13" fill="#FDFCFA" opacity="0.92"/>
+<text x="270" y="131" text-anchor="middle" font-size="9.5" fill="#1c1917">fraud score (sync, 30s)</text>
+<circle cx="12" cy="180" r="8" fill="#b45309"/><text x="12" y="183" text-anchor="middle" font-size="9" font-weight="700" fill="#fff">4</text>
+<rect x="148" y="158" width="123" height="44" rx="5" fill="#f5f5f4" stroke="#e7e5e4" stroke-width="1"/>
+<text x="209" y="178" text-anchor="middle" font-size="9" fill="#1c1917">run decision function</text>
+<text x="209" y="190" text-anchor="middle" font-size="9" fill="#1c1917">— outcomes below</text>
+</svg>
+<div class="wf-branch mt-sm"><span class="wf-r wf-ok"><strong>Clean + Advocate</strong> → auto-approve → Processing → Paid</span><span class="wf-r wf-warn"><strong>Fraud 0.3–0.7 / over ceiling</strong> → Held → human approve/reject</span><span class="wf-r wf-err"><strong>Over block threshold</strong> → blocked → fraud.flagged (Flow 5)</span></div>
+</figure>
+<p><strong>Happens here / never here:</strong> AI can move a reward to <code>Held</code> (🟢, reversible) but can never move it to <code>Paid</code>, <code>Rejected</code>, or <code>Reversed</code> — those require either the deterministic auto-approve path or a Keto-gated human action (<code>rewards:approve</code> / <code>rewards:reject</code> / <code>rewards:clawback</code>). Payout is two-step (<code>POST /v1/payouts</code> then <code>/confirm</code>); funds never move on a single call.</p>
+
+<h2 id="s11-4">11.4 Flow 4 — Campaign Setup &amp; Optimization via AI</h2>
+<p>Two related sub-flows: <strong>setup</strong> (operator clicks &ldquo;AI Setup&rdquo;, synchronous, Campaign Setup Agent) and <strong>optimization</strong> (scheduled daily, Optimization Agent). Both are <strong>advisory only</strong>: the AI service produces a structured recommendation; nothing in the campaign changes until an operator accepts it. The AI service holds no write tool over Campaign.</p>
+<p><strong>Setup:</strong> the dashboard calls <code>POST /internal/ai/recommendations/campaign-setup</code>. The Campaign Setup Agent (Tier C, LLM) reads only: the client&rsquo;s existing programs, the Playbook library, anonymized cross-client benchmarks, and vertical defaults — all via read-only tools. It returns a complete proposal (Pulse, Variants, Segments, Reward Configuration, schedule) as structured JSON attached to the program and rendered in the dashboard. It <strong>cannot</strong> activate, commit, or approve a budget.</p>
+<p><strong>Optimization:</strong> the <code>campaign_optimization</code> Temporal schedule (daily 02:00 UTC) lists active campaigns, reads each campaign&rsquo;s KPIs from Analytics, invokes the Optimization Agent, persists recommendations, and publishes <code>ai.recommendation_generated</code>. The same agent is triggered on <code>analytics.anomaly_detected</code> for off-cycle review. Recommendations carry <code>risk_level</code> (🟢/🟡/🔴), <code>confidence_score</code>, <code>expected_impact</code>, and a <code>reasoning_chain</code>.</p>
+<p><strong>Acceptance propagation:</strong> when an operator accepts via <code>POST /v1/recommendations/{id}/accept</code>, the change is applied by the <em>owning</em> service through its normal API — reward-amount and variant changes land in Campaign, segment refinements land in Segmentation, and the effect later shows up in Analytics. The accept endpoint records the outcome back onto the recommendation for the AI feedback loop.</p>
+<table>
+<thead><tr><th>#</th><th>Step</th><th>Service</th><th>Events / Workflow</th></tr></thead>
+<tbody>
+<tr><td>1</td><td>Daily schedule lists active campaigns</td><td>AI (Temporal)</td><td><code>campaign_optimization</code> WF</td></tr>
+<tr><td>2</td><td>Fetch KPIs / variant comparison / funnel / reward costs (read tools)</td><td>AI → Analytics <em>(sync)</em></td><td>read-only tool calls</td></tr>
+<tr><td>3</td><td>Optimization Agent (Tier C) generates typed recommendations; verification model on incentive items</td><td>AI</td><td>persist recommendation records</td></tr>
+<tr><td>4</td><td>Publish recommendations; Campaign stores proposals; operator notified</td><td>AI, Campaign, Notification</td><td><code>ai.recommendation_generated</code>; outbound <code>recommendation.created</code></td></tr>
+<tr><td>5</td><td>Operator reviews in dashboard, accepts a 🟡 reward-amount change</td><td>AI</td><td><code>POST /v1/recommendations/{id}/accept</code></td></tr>
+<tr><td>6</td><td>Change applied via the owning service&rsquo;s API; variant updated</td><td>Campaign (or Segmentation)</td><td><code>variant.updated</code></td></tr>
+<tr><td>7</td><td>Effect observed downstream; feedback loop tracks accepted-vs-outcome</td><td>Analytics, AI</td><td><code>kpi.computed</code>; outcome recorded</td></tr>
+</tbody>
+</table>
+<figure><figcaption>Flow 4 — Daily AI optimization (advisory)</figcaption>
+<svg viewBox="0 0 652 402" xmlns="http://www.w3.org/2000/svg" style="width:100%;height:auto;font-family:Geist,system-ui,sans-serif" role="img"><defs>
+<marker id="a-ink" markerWidth="8" markerHeight="8" refX="7" refY="3" orient="auto"><path d="M0,0 L7,3 L0,6 Z" fill="#1c1917"/></marker>
+<marker id="a-acc" markerWidth="8" markerHeight="8" refX="7" refY="3" orient="auto"><path d="M0,0 L7,3 L0,6 Z" fill="#b45309"/></marker>
+<marker id="a-mint" markerWidth="8" markerHeight="8" refX="7" refY="3" orient="auto"><path d="M0,0 L7,3 L0,6 Z" fill="#047857"/></marker>
+<marker id="a-slate" markerWidth="8" markerHeight="8" refX="7" refY="3" orient="auto"><path d="M0,0 L7,3 L0,6 Z" fill="#1e40af"/></marker>
+<marker id="a-rose" markerWidth="8" markerHeight="8" refX="7" refY="3" orient="auto"><path d="M0,0 L7,3 L0,6 Z" fill="#be123c"/></marker>
+<marker id="a-ink3" markerWidth="8" markerHeight="8" refX="7" refY="3" orient="auto"><path d="M0,0 L7,3 L0,6 Z" fill="#78716c"/></marker>
+<marker id="a-line" markerWidth="8" markerHeight="8" refX="7" refY="3" orient="auto"><path d="M0,0 L7,3 L0,6 Z" fill="#e7e5e4"/></marker>
+<marker id="a-paper" markerWidth="8" markerHeight="8" refX="7" refY="3" orient="auto"><path d="M0,0 L7,3 L0,6 Z" fill="#FDFCFA"/></marker>
+<marker id="a-wash" markerWidth="8" markerHeight="8" refX="7" refY="3" orient="auto"><path d="M0,0 L7,3 L0,6 Z" fill="#f5f5f4"/></marker>
+<marker id="a-accbg" markerWidth="8" markerHeight="8" refX="7" refY="3" orient="auto"><path d="M0,0 L7,3 L0,6 Z" fill="#fef3c7"/></marker>
+<marker id="a-mintbg" markerWidth="8" markerHeight="8" refX="7" refY="3" orient="auto"><path d="M0,0 L7,3 L0,6 Z" fill="#d1fae5"/></marker>
+<marker id="a-rosebg" markerWidth="8" markerHeight="8" refX="7" refY="3" orient="auto"><path d="M0,0 L7,3 L0,6 Z" fill="#ffe4e6"/></marker>
+</defs>
+<rect x="34" y="4" width="106" height="22" rx="5" fill="#78716c"/>
+<text x="87" y="19" text-anchor="middle" font-size="10.5" font-weight="600" fill="#fff">Schedule</text>
+<line x1="87" y1="30" x2="87" y2="394" stroke="#e7e5e4" stroke-width="1" stroke-dasharray="3 3"/>
+<rect x="156" y="4" width="106" height="22" rx="5" fill="#b45309"/>
+<text x="209" y="19" text-anchor="middle" font-size="10.5" font-weight="600" fill="#fff">AI</text>
+<line x1="209" y1="30" x2="209" y2="394" stroke="#e7e5e4" stroke-width="1" stroke-dasharray="3 3"/>
+<rect x="278" y="4" width="106" height="22" rx="5" fill="#78716c"/>
+<text x="331" y="19" text-anchor="middle" font-size="10.5" font-weight="600" fill="#fff">Analytics</text>
+<line x1="331" y1="30" x2="331" y2="394" stroke="#e7e5e4" stroke-width="1" stroke-dasharray="3 3"/>
+<rect x="400" y="4" width="106" height="22" rx="5" fill="#1c1917"/>
+<text x="453" y="19" text-anchor="middle" font-size="10.5" font-weight="600" fill="#fff">Campaign</text>
+<line x1="453" y1="30" x2="453" y2="394" stroke="#e7e5e4" stroke-width="1" stroke-dasharray="3 3"/>
+<rect x="522" y="4" width="106" height="22" rx="5" fill="#1e40af"/>
+<text x="575" y="19" text-anchor="middle" font-size="10.5" font-weight="600" fill="#fff">Operator</text>
+<line x1="575" y1="30" x2="575" y2="394" stroke="#e7e5e4" stroke-width="1" stroke-dasharray="3 3"/>
+<circle cx="12" cy="54" r="8" fill="#b45309"/><text x="12" y="57" text-anchor="middle" font-size="9" font-weight="700" fill="#fff">1</text>
+<line x1="87" y1="54" x2="209" y2="54" stroke="#1e40af" stroke-width="1.6" stroke-dasharray="5 3" marker-end="url(#a-slate)"/>
+<rect x="74" y="37" width="148" height="13" fill="#FDFCFA" opacity="0.92"/>
+<text x="148" y="47" text-anchor="middle" font-size="9.5" fill="#1c1917">daily 02:00 — list campaigns</text>
+<circle cx="12" cy="96" r="8" fill="#b45309"/><text x="12" y="99" text-anchor="middle" font-size="9" font-weight="700" fill="#fff">2</text>
+<line x1="209" y1="96" x2="331" y2="96" stroke="#b45309" stroke-width="1.6" marker-end="url(#a-acc)"/>
+<rect x="201" y="79" width="138" height="13" fill="#FDFCFA" opacity="0.92"/>
+<text x="270" y="89" text-anchor="middle" font-size="9.5" fill="#1c1917">read KPIs / funnel / costs</text>
+<circle cx="12" cy="138" r="8" fill="#b45309"/><text x="12" y="141" text-anchor="middle" font-size="9" font-weight="700" fill="#fff">3</text>
+<rect x="155" y="116" width="108" height="44" rx="5" fill="#f5f5f4" stroke="#e7e5e4" stroke-width="1"/>
+<text x="209" y="136" text-anchor="middle" font-size="9" fill="#1c1917">Optimization</text>
+<text x="209" y="148" text-anchor="middle" font-size="9" fill="#1c1917">Agent (LLM) → recs</text>
+<circle cx="12" cy="180" r="8" fill="#b45309"/><text x="12" y="183" text-anchor="middle" font-size="9" font-weight="700" fill="#fff">4</text>
+<line x1="209" y1="180" x2="453" y2="180" stroke="#1e40af" stroke-width="1.6" stroke-dasharray="5 3" marker-end="url(#a-slate)"/>
+<rect x="250" y="163" width="163" height="13" fill="#FDFCFA" opacity="0.92"/>
+<text x="331" y="173" text-anchor="middle" font-size="9.5" fill="#1c1917">recommendation → store proposal</text>
+<circle cx="12" cy="222" r="8" fill="#b45309"/><text x="12" y="225" text-anchor="middle" font-size="9" font-weight="700" fill="#fff">5</text>
+<line x1="209" y1="222" x2="575" y2="222" stroke="#1e40af" stroke-width="1.6" stroke-dasharray="5 3" marker-end="url(#a-slate)"/>
+<rect x="351" y="205" width="83" height="13" fill="#FDFCFA" opacity="0.92"/>
+<text x="392" y="215" text-anchor="middle" font-size="9.5" fill="#1c1917">notify operator</text>
+<circle cx="12" cy="264" r="8" fill="#b45309"/><text x="12" y="267" text-anchor="middle" font-size="9" font-weight="700" fill="#fff">6</text>
+<line x1="575" y1="264" x2="209" y2="264" stroke="#b45309" stroke-width="1.6" marker-end="url(#a-acc)"/>
+<rect x="341" y="247" width="103" height="13" fill="#FDFCFA" opacity="0.92"/>
+<text x="392" y="257" text-anchor="middle" font-size="9.5" fill="#1c1917">accept (human gate)</text>
+<circle cx="12" cy="306" r="8" fill="#b45309"/><text x="12" y="309" text-anchor="middle" font-size="9" font-weight="700" fill="#fff">7</text>
+<line x1="209" y1="306" x2="453" y2="306" stroke="#047857" stroke-width="1.6" marker-end="url(#a-mint)"/>
+<rect x="250" y="289" width="163" height="13" fill="#FDFCFA" opacity="0.92"/>
+<text x="331" y="299" text-anchor="middle" font-size="9.5" fill="#1c1917">apply via API → variant.updated</text>
+<circle cx="12" cy="348" r="8" fill="#b45309"/><text x="12" y="351" text-anchor="middle" font-size="9" font-weight="700" fill="#fff">8</text>
+<line x1="331" y1="348" x2="209" y2="348" stroke="#1e40af" stroke-width="1.6" stroke-dasharray="5 3" marker-end="url(#a-slate)"/>
+<rect x="204" y="331" width="133" height="13" fill="#FDFCFA" opacity="0.92"/>
+<text x="270" y="341" text-anchor="middle" font-size="9.5" fill="#1c1917">effect → outcome recorded</text>
+</svg>
+<p class="note">AI never mutates a campaign directly. The only change path is operator accept → the owning service's API. Setup works the same way: dashboard → Campaign Setup Agent → proposal.</p></figure>
+<p><strong>Happens here / never here:</strong> the Optimization workflow never modifies a campaign directly — it only emits proposals. The only mutation path is operator acceptance → owning-service API. AI proposals to live campaigns require human acceptance even for 🟢-tagged items, because campaign configuration is operator-owned.</p>
+
+<h2 id="s11-5">11.5 Flow 5 — Fraud Escalation &amp; Review</h2>
+<p>Three tiers feed one human decision. <strong>Tier A</strong> (deterministic rules: velocity, IP clustering, self-referral, geographic impossibility, disposable email) runs real-time on every <code>touch.recorded</code> / <code>referral.created</code> — no LLM. <strong>Tier B</strong> (ML anomaly detection, gradient boosting) runs daily batch — no LLM. <strong>Tier C</strong> (LLM narrative) runs in batch over aggregate patterns and on-demand when a human escalates a case. The Fraud Detection Agent may auto-hold a reward (🟢, reversible) and flag a participant for review (🟡); it can <strong>never</strong> ban a participant or clawback a reward (🔴).</p>
+<p>When a score crosses the signal threshold, the agent emits <code>fraud.flagged</code>, which (a) puts any associated reward on <code>Held</code> in the Reward service and (b) starts the <code>fraud_review</code> Temporal workflow. The workflow gathers evidence (recent referrals + touch patterns from Referral, full reasoning chain from AI), creates a review ticket, notifies an operator, and waits for a Keto-gated human decision.</p>
+<table>
+<thead><tr><th>#</th><th>Step</th><th>Service</th><th>Events / Workflow</th></tr></thead>
+<tbody>
+<tr><td>1</td><td>Tier A rule trips on a touch/referral; or Tier B batch flags anomaly</td><td>AI</td><td><code>ai.fraud_score_updated</code></td></tr>
+<tr><td>2</td><td>Score crosses signal threshold → raise signal</td><td>AI</td><td><code>fraud.flagged</code></td></tr>
+<tr><td>3</td><td>Reward consumes signal → associated reward to <code>Held</code></td><td>Reward</td><td><code>reward.held</code></td></tr>
+<tr><td>4</td><td>Fraud Review workflow gathers evidence (referrals, touches, reasoning chain)</td><td>AI (Temporal) → Referral, AI</td><td><code>fraud_review</code> WF</td></tr>
+<tr><td>5</td><td>Create review ticket; notify operator (dashboard + email)</td><td>AI, Notification</td><td>signal wait <code>operator_decision</code></td></tr>
+<tr><td>6</td><td>72h no action → reminder; 7d → escalate to owner</td><td>AI (Temporal)</td><td>timers</td></tr>
+<tr><td>7a</td><td><em>approve</em> → clear flag; held reward resumes lifecycle</td><td>AI, Referral, Reward</td><td>clear fraud flag</td></tr>
+<tr><td>7b</td><td><em>reject</em> → reject the participant&rsquo;s pending rewards</td><td>Reward</td><td><code>reward.rejected</code></td></tr>
+<tr><td>7c</td><td><em>ban</em> → block participant (human-only code path)</td><td>Referral</td><td><code>participant.state_changed</code> (Banned), <code>participant.trust_changed</code></td></tr>
+</tbody>
+</table>
+<figure><figcaption>Flow 5 — Fraud escalation, then a human decision</figcaption>
+<svg viewBox="0 0 652 276" xmlns="http://www.w3.org/2000/svg" style="width:100%;height:auto;font-family:Geist,system-ui,sans-serif" role="img"><defs>
+<marker id="a-ink" markerWidth="8" markerHeight="8" refX="7" refY="3" orient="auto"><path d="M0,0 L7,3 L0,6 Z" fill="#1c1917"/></marker>
+<marker id="a-acc" markerWidth="8" markerHeight="8" refX="7" refY="3" orient="auto"><path d="M0,0 L7,3 L0,6 Z" fill="#b45309"/></marker>
+<marker id="a-mint" markerWidth="8" markerHeight="8" refX="7" refY="3" orient="auto"><path d="M0,0 L7,3 L0,6 Z" fill="#047857"/></marker>
+<marker id="a-slate" markerWidth="8" markerHeight="8" refX="7" refY="3" orient="auto"><path d="M0,0 L7,3 L0,6 Z" fill="#1e40af"/></marker>
+<marker id="a-rose" markerWidth="8" markerHeight="8" refX="7" refY="3" orient="auto"><path d="M0,0 L7,3 L0,6 Z" fill="#be123c"/></marker>
+<marker id="a-ink3" markerWidth="8" markerHeight="8" refX="7" refY="3" orient="auto"><path d="M0,0 L7,3 L0,6 Z" fill="#78716c"/></marker>
+<marker id="a-line" markerWidth="8" markerHeight="8" refX="7" refY="3" orient="auto"><path d="M0,0 L7,3 L0,6 Z" fill="#e7e5e4"/></marker>
+<marker id="a-paper" markerWidth="8" markerHeight="8" refX="7" refY="3" orient="auto"><path d="M0,0 L7,3 L0,6 Z" fill="#FDFCFA"/></marker>
+<marker id="a-wash" markerWidth="8" markerHeight="8" refX="7" refY="3" orient="auto"><path d="M0,0 L7,3 L0,6 Z" fill="#f5f5f4"/></marker>
+<marker id="a-accbg" markerWidth="8" markerHeight="8" refX="7" refY="3" orient="auto"><path d="M0,0 L7,3 L0,6 Z" fill="#fef3c7"/></marker>
+<marker id="a-mintbg" markerWidth="8" markerHeight="8" refX="7" refY="3" orient="auto"><path d="M0,0 L7,3 L0,6 Z" fill="#d1fae5"/></marker>
+<marker id="a-rosebg" markerWidth="8" markerHeight="8" refX="7" refY="3" orient="auto"><path d="M0,0 L7,3 L0,6 Z" fill="#ffe4e6"/></marker>
+</defs>
+<rect x="34" y="4" width="106" height="22" rx="5" fill="#b45309"/>
+<text x="87" y="19" text-anchor="middle" font-size="10.5" font-weight="600" fill="#fff">AI</text>
+<line x1="87" y1="30" x2="87" y2="268" stroke="#e7e5e4" stroke-width="1" stroke-dasharray="3 3"/>
+<rect x="156" y="4" width="106" height="22" rx="5" fill="#047857"/>
+<text x="209" y="19" text-anchor="middle" font-size="10.5" font-weight="600" fill="#fff">Reward</text>
+<line x1="209" y1="30" x2="209" y2="268" stroke="#e7e5e4" stroke-width="1" stroke-dasharray="3 3"/>
+<rect x="278" y="4" width="106" height="22" rx="5" fill="#1c1917"/>
+<text x="331" y="19" text-anchor="middle" font-size="10.5" font-weight="600" fill="#fff">Referral</text>
+<line x1="331" y1="30" x2="331" y2="268" stroke="#e7e5e4" stroke-width="1" stroke-dasharray="3 3"/>
+<rect x="400" y="4" width="106" height="22" rx="5" fill="#78716c"/>
+<text x="453" y="19" text-anchor="middle" font-size="10.5" font-weight="600" fill="#fff">Notif</text>
+<line x1="453" y1="30" x2="453" y2="268" stroke="#e7e5e4" stroke-width="1" stroke-dasharray="3 3"/>
+<rect x="522" y="4" width="106" height="22" rx="5" fill="#1e40af"/>
+<text x="575" y="19" text-anchor="middle" font-size="10.5" font-weight="600" fill="#fff">Operator</text>
+<line x1="575" y1="30" x2="575" y2="268" stroke="#e7e5e4" stroke-width="1" stroke-dasharray="3 3"/>
+<circle cx="12" cy="54" r="8" fill="#b45309"/><text x="12" y="57" text-anchor="middle" font-size="9" font-weight="700" fill="#fff">1</text>
+<rect x="33" y="32" width="108" height="44" rx="5" fill="#f5f5f4" stroke="#e7e5e4" stroke-width="1"/>
+<text x="87" y="52" text-anchor="middle" font-size="9" fill="#1c1917">Tier A rule / Tier</text>
+<text x="87" y="64" text-anchor="middle" font-size="9" fill="#1c1917">B batch → score</text>
+<circle cx="12" cy="96" r="8" fill="#b45309"/><text x="12" y="99" text-anchor="middle" font-size="9" font-weight="700" fill="#fff">2</text>
+<line x1="87" y1="96" x2="209" y2="96" stroke="#b45309" stroke-width="1.6" marker-end="url(#a-acc)"/>
+<rect x="62" y="79" width="173" height="13" fill="#FDFCFA" opacity="0.92"/>
+<text x="148" y="89" text-anchor="middle" font-size="9.5" fill="#1c1917">fraud.flagged → reward Held</text>
+<circle cx="12" cy="138" r="8" fill="#b45309"/><text x="12" y="141" text-anchor="middle" font-size="9" font-weight="700" fill="#fff">3</text>
+<line x1="87" y1="138" x2="331" y2="138" stroke="#78716c" stroke-width="1.6" marker-end="url(#a-ink3)"/>
+<rect x="168" y="121" width="83" height="13" fill="#FDFCFA" opacity="0.92"/>
+<text x="209" y="131" text-anchor="middle" font-size="9.5" fill="#1c1917">gather evidence</text>
+<circle cx="12" cy="180" r="8" fill="#b45309"/><text x="12" y="183" text-anchor="middle" font-size="9" font-weight="700" fill="#fff">4</text>
+<line x1="87" y1="180" x2="453" y2="180" stroke="#1e40af" stroke-width="1.6" stroke-dasharray="5 3" marker-end="url(#a-slate)"/>
+<rect x="211" y="163" width="118" height="13" fill="#FDFCFA" opacity="0.92"/>
+<text x="270" y="173" text-anchor="middle" font-size="9.5" fill="#1c1917">create ticket → notify</text>
+<circle cx="12" cy="222" r="8" fill="#b45309"/><text x="12" y="225" text-anchor="middle" font-size="9" font-weight="700" fill="#fff">5</text>
+<line x1="87" y1="222" x2="575" y2="222" stroke="#b45309" stroke-width="1.6" marker-end="url(#a-acc)"/>
+<rect x="265" y="205" width="133" height="13" fill="#FDFCFA" opacity="0.92"/>
+<text x="331" y="215" text-anchor="middle" font-size="9.5" fill="#1c1917">await decision (72h · 7d)</text>
+</svg>
+<div class="wf-branch mt-sm"><span class="wf-r wf-ok"><strong>approve</strong> → clear flag; held reward resumes</span><span class="wf-r wf-warn"><strong>reject</strong> → reject pending rewards (reward.rejected)</span><span class="wf-r wf-err"><strong>ban</strong> → block participant — <em>human-only</em></span></div>
+</figure>
+<p><strong>Happens here / never here:</strong> the ban branch is unreachable by the AI service — only an operator signal can enter it. Tier C LLM analysis is never in the synchronous request path; it runs only in batch or on explicit human escalation.</p>
+<hr>
+<h1 id="s12">12. Service-Internal Application Architecture</h1>
+<p>Every service follows the same NestJS layering. From edge to core: <strong>middleware/guards</strong> (auth, tenant context, rate limit) → <strong>controllers</strong> (HTTP shape only) → <strong>application services / use-cases</strong> (orchestration, transactions, Temporal client calls) → <strong>domain</strong> (aggregates, entities, invariants) → <strong>repositories</strong> (RDS/Redis) and <strong>integration adapters</strong> (event publishers, sync clients, Temporal activity handlers, SQS consumers). The rule that holds across all four services below: <strong>business rules live in the domain and application layers; integration logic lives in adapters; controllers and consumers are thin.</strong> OpenTelemetry is injected at the edges — controllers, SQS consumers, Temporal activities, and outbound sync/AI clients all open spans; the domain layer stays free of telemetry code.</p>
+
+<h2 id="s12-1">12.1 Event Ingestion Service</h2>
+<p>Stateless, no RDS, Redis-only. There is no domain aggregate here — the &ldquo;domain&rdquo; is the validation pipeline itself. Its job is to turn untrusted inbound HTTP into a trusted, deduplicated, enriched event on SNS, and to return a fast <code>202</code>.</p>
+<figure><figcaption>Inside the Event Ingestion Service</figcaption>
+<svg viewBox="0 0 700 358" xmlns="http://www.w3.org/2000/svg" style="width:100%;height:auto;font-family:Geist,system-ui,sans-serif" role="img">
+<defs><marker id="dn" markerWidth="9" markerHeight="9" refX="4.5" refY="7" orient="auto"><path d="M0,0 L9,0 L4.5,7 Z" fill="#78716c"/></marker></defs>
+<rect x="12" y="8" width="676" height="58" rx="8" fill="#dbeafe" stroke="#cfcbc6" stroke-width="1"/>
+<rect x="12" y="8" width="5" height="58" rx="2.5" fill="#1e40af"/>
+<text x="24" y="26" font-size="11" font-weight="700" fill="#1e40af" letter-spacing="0.02em">Edge</text>
+<rect x="24.0" y="34" width="322.0" height="24" rx="5" fill="#ffffff" stroke="#1e40af" stroke-width="1"/>
+<text x="185.0" y="49" text-anchor="middle" font-size="8.5" fill="#1c1917">SDK · publishable key</text>
+<rect x="354.0" y="34" width="322.0" height="24" rx="5" fill="#ffffff" stroke="#1e40af" stroke-width="1"/>
+<text x="515.0" y="49" text-anchor="middle" font-size="8.5" fill="#1c1917">Client backend · secret key</text>
+<rect x="12" y="88" width="676" height="46" rx="8" fill="#f5f5f4" stroke="#cfcbc6" stroke-width="1"/>
+<rect x="12" y="88" width="5" height="46" rx="2.5" fill="#78716c"/>
+<text x="24" y="106" font-size="11" font-weight="700" fill="#78716c" letter-spacing="0.02em">Guards</text>
+<text x="24" y="124" font-size="10" fill="#44403c">auth → internal JWT (validate-token) · rate-limit (Redis)</text>
+<rect x="12" y="156" width="676" height="46" rx="8" fill="#ece9e6" stroke="#cfcbc6" stroke-width="1"/>
+<rect x="12" y="156" width="5" height="46" rx="2.5" fill="#1c1917"/>
+<text x="24" y="174" font-size="11" font-weight="700" fill="#1c1917" letter-spacing="0.02em">Controllers</text>
+<text x="24" y="192" font-size="10" fill="#44403c">/v1/events · /v1/sdk/* · inbound provider receivers — thin</text>
+<rect x="12" y="224" width="676" height="58" rx="8" fill="#fef3c7" stroke="#cfcbc6" stroke-width="1"/>
+<rect x="12" y="224" width="5" height="58" rx="2.5" fill="#b45309"/>
+<text x="24" y="242" font-size="11" font-weight="700" fill="#b45309" letter-spacing="0.02em">Application · Validation Pipeline</text>
+<text x="676" y="242" text-anchor="end" font-size="9" font-style="italic" fill="#78716c">all rules live here</text>
+<rect x="24.0" y="250" width="86.3" height="24" rx="5" fill="#ffffff" stroke="#b45309" stroke-width="1"/>
+<text x="67.1" y="265" text-anchor="middle" font-size="8.5" fill="#1c1917">schema</text>
+<rect x="118.3" y="250" width="86.3" height="24" rx="5" fill="#ffffff" stroke="#b45309" stroke-width="1"/>
+<text x="161.4" y="265" text-anchor="middle" font-size="8.5" fill="#1c1917">trust</text>
+<rect x="212.6" y="250" width="86.3" height="24" rx="5" fill="#ffffff" stroke="#b45309" stroke-width="1"/>
+<text x="255.7" y="265" text-anchor="middle" font-size="8.5" fill="#1c1917">Rules Guard</text>
+<rect x="306.9" y="250" width="86.3" height="24" rx="5" fill="#ffffff" stroke="#b45309" stroke-width="1"/>
+<text x="350.0" y="265" text-anchor="middle" font-size="8.5" fill="#1c1917">dedup</text>
+<rect x="401.1" y="250" width="86.3" height="24" rx="5" fill="#ffffff" stroke="#b45309" stroke-width="1"/>
+<text x="444.3" y="265" text-anchor="middle" font-size="8.5" fill="#1c1917">context</text>
+<rect x="495.4" y="250" width="86.3" height="24" rx="5" fill="#ffffff" stroke="#b45309" stroke-width="1"/>
+<text x="538.6" y="265" text-anchor="middle" font-size="8.5" fill="#1c1917">enrich</text>
+<rect x="589.7" y="250" width="86.3" height="24" rx="5" fill="#ffffff" stroke="#b45309" stroke-width="1"/>
+<text x="632.9" y="265" text-anchor="middle" font-size="8.5" fill="#1c1917">consent</text>
+<rect x="12" y="304" width="676" height="46" rx="8" fill="#d1fae5" stroke="#cfcbc6" stroke-width="1"/>
+<rect x="12" y="304" width="5" height="46" rx="2.5" fill="#047857"/>
+<text x="24" y="322" font-size="11" font-weight="700" fill="#047857" letter-spacing="0.02em">Adapter → bus</text>
+<text x="24" y="340" font-size="10" fill="#44403c">SNS publish → ingestion / participant events → 202 Accepted</text>
+<line x1="350" y1="69" x2="350" y2="86" stroke="#78716c" stroke-width="1.4" marker-end="url(#dn)"/>
+<line x1="350" y1="137" x2="350" y2="154" stroke="#78716c" stroke-width="1.4" marker-end="url(#dn)"/>
+<line x1="350" y1="205" x2="350" y2="222" stroke="#78716c" stroke-width="1.4" marker-end="url(#dn)"/>
+<line x1="350" y1="285" x2="350" y2="302" stroke="#78716c" stroke-width="1.4" marker-end="url(#dn)"/>
+</svg>
+<p class="note">Read top → bottom: a request enters at the Edge and flows inward; events leave from the Adapters at the bottom. Amber = where business rules live. No referral, reward, or attribution logic lives here — Ingestion classifies and forwards.</p></figure>
+<p><strong>Business rules vs integration:</strong> the trust-boundary check (publishable keys may only send touch events) and the Business Rules Guard (campaign availability, link state) are business rules and live in the pipeline service. SNS publishing, Redis access, and the Tenant token call are integration adapters. The controller does nothing but bind the request and call the pipeline. <strong>Never here:</strong> no referral records, no reward logic, no attribution — ingestion classifies and forwards, it does not decide outcomes.</p>
+
+<h2 id="s12-2">12.2 Referral Workflow Service</h2>
+<p>The richest domain in the platform and the one place attribution is computed. It owns the Referral aggregate, the Participant and Invitee profiles, the participant lifecycle and trust-tier state machines, and the immutable Attribution records. Temporal is called <strong>only from the application layer</strong> — controllers and consumers start or signal workflows through a workflow-client adapter; the domain model never imports Temporal.</p>
+<figure><figcaption>Inside the Referral Workflow Service</figcaption>
+<svg viewBox="0 0 700 358" xmlns="http://www.w3.org/2000/svg" style="width:100%;height:auto;font-family:Geist,system-ui,sans-serif" role="img">
+<defs><marker id="dn" markerWidth="9" markerHeight="9" refX="4.5" refY="7" orient="auto"><path d="M0,0 L9,0 L4.5,7 Z" fill="#78716c"/></marker></defs>
+<rect x="12" y="8" width="676" height="58" rx="8" fill="#dbeafe" stroke="#cfcbc6" stroke-width="1"/>
+<rect x="12" y="8" width="5" height="58" rx="2.5" fill="#1e40af"/>
+<text x="24" y="26" font-size="11" font-weight="700" fill="#1e40af" letter-spacing="0.02em">Edge</text>
+<rect x="24.0" y="34" width="322.0" height="24" rx="5" fill="#ffffff" stroke="#1e40af" stroke-width="1"/>
+<text x="185.0" y="49" text-anchor="middle" font-size="8.5" fill="#1c1917">HTTP · dashboard (auth+tenant+Keto)</text>
+<rect x="354.0" y="34" width="322.0" height="24" rx="5" fill="#ffffff" stroke="#1e40af" stroke-width="1"/>
+<text x="515.0" y="49" text-anchor="middle" font-size="8.5" fill="#1c1917">SQS consumer · idempotent</text>
+<rect x="12" y="88" width="676" height="46" rx="8" fill="#ece9e6" stroke="#cfcbc6" stroke-width="1"/>
+<rect x="12" y="88" width="5" height="46" rx="2.5" fill="#1c1917"/>
+<text x="24" y="106" font-size="11" font-weight="700" fill="#1c1917" letter-spacing="0.02em">Controllers</text>
+<text x="24" y="124" font-size="10" fill="#44403c">/v1/referrals · /referral-links/generate · /referrers/{id}</text>
+<rect x="12" y="156" width="676" height="58" rx="8" fill="#fef3c7" stroke="#cfcbc6" stroke-width="1"/>
+<rect x="12" y="156" width="5" height="58" rx="2.5" fill="#b45309"/>
+<text x="24" y="174" font-size="11" font-weight="700" fill="#b45309" letter-spacing="0.02em">Application / Use-cases</text>
+<text x="676" y="174" text-anchor="end" font-size="9" font-style="italic" fill="#78716c">→ Temporal Lifecycle WF</text>
+<rect x="24.0" y="182" width="212.0" height="24" rx="5" fill="#ffffff" stroke="#b45309" stroke-width="1"/>
+<text x="130.0" y="197" text-anchor="middle" font-size="8.5" fill="#1c1917">generate-link</text>
+<rect x="244.0" y="182" width="212.0" height="24" rx="5" fill="#ffffff" stroke="#b45309" stroke-width="1"/>
+<text x="350.0" y="197" text-anchor="middle" font-size="8.5" fill="#1c1917">match-conversion</text>
+<rect x="464.0" y="182" width="212.0" height="24" rx="5" fill="#ffffff" stroke="#b45309" stroke-width="1"/>
+<text x="570.0" y="197" text-anchor="middle" font-size="8.5" fill="#1c1917">run-lifecycle</text>
+<rect x="12" y="236" width="676" height="46" rx="8" fill="#ece9e6" stroke="#cfcbc6" stroke-width="1"/>
+<rect x="12" y="236" width="5" height="46" rx="2.5" fill="#1c1917"/>
+<text x="24" y="254" font-size="11" font-weight="700" fill="#1c1917" letter-spacing="0.02em">Domain</text>
+<text x="676" y="254" text-anchor="end" font-size="9" font-style="italic" fill="#78716c">invariants enforced here</text>
+<text x="24" y="272" font-size="10" fill="#44403c">Referral &amp; Participant state machines · Attribution (6 models)</text>
+<rect x="12" y="304" width="676" height="46" rx="8" fill="#d1fae5" stroke="#cfcbc6" stroke-width="1"/>
+<rect x="12" y="304" width="5" height="46" rx="2.5" fill="#047857"/>
+<text x="24" y="322" font-size="11" font-weight="700" fill="#047857" letter-spacing="0.02em">Repositories &amp; Adapters</text>
+<text x="24" y="340" font-size="10" fill="#44403c">referral_db (RDS) · Redis hot state · SNS publish · sync clients (Segmentation, AI)</text>
+<line x1="350" y1="69" x2="350" y2="86" stroke="#78716c" stroke-width="1.4" marker-end="url(#dn)"/>
+<line x1="350" y1="137" x2="350" y2="154" stroke="#78716c" stroke-width="1.4" marker-end="url(#dn)"/>
+<line x1="350" y1="217" x2="350" y2="234" stroke="#78716c" stroke-width="1.4" marker-end="url(#dn)"/>
+<line x1="350" y1="285" x2="350" y2="302" stroke="#78716c" stroke-width="1.4" marker-end="url(#dn)"/>
+</svg>
+<p class="note">Read top → bottom: a request enters at the Edge and flows inward; events leave from the Adapters at the bottom. Amber = where business rules live. Temporal is called only from the Application layer — never controllers or domain.</p></figure>
+<p><strong>Where invariants are enforced:</strong> only the domain may transition the Referral or Participant state machine and only the domain computes an Attribution record (which is then immutable). The application layer decides <em>when</em> to compute (inside the Temporal workflow, between conversion validation and reward emission); the domain decides <em>what</em> the computation yields. <strong>Where Temporal is called from:</strong> the application layer, never the controller directly and never the domain. <strong>Never here:</strong> reward amounts, payout logic, or eligibility rules — those are read from or delegated to Reward, Reward-config, and Segmentation respectively.</p>
+
+<h2 id="s12-3">12.3 AI Intelligence Service</h2>
+<p>The only service permitted to make LLM calls. Its internal structure mirrors the three processing tiers, with a strict separation between read tools and guarded write tools (the reversible <code>hold_reward</code> being the principal one). The agent layer is LangChain <code>AgentExecutor</code> instances; the tool layer wraps internal HTTP calls to other services and is the <em>only</em> place those calls originate.</p>
+<figure><figcaption>Inside the AI Intelligence Service</figcaption>
+<svg viewBox="0 0 700 370" xmlns="http://www.w3.org/2000/svg" style="width:100%;height:auto;font-family:Geist,system-ui,sans-serif" role="img">
+<defs><marker id="dn" markerWidth="9" markerHeight="9" refX="4.5" refY="7" orient="auto"><path d="M0,0 L9,0 L4.5,7 Z" fill="#78716c"/></marker></defs>
+<rect x="12" y="8" width="676" height="58" rx="8" fill="#dbeafe" stroke="#cfcbc6" stroke-width="1"/>
+<rect x="12" y="8" width="5" height="58" rx="2.5" fill="#1e40af"/>
+<text x="24" y="26" font-size="11" font-weight="700" fill="#1e40af" letter-spacing="0.02em">Edge</text>
+<rect x="24.0" y="34" width="212.0" height="24" rx="5" fill="#ffffff" stroke="#1e40af" stroke-width="1"/>
+<text x="130.0" y="49" text-anchor="middle" font-size="8.5" fill="#1c1917">HTTP · dashboard/internal</text>
+<rect x="244.0" y="34" width="212.0" height="24" rx="5" fill="#ffffff" stroke="#1e40af" stroke-width="1"/>
+<text x="350.0" y="49" text-anchor="middle" font-size="8.5" fill="#1c1917">SQS · filtered (dedup 24h)</text>
+<rect x="464.0" y="34" width="212.0" height="24" rx="5" fill="#ffffff" stroke="#1e40af" stroke-width="1"/>
+<text x="570.0" y="49" text-anchor="middle" font-size="8.5" fill="#1c1917">Temporal · activities</text>
+<rect x="12" y="88" width="676" height="46" rx="8" fill="#ece9e6" stroke="#cfcbc6" stroke-width="1"/>
+<rect x="12" y="88" width="5" height="46" rx="2.5" fill="#1c1917"/>
+<text x="24" y="106" font-size="11" font-weight="700" fill="#1c1917" letter-spacing="0.02em">Controllers</text>
+<text x="24" y="124" font-size="10" fill="#44403c">/internal/ai/* · /v1/recommendations/* · /v1/ai/campaign-assistant/*</text>
+<rect x="12" y="156" width="676" height="58" rx="8" fill="#fef3c7" stroke="#cfcbc6" stroke-width="1"/>
+<rect x="12" y="156" width="5" height="58" rx="2.5" fill="#b45309"/>
+<text x="24" y="174" font-size="11" font-weight="700" fill="#b45309" letter-spacing="0.02em">Application · Tier Router</text>
+<text x="676" y="174" text-anchor="end" font-size="9" font-style="italic" fill="#78716c">keeps 95%+ zero-LLM</text>
+<rect x="24.0" y="182" width="212.0" height="24" rx="5" fill="#ffffff" stroke="#b45309" stroke-width="1"/>
+<text x="130.0" y="197" text-anchor="middle" font-size="8.5" fill="#1c1917">Tier A · rules (no LLM)</text>
+<rect x="244.0" y="182" width="212.0" height="24" rx="5" fill="#ffffff" stroke="#b45309" stroke-width="1"/>
+<text x="350.0" y="197" text-anchor="middle" font-size="8.5" fill="#1c1917">Tier B · ML (no LLM)</text>
+<rect x="464.0" y="182" width="212.0" height="24" rx="5" fill="#ffffff" stroke="#b45309" stroke-width="1"/>
+<text x="570.0" y="197" text-anchor="middle" font-size="8.5" fill="#1c1917">Tier C · LLM agents</text>
+<rect x="12" y="236" width="676" height="46" rx="8" fill="#ece9e6" stroke="#cfcbc6" stroke-width="1"/>
+<rect x="12" y="236" width="5" height="46" rx="2.5" fill="#1c1917"/>
+<text x="24" y="254" font-size="11" font-weight="700" fill="#1c1917" letter-spacing="0.02em">Domain</text>
+<text x="676" y="254" text-anchor="end" font-size="9" font-style="italic" fill="#78716c">explainability invariant</text>
+<text x="24" y="272" font-size="10" fill="#44403c">recommendation record + decision log (reasoning chain)</text>
+<rect x="12" y="304" width="676" height="58" rx="8" fill="#d1fae5" stroke="#cfcbc6" stroke-width="1"/>
+<rect x="12" y="304" width="5" height="58" rx="2.5" fill="#047857"/>
+<text x="24" y="322" font-size="11" font-weight="700" fill="#047857" letter-spacing="0.02em">Tool Registry (adapters)</text>
+<rect x="24.0" y="330" width="322.0" height="24" rx="5" fill="#ffffff" stroke="#047857" stroke-width="1"/>
+<text x="185.0" y="345" text-anchor="middle" font-size="8.5" fill="#1c1917">read → Campaign / Analytics / Referral / Reward / Segmentation</text>
+<rect x="354.0" y="330" width="322.0" height="24" rx="5" fill="#ffffff" stroke="#047857" stroke-width="1"/>
+<text x="515.0" y="345" text-anchor="middle" font-size="8.5" fill="#1c1917">write → hold_reward (reversible, logged)</text>
+<line x1="350" y1="69" x2="350" y2="86" stroke="#78716c" stroke-width="1.4" marker-end="url(#dn)"/>
+<line x1="350" y1="137" x2="350" y2="154" stroke="#78716c" stroke-width="1.4" marker-end="url(#dn)"/>
+<line x1="350" y1="217" x2="350" y2="234" stroke="#78716c" stroke-width="1.4" marker-end="url(#dn)"/>
+<line x1="350" y1="285" x2="350" y2="302" stroke="#78716c" stroke-width="1.4" marker-end="url(#dn)"/>
+</svg>
+<p class="note">Read top → bottom: a request enters at the Edge and flows inward; events leave from the Adapters at the bottom. Amber = where business rules live. The only write tool is the reversible hold_reward — no tool exists for a 🔴 action.</p></figure>
+<p><strong>Business rules vs integration:</strong> the tier-routing decision (which keeps 95%+ of work zero-LLM) is a business rule in the application layer; the LangChain tool wrappers are integration adapters and the <em>only</em> egress to other services&rsquo; data. <strong>Where invariants are enforced:</strong> every Tier C decision must write a decision log with a reasoning chain before its result is allowed to leave the service — explainability is enforced in the domain layer, not bolted on. <strong>Never here:</strong> no operational state is owned or mutated except the single reversible <code>hold_reward</code>; the agent layer cannot reach a 🔴 action because no write tool for it exists in the registry.</p>
+
+<h2 id="s12-4">12.4 Reward &amp; Payout Service</h2>
+<p>Owns the reward lifecycle and the money. Its application layer hosts the Reward Approval workflow client and the cap ledger; its domain enforces the lifecycle state machine and cap atomicity.</p>
+<figure><figcaption>Inside the Reward & Payout Service</figcaption>
+<svg viewBox="0 0 700 358" xmlns="http://www.w3.org/2000/svg" style="width:100%;height:auto;font-family:Geist,system-ui,sans-serif" role="img">
+<defs><marker id="dn" markerWidth="9" markerHeight="9" refX="4.5" refY="7" orient="auto"><path d="M0,0 L9,0 L4.5,7 Z" fill="#78716c"/></marker></defs>
+<rect x="12" y="8" width="676" height="58" rx="8" fill="#dbeafe" stroke="#cfcbc6" stroke-width="1"/>
+<rect x="12" y="8" width="5" height="58" rx="2.5" fill="#1e40af"/>
+<text x="24" y="26" font-size="11" font-weight="700" fill="#1e40af" letter-spacing="0.02em">Edge</text>
+<rect x="24.0" y="34" width="322.0" height="24" rx="5" fill="#ffffff" stroke="#1e40af" stroke-width="1"/>
+<text x="185.0" y="49" text-anchor="middle" font-size="8.5" fill="#1c1917">HTTP · Keto-gated (approve/reject/clawback)</text>
+<rect x="354.0" y="34" width="322.0" height="24" rx="5" fill="#ffffff" stroke="#1e40af" stroke-width="1"/>
+<text x="515.0" y="49" text-anchor="middle" font-size="8.5" fill="#1c1917">SQS · referral.converted / fraud.flagged</text>
+<rect x="12" y="88" width="676" height="46" rx="8" fill="#ece9e6" stroke="#cfcbc6" stroke-width="1"/>
+<rect x="12" y="88" width="5" height="46" rx="2.5" fill="#1c1917"/>
+<text x="24" y="106" font-size="11" font-weight="700" fill="#1c1917" letter-spacing="0.02em">Controllers</text>
+<text x="24" y="124" font-size="10" fill="#44403c">/v1/rewards/{id}/approve|reject|clawback · /v1/payouts · /confirm</text>
+<rect x="12" y="156" width="676" height="58" rx="8" fill="#fef3c7" stroke="#cfcbc6" stroke-width="1"/>
+<rect x="12" y="156" width="5" height="58" rx="2.5" fill="#b45309"/>
+<text x="24" y="174" font-size="11" font-weight="700" fill="#b45309" letter-spacing="0.02em">Application</text>
+<text x="676" y="174" text-anchor="end" font-size="9" font-style="italic" fill="#78716c">→ Reward Approval WF</text>
+<rect x="24.0" y="182" width="212.0" height="24" rx="5" fill="#ffffff" stroke="#b45309" stroke-width="1"/>
+<text x="130.0" y="197" text-anchor="middle" font-size="8.5" fill="#1c1917">reward-creation</text>
+<rect x="244.0" y="182" width="212.0" height="24" rx="5" fill="#ffffff" stroke="#b45309" stroke-width="1"/>
+<text x="350.0" y="197" text-anchor="middle" font-size="8.5" fill="#1c1917">decision-function</text>
+<rect x="464.0" y="182" width="212.0" height="24" rx="5" fill="#ffffff" stroke="#b45309" stroke-width="1"/>
+<text x="570.0" y="197" text-anchor="middle" font-size="8.5" fill="#1c1917">payout-batching</text>
+<rect x="12" y="236" width="676" height="46" rx="8" fill="#ece9e6" stroke="#cfcbc6" stroke-width="1"/>
+<rect x="12" y="236" width="5" height="46" rx="2.5" fill="#1c1917"/>
+<text x="24" y="254" font-size="11" font-weight="700" fill="#1c1917" letter-spacing="0.02em">Domain</text>
+<text x="676" y="254" text-anchor="end" font-size="9" font-style="italic" fill="#78716c">invariants enforced here</text>
+<text x="24" y="272" font-size="10" fill="#44403c">Reward state machine · cap ledger (advisory lock) · clawback = correction, not delete</text>
+<rect x="12" y="304" width="676" height="46" rx="8" fill="#d1fae5" stroke="#cfcbc6" stroke-width="1"/>
+<rect x="12" y="304" width="5" height="46" rx="2.5" fill="#047857"/>
+<text x="24" y="322" font-size="11" font-weight="700" fill="#047857" letter-spacing="0.02em">Repositories &amp; Adapters</text>
+<text x="24" y="340" font-size="10" fill="#44403c">reward_db (RDS) · sync (Campaign, AI) · SNS publish (reward.*, payout.*)</text>
+<line x1="350" y1="69" x2="350" y2="86" stroke="#78716c" stroke-width="1.4" marker-end="url(#dn)"/>
+<line x1="350" y1="137" x2="350" y2="154" stroke="#78716c" stroke-width="1.4" marker-end="url(#dn)"/>
+<line x1="350" y1="217" x2="350" y2="234" stroke="#78716c" stroke-width="1.4" marker-end="url(#dn)"/>
+<line x1="350" y1="285" x2="350" y2="302" stroke="#78716c" stroke-width="1.4" marker-end="url(#dn)"/>
+</svg>
+<p class="note">Read top → bottom: a request enters at the Edge and flows inward; events leave from the Adapters at the bottom. Amber = where business rules live. The decision function runs in Application; the state transition is applied by the Domain.</p></figure>
+<p><strong>Where invariants are enforced:</strong> the lifecycle transitions and cap atomicity (advisory lock on the cap counter) are domain invariants — concurrent conversions for the same participant/campaign cannot over-pay. A clawback is an immutable correction that coexists with the original <code>reward.earned</code>; it is never a deletion. <strong>Where the decision function runs:</strong> the application layer, inside the Reward Approval workflow — it reads fraud score, trust ceiling, and budget, but the resulting <em>transition</em> is applied by the domain. <strong>Never here:</strong> reward <em>configuration</em> (lives on the Variant in Campaign) and fraud <em>verdicts</em> (AI) are read, never owned. This service hosts the <strong>Reward and Payout eligibility checkpoints</strong> (§13.5): the application layer makes a synchronous, fail-closed PDP call inside the Temporal workflow before approving or disbursing — pushing caps, fraud score, and trust to the eligibility service rather than letting it read them.</p>
+<hr>
+<h1 id="s13">13. Cross-Cutting Application Concerns</h1>
+<p>Four concerns are implemented identically across all nine services so that behaviour is predictable regardless of which service a request lands in. Each is a NestJS construct positioned at a specific layer.</p>
+
+<h2 id="s13-1">13.1 Auth &amp; tenant context</h2>
+<p>Authentication is resolved once, at the edge. The ALB + Traefik + NestJS Auth Guard calls Tenant&rsquo;s <code>GET /internal/validate-token</code>, which resolves either an API key or an OAuth2 JWT into a uniform internal JWT carrying <code>{ tenant_id, user_id, source, key_type, perms[] }</code>. From that point inward, every service reads tenant context from request scope — a request-scoped provider attaches <code>tenant_id</code> so repositories scope every query without the controller passing it explicitly.</p>
+<p><strong>Authorization model (hybrid).</strong> Ory Keto is the source of truth. The gateway resolves a dashboard caller's Keto permissions at token issuance and embeds them as a <code>perms[]</code> snapshot in the short-lived internal JWT (TTL ≤ 15 min). Downstream guards authorize coarse-grained operations — reads, lists, ordinary writes, <code>analytics:read</code> — directly from that snapshot, with no Keto round-trip. Money-moving and object-scoped actions always re-check Keto <strong>live</strong> in a guard at the controller boundary (<code>rewards:approve</code>, <code>rewards:reject</code>, <code>rewards:clawback</code>, <code>payouts:write/confirm</code>, <code>api_keys:manage</code>, any &ldquo;can user X act on object Y&rdquo; check), so a stale token can never authorize a payout; the short TTL bounds staleness for everything else. API keys are never Keto subjects — their internal JWT carries no <code>perms</code> — and a key must never be able to authorize a payout. (Matches API Contract §2 and Responsibility Contract §1.3.) <strong>The API-key vs JWT paths diverge by destination:</strong> API keys (publishable or secret) reach <em>only</em> the Ingestion Service and its SDK/receiver endpoints; any API-key request to a CRUD, reward, payout, or analytics endpoint returns <code>403 authorization_error</code> at the gateway. Dashboard sessions (OAuth2 JWT) reach configuration and money endpoints and there hit the Keto guard. The two paths never cross.</p>
+
+<h2 id="s13-2">13.2 Validation &amp; error handling</h2>
+<p>Request validation happens at the controller boundary via NestJS validation pipes against the API and event schemas — including the conditional rules (a conversion needs one of <code>invitee_email</code> / <code>invitee_external_id</code>; a <code>recurring</code> conversion needs <code>revenue_mrr</code>). Schema failures return <code>400</code> / <code>422</code> before any business logic runs. Business-rule failures are raised as typed domain exceptions in the domain/application layer and mapped by a single global exception filter into the contract&rsquo;s typed error shape (e.g. <code>409 Conflict</code> for invalid state-machine transitions, <code>410 Gone</code> for archived/expired campaigns or revoked links, <code>403 authorization_error</code> for trust-boundary violations). The filter is the one place HTTP status and the contract error body are decided — services never hand-build error responses.</p>
+
+<h2 id="s13-3">13.3 Idempotency</h2>
+<p>Idempotency is layered. At the controller/consumer edge, the <strong>client-supplied <code>external_id</code></strong> is the deduplication key: Ingestion checks <code>tenant_id + external_id</code> in Redis (90-day window) and returns <code>202 Accepted</code> with <code>processing_status: "duplicate"</code> on a repeat; for events from billing provider the provider&rsquo;s native event id is mapped onto <code>external_id</code> so provider retries dedup the same way. Downstream consumers add their own composite keys so that SQS at-least-once redelivery is safe even if the edge dedup is bypassed: Referral and Reward use <code>referral_id + event_type</code>, AI uses <code>event_id</code> (24h), Analytics relies on ClickHouse <code>ReplacingMergeTree</code> on <code>event_id</code>, Notification uses <code>event_id + webhook_id</code>. The dedup logic sits in the consumer/application layer, not the domain — the domain assumes it is only ever called once per logical event.</p>
+
+<h2 id="s13-4">13.4 Observability hooks</h2>
+<p>OpenTelemetry context is created at every entry edge and propagated everywhere a request or event travels, so a single trace spans the HTTP edge, the SNS/SQS hop, the Temporal workflow, and any AI call:</p>
+<table>
+<thead><tr><th>Edge</th><th>Hook</th><th>Span attributes</th></tr></thead>
+<tbody>
+<tr><td>HTTP controllers</td><td>Interceptor opens a server span per request</td><td><code>tenant_id</code>, route, status, latency, <code>key_type</code></td></tr>
+<tr><td>Sync service-to-service</td><td><code>traceparent</code>/<code>tracestate</code> headers propagated</td><td>caller, callee, latency, circuit-breaker state</td></tr>
+<tr><td>SQS consumers</td><td>Trace context in message attributes; consumer continues the trace</td><td>topic, queue, <code>event_id</code>, receive count, dedup hit</td></tr>
+<tr><td>Temporal workflows &amp; activities</td><td>Workflow + activity spans linked to the originating trace</td><td>workflow type, run id, activity, retry count</td></tr>
+<tr><td>AI calls (Tier C)</td><td>Span per agent run + linked decision log</td><td>agent type, tier, model, tokens, cost, <code>confidence_score</code></td></tr>
+</tbody>
+</table>
+<p>Logs and traces share the trace id; the AI decision log is keyed by the same trace id, so a recommendation in the dashboard can be tied back to the exact prompt, model, and inputs that produced it. The domain layer emits no telemetry — observability is an edge concern by construction.</p>
+
+<h2 id="s13-5">13.5 Eligibility — centralized rules, distributed checkpoints</h2>
+<p>Eligibility follows a Policy Decision Point / Policy Enforcement Point split, the same shape as Keto for authorization. The <strong>rules</strong> are centralized in the Segmentation &amp; Eligibility Service (the PDP, §2.3); the <strong>moments</strong> are distributed as five checkpoints across the services that own each lifecycle stage (the PEPs). You cannot centralize the moment — only Referral knows &ldquo;a referral is being created,&rdquo; only Reward knows &ldquo;a reward is about to be approved.&rdquo; The PDP answers <em>whether</em>; Fraud answers <em>how risky</em>; Attribution answers <em>who gets credit</em> — three separate questions that never merge.</p>
+<p>Each call is synchronous and is a <strong>must</strong>, not best-effort: a checkpoint either receives a fresh decision or the action does not proceed. Three operations are kept semantically distinct because their fail modes are opposite — folding them into one <code>evaluate</code> is how a money check eventually inherits a fail-open default:</p>
+<ul>
+<li><strong>check-eligibility</strong> — the gate. <strong>Fail-closed.</strong> Missing attributes on a gating rule resolve conservatively (deny), per rule.</li>
+<li><strong>resolve-variant</strong> — segment → variant. <strong>Fails open</strong> → the Default Variant; a missing attribute is a non-match and falls through, never blocking enrollment.</li>
+<li><strong>assign-ab</strong> — deterministic hash-based bucketing; stable for a given actor.</li>
+</ul>
+<table>
+<thead><tr><th>Checkpoint</th><th>PEP — service · moment</th><th>Representative rules</th><th>On PDP unavailable</th></tr></thead>
+<tbody>
+<tr><td><strong>Entry</strong></td><td>Referral · enrollment (<code>POST /v1/referrers</code>, backend-owned)</td><td>Campaign status; segment match (→ default); dedup (idempotent); participant banned/suspended; participant cap</td><td>Fail-closed — reject enroll; client backend retries</td></tr>
+<tr><td><strong>Referral</strong></td><td>Referral · referral creation</td><td>Campaign still active; participant in good standing; referral cap; link expiry; self-referral (silent block + fraud flag)</td><td>Fail-closed — reject <code>eligibility_unavailable</code></td></tr>
+<tr><td><strong>Conversion</strong></td><td>Referral · conversion validation</td><td>Attribution window; invitee dedup (already converted?); fraud-signal flagging</td><td>Fail-closed → durable retry (Temporal)</td></tr>
+<tr><td><strong>Reward</strong></td><td>Reward · reward calculation / approval</td><td>Budget remaining; reward cap (per campaign/period); fraud score &gt; threshold → hold</td><td>Fail-closed → durable retry (Temporal)</td></tr>
+<tr><td><strong>Payout</strong></td><td>Reward · payout confirm</td><td>Payout method set; hold period elapsed; identity verification (high thresholds); tax form (W-9, US ≈ $600)</td><td>Fail-closed → durable retry (Temporal)</td></tr>
+</tbody></table>
+<p><strong>Event Ingestion is deliberately not a checkpoint.</strong> Its Redis campaign-availability check answers &ldquo;is this campaign accepting events at all,&rdquo; which is availability, not a per-actor eligibility decision. Ingestion stays thin; checkpoints live only in Referral (Entry, Referral, Conversion) and Reward (Reward, Payout) — Campaign serves configuration and enforces no checkpoint.</p>
+<p><strong>Inputs — pushed vs read.</strong> The PDP owns rules, segment definitions, membership, and A/B state, and reads only those. Everything else is pushed in by the calling checkpoint, so the PDP never reaches into caps, fraud, trust, or consent:</p>
+<table>
+<thead><tr><th>Signal</th><th>Source of truth</th><th>Delivery</th></tr></thead>
+<tbody>
+<tr><td><code>tenant_id</code>, <code>campaign_id</code>, actor refs, <code>trigger</code>/<code>event_type</code>, <code>occurred_at</code></td><td>caller</td><td>pushed in the request</td></tr>
+<tr><td>Actor attributes for segment rules</td><td>caller / profile</td><td>pushed (absent → non-match)</td></tr>
+<tr><td><code>amount</code>, <code>currency</code>, <code>reward_type</code> (Reward/Payout)</td><td>Reward</td><td>pushed</td></tr>
+<tr><td>Cap counters</td><td>Reward</td><td>pushed (PDP must not read the ledger)</td></tr>
+<tr><td><code>fraud_score</code></td><td>AI</td><td>pushed by the caller (already obtained)</td></tr>
+<tr><td><code>trust_tier</code>, <code>consent</code></td><td>Referral</td><td>pushed</td></tr>
+<tr><td>Segment membership · rule set · A/B allocation</td><td>Segmentation &amp; Eligibility</td><td>read locally (its own DB + Redis)</td></tr>
+</tbody></table>
+<p>The contract is one versioned <code>EligibilityContext</code> in, one auditable decision out — stamped with <code>rule_version</code> and <code>decision_id</code> (the same reproducibility discipline as the AI decision logs), so a disputed reward can be explained later:</p>
+<pre class="asc"><code>POST /internal/eligibility/evaluate
+  → EligibilityContext {
+      checkpoint: entry | referral | conversion | reward | payout,
+      operation:  check_eligibility | resolve_variant | assign_ab,
+      tenant_id, campaign_id, actor refs, trigger, occurred_at,
+      attributes{...}, amount?, currency?, reward_type?,
+      caps?{...}, fraud_score?, trust_tier?, consent?        # pushed by the caller
+    }
+  ← EligibilityDecision {
+      eligible: bool, denied_reasons[],
+      resolved_variant_id?, ab_bucket?,
+      rule_version, decision_id
+    }</code></pre>
+<p><strong>Distributed enforcement must be provable.</strong> Because the moment is spread across services, ship one shared eligibility-client library so no service hand-rolls the call, and use the <code>eligibility.evaluated</code> events to detect a concerned path that did not check. Re-evaluate at money moments: eligibility decided at enrollment does not stay true — fraud flags, cap exhaustion, and consent revocation happen later — so the Conversion, Reward, and Payout checkpoints re-check rather than trusting the Entry decision.</p>
+<hr>
+
+<h1 id="s14">14. AI Integration in the Application Layer</h1>
+<p>This section is the AI column of §10.2, expanded. For each agent: which service calls it, what input that caller assembles and from where, how the response is consumed, and whether it is advisory or auto-executing.</p>
+<table>
+<thead><tr><th>Agent</th><th>Called by</th><th>Input (fields &amp; source)</th><th>Response integration</th><th>Advisory vs auto-execute</th></tr></thead>
+<tbody>
+<tr><td><strong>Campaign Setup</strong></td><td>Dashboard → AI (<code>/internal/ai/recommendations/campaign-setup</code>)</td><td>Client&rsquo;s programs (Campaign), Playbook library, anonymized benchmarks (Analytics), vertical defaults — read-only tools</td><td>Structured proposal attached to the program; rendered for review</td><td>Advisory only — cannot activate or commit</td></tr>
+<tr><td><strong>Optimization</strong></td><td>Temporal <code>campaign_optimization</code> (daily) &amp; on <code>analytics.anomaly_detected</code></td><td>Campaign KPIs, variant comparison, funnel, reward costs, participant performance (Analytics, read tools)</td><td><code>ai.recommendation_generated</code> → stored on campaign; surfaced as 🟢/🟡/🔴</td><td>Advisory only — mutation requires operator accept</td></tr>
+<tr><td><strong>Fraud Detection</strong></td><td>Referral &amp; Reward (<code>/internal/ai/fraud-score</code>, sync); event-driven Tiers A/B</td><td>Touch events, participant history, IP-cluster data, device fingerprints, velocity metrics (read tools)</td><td>Numeric score; <code>fraud.flagged</code> → reward to <code>Held</code>; flag for review</td><td>🟢 auto-hold (reversible) &amp; flag; 🔴 ban/clawback human-only</td></tr>
+<tr><td><strong>Insight Generation</strong></td><td>Temporal health-score schedule (daily) &amp; threshold crossings</td><td>Program health, KPIs, benchmarks, trend data, fraud rates (read tools)</td><td><code>ai.insight_generated</code> → dashboard insights (Anomaly/Opportunity/Quick Win/Benchmark/Risk/Trend)</td><td>Informational only — no write tools at all</td></tr>
+</tbody>
+</table>
+<p><strong>When AI is advisory only:</strong> Campaign Setup, Optimization, and Insight Generation never mutate state. Their output is a recommendation or an insight; the only path to a state change is an operator action through an owning service&rsquo;s API. This holds even for a 🟢-tagged optimization item, because campaign configuration is operator-owned.</p>
+<p><strong>When AI may auto-execute within guardrails:</strong> exactly one case — the Fraud Detection Agent&rsquo;s <code>hold_reward</code> write tool. Holding a reward is reversible, fully logged, and bounded: it pauses money movement without moving or denying it. The agent <strong>cannot</strong> ban a participant, reject a referral, clawback a reward, or modify fraud rules — those code paths exist only behind a Keto-gated human action.</p>
+<p>Human-in-the-loop points are concrete: each gate is a specific UI view, a specific backend endpoint, and (where a workflow is waiting) a specific Temporal signal.</p>
+<table>
+<thead><tr><th>Gate</th><th>UI view</th><th>Backend endpoint</th><th>Temporal signal</th></tr></thead>
+<tbody>
+<tr><td>Accept/reject an AI recommendation</td><td>Recommendations panel</td><td><code>POST /v1/recommendations/{id}/accept|dismiss</code></td><td>none (no workflow waiting)</td></tr>
+<tr><td>Approve/reject a held reward</td><td>Reward approval queue</td><td><code>POST /v1/rewards/{id}/approve|reject</code> (Keto)</td><td><code>human_decision</code> → Reward Approval WF</td></tr>
+<tr><td>Fraud review decision</td><td>Fraud review queue</td><td>review-decision action (Keto)</td><td><code>operator_decision</code> → <code>fraud_review</code> WF</td></tr>
+<tr><td>Ban a participant</td><td>Participant detail</td><td><code>POST /v1/referrers/{id}/block</code> (Keto)</td><td>ban branch of <code>fraud_review</code> (human-only)</td></tr>
+<tr><td>Clawback a paid reward</td><td>Reward detail</td><td><code>POST /v1/rewards/{id}/clawback</code> (reason required, Keto)</td><td>none (correction event)</td></tr>
+</tbody>
+</table>
+<hr>
+
+<h1 id="s15">15. Non-Functional System Tradeoffs (System &amp; App Level)</h1>
+<p><strong>What we optimize for:</strong> a system two senior engineers can operate; correctness on anything that moves money; bounded LLM cost; EU data residency. <strong>What we intentionally do not do:</strong> no per-tenant databases (shared-schema isolation by <code>tenant_id</code> + Keto instead); no multi-region active-active (single EU region, backups + restore); no real-time analytics (ClickHouse lag is accepted); no synchronous LLM calls in any money or request-critical path; no AI authority over irreversible actions. The table ties each choice to its system and application consequences.</p>
+<table>
+<thead><tr><th>Dimension</th><th>Chosen approach</th><th>Alternative considered</th><th>Rationale</th></tr></thead>
+<tbody>
+<tr><td><strong>Tenant isolation</strong></td><td>Shared RDS per service, row-level scoping by <code>tenant_id</code> + Keto</td><td>Database-per-tenant</td><td>Per-tenant DBs are unoperable for a 2-engineer team at this scale; Keto + scoped repositories give isolation without multiplying migrations and backups.</td></tr>
+<tr><td><strong>Regional topology</strong></td><td>Single EU region, automated backups + restore runbook</td><td>Multi-region active-active</td><td>Active-active doubles operational surface and adds cross-region consistency problems no one is staffed to debug; EU-single satisfies residency and the availability target.</td></tr>
+<tr><td><strong>Attribution placement</strong></td><td>Computed in the Referral Lifecycle workflow, pre-reward</td><td>Computed in Analytics</td><td>Attribution is on the money critical path; it must not compete with dashboard query load on ClickHouse. Analytics stays pure reporting.</td></tr>
+<tr><td><strong>Analytics freshness</strong></td><td>Eventual: 5–30s ClickHouse lag via 5s batch inserts</td><td>Real-time OLAP ingestion</td><td>Dashboards tolerate seconds of lag; real-time eligibility uses Redis counters instead. Real-time OLAP would raise cost and complexity for no product gain.</td></tr>
+<tr><td><strong>Fraud scoring latency</strong></td><td>Tier A deterministic, &lt;100ms sync; 3s ceiling then degrade to <code>null</code> + async</td><td>LLM scoring in the request path</td><td>Per-event LLM cost is prohibitive and would blow the referral-creation latency budget; 95%+ of fraud work stays zero-LLM. LLM (Tier C) is batch/on-demand only.</td></tr>
+<tr><td><strong>AI authority</strong></td><td>Advisory + one reversible 🟢 action (<code>hold_reward</code>)</td><td>Auto-execute optimization/fraud decisions</td><td>Wrong AI decisions on money are expensive and erode trust; human gates on all 🔴 actions cap the downside while keeping the AI useful.</td></tr>
+<tr><td><strong>Inter-service comms</strong></td><td>Async SNS/SQS by default; sync only when the caller cannot proceed without the answer</td><td>Sync HTTP everywhere</td><td>Sync chains couple availability and stack latency; the five sync calls (token, eligibility, reward-config, fraud, health) are deliberate exceptions, each with a circuit breaker and fallback.</td></tr>
+<tr><td><strong>Eligibility model</strong></td><td>Centralized rule engine (PDP) + five distributed checkpoints (PEPs); synchronous, fail-closed &mdash; a &ldquo;must&rdquo;</td><td>Eligibility logic duplicated in each service, or a best-effort async check</td><td>One rule brain keeps decisions consistent, versioned, and auditable; the PEPs supply the lifecycle moment. Making it a hard sync dependency means no money moves un-checked — at the cost of putting the eligibility service on four critical paths, so it gets Ingestion-grade HA and durable retry inside workflows.</td></tr>
+<tr><td><strong>Workflow durability</strong></td><td>Temporal for anything that waits, retries, or spans services</td><td>Cron + ad-hoc state tables</td><td>Reward holds, fraud reviews, and optimization span days and survive deploys; rebuilding that durability by hand is exactly the operational load a small team must avoid.</td></tr>
+<tr><td><strong>events from billing provider entry point</strong></td><td>Dedicated provider-signed inbound receivers, separate from <code>POST /v1/events</code></td><td>Route provider webhooks through public ingestion</td><td>Provider payloads use foreign signatures/schemas and must be treated as data-never-commands; a separate hardened surface keeps the public ingestion contract clean.</td></tr>
+</tbody>
+</table>
+</main>
+<script>
+const o=new IntersectionObserver(e=>{e.forEach(e=>{if(e.isIntersecting){document.querySelectorAll('.sd a').forEach(a=>a.classList.remove('active'));const l=document.querySelector(`.sd a[href="#${e.target.id}"]`);l&&l.classList.add('active')}})},{rootMargin:'-20% 0px -75% 0px'});
+document.querySelectorAll('h1[id],h2[id]').forEach(h=>o.observe(h));
+</script></body></html>

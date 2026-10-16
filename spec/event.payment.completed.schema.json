@@ -1,0 +1,76 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://referralai.dev/schemas/event.payment.completed.schema.json",
+  "title": "payment.completed properties schema",
+  "type": "object",
+  "allOf": [
+    {
+      "$ref": "event._defs.schema.json#/$defs/identity"
+    },
+    {
+      "$ref": "event._defs.schema.json#/$defs/revenue"
+    }
+  ],
+  "properties": {
+    "referral_code": {
+      "type": "string",
+      "description": "For direct attribution."
+    },
+    "payment_provider": {
+      "type": "string",
+      "enum": [
+        "stripe",
+        "paddle",
+        "chargebee",
+        "paypal",
+        "wire",
+        "custom"
+      ],
+      "description": "Billing provider."
+    },
+    "payment_external_id": {
+      "type": "string",
+      "description": "Payment identifier in the client's billing system."
+    },
+    "plan_id": {
+      "type": "string",
+      "description": "The plan the payment is for."
+    },
+    "plan_name": {
+      "type": "string",
+      "description": "Human-readable plan name."
+    },
+    "billing_interval": {
+      "type": "string",
+      "enum": [
+        "monthly",
+        "quarterly",
+        "annual",
+        "one_time",
+        "custom"
+      ],
+      "description": "Billing interval."
+    },
+    "is_first_payment": {
+      "type": "boolean",
+      "description": "Whether this is the Referee's first-ever payment."
+    },
+    "trial_converted": {
+      "type": "boolean",
+      "description": "Whether this is a trial-to-paid conversion."
+    },
+    "product_id": {
+      "type": "string",
+      "description": "Client identifier of the product purchased. Cross-Sell Pulse discriminator."
+    },
+    "is_reactivation": {
+      "type": "boolean",
+      "description": "Client asserts this payment re-activates a churned customer. Reactivation Pulse discriminator."
+    },
+    "switched_from": {
+      "type": "string",
+      "description": "Competitor the Referee asserts they switched from. Switch-Up Pulse discriminator; reward held until verified."
+    }
+  },
+  "unevaluatedProperties": false
+}

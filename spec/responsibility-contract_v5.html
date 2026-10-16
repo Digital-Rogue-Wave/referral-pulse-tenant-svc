@@ -1,0 +1,378 @@
+<!DOCTYPE html><html lang="en"><head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>ReferralAI — SDK vs Backend Responsibility Contract v5.0</title><style>
+
+@import url('https://fonts.googleapis.com/css2?family=Instrument+Serif&family=Geist:wght@400;500;600&family=Geist+Mono:wght@400&display=swap');
+:root{
+  --ink:#1c1917;--ink2:#44403c;--ink3:#78716c;--ink4:#a8a29e;
+  --paper:#FDFCFA;--card:#fff;--line:#e7e5e4;--wash:#f5f5f4;
+  --acc:#b45309;--acc2:#92400e;--accbg:#fef3c7;
+  --mint:#047857;--mint2:#065f46;--mintbg:#d1fae5;
+  --slate:#1e40af;--slate2:#1e3a8a;--slatebg:#dbeafe;
+  --rose:#be123c;--rose2:#9f1239;--rosebg:#ffe4e6;
+  --sw:220px
+}
+*{margin:0;padding:0;box-sizing:border-box}
+html{scroll-behavior:smooth;scroll-padding-top:20px}
+body{font-family:Geist,system-ui,sans-serif;background:var(--paper);color:var(--ink);font-size:14.5px;line-height:1.75;display:flex;-webkit-font-smoothing:antialiased}
+
+nav.sd{position:fixed;top:0;left:0;width:var(--sw);height:100vh;border-right:1px solid var(--line);overflow-y:auto;padding:24px 0;background:var(--paper)}
+.sd-b{padding:0 16px 16px}
+.sd-b h2{font-family:'Instrument Serif',serif;font-size:20px;color:var(--acc2);font-weight:400}
+.sd-b small{font-size:11px;color:var(--ink4);display:block;margin-top:2px;letter-spacing:.04em;text-transform:uppercase}
+.sd a{display:block;padding:2px 16px;color:var(--ink3);text-decoration:none;font-size:12px;line-height:1.6;transition:color .1s}
+.sd a:hover{color:var(--ink)}
+.sd a.n1{color:var(--ink2);font-weight:600;margin-top:12px;font-size:12px}
+.sd a.n2{padding-left:28px;font-size:11.5px;color:var(--ink4)}
+
+main{margin-left:var(--sw);max-width:780px;padding:40px 48px 100px}
+h1{font-family:'Instrument Serif',serif;font-size:28px;font-weight:400;color:var(--ink);margin:56px 0 16px;letter-spacing:-.02em}
+h1:first-of-type{margin-top:0}
+h2{font-size:16px;font-weight:600;margin:32px 0 10px;letter-spacing:-.01em}
+h3{font-size:14px;font-weight:600;color:var(--acc2);margin:24px 0 6px}
+h4{font-size:13px;font-weight:600;margin:16px 0 4px}
+p{margin:0 0 12px;color:var(--ink2)}
+strong{color:var(--ink);font-weight:600}
+strong.err{color:var(--rose)}strong.ok{color:var(--mint)}strong.warn{color:var(--acc)}
+em{color:var(--ink3)}
+a{color:var(--acc);text-decoration:none;border-bottom:1px solid var(--accbg)}
+a:hover{border-color:var(--acc)}
+hr{border:none;height:1px;background:var(--line);margin:36px 0}
+ul,ol{margin:0 0 14px 20px;color:var(--ink2)}
+li{margin-bottom:4px}
+code{font-family:'Geist Mono',monospace;font-size:12.5px;background:var(--wash);color:var(--acc2);padding:1px 4px;border-radius:3px}
+
+blockquote{border-left:3px solid var(--acc);padding:10px 16px;margin:14px 0 20px;background:var(--accbg);border-radius:0 6px 6px 0;font-size:13.5px}
+blockquote p{color:var(--acc2)}
+blockquote p:last-child{margin:0}
+
+table{width:100%;border-collapse:collapse;margin:12px 0 20px;font-size:13px}
+th{text-align:left;padding:8px 10px;font-weight:500;font-size:10.5px;text-transform:uppercase;letter-spacing:.08em;color:var(--ink4);border-bottom:2px solid var(--line)}
+td{padding:7px 10px;border-bottom:1px solid var(--wash);color:var(--ink2);vertical-align:top}
+tr:hover td{background:var(--wash)}
+
+figure{margin:22px 0 28px;padding:20px;background:var(--card);border:1px solid var(--line);border-radius:10px}
+figcaption{font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:.14em;color:var(--ink4);margin-bottom:14px}
+figure svg{display:block}
+figure svg text{font-family:Geist,system-ui,sans-serif}
+.s-h{font-size:13px;font-weight:600}
+.s-b{font-size:11.5px}
+.z-rose{fill:var(--rose2)}.z-rose2{fill:var(--rose)}
+.z-mint{fill:var(--mint2)}.z-mint2{fill:var(--mint)}
+.z-slate{fill:var(--slate2)}.z-slate2{fill:var(--slate)}
+.z-ink{fill:var(--ink)}.z-ink2{fill:var(--ink2)}.z-ink3{fill:var(--ink3)}.z-acc{fill:var(--acc)}
+
+.boundary{font-size:13px;padding:8px 14px;border-radius:6px;line-height:1.5;margin:4px 0}
+.b-can{background:var(--wash);border-left:3px solid var(--ink4)}
+.b-must{background:var(--mintbg);border-left:3px solid var(--mint)}
+.b-mustnot{background:var(--rosebg);border-left:3px solid var(--rose)}
+.b-should{background:var(--slatebg);border-left:3px solid var(--slate)}
+.blab{font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:.1em;display:block;margin:18px 0 6px}
+.blab.can{color:var(--ink3)}.blab.must{color:var(--mint)}.blab.mustnot{color:var(--rose)}.blab.should{color:var(--slate)}
+
+@media(max-width:800px){nav.sd{display:none}main{margin-left:0;padding:20px}}
+@media print{nav.sd{display:none}main{margin-left:0;max-width:100%}figure{break-inside:avoid}}
+::-webkit-scrollbar{width:3px}::-webkit-scrollbar-thumb{background:var(--line);border-radius:2px}
+
+</style></head><body>
+<nav class="sd"><div class="sd-b"><h2>ReferralAI</h2><small>Responsibility Contract v5.0</small></div>
+<a href="#contract" class="n1">SDK vs Backend Contract</a>
+<a href="#changes" class="n2">What Changed Since v2.0</a>
+<a href="#1-design" class="n1">1. Design Principles</a>
+<a href="#why-split" class="n2">Why the Split Exists</a>
+<a href="#threat-model" class="n2">Threat Model</a>
+<a href="#keto-jwt" class="n2">Keto &amp; the JWT</a>
+<a href="#easy-path" class="n2">Easy Path = Correct Path</a>
+<a href="#2-sdk" class="n1">2. SDK Responsibilities</a>
+<a href="#sdk-tracking" class="n2">Tracking Scope</a>
+<a href="#sdk-attribution" class="n2">Attribution Context</a>
+<a href="#sdk-widget" class="n2">Widget Rendering</a>
+<a href="#sdk-retry" class="n2">Retry &amp; Buffering</a>
+<a href="#sdk-consent" class="n2">Consent Handling</a>
+<a href="#sdk-boundaries" class="n2">Explicit Boundaries</a>
+<a href="#3-backend" class="n1">3. Backend Responsibilities</a>
+<a href="#be-events" class="n2">Authoritative Events</a>
+<a href="#be-revenue" class="n2">Revenue &amp; Payment</a>
+<a href="#be-methodb" class="n2">events from billing provider Metadata</a>
+<a href="#be-enroll" class="n2">Participant Enrollment</a>
+<a href="#be-fraud" class="n2">Fraud-Sensitive Actions</a>
+<a href="#be-boundaries" class="n2">Explicit Boundaries</a>
+<a href="#4-shared" class="n1">4. Shared Responsibilities</a>
+<a href="#sh-idem" class="n2">Correlation &amp; Idempotency</a>
+<a href="#sh-identity" class="n2">Identity Resolution</a>
+<a href="#sh-recovery" class="n2">Error Recovery</a>
+<a href="#sh-debug" class="n2">Debugging Support</a>
+<a href="#5-mistakes" class="n1">5. Integration Mistakes</a>
+</nav>
+<main>
+
+<h1 id="contract">ReferralAI — SDK vs Backend Responsibility Contract</h1><div style="border:1px solid #fde68a;background:#fffbeb;border-radius:8px;padding:12px 16px;margin:0 0 24px;font-size:13px;line-height:1.6">
+<strong>Revision 2026-10-12 — applied from the product-spec rework (Product Spec Appendix A #25–#46).</strong> Mechanical changes applied in this file: Program Admin → <strong>Owner</strong>; referee / referee_* → <strong>invitee / invitee_*</strong>; referrer (prose) → <strong>participant</strong> (wire names <code>/v1/referrers</code>, Keto <code>referrers</code> unchanged); Method A / Method B → <strong>events from backend / events from billing provider</strong>; touch events renamed <code>referral.link.clicked</code>, <code>referral.link.shared</code>, <code>referral.page.viewed</code>, <code>referral.email.opened|clicked</code>, <code>referral.widget.viewed</code>; <code>reward.calculated</code> → <code>reward.earned</code>; Partner actor removed from V1; payout partner → payout provider.<br><strong>Addendum 2026-10-12 (receivers move, Product Spec #47 / R-DOM-05 / R-SDK-07):</strong> provider webhooks are verified and admitted by Event Ingestion at <code>/inbound/{provider}/{connection_id}</code> (same dedup, Rules Guard and consent pipeline as every tracked event); the notification service is outbound only.
+</div>
+<p><strong>Version:</strong> 5.0 — suite-wide version alignment (2026-10-09); content of 3.0 + the October 2026 coherence pass. Earlier change-log entries keep the pre-alignment numbering (2.0 → 3.0).<br>
+<strong>Status:</strong> Draft for review<br>
+<strong>Last Updated:</strong> June 2026<br>
+<strong>Author:</strong> Platform Engineering — Developer Experience<br>
+<strong>Companion (all v5.0):</strong> Product Specification · API Contract · Event Model · Architecture · Failure &amp; Observability Model<br>
+<strong>Supersedes:</strong> SDK vs Backend Responsibility Contract v2.0</p>
+
+<blockquote><p><strong>Scope of this document.</strong> This is a behavioural contract, not an API reference. It draws hard boundaries between what the JS SDK must do, what the client backend must do, and what must never be trusted from the browser. It deliberately avoids endpoint paths, request shapes, and field-level schemas; those live in the API Contract and the Event Model. Where this version tightens a rule relative to v2.0 — because the newer ground-truth documents changed — the change is called out in a <em>Reconciliation</em> note.</p></blockquote>
+
+<hr>
+
+<h2 id="changes">What Changed Since v2.0 (Read This First)</h2>
+<p>Version 2.0 was written against API Contract v1.2 and Event Model v2.1. The platform now tracks API Contract v5.0, Event Model v5.0, and Product Spec v5.0 (pre-alignment: 1.3 / 3.0 / 4). Four points are load-bearing for this contract, and every section below assumes them — the first three are genuine changes from v2.0, the fourth corrects a model that integrators routinely get wrong:</p>
+<ul>
+<li><strong>Widget identity is now established by a backend-signed token, not a browser-supplied user identifier.</strong> The browser presents a token minted and signed by the client's backend; the platform verifies that signature server-side before it renders anything personalised. A raw user id asserted by browser code is no longer accepted. This is a security tightening, not a convenience change.</li>
+<li><strong>Authorisation uses a Keto-resolved permission snapshot in the JWT, with a live Keto re-check on high-risk actions.</strong> The gateway resolves a dashboard caller's permissions from Ory Keto <em>at token issuance</em> and embeds them as a snapshot claim in a short-lived JWT (TTL ≤ 15 minutes); downstream guards authorise coarse-grained operations straight from that snapshot, while money-moving and object-scoped actions (reward approval, rejection, clawback, payout creation and confirmation, key management) always re-query Keto live so a stale token can never authorise a payout. Keto remains the source of truth. API keys are never Keto subjects — they mint an internal JWT with no permissions, key-gated to ingestion. None of this touches the SDK.</li>
+<li><strong>Revenue is carried as flat monetary fields, not a nested revenue object.</strong> The substance is unchanged — amount, currency, recurring-revenue figures, and lifetime-value estimate still come from a trusted source — but the model is now flat for analytics and ML reasons.</li>
+<li><strong>Enrollment is selective-only and backend-owned; there is no self-enrollment and no participant portal.</strong> Under the Product Spec and API Contract, participants are enrolled by the client (API, bulk, CSV, CRM) before they can refer; the widget renders only for already-enrolled participants, and no self-enroll path exists. Participants also have no platform-hosted page — the magic-link/tokenised portal was removed in v4. The browser cannot enrol anyone. See <a href="#sdk-widget">2.3</a> and <a href="#be-enroll">3.4</a>.</li>
+</ul>
+
+<hr>
+
+<h1 id="1-design">1. Design Principles</h1>
+
+<h3 id="why-split">1.1 Why the Split Exists</h3>
+<p>The platform spans two production trust zones with fundamentally different risk profiles, plus a third zone for human operators. The JS SDK runs in the browser — an environment the client does not control, where code can be read, modified, and replayed by any visitor. The client backend runs on infrastructure the client owns, holding secret credentials that never leave server memory. The dashboard is operated by authenticated human users acting on configuration and money.</p>
+<p>This split is the load-bearing wall of attribution integrity and revenue protection. Every rule in this contract answers a single question: <strong>if this data were fabricated by a hostile browser, what breaks?</strong> A fabricated touch wastes a little analytics capacity and nothing more. A fabricated conversion moves money, because conversions create rewards and rewards become payouts. That asymmetry — not a frontend/backend org chart — dictates the entire boundary.</p>
+
+<figure><figcaption>Figure 1 · Responsibility split by trust zone</figcaption>
+<svg viewBox="0 0 680 410" width="100%" role="img"><title>ReferralAI responsibility split across three trust zones</title><desc>Browser JS SDK (low trust, touches only), client backend (high trust, conversions and revenue), and operator dashboard (Keto-gated configuration and money) all feed a central platform that computes attribution, rewards and payouts and re-derives sensitive context for low-trust events.</desc>
+<defs><marker id="ar" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M2 1L8 5L2 9" fill="none" stroke="context-stroke" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></marker></defs>
+<rect x="40" y="50" width="186" height="160" rx="12" fill="#ffe4e6" stroke="#be123c" stroke-width="0.5"/>
+<text class="s-h z-rose" x="54" y="78">Browser (JS SDK)</text>
+<text class="s-b z-rose2" x="54" y="96">publishable key</text>
+<text class="s-b z-rose2" x="54" y="126">Touch events</text>
+<text class="s-b z-rose2" x="54" y="148">Attribution + cookies</text>
+<text class="s-b z-rose2" x="54" y="170">Widget (signed token)</text>
+<text class="s-b z-rose2" x="54" y="192">No conversions / revenue</text>
+<rect x="247" y="50" width="186" height="160" rx="12" fill="#d1fae5" stroke="#047857" stroke-width="0.5"/>
+<text class="s-h z-mint" x="261" y="78">Client backend</text>
+<text class="s-b z-mint2" x="261" y="96">secret key</text>
+<text class="s-b z-mint2" x="261" y="126">Conversions</text>
+<text class="s-b z-mint2" x="261" y="148">Revenue + custom events</text>
+<text class="s-b z-mint2" x="261" y="170">Enrollment + events from billing provider</text>
+<rect x="454" y="50" width="186" height="160" rx="12" fill="#dbeafe" stroke="#1e40af" stroke-width="0.5"/>
+<text class="s-h z-slate" x="468" y="78">Operator</text>
+<text class="s-b z-slate2" x="468" y="96">dashboard session</text>
+<text class="s-b z-slate2" x="468" y="126">Config (CRUD)</text>
+<text class="s-b z-slate2" x="468" y="148">Approvals + clawbacks</text>
+<text class="s-b z-slate2" x="468" y="170">Payouts</text>
+<line x1="133" y1="212" x2="133" y2="266" stroke="#a8a29e" stroke-width="1.5" marker-end="url(#ar)"/>
+<line x1="340" y1="212" x2="340" y2="266" stroke="#a8a29e" stroke-width="1.5" marker-end="url(#ar)"/>
+<line x1="547" y1="212" x2="547" y2="266" stroke="#a8a29e" stroke-width="1.5" marker-end="url(#ar)"/>
+<text class="s-b z-ink3" x="145" y="242">touches only</text>
+<text class="s-b z-ink3" x="352" y="242">all events</text>
+<text class="s-b z-ink3" x="559" y="242">Keto-gated</text>
+<rect x="40" y="270" width="600" height="80" rx="14" fill="#f5f5f4" stroke="#a8a29e" stroke-width="0.5"/>
+<text class="s-h z-ink" x="54" y="298">Platform</text>
+<text class="s-b z-ink2" x="54" y="318">Computes attribution, rewards, payouts</text>
+<text class="s-b z-ink3" x="54" y="338">Server-derives IP / UA / geo · rejects browser conversions</text>
+<rect x="40" y="368" width="14" height="14" rx="3" fill="#ffe4e6" stroke="#be123c" stroke-width="0.5"/>
+<text class="s-b z-ink2" x="60" y="379">low trust — browser</text>
+<rect x="232" y="368" width="14" height="14" rx="3" fill="#d1fae5" stroke="#047857" stroke-width="0.5"/>
+<text class="s-b z-ink2" x="252" y="379">high trust — backend</text>
+<rect x="440" y="368" width="14" height="14" rx="3" fill="#dbeafe" stroke="#1e40af" stroke-width="0.5"/>
+<text class="s-b z-ink2" x="460" y="379">operator — Keto</text>
+</svg></figure>
+
+<p>Three authentication mechanisms map onto the three zones, and they are not interchangeable:</p>
+<ul>
+<li><strong>Publishable keys</strong> (prefix <code>rai_pub_</code>) authenticate the JS SDK in the browser. They may submit touch events and call the SDK/widget surface, and nothing else. Their trust level is <strong>low</strong>.</li>
+<li><strong>Secret keys</strong> (prefix <code>rai_live_</code>) authenticate the client backend and verified billing relays. They may submit every event class — touch, conversion, custom — and their data is trusted at <strong>high</strong> trust. They must never appear in browser-reachable code.</li>
+<li><strong>Dashboard sessions</strong> (OAuth2/JWT via Ory Kratos) authenticate human operators for all configuration, reward, payout, and analytics operations.</li>
+</ul>
+<p>A hard boundary sits underneath all three: <strong>API keys of either kind cannot touch configuration resources</strong> — Programs, Campaigns, Variants, Segments, Participants, Referrals, Rewards, Payouts, Analytics, Webhooks, or key management. Those require a dashboard session and a passing Keto permission check. This is enforced at the gateway, not in application code, and an attempt is refused regardless of how the request is framed.</p>
+
+<h3 id="threat-model">1.2 Threat Model Assumptions</h3>
+<p><strong>The browser is hostile territory.</strong> Every value submitted under a publishable key is suspect. Claimed IP addresses, user agents, geos, timestamps, referral codes, and session identifiers carry no authority. For low-trust submissions the platform derives the security-sensitive context — hashed IP, user agent, device, geo — server-side from the request itself and ignores whatever the body claims. The SDK reports what it observed; the platform decides what to believe.</p>
+<p><strong>The backend is trusted but fallible.</strong> Secret-key events are taken at high trust: revenue, conversion signals, and confirmed identity are accepted at face value. The platform still validates schema and enforces deduplication, but it does not second-guess the backend's business data. The risk in this zone is bugs, omissions, and misconfiguration — not malice. The contract therefore optimises the backend path for <em>correctness and hard-to-misuse defaults</em>, and the browser path for <em>containment</em>.</p>
+<p><strong>Partial integrations are the normal case.</strong> Clients ship the SDK weeks before the backend sends conversions. They pass the referral code on some conversions and forget it on others. They wire up a billing provider but forget the metadata write. The platform must degrade gracefully: attribution may become less precise, but it must <strong>never become silently wrong</strong>. Missing data surfaces as visible coverage gaps in dashboards; it is never back-filled with invented referrals.</p>
+<p><strong>Consent is volatile and per-event.</strong> A invitee may grant consent on load and revoke three clicks later. Consent is not a one-time switch; it travels on every tracked event and the platform re-evaluates it independently at processing time. A denied event is still accepted, but processed in restricted mode — no cookies, no fingerprints, no PII linkage, best-effort attribution only.</p>
+<p><strong>Inbound third-party callbacks are data, never commands.</strong> Billing and payout provider webhooks can advance a referral or a payout, but they can never alter configuration, approve a reward, or move money on their own authority. They are verified by the provider's signature scheme and then translated into internal conversion or payout signals.</p>
+<p><strong>Participants have no platform account.</strong> Per the Product Spec, the external advocate (the Participant, named the Participant resource in the API) never logs in. Their entire interaction surface is the embedded widget, referral links, platform emails, and QR codes — there is no platform-hosted page or tokenised portal (the magic-link micro-portal was removed in v4), and payout method is collected through the widget or a provider-hosted flow. The SDK renders the widget; the backend owns the participant's lifecycle.</p>
+
+<h3 id="keto-jwt">1.3 How Keto and the JWT Actually Work (and Why the SDK Never Touches Either)</h3>
+<p>Authorisation for operators is decoupled from where it is enforced. Ory Keto is the source of truth, storing permissions as Zanzibar-style relation tuples. To avoid a Keto round-trip on every request, the gateway resolves a dashboard caller's permissions from Keto <em>at token issuance</em> and embeds them as a snapshot claim in a short-lived internal JWT (TTL ≤ 15 minutes). Downstream guards authorise coarse-grained operations directly from that snapshot — no Keto call — while high-risk and object-scoped operations (reward approval, rejection, clawback, payout creation and confirmation, key management, and any "can user X act on object Y" check) always re-query Keto live, so a stale token can never authorise a payout. If a permission is revoked mid-session, the live-checked actions deny immediately and the coarse actions deny on the next short-lived token refresh.</p>
+<blockquote><p><strong>Note.</strong> The JWT is not identity-only: it carries a Keto-resolved <code>perms</code> snapshot taken at issuance, and money-moving or object-scoped actions re-check Keto live on top of it. The short TTL bounds how stale a cached permission can be. This is the API Contract (§2) model and matches the platform architecture — do not assume either a pure per-request Keto lookup or a permission-free token.</p></blockquote>
+<p>Crucially for this contract, <strong>API keys are never Keto subjects.</strong> An ingestion request authenticated by a publishable or secret key mints an internal JWT with no permission claim at all; keys are key-gated to ingestion and the SDK and widget surfaces, and can reach nothing else. So the SDK never holds a permissioned JWT, never participates in a Keto check, and can never reach a Keto-gated resource. Every operation that authorisation protects — approval, rejection, clawback, payout, configuration, erasure — is a backend or operator concern by construction. The browser's lack of these capabilities is not a policy the SDK is trusted to honour; it is a wall the gateway enforces.</p>
+
+<h3 id="easy-path">1.4 The Easy Path Is the Correct Path</h3>
+<p>If doing the right thing requires a client to memorise a call sequence, coordinate timing across teams, or hand-assemble attribution chains, they will get it wrong. The minimal integration must produce correct attribution on its own. The platform supports two attribution methods, and the smallest correct integration of each must work out of the box:</p>
+<ul>
+<li><strong>events from backend — identity matching (recommended).</strong> The SDK captures the referral code and exposes the current attribution context through <code>RefRev.getAttribution()</code>. The frontend hands that context to the backend, and the backend includes the referral code and a confirmed invitee identity on the conversion it sends. The platform computes attribution server-side.</li>
+<li><strong>events from billing provider — payment-provider metadata.</strong> The SDK captures the referral code; the frontend hands it to the backend at customer creation; the backend writes it into the billing provider's customer metadata. The platform reads it from verified billing webhooks and attributes the resulting payments — no explicit conversion call from the client at all.</li>
+</ul>
+<p>In both methods the SDK absorbs the messy browser concerns — code extraction, consent gating, cookie and session continuity, URL cleaning — so the client's only real obligation collapses to one sentence: <em>when a user does something valuable, make sure the referral code travels with it.</em> The contract is engineered so the lazy integration is also the safe one, and so the insecure shortcut of sending conversions from the browser is not merely discouraged but impossible.</p>
+
+<hr>
+
+<h1 id="2-sdk">2. SDK Responsibilities</h1>
+<p>The JS SDK is the platform's eyes in the browser. It observes what happens before the user is known, preserves referral context across navigation, renders the participant-facing widget, and bridges attribution context from browser to backend. It operates exclusively under a publishable key and is bound by every low-trust constraint above.</p>
+
+<h3 id="sdk-tracking">2.1 Tracking Scope</h3>
+<p>The SDK's entire event remit is <strong>touch-level signals</strong> — the behaviour that occurs before and around a conversion. Of the platform's tracked event types, the SDK is the legitimate origin for the browser-side touches: a invitee clicking a referral link, a participant sharing their link through the widget, a invitee viewing a page while a referral session is active, and the participant viewing the widget itself.</p>
+<p>The remaining engagement touches — email invitations being opened and email links being clicked — are produced <strong>platform-side</strong> by the email service (tracking pixel and redirect handler), not by the SDK. They arrive at high trust because the platform itself generated them. The SDK <strong class="err">MUST NOT</strong> attempt to synthesise or claim these.</p>
+<p>Touch events are the raw material of attribution; they are <strong>not</strong> attribution. The platform's Attribution Engine computes attribution server-side only after a conversion arrives from a trusted source. A flood of touch events with no trusted conversion produces no reward and no attribution — by design. The SDK also produces and maintains the anonymous identifiers — a session identifier and a longer-lived visitor token — that let the platform later stitch anonymous pre-conversion touches to the identified user who converts. Stitching is a platform operation; the SDK's contribution is to emit consistent identifiers that survive navigation, not to perform any linking itself.</p>
+
+<h3 id="sdk-attribution">2.2 Attribution Context Handling</h3>
+<p>When a visitor arrives on a referral link, the SDK extracts the referral code from the URL, validates it through the SDK link-resolution surface, and — subject to consent — persists it in a first-party attribution cookie on the client's own domain with a local-storage backup. It records the foundational click touch and cleans the referral parameter out of the URL so it does not pollute bookmarks and shares.</p>
+<p>The SDK then exposes the current attribution context through <code>RefRev.getAttribution()</code>, which returns a <strong>server-validated</strong> snapshot for the frontend to pass to the backend. This single call is the designated bridge across the trust boundary; it exists specifically so the handoff is trivial and hard to get wrong.</p>
+<p>The SDK does <strong>not</strong> decide attribution. It does not choose which participant gets credit, evaluate attribution windows, or determine eligibility. It captures and preserves context so the platform can make those decisions when a trusted conversion arrives. The attribution context that situates an event in a referral chain is assembled and progressively enriched server-side, never by browser code.</p>
+
+<h3 id="sdk-widget">2.3 Widget Rendering</h3>
+<p>The widget is the participant's primary interaction surface, because participants have no login. On initialisation the SDK presents a <strong>backend-signed identity token</strong> to the widget configuration surface. The platform verifies the signature, extracts the vouched-for identity, checks enrollment, and returns the mode to render: an active-referrer experience (link, sharing tools, stats) for an enrolled participant; otherwise nothing. Under selective enrollment — which is the platform's only enrollment model — a non-enrolled user sees no widget and is given no indication the program exists. A blocked or suspended participant likewise sees nothing.</p>
+<blockquote><p><strong>Reconciliation (supersedes v2.0).</strong> v2.0 required a raw user id in SDK initialisation. The Product Spec and API Contract replace this with a backend-signed token. The widget will not render on a browser-asserted identity. This closes a spoofing gap — a visitor can no longer impersonate another participant by editing an initialisation value — and it is the reason the "missing identity" mistake in §5 is reframed around the token, not the user id.</p></blockquote>
+<blockquote><p><strong>Reconciliation (supersedes v2.0).</strong> v2.0 described open and selective enrollment with browser self-enrollment for open campaigns. The Product Spec and API Contract remove self-enrollment entirely: enrollment is selective-only, the widget renders only for already-enrolled participants, and no self-enroll path exists. Build to selective; the browser cannot enrol anyone.</p></blockquote>
+<p>Widget interactions that represent real participant behaviour — pressing a share control — are emitted as share touches through the ingestion pipeline like any other touch.</p>
+
+<h3 id="sdk-retry">2.4 Retry, Buffering, and Delivery</h3>
+<p>The browser is an unreliable delivery environment, and the SDK must behave as though every request might fail. It <strong>MUST</strong> retry failed submissions with exponential backoff, hold events in a bounded in-memory queue when consent is still pending, and use a page-unload-safe transport so the last events of a session are not lost on navigation. It <strong>MUST</strong> keep a local-storage backup of attribution data as a fallback when cookies are cleared.</p>
+<p>Delivery is best-effort by necessity, and the platform is designed to tolerate that. The platform's secondary deduplication — a composite of referral code, session, and a short time bucket — protects touch ingestion even when the SDK cannot guarantee a perfectly stable correlation id under degraded conditions. The SDK should still make its best effort at stable identifiers; it must not rely on the platform's safety net as a substitute for trying.</p>
+
+<h3 id="sdk-consent">2.5 Consent Handling</h3>
+<p>The SDK integrates with the client's consent management platform and operates in exactly three modes. In <strong>granted</strong> mode it sets first-party cookies, runs the full widget, and sends touches carrying the granted consent state. In <strong>denied</strong> mode it sets no cookies, stores nothing, and sends nothing; the widget degrades to a generic, stateless experience, and attribution remains possible only through the backend's server-side path. In <strong>pending</strong> mode it sets no cookies and sends nothing yet — events are queued in the bounded in-memory buffer; on a later grant the queue flushes and normal operation begins, and on a later denial the queue is discarded.</p>
+<blockquote><p><strong>Reconciliation (terminology).</strong> The SDK's three operational modes — granted, denied, pending — map directly onto the envelope's <code>tracking_consent</code> enum, which is exactly granted/denied/pending and is required on every tracked event (domain events inherit it from their triggering tracked event). In pending mode the SDK buffers rather than sending; it does not invent a separate value.</p></blockquote>
+<p>Consent gates three things together — cookie storage, event sending, and the data-collecting behaviour of the widget — and the SDK must treat them as a single live gate, re-checked on every action, not a one-time decision captured at load.</p>
+
+<h3 id="sdk-boundaries">2.6 Explicit Boundaries</h3>
+<span class="blab can">The SDK CAN</span>
+<div class="boundary b-can">Extract referral codes and UTM parameters from the landing URL · validate a code through the SDK link-resolution surface and retrieve its campaign context and reward preview · set and read first-party cookies on the client's own domain with a local-storage backup · generate and maintain session and anonymous-visitor identifiers · emit browser-side touch events (link clicks, shares, page views with active referral context, widget views) · render the participant widget per the server-returned mode · expose a server-validated attribution context via <code>RefRev.getAttribution()</code> · buffer events during pending consent and retry failed deliveries · clean the referral parameter from the URL after capture · show the opt-in built-in minimal consent prompt when the client has neither a CMP nor a banner (off by default; it only calls <code>setConsent()</code>).</div>
+
+<span class="blab must">The SDK MUST</span>
+<div class="boundary b-must">Present a backend-signed identity token for the widget; if none is supplied, render no widget, log a clear console warning, and continue tracking invitee touches · treat consent as a live, per-action gate and attach the current consent state to every tracked event · attach a session identifier to every event to support stitching · persist and validate the referral code at the moment of capture, before relying on it · carry the SDK version on every event for debugging and compatibility · use transport-layer encryption exclusively and respect publishable-key rate limits · fail invisibly from the end user's perspective — an SDK error must never break the client's page · treat attribution as read-only context it reports, never a decision it makes.</div>
+
+<span class="blab mustnot">The SDK MUST NOT</span>
+<div class="boundary b-mustnot">Send conversion events of any kind (hard-blocked at the ingestion boundary for publishable keys) · send revenue or any monetary value · send custom behavioural events (these require a secret key and originate from the backend) · submit batched events · claim or spoof IP, user agent, geo, or device · transmit raw personal data, including raw email addresses, in event payloads · compute, store, or cache any attribution, eligibility, fraud, or reward decision · reach any configuration, reward, payout, or key-management resource · approve, reject, hold, clawback, or otherwise influence a reward or payout · set cookies, store data, or send events while consent is denied · rely on the local browser environment for any security decision.</div>
+<p class="mt-sm"><em>Reconciliation: v2.0 contradicted itself by both permitting and forbidding SDK custom events. They are forbidden — the SDK has no custom-event capability.</em></p>
+
+<hr>
+
+<h1 id="3-backend">3. Backend Responsibilities</h1>
+<p>The client backend is the source of truth for everything that moves money or confirms identity. It authenticates with a secret key for ingestion, and its events are accepted at high trust. That trust is a responsibility: the platform does not second-guess the backend, so the backend must send correct, timely, and complete signals.</p>
+
+<h3 id="be-events">3.1 Authoritative Events</h3>
+<p>The backend is the <strong>sole legitimate source</strong> of conversion signals: a completed signup, a completed payment, a subscription renewal, and submitted feedback. Each of these can advance a referral and can ultimately create a reward, which is precisely why none of them may originate in the browser. Each conversion <strong>MUST</strong> carry a confirmed invitee identity — an email or the client's own external identifier (at least one of the two) — so the platform can resolve it to the right referral.</p>
+<p>The backend is also the only source of custom behavioural events used for segmentation, propensity modelling, and analytics. Custom events do not drive the referral workflow directly; where a custom event matches a running campaign's trigger, the platform itself translates it into an internal conversion signal. That translation is the platform's job, not something the client should attempt to fake by mislabelling a custom event as a conversion.</p>
+
+<h3 id="be-revenue">3.2 Revenue and Payment Events</h3>
+<p>All monetary data originates server-side: payment amount, currency, recurring-revenue figures, and any lifetime-value estimate. These values are expressed as integer minor units (cents) paired with an ISO currency code, and recurring conversions must carry the recurring figure. Refunds and chargebacks are never expressed as negative payments; they flow through the reversal and clawback path, which requires an explicit reason and writes an immutable audit record.</p>
+<p>Revenue is the hinge between activity and money. It feeds attribution (revenue attributed to the originating referral), reward computation (percentage and revenue-share structures), analytics, and the AI subsystem's incentive optimisation. A wrong revenue figure does not just distort a dashboard — it changes what gets paid. The backend owns that correctness.</p>
+<blockquote><p><strong>Reconciliation (Event Model v3.0).</strong> Monetary data is now carried as flat scalar fields rather than a nested revenue object. The obligation is unchanged — revenue comes from a trusted source in minor units with a currency — but integrations written against the v2.1 nested shape must flatten.</p></blockquote>
+
+<h3 id="be-methodb">3.3 Payment-Provider Webhooks (events from billing provider)</h3>
+<p>For clients on a supported billing provider, the backend can lean on events from billing provider and avoid sending explicit conversions at all. Its single obligation is to <strong>write the referral code (and click identifier) into the provider's customer metadata at customer creation</strong>. Thereafter the platform reads that metadata from verified billing webhooks and attributes every resulting payment automatically. The relayed events arrive at high trust because the platform verifies the provider's signature before processing, and an unverifiable callback is dropped, not queued. These callbacks can advance a referral or payout but can never change configuration.</p>
+
+<h3 id="be-enroll">3.4 Participant Enrollment</h3>
+<p>The backend owns the participant lifecycle. It registers participants — singly or in bulk, and via CSV or CRM connectors — before they can share. At registration the platform resolves the participant's variant for the campaign through the segment-priority fallback chain and binds their link to that variant, so the participant's reward is fixed and known at share time rather than at invitee-click time.</p>
+<p>Enrollment is selective-only, so this backend-driven registration is the <strong>only</strong> way a participant comes to exist; there is no self-enroll path and the browser cannot enrol anyone. The backend <strong class="err">MUST NOT</strong> delegate the decision of <em>who is allowed to refer</em> to the browser.</p>
+
+<h3 id="be-fraud">3.5 Fraud-Sensitive and Money-Moving Actions</h3>
+<p>Every action that affects money or trust is an operator/backend action authenticated by a dashboard session and gated by a Keto permission check — never by an API key. This set includes reward approval and rejection; reward clawback (reason mandatory, immutable audit trail); the two-step creation and confirmation of payouts; manual referral rejection; participant blocking and unblocking; trust-tier and participant-state changes the platform itself drives; and GDPR erasure requests. The reward lifecycle these actions operate on runs <strong>Pending → Held → Approved → Processing → Paid</strong>, with <strong>Rejected</strong> and <strong>Reversed</strong> as terminal off-ramps; a reward enters Held automatically when its fraud score lands in the review band or its amount exceeds the participant's trust ceiling.</p>
+<p>The backend may <em>override</em> default automated decisions where the campaign permits it — for example, manually approving a reward that auto-approval would have held — but the authority to do so is a Keto permission, evaluated live, not a capability that travels in a token or a key.</p>
+
+<h3 id="be-boundaries">3.6 Explicit Boundaries</h3>
+<span class="blab must">The backend MUST</span>
+<div class="boundary b-must">Send every conversion event under the secret key (conversions under a publishable key are rejected) · include a confirmed invitee identity (email or external id) on every conversion · provide a stable, deterministic correlation id on every event so retries deduplicate cleanly · express all revenue as integer minor units with a currency code, and include the recurring figure on recurring conversions · keep the secret key server-side only — never in frontend code, browser logs, or any client-reachable storage · use a dashboard session (and pass the live Keto check) for all configuration, reward, payout, erasure, and key-management operations · own participant enrollment for the selective model · for events from billing provider, write the referral code and click identifier into the billing provider's customer metadata at customer creation.</div>
+
+<span class="blab should">The backend SHOULD</span>
+<div class="boundary b-should">Forward the referral code obtained from <code>RefRev.getAttribution()</code> onto every conversion — the single highest-leverage thing it can do for attribution accuracy · subscribe to outbound webhooks for state changes rather than polling, since ingestion is acknowledged and then processed asynchronously · emit server-side touches for surfaces the browser SDK cannot see, such as native mobile apps and server-rendered pages · enrich conversions with optional dimensions — plan, billing interval, first-payment and trial-conversion flags, lifetime-value estimate — to sharpen analytics and AI · pass participant attributes at enrollment so segment evaluation and variant resolution have what they need · carry its own internal correlation identifiers in the opaque metadata field for end-to-end tracing.</div>
+
+<span class="blab mustnot">The backend MUST NOT rely on the SDK for</span>
+<div class="boundary b-mustnot">Conversion signals (the SDK cannot send them) · revenue (the SDK cannot include it) · custom events (these require a secret key) · confirmed identity (the browser only ever holds anonymous or hashed identifiers) · any fraud-sensitive or money-moving action — approval, rejection, hold, clawback, payout · attribution, eligibility, or reward decisions (the backend sends facts; the platform decides) · configuration of any kind, or enforcement of consent and erasure beyond what the consent platform and SDK handle in the browser.</div>
+
+<hr>
+
+<h1 id="4-shared">4. Shared Responsibilities</h1>
+<p>A few concerns sit on the boundary itself. Neither side owns them alone; both must participate, and the design is arranged so they can do so without coupling to each other. The contract is what makes the full journey debuggable — and the same journey shows who owns each hop.</p>
+
+<figure><figcaption>Figure 2 · Who owns each hop, from link click to payout</figcaption>
+<svg viewBox="0 0 680 150" width="100%" role="img"><title>End-to-end referral lifecycle coloured by owning trust zone</title><desc>Link click and touches are owned by the browser SDK; conversion by the client backend; referral and reward computation by the platform; payout by the operator. The referral code is the single handoff that crosses the browser-to-backend boundary.</desc>
+<defs><marker id="ar2" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M2 1L8 5L2 9" fill="none" stroke="context-stroke" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></marker></defs>
+<text class="s-b z-acc" x="236" y="46" text-anchor="middle">referral code handoff</text>
+<rect x="40" y="60" width="86" height="40" rx="8" fill="#ffe4e6" stroke="#be123c" stroke-width="0.5"/>
+<text class="s-h z-rose" x="83" y="80" text-anchor="middle" dominant-baseline="central">Link click</text>
+<rect x="142" y="60" width="86" height="40" rx="8" fill="#ffe4e6" stroke="#be123c" stroke-width="0.5"/>
+<text class="s-h z-rose" x="185" y="80" text-anchor="middle" dominant-baseline="central">Touches</text>
+<rect x="244" y="60" width="86" height="40" rx="8" fill="#d1fae5" stroke="#047857" stroke-width="0.5"/>
+<text class="s-h z-mint" x="287" y="80" text-anchor="middle" dominant-baseline="central">Conversion</text>
+<rect x="346" y="60" width="86" height="40" rx="8" fill="#f5f5f4" stroke="#a8a29e" stroke-width="0.5"/>
+<text class="s-h z-ink" x="389" y="80" text-anchor="middle" dominant-baseline="central">Referral</text>
+<rect x="448" y="60" width="86" height="40" rx="8" fill="#f5f5f4" stroke="#a8a29e" stroke-width="0.5"/>
+<text class="s-h z-ink" x="491" y="80" text-anchor="middle" dominant-baseline="central">Reward</text>
+<rect x="550" y="60" width="86" height="40" rx="8" fill="#dbeafe" stroke="#1e40af" stroke-width="0.5"/>
+<text class="s-h z-slate" x="593" y="80" text-anchor="middle" dominant-baseline="central">Payout</text>
+<line x1="127" y1="80" x2="141" y2="80" stroke="#a8a29e" stroke-width="1.5" marker-end="url(#ar2)"/>
+<line x1="229" y1="80" x2="243" y2="80" stroke="#a8a29e" stroke-width="1.5" marker-end="url(#ar2)"/>
+<line x1="331" y1="80" x2="345" y2="80" stroke="#a8a29e" stroke-width="1.5" marker-end="url(#ar2)"/>
+<line x1="433" y1="80" x2="447" y2="80" stroke="#a8a29e" stroke-width="1.5" marker-end="url(#ar2)"/>
+<line x1="535" y1="80" x2="549" y2="80" stroke="#a8a29e" stroke-width="1.5" marker-end="url(#ar2)"/>
+<text class="s-b z-rose2" x="83" y="120" text-anchor="middle">Browser</text>
+<text class="s-b z-rose2" x="185" y="120" text-anchor="middle">Browser</text>
+<text class="s-b z-mint2" x="287" y="120" text-anchor="middle">Backend</text>
+<text class="s-b z-ink3" x="389" y="120" text-anchor="middle">Platform</text>
+<text class="s-b z-ink3" x="491" y="120" text-anchor="middle">Platform</text>
+<text class="s-b z-slate2" x="593" y="120" text-anchor="middle">Operator</text>
+</svg></figure>
+<p>The browser owns observation, the backend owns the money signal, the platform decides (attribution, eligibility, reward computation), and the operator releases funds. Reward sits with the platform because it is <em>computed</em> there; an operator's approval — when the lifecycle calls for one — is the Keto-gated action that moves it forward. The only place the chain crosses the browser-to-backend trust boundary is the referral-code handoff, which is exactly why that handoff gets a dedicated SDK call.</p>
+
+<h3 id="sh-idem">4.1 Correlation Identifiers and Idempotency</h3>
+<p>The platform runs two distinct deduplication regimes, and conflating them is a common source of confusion. <strong>Ingestion</strong> deduplicates on a source-supplied correlation id scoped to the tenant over a long window, so the same business event is never recorded twice. <strong>Resource-creating operations</strong> deduplicate on a separate request-level idempotency key over a short window, so the same request never creates two resources. The two never share an identifier and never need to.</p>
+<p>The split of labour is clean. The <strong>SDK</strong> supplies correlation ids for the touches it emits; under degraded browser conditions these may be imperfect, which is exactly why the platform layers its short-window secondary deduplication beneath touch ingestion. The <strong>backend</strong> supplies correlation ids for conversions and custom events, and these <strong>MUST</strong> be deterministic — derived from a domain fact such as the signup or the payment — so a retry reproduces the same id and deduplicates instead of double-counting. SDK-generated and backend-generated ids never have to coordinate, because deduplication is scoped per tenant and per id.</p>
+
+<h3 id="sh-identity">4.2 Identity Resolution</h3>
+<p>Identity resolution links anonymous pre-conversion touches to the identified user who converts, and it requires both sides. The <strong>SDK</strong> contributes the anonymous signals — session identifier, longer-lived visitor token, and the referral code itself — on every touch. The <strong>backend</strong> contributes confirmed identity — the email or external id — at conversion, the moment the anonymous invitee becomes a known person.</p>
+<p>The platform stitches in a strict priority order — the single six-key ladder of the Product Specification: <strong>referral code first</strong>, then a <strong>linked identity</strong> (a provider customer id or the client's external id already resolved to an open referral), then the <strong>click identifier</strong> minted at link resolution, then <strong>session</strong>, then <strong>email</strong>. Code-based linkage is the most reliable and is also how events from billing provider works, since the code lives in the provider metadata. Session linkage is strongest for same-session journeys. Email is the fallback when nothing else is available. <strong class="err">Probabilistic stitching is explicitly forbidden</strong> — no device fingerprinting, no IP correlation, no behavioural-similarity guessing. A small share of unstitched events is an accepted cost; inventing links is not, both for attribution integrity and for GDPR.</p>
+<p>The one handoff that matters above all others is getting the referral code to travel from SDK to frontend to backend to the conversion. <code>RefRev.getAttribution()</code> exists to make that handoff a single call. Everything else in identity resolution is a fallback for when that handoff did not happen.</p>
+
+<h3 id="sh-recovery">4.3 Error Recovery</h3>
+<p>The system is designed to fail <strong>noisily, not silently wrong</strong>. When the SDK misses touches — network failures, consent revocation mid-session, blocked cookies — touch coverage degrades but the pipeline survives, because the platform can still attribute a conversion that arrives with a referral code or a matching identity. Dashboards surface attribution coverage as a quality metric so the gap is visible rather than hidden.</p>
+<p>When the backend misses conversions, the consequences are heavier because conversions drive payouts; recovery is built in through generous conversion-side timing windows, bulk backfill via the batch ingestion path, and deduplication that makes resending always safe. When the platform itself stumbles, at-least-once delivery and idempotent processing guarantee that an acknowledged event is eventually processed, and the per-event processing status plus the business-rules guard give immediate, legible feedback when an event is refused for a campaign-level reason rather than being quietly dropped. The throughline: a coverage gap should always be observable, and the platform should never paper over one with a fabricated referral.</p>
+
+<h3 id="sh-debug">4.4 Debugging Support</h3>
+<p>Each zone contributes a different part of the diagnostic trail. The <strong>SDK</strong> contributes the session identifier and its own version, which together let a single visitor's browser journey be reconstructed. The <strong>backend</strong> contributes deterministic correlation ids drawn from its own domain and may stash internal references in the opaque metadata field. The <strong>platform</strong> assigns a time-ordered event id, records operational timestamps, preserves the full source and trust provenance of every event, exposes a processing status, and stamps every response with a request identifier for tracing.</p>
+<p>Read end to end (Figure 2), these turn the responsibility split into a debuggable pipeline: a correlation id leads to an event id, which leads to a referral, which leads to an attribution decision, which leads to a reward and finally a payout. The contract's value at debugging time is that each link in that chain has a clearly responsible owner — so when the chain breaks, it is obvious which side to look at.</p>
+
+<hr>
+
+<h1 id="5-mistakes">5. Common Integration Mistakes</h1>
+<p>These are the failure patterns the four documents predict, with the underlying misunderstanding and the way the platform's design and this contract defend against each.</p>
+
+<h3>5.1 Sending Conversions or Revenue from the Browser</h3>
+<p>The frontend already has the SDK and the signup form, so it is tempting to fire the conversion there. It is wrong because anyone with developer tools could then fabricate conversions and mint rewards. The platform removes the temptation entirely: publishable keys are scoped to touches, and a conversion or any revenue value under a publishable key is hard-rejected at the ingestion boundary. There is no configuration that loosens this.</p>
+
+<h3>5.2 Not Forwarding the Referral Code to the Backend</h3>
+<p>The SDK captures the code, but separate frontend and backend teams never bridge it across the boundary, so the conversion arrives without it. Attribution then falls back to email matching, which fails for cross-device journeys, changed emails, and multi-referral cases. The defence is to make the bridge trivial — <code>RefRev.getAttribution()</code> is one call — and to surface attribution coverage and repeated code-less conversions as visible warnings rather than silent degradation.</p>
+
+<h3>5.3 Submitting Revenue in the Wrong Units</h3>
+<p>A client sends major units where minor units are required, and every revenue figure is off by a factor of one hundred, corrupting revenue attribution, percentage rewards, and financial reporting. The platform validates that amounts are integers, the contract states minor units unambiguously, and revenue-per-referral analytics make a hundred-fold error glaringly obvious almost immediately.</p>
+
+<h3>5.4 Non-Deterministic or Missing Correlation Ids</h3>
+<p>A developer treats the correlation id as throwaway and regenerates it on every retry, so retries become duplicates — the same conversion counted twice, the same reward earned twice. The platform requires the id, returns a clear duplicate status when it sees a repeat, and the contract directs the backend to derive the id from a domain fact (the signup, the payment) so retries reproduce it. For touches, the platform's secondary deduplication absorbs the browser's imperfection; for conversions, the deterministic id is the only defence and the backend owns it.</p>
+
+<h3>5.5 Omitting the Backend-Signed Widget Token</h3>
+<p>A client copies the SDK snippet, never wires up the backend-signed identity token, and the widget silently never renders even though invitee tracking works. The misunderstanding is that the widget identifies users the way analytics tools do, from a value the page supplies. It does not: identity for the widget must be vouched for by the backend, because a browser-asserted identity could be forged to impersonate another participant. The SDK logs an explicit warning naming the missing token, the integration-health view flags repeated tokenless loads, and invitee touch tracking keeps working so only the widget is affected. <em>(This supersedes the v2.0 "missing userId" mistake; the fix is now a backend-signed token, not a raw id.)</em></p>
+
+<h3>5.6 Hard-Coding Consent as Granted</h3>
+<p>Consent gating feels like friction, so a developer pins consent to granted regardless of the actual choice. This is a direct GDPR violation that also writes a false audit trail the client cannot defend under inquiry. The platform records the consent state on every event and acts on it, the contract makes copy-paste consent-platform integration the path of least resistance, and the pending mode's bounded queue means correct handling loses no events while the user decides — so there is no data-collection reason to cheat.</p>
+
+<h3>5.7 Assuming Touches Guarantee Attribution</h3>
+<p>Seeing touches in the dashboard, a client assumes attribution will follow for anyone who later converts. Touches are necessary but not sufficient: attribution also needs a trusted conversion with a linkable identity, arrival within the attribution window, an active campaign, passing eligibility, and no fraud hold. The platform makes the rest of the funnel explicit — referrals can expire, be rejected, or simply never convert — and the business-rules guard gives immediate feedback at ingestion when a touch hits an expired link or an unknown campaign, so the gap is legible rather than mysterious.</p>
+
+<h3>5.8 Sending Events Long After They Occurred</h3>
+<p>A backend batches conversions and sends them days later stamped with the send time instead of the occurrence time. Attribution-window evaluation keys off the occurrence time, so a conversion that genuinely fell inside the window can be misclassified as organic, and time-series analytics drift. The platform enforces freshness bounds on the occurrence time and rejects implausible future timestamps, and the event model is explicit that the occurrence time is the business-significant one, distinct from when the platform ingested or processed the event.</p>
+
+<h3>5.9 Reaching for an API Key to Configure or Pay</h3>
+<p>A developer carrying over an older mental model tries to manage campaigns, read analytics, or move payouts with a secret key. Under this platform, keys of either kind cannot touch configuration, reward, payout, or analytics resources at all; those require a dashboard session and a live Keto permission check. The gateway refuses any such attempt, with a message that points the developer at the right authentication path. <em>(API keys are never Keto subjects — they are key-gated to ingestion. Configuration, reward, and payout operations need a dashboard JWT carrying a Keto-resolved permission snapshot, with a live Keto re-check on money-moving and object-scoped actions.)</em></p>
+
+<h3>5.10 Forgetting the events from billing provider Metadata Write</h3>
+<p>A client wires up the billing webhook but never writes the referral code into the provider's customer metadata, so the platform receives payments it cannot attribute — revenue is visible in the billing provider but absent from referral attribution. The webhook side is automatic; the metadata write is the one piece of backend work events from billing provider requires. The platform surfaces unattributed payments from a connected provider as an explicit warning, and the contract names the metadata write as the backend's single events from billing provider obligation so it is hard to overlook.</p>
+
+<hr>
+<p><strong>Version:</strong> 5.0 · <strong>Date:</strong> October 2026 · <strong>Status:</strong> Draft for review · <strong>Author:</strong> Platform Engineering — Developer Experience</p>
+<p><strong>Changes from v2.0:</strong> re-pinned to API Contract v1.3, Event Model v3.0, and Product Spec v4; widget identity moved from a browser user id to a backend-signed token (§2.3, §5.5); self-enrollment removed — enrollment is selective-only and backend-owned, and the participant magic-link portal was removed (§0, §1.2, §2.3, §3.4); revenue flattened to scalar fields (§3.2); authorisation model stated accurately — Keto-resolved permission snapshot in a short-lived JWT with live Keto re-check on money/keys, and API keys are never Keto subjects (§1.3, §5.9); consent enum aligned to granted/denied/pending (§2.5); SDK custom-event contradiction resolved (forbidden, §2.6); reward lifecycle aligned to Pending → Held → Approved → Processing → Paid (§3.5); trust-zone and lifecycle-ownership diagrams added (Figures 1–2). This is a behavioural contract; it carries no endpoint paths, payloads, or field-level schemas.</p>
+<p><strong>Coherence pass (2026-10-06):</strong> identity-resolution order (§4.2) restated as the platform's single six-key ladder, adding the linked-identity and click-identifier steps; the SDK's opt-in built-in consent mini-prompt (Product Spec §9) added to the SDK CAN list (§2.6); typo fix (§2.5).</p>
+
+</main>
+</body></html>

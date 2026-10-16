@@ -1,0 +1,705 @@
+<!DOCTYPE html><html lang="en"><head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>ReferralAI — Failure &amp; Observability Model v5.0</title><style>
+
+@import url('https://fonts.googleapis.com/css2?family=Instrument+Serif&family=Geist:wght@400;500;600&family=Geist+Mono:wght@400&display=swap');
+:root{
+  --ink:#1c1917;--ink2:#44403c;--ink3:#78716c;--ink4:#a8a29e;
+  --paper:#FDFCFA;--card:#fff;--line:#e7e5e4;--wash:#f5f5f4;
+  --acc:#b45309;--acc2:#92400e;--accbg:#fef3c7;
+  --mint:#047857;--mintbg:#d1fae5;
+  --slate:#1e40af;--slatebg:#dbeafe;
+  --rose:#be123c;--rosebg:#ffe4e6;
+  --sw:220px
+}
+*{margin:0;padding:0;box-sizing:border-box}
+html{scroll-behavior:smooth;scroll-padding-top:20px}
+body{font-family:Geist,system-ui,sans-serif;background:var(--paper);color:var(--ink);font-size:14.5px;line-height:1.75;display:flex;-webkit-font-smoothing:antialiased}
+
+/* SIDEBAR */
+nav.sd{position:fixed;top:0;left:0;width:var(--sw);height:100vh;border-right:1px solid var(--line);overflow-y:auto;padding:24px 0;background:var(--paper)}
+.sd-b{padding:0 16px 16px}
+.sd-b h2{font-family:'Instrument Serif',serif;font-size:20px;color:var(--acc2);font-weight:400}
+.sd-b small{font-size:11px;color:var(--ink4);display:block;margin-top:2px;letter-spacing:.04em;text-transform:uppercase}
+.sd a{display:block;padding:2px 16px;color:var(--ink3);text-decoration:none;font-size:12px;line-height:1.6;transition:color .1s}
+.sd a:hover{color:var(--ink)}
+.sd a.n1{color:var(--ink2);font-weight:600;margin-top:12px;font-size:12px}
+.sd a.n2{padding-left:28px;font-size:11.5px;color:var(--ink4)}
+.sd a.active{color:var(--acc);font-weight:500}
+
+/* MAIN */
+main{margin-left:var(--sw);max-width:780px;padding:40px 48px 100px}
+h1{font-family:'Instrument Serif',serif;font-size:28px;font-weight:400;color:var(--ink);margin:56px 0 16px;letter-spacing:-.02em}
+h1:first-of-type{margin-top:0}
+h2{font-size:16px;font-weight:600;margin:32px 0 10px;letter-spacing:-.01em}
+h3{font-size:14px;font-weight:600;color:var(--acc2);margin:24px 0 6px}
+h4{font-size:13px;font-weight:600;margin:16px 0 4px}
+p{margin:0 0 12px;color:var(--ink2)}
+strong{color:var(--ink);font-weight:600}
+em{color:var(--ink3)}
+a{color:var(--acc);text-decoration:none;border-bottom:1px solid var(--accbg)}
+a:hover{border-color:var(--acc)}
+hr{border:none;height:1px;background:var(--line);margin:36px 0}
+ul,ol{margin:0 0 12px 20px;color:var(--ink2)}
+li{margin-bottom:3px}
+
+table{width:100%;border-collapse:collapse;margin:12px 0 20px;font-size:13px}
+th{text-align:left;padding:8px 10px;font-weight:500;font-size:10.5px;text-transform:uppercase;letter-spacing:.08em;color:var(--ink4);border-bottom:2px solid var(--line)}
+td{padding:7px 10px;border-bottom:1px solid var(--wash);color:var(--ink2)}
+tr:hover td{background:var(--wash)}
+
+code{font-family:'Geist Mono',monospace;font-size:12.5px;background:var(--wash);color:var(--acc2);padding:1px 4px;border-radius:3px}
+pre{background:var(--wash);border-radius:8px;padding:16px 20px;overflow-x:auto;margin:12px 0 20px;line-height:1.6;border:1px solid var(--line)}
+pre code{background:none;padding:0;color:var(--ink2);font-size:12px}
+pre.asc{border-left:3px solid var(--acc);background:var(--accbg)}
+
+blockquote{border-left:3px solid var(--acc);padding:10px 16px;margin:12px 0 20px;background:var(--accbg);border-radius:0 6px 6px 0}
+blockquote p:last-child{margin:0}
+
+/* ═══ DIAGRAMS ═══ */
+figure{margin:20px 0 28px;padding:20px;background:var(--card);border:1px solid var(--line);border-radius:10px}
+figure.fig-sm{padding:14px 20px}
+figcaption{font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:.14em;color:var(--ink4);margin-bottom:14px}
+
+.node{text-align:center;padding:8px 20px;border-radius:6px;font-weight:600;font-size:13px;display:inline-block}
+.nd-root{background:var(--ink);color:var(--paper);margin:0 auto;display:block;width:fit-content}
+.nd-root span{font-weight:400;opacity:.7;margin-left:6px;font-size:12px}
+.nd-mid{background:var(--slatebg);color:var(--slate);margin:0 auto;display:block;width:fit-content}
+
+.edge{width:2px;height:16px;background:var(--line);margin:0 auto}
+.edge.lg{height:24px}
+
+.tags{display:flex;flex-wrap:wrap;gap:6px;justify-content:center;margin:8px 0;font-size:12px;color:var(--ink3)}
+
+.cols{display:flex;gap:10px;flex-wrap:wrap}
+.trio{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}
+.leaf{flex:1;min-width:140px;padding:12px;border-radius:8px;font-size:13px;line-height:1.5;border:1px solid var(--line);background:var(--wash)}
+.lf-a{border-left:3px solid var(--mint);background:var(--mintbg)}
+.lf-b{border-left:3px solid var(--acc);background:var(--accbg)}
+.lf-c{border-left:3px solid var(--ink4);background:var(--wash)}
+
+.grid8{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin-bottom:6px}
+.grid6{display:grid;grid-template-columns:repeat(3,1fr);gap:6px}
+.cell{padding:12px;border-radius:6px;font-size:12.5px;text-align:center;background:var(--wash);border:1px solid var(--line);line-height:1.4}
+.cell small{color:var(--ink3);font-size:11px}
+.cell-w{margin-top:4px}
+
+.duo{display:flex;gap:10px}
+.duo-col{flex:1;border-radius:8px;overflow:hidden;border:1px solid var(--line)}
+.duo-h{padding:8px 14px;font-weight:600;font-size:12.5px;color:var(--paper)}
+.dh-l{background:var(--ink)}
+.dh-r{background:var(--mint)}
+.dh-r2{background:var(--mint)}
+.dh-r3{background:var(--rose)}
+.duo-b{padding:10px 14px}
+
+.step-list div{font-size:13px;padding:4px 0;border-bottom:1px solid var(--wash);color:var(--ink2)}
+.step-list div:last-child{border:none}
+.step-list.compact div{padding:2px 0;font-size:12.5px}
+.step-list .hl,.hl{background:var(--accbg);padding:3px 8px;border-radius:4px;border-bottom-color:transparent}
+.verdict{margin-top:8px;padding:6px 10px;border-radius:4px;font-size:12px;font-weight:600}
+.verdict.ok{background:var(--mintbg);color:var(--mint)}
+.verdict.bad{background:var(--rosebg);color:var(--rose)}
+
+.pipe{display:flex;align-items:center;gap:4px;flex-wrap:wrap}
+.pk{padding:6px 14px;border-radius:6px;font-weight:500;font-size:12px;color:var(--paper);position:relative}
+.pk::after{content:'→';position:absolute;right:-12px;color:var(--ink4);font-size:12px}
+.pk:last-child::after{content:''}
+.pk-0{background:#a8a29e}.pk-1{background:var(--slate)}.pk-2{background:var(--mint)}
+.pk-3{background:var(--acc)}.pk-4{background:var(--rose)}.pk-5{background:var(--ink3)}
+
+.waterfall{display:flex;flex-direction:column;gap:6px}
+.waterfall.numbered{counter-reset:wf}
+.waterfall.numbered .wf{counter-increment:wf}
+.waterfall.numbered .wf::before{content:counter(wf)'.';font-weight:600;margin-right:6px;color:var(--acc)}
+.wf{padding:10px 16px;border-radius:6px;font-size:13px;background:var(--wash);border-left:3px solid var(--line);line-height:1.5;color:var(--ink2)}
+.wf-w{border-left-color:var(--acc);background:var(--accbg)}
+.wf-d{border-left-color:var(--rose);background:var(--rosebg)}
+.wf-ok2{border-left-color:var(--mint);background:var(--mintbg)}
+.wf-branch{display:flex;flex-wrap:wrap;gap:6px}
+.wf-r{flex:1;min-width:120px;padding:8px 12px;border-radius:6px;font-size:12.5px;background:var(--wash);border:1px solid var(--line)}
+.wf-ok{border-left:3px solid var(--mint);background:var(--mintbg)}
+.wf-warn{border-left:3px solid var(--acc);background:var(--accbg)}
+.wf-err{border-left:3px solid var(--rose);background:var(--rosebg)}
+
+.checklist{display:flex;flex-direction:column;gap:4px}
+.cl-ok,.cl-no,.cl-warn{padding:8px 14px;border-radius:6px;font-size:13px;line-height:1.5}
+.cl-ok{background:var(--mintbg);border-left:3px solid var(--mint)}
+.cl-no{background:var(--rosebg);border-left:3px solid var(--rose)}
+.cl-warn{background:var(--accbg);border-left:3px solid var(--acc)}
+
+.box-nest{display:flex;flex-direction:column;align-items:center;gap:4px}
+.bn-outer{border:1px solid var(--line);border-radius:10px;padding:14px;width:100%;background:var(--wash)}
+.bn-inner{border:1px solid var(--slatebg);border-radius:8px;padding:12px;background:var(--slatebg)}
+.bn-label{font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:.08em;color:var(--ink4);margin-bottom:8px;display:block}
+.bn-label.accent{color:var(--slate)}
+.sm .cell{min-width:0}
+
+.note{font-size:12px;color:var(--ink3);margin-top:8px;font-style:italic;text-align:center}
+.mt-sm{margin-top:8px}.mb-sm{margin-bottom:10px}
+strong.err{color:var(--rose)}
+strong.ok{color:var(--mint)}
+strong.warn{color:var(--acc)}
+
+@media(max-width:800px){nav.sd{display:none}main{margin-left:0;padding:20px}
+.grid8{grid-template-columns:repeat(2,1fr)}.grid6{grid-template-columns:repeat(2,1fr)}
+.duo,.cols,.trio{flex-direction:column}}
+@media print{nav.sd{display:none}main{margin-left:0;max-width:100%}figure{break-inside:avoid;box-shadow:none}}
+::-webkit-scrollbar{width:3px}::-webkit-scrollbar-thumb{background:var(--line);border-radius:2px}
+</style>
+</head><body>
+<nav class="sd"><div class="sd-b"><h2>ReferralAI</h2><small>Failure &amp; Observability v5.0</small></div>
+<a href="#fom" class="n1">Failure &amp; Observability Model</a>
+<a href="#document-purpose" class="n2">Document Purpose</a>
+<a href="#principles" class="n2">Correctness Principles</a>
+
+<a href="#1-taxonomy" class="n1">1. Failure Taxonomy</a>
+<a href="#11-sdk" class="n2">1.1 SDK (Browser)</a>
+<a href="#12-backend" class="n2">1.2 Client Backend</a>
+<a href="#13-network" class="n2">1.3 Network / Integration</a>
+<a href="#14-ingestion" class="n2">1.4 Platform Ingestion</a>
+<a href="#15-attribution" class="n2">1.5 Attribution &amp; Reward</a>
+
+<a href="#2-detection" class="n1">2. Detection Signals</a>
+<a href="#21-metrics" class="n2">2.1 Metrics That Matter</a>
+<a href="#22-anomalies" class="n2">2.2 Anomaly Patterns</a>
+<a href="#23-silent" class="n2">2.3 Silent Failures</a>
+
+<a href="#3-client" class="n1">3. Client-Facing Monitoring</a>
+<a href="#31-health" class="n2">3.1 Integration Health</a>
+<a href="#32-alerts" class="n2">3.2 Warnings &amp; Alerts</a>
+<a href="#33-confidence" class="n2">3.3 Confidence &amp; Coverage</a>
+<a href="#34-program-health" class="n2">3.4 Program Health Score</a>
+
+<a href="#4-safeguards" class="n1">4. Platform-Side Safeguards</a>
+<a href="#41-dlq" class="n2">4.1 Dead-Letter Queues</a>
+<a href="#42-replay" class="n2">4.2 Replay Mechanisms</a>
+<a href="#43-reconciliation" class="n2">4.3 Reconciliation Jobs</a>
+<a href="#44-degradation" class="n2">4.4 Fraud-Safe Degradation</a>
+
+<a href="#5-support" class="n1">5. Support &amp; Debugging</a>
+<a href="#51-flow" class="n2">5.1 Investigation Flow</a>
+<a href="#52-inspectable" class="n2">5.2 Inspectable Data</a>
+<a href="#53-opaque" class="n2">5.3 Intentionally Opaque</a>
+<a href="#54-keys" class="n2">5.4 Correlation Keys</a>
+<a href="#55-feedback" class="n2">5.5 Feedback Loop</a>
+
+<a href="#changelog" class="n1">Change Log</a>
+</nav>
+<main><h1 id="fom">Failure &amp; Observability Model</h1><div style="border:1px solid #fde68a;background:#fffbeb;border-radius:8px;padding:12px 16px;margin:0 0 24px;font-size:13px;line-height:1.6">
+<strong>Revision 2026-10-12 — applied from the product-spec rework (Product Spec Appendix A #25–#46).</strong> Mechanical changes applied in this file: Program Admin → <strong>Owner</strong>; referee / referee_* → <strong>invitee / invitee_*</strong>; referrer (prose) → <strong>participant</strong> (wire names <code>/v1/referrers</code>, Keto <code>referrers</code> unchanged); Method A / Method B → <strong>events from backend / events from billing provider</strong>; touch events renamed <code>referral.link.clicked</code>, <code>referral.link.shared</code>, <code>referral.page.viewed</code>, <code>referral.email.opened|clicked</code>, <code>referral.widget.viewed</code>; <code>reward.calculated</code> → <code>reward.earned</code>; Partner actor removed from V1; payout partner → payout provider.<br><strong>Addendum 2026-10-12 (receivers move, Product Spec #47 / R-DOM-05 / R-SDK-07):</strong> owner of <code>billing_webhooks.*</code> metrics is now Event Ingestion (provider receivers); add <code>inbound.signature_rejected.rate</code> and <code>tracking.token_invalid.rate</code> to the ingestion layer.
+</div>
+<p><strong>Document Version:</strong> 5.0 — suite-wide version alignment (2026-10-09); content of 3.0 (which reconciled 2.0 against the companion specs) + the October 2026 coherence passes. Earlier change-log entries keep the pre-alignment numbering (2.0 → 3.0).<br>
+<strong>Classification:</strong> Internal — Architecture<br>
+<strong>Status:</strong> Implementation-Ready Reliability Specification<br>
+<strong>Last Updated:</strong> June 2026<br>
+<strong>Author:</strong> Reliability Engineering &amp; Platform Architecture<br>
+<strong>Companion Documents (all v5.0):</strong> Product Specification · API Contract · Event Model · DB Model · Architecture · Responsibility Contract<br>
+<strong>Audience:</strong> SRE, Backend engineers, Support engineering, Fraud ops</p>
+<hr>
+
+<h2 id="document-purpose">Document Purpose</h2>
+<p>This document defines the concrete failure &amp; observability model for the Referral Revenue OS, assuming integrations are imperfect and the world outside the platform is adversarial or buggy. It defines failure modes, the signals that detect them, how integration health and attribution confidence are exposed to clients, the internal safeguards that protect correctness, and the support workflow that ties them together.</p>
+<p>This revision reconciles the model against the current companion specifications. Structure, the failure-ID scheme (<code>F-SDK</code>, <code>F-BE</code>, <code>F-NET</code>, <code>F-ING</code>, <code>F-ATT</code>), and the core stance are unchanged from v2.0. The substantive deltas — flattened revenue fields and the conditional MRR/identity requirements, the corrected Ingestion Event Rules Guard behaviour for paused campaigns, the first-class Program Health Score, per-checkpoint fraud thresholds, and the fraud/trust communication effects — are folded into the relevant sections and listed in the change log.</p>
+
+<h2 id="principles">Correctness Principles</h2>
+<p>Two principles govern everything below and resolve every ambiguous case:</p>
+<ol>
+<li><strong>Under-attribute and under-pay before mis-attributing or over-paying.</strong> When data quality or fraud risk is uncertain, the system withholds credit and money rather than guessing.</li>
+<li><strong>Benign data loss must never trigger punitive action.</strong> A dropped beacon or a blocked cookie degrades coverage; it must never be read as fraud and must never suspend a participant or claw back a reward.</li>
+</ol>
+<hr>
+
+<h1 id="1-taxonomy">1. Failure Taxonomy</h1>
+<p>Failures are classified by origin layer. Each records what breaks, how silently it breaks, and whether it can move money. For every class, the dominant effect is one of three: it reduces <strong>coverage</strong> (we see less of the journey), it distorts <strong>numbers</strong> (the figures we report are wrong), or it risks <strong>moving money incorrectly</strong> (rewards/payouts are wrong). The two layers with money-moving potential — Client Backend and Attribution &amp; Reward Logic — get the most defensive treatment.</p>
+
+<h2 id="11-sdk">1.1 SDK (Browser) Failures</h2>
+<p>These occur in the browser — hostile, uncontrolled territory. The platform assumes every one of these will happen. The SDK operates exclusively with publishable keys (<code>rai_pub_</code>) and is restricted to touch-event ingestion and the SDK endpoints (API Contract §5.4). It carries <code>trust_level: low</code>: touch events only, never conversions, never revenue. Consequently, <strong>no SDK failure can move money directly</strong> — the entire layer affects coverage and the precision of numbers, never the correctness of a payout. This is a deliberate trust-zone property, not an accident.</p>
+
+<h3 id="f-sdk-01">F-SDK-01: SDK Not Loaded</h3>
+<p><strong>Cause:</strong> The client omitted the snippet, loaded it behind a condition that failed, an ad blocker or privacy extension blocked the script domain, or a CSP rule blocks the SDK origin.</p>
+<p><strong>What breaks:</strong> Zero touch events. No referral context captured, no cookies set, no widget rendered. Attribution falls back entirely to backend-supplied <code>referral_code</code> on conversion events — events from backend (invitee identity matching) or events from billing provider (payment-provider metadata) per Product Spec §9. If neither is configured, conversions look organic.</p>
+<p><strong>Dominant effect:</strong> Coverage. <strong>Money impact:</strong> None directly — rewards are under-attributed, never over-attributed.</p>
+<p><strong class="err">Silent failure risk: High.</strong> The client's site behaves normally; no user-visible error. The first sign is zero touch events in dashboards, which a client may not check for days.</p>
+
+<h3 id="f-sdk-02">F-SDK-02: Backend-Signed Widget Token Not Provided in <code>init()</code></h3>
+<p><strong>Cause:</strong> The SDK is initialized without the backend-signed identity token (<code>token</code> in <code>RefRev.init()</code>), typically because a developer copied the snippet without wiring the JWT their backend must mint; the token is mandatory for the participant-facing widget (Product Spec §9; Responsibility Contract §2.3, §5.5). A browser-asserted user id is not accepted.</p>
+<p><strong>What breaks:</strong> The widget does not render. All campaigns use selective enrollment and there is no self-enrollment via the widget (Product Spec §7), so the widget only ever renders for an already-enrolled participant; without a verified token the platform cannot identify that participant, so even an enrolled one is shown nothing. The SDK logs a console warning and reports the condition as init metadata. Invitee touch tracking still works for visitors arriving via referral links — only the participant-facing surface is dead.</p>
+<p><strong>Dominant effect:</strong> Coverage (no participant surface → no referral volume). <strong>Money impact:</strong> Indirect under-attribution; a participant who cannot see their link cannot share it. The platform-sent enrollment email is the only other surface on which they can receive it (there is no participant-facing portal — Product Spec §7).</p>
+<p><strong class="err">Silent failure risk: High.</strong> The SDK loads and tracks invitee clicks, so the dashboard shows activity, masking the dead widget. Visible only via the "SDK loaded without token" signal.</p>
+
+<h3 id="f-sdk-03">F-SDK-03: Cookie Blocked or Cleared</h3>
+<p><strong>Cause:</strong> Browser ITP/ETP policies, user-cleared cookies, incognito mode, aggressive privacy settings, or consent <code>denied</code>.</p>
+<p><strong>What breaks:</strong> The first-party cookies — <code>_rr_ref</code> (referral-code anchor), <code>_rr_sess</code> (session identity), <code>_rr_vid</code> (visitor / <code>anonymous_id</code>) — are unavailable. The SDK falls back to a localStorage backup of the <code>_rr_ref</code> payload (Responsibility Contract §2.4). If localStorage is also blocked, attribution relies on URL-parameter passthrough only; if the visitor leaves the landing page and returns directly, referral context is lost.</p>
+<p><strong>Dominant effect:</strong> Coverage. <strong>Money impact:</strong> Under-attribution — affected conversions are recorded as organic.</p>
+<p><strong class="warn">Silent failure risk: Medium.</strong> In-memory session touches still flow but lack the persistent referral context needed for multi-page-load attribution. Both cookie and localStorage failing together is undetectable until attribution coverage drops.</p>
+
+<h3 id="f-sdk-04">F-SDK-04: Consent Unknown / CMP Delay</h3>
+<p><strong>Cause:</strong> The client's CMP loads slowly, fails, or races the SDK. The SDK enters <code>pending</code> consent state and buffers touch events in memory (bounded queue with a short expiry — Product Spec §9; Responsibility Contract §2.5).</p>
+<p><strong>What breaks:</strong> In <code>pending</code>, no cookies are set and events are <em>queued</em>. If the CMP never resolves, the queue expires and events are dropped; if the visitor navigates away first, the queue is lost. This is distinct from <code>denied</code>, where <strong>no cookies are set and no events are sent at all</strong> — <code>denied</code> is silent by design, <code>pending</code> is a recoverable limbo.</p>
+<p><strong>Dominant effect:</strong> Coverage. <strong>Money impact:</strong> Under-attribution.</p>
+<p><strong class="err">Silent failure risk: High.</strong> The SDK must never break the client's site, so CMP failures produce no visible error and no events — indistinguishable from "no visitors" without region-level analysis.</p>
+
+<h3 id="f-sdk-05">F-SDK-05: Event Submission Failures</h3>
+<p><strong>Cause:</strong> Network drops, ingestion endpoint transiently unavailable, publishable-key touch rate limit exceeded (10,000 touch events/min per key; SDK endpoints 500 req/min — API Contract §8.1), or DNS failure.</p>
+<p><strong>What breaks:</strong> Touch events are delayed or lost. The SDK retries with backoff. The platform's secondary deduplication (<code>referral_code + session_id + 5-minute bucket</code> — API Contract §5.3) safely collapses retried touches even when client-side <code>external_id</code> generation is unstable.</p>
+<p><strong>Dominant effect:</strong> Coverage. <strong>Money impact:</strong> Minimal — touches are input to attribution but do not move money.</p>
+<p><strong class="warn">Silent failure risk: Medium.</strong> Buffering and retry mask transient failures; sustained failure leaves gaps visible only after the fact.</p>
+
+<h3 id="f-sdk-06">F-SDK-06: <code>sendBeacon</code> Failure on Page Unload</h3>
+<p><strong>Cause:</strong> The browser lacks <code>sendBeacon</code>, kills the request before completion, or the payload exceeds the beacon size limit.</p>
+<p><strong>What breaks:</strong> The final event on a page — often the most attribution-significant — is lost.</p>
+<p><strong>Dominant effect:</strong> Coverage. <strong>Money impact:</strong> Minimal per event; aggregated, it degrades attribution quality.</p>
+<p><strong class="err">Silent failure risk: High.</strong> <code>sendBeacon</code> provides no completion callback, so failure is unobservable client-side.</p>
+
+<h3 id="f-sdk-07">F-SDK-07: <code>resolve-link</code> Failure</h3>
+<p><strong>Cause:</strong> The link-resolution call (API Contract §4.2) fails on network error, or the Ingestion Event Rules Guard rejects it: <code>410</code> for an expired/archived/completed campaign or revoked link, <code>403</code> for a blocked participant's code, <code>422</code> for an unknown campaign (API Contract §5.5).</p>
+<p><strong>What breaks:</strong> The SDK cannot validate the code or fetch campaign context (cookie TTL, invitee reward preview). For a genuinely invalid/expired code, not tracking is <strong>correct</strong>. For a transient network error, the SDK should persist the raw URL code and retry, but the code remains unvalidated until it succeeds.</p>
+<p><strong>Dominant effect:</strong> Coverage. <strong>Money impact:</strong> Under-attribution if legitimate codes are discarded on transient failure.</p>
+<p><strong class="err">Silent failure risk: High</strong> for transient failures. Note the interaction with the fraud/trust communication effects (§4.4): a <code>410</code> on resolve-link can also mean the participant is <em>blocked</em>, not that the link expired — the two are indistinguishable from the SDK's side and must be separated server-side during debugging.</p>
+
+<h2 id="12-backend">1.2 Client Backend Failures</h2>
+<p>These occur inside the client's trusted infrastructure and are the most dangerous class, because backend events carry <code>trust_level: high</code> (API Contract §5.4): revenue, context, and consent are all trusted as asserted. CRUD operations are <em>not</em> available to API keys — campaign management, reward approval, and payout initiation require OAuth2 JWT (API Contract §2). This caps the blast radius of a backend compromise but does nothing to protect against honest mis-integration, which is where most money risk actually lives.</p>
+
+<h3 id="f-be-01">F-BE-01: Conversion Events Never Sent</h3>
+<p><strong>Cause:</strong> The backend integration was never built, a broken build shipped, an internal queue silently failed, or the conversion call was removed in a refactor. Applies to events from backend, where the backend explicitly emits conversions. events from billing provider is not affected by this specific mode, since conversions arrive via billing webhooks.</p>
+<p><strong>What breaks:</strong> Everything downstream. No conversions → no attribution → no referral transitions → no reward evaluation → no payouts. The program is operationally dead; touch events keep arriving but lead nowhere.</p>
+<p><strong>Dominant effect:</strong> Moves money by omission — under-payout. <strong>Money impact:</strong> Participants are not compensated.</p>
+<p><strong class="err">Silent failure risk: Very high.</strong> The platform has no way to know the client <em>should</em> be sending conversions. The only signal is a conversion rate that sits at zero.</p>
+
+<h3 id="f-be-02">F-BE-02: Referral Code Not Forwarded</h3>
+<p><strong>Cause:</strong> The SDK captures the code in <code>_rr_ref</code>, but the signup/payment flow never calls the attribution-retrieval method and omits <code>referral_code</code> from the backend conversion event (Responsibility Contract §5.2).</p>
+<p><strong>What breaks:</strong> The highest-fidelity path — direct referral-code stitching (key 1 of the ladder, Event Model §7.3) — is unavailable. The platform falls back to linked identity (keys 2–3), <code>click_id</code> (key 4), session (key 5) and finally email-hash (key 6) stitching. These succeed for same-device, same-email journeys and fail for cross-device or email-change cases.</p>
+<p><strong>Dominant effect:</strong> Distorts numbers / reduces coverage. <strong>Money impact:</strong> Under-attribution in ambiguous cases. Over-attribution is impossible — there is no probabilistic stitching (Event Model §7.3).</p>
+<p><strong class="err">Silent failure risk: High.</strong> Fallback stitching still works often enough to mask the problem.</p>
+
+<h3 id="f-be-03">F-BE-03: Revenue Submitted in Wrong Units</h3>
+<p><strong>Cause:</strong> The client sends <code>revenue_amount: 49</code> instead of <code>4900</code> for a €49.00 payment because their internal systems use major units. Per the conversion schemas, <code>revenue_amount</code> is an integer in <strong>minor</strong> units (cents); <code>revenue_currency</code> must match the ISO-4217 three-letter pattern.</p>
+<p><strong>What breaks:</strong> Every financial figure is off by 100×. Revenue per referral, reward ROI, and all KPI dashboards show implausible numbers; percentage-based rewards calculate on 1/100th of the real amount. The Revenue Impact sub-score of Program Health (§3.4) is corrupted in the same direction.</p>
+<p><strong>Dominant effect:</strong> Distorts numbers; risks moving money on percentage rewards. <strong>Money impact:</strong> Under-payout on percentage rewards.</p>
+<p><strong class="warn">Silent failure risk: Medium.</strong> Schema validation rejects non-integers (so <code>49.00</code> is caught), but <code>49</code> is a valid integer and passes. The anomaly is visible in dashboards but needs client attention.</p>
+
+<h3 id="f-be-04">F-BE-04: Duplicate Conversion Events (Non-deterministic <code>external_id</code>)</h3>
+<p><strong>Cause:</strong> The client generates a random <code>external_id</code> per retry instead of deriving it from a stable domain key (a signup or payment identifier). <code>external_id</code> is the domain dedup key with a 90-day, per-tenant window (API Contract §1, §5.3).</p>
+<p><strong>What breaks:</strong> Each retry is a new event. The same conversion is counted multiple times; the same reward is earned multiple times.</p>
+<p><strong>Dominant effect:</strong> Moves money — over-payout. <strong>Money impact:</strong> Participants receive duplicate rewards.</p>
+<p><strong class="warn">Silent failure risk: Medium-low.</strong> The client sees a successful <code>202 Accepted</code> per call; duplication surfaces as multiple <code>reward.earned</code> domain events for one invitee within minutes. Dedup cannot catch what the client never marked as the same event.</p>
+
+<h3 id="f-be-05">F-BE-05: Events Sent Long After Occurrence</h3>
+<p><strong>Cause:</strong> The client batches conversions and sends them days late with <code>occurred_at</code> set to "now" instead of the true time. Touch events must occur within 7 days, conversions within 30 days (Event Model §2.1).</p>
+<p><strong>What breaks:</strong> Attribution-window evaluation uses the wrong timestamp, so the window boundary is computed against a fictional time.</p>
+<p><strong>Dominant effect:</strong> Distorts numbers; can move money. <strong>Money impact:</strong> Unpredictable — both over- and under-attribution are possible near window edges.</p>
+<p><strong class="err">Silent failure risk: High.</strong> Events are accepted as long as <code>occurred_at</code> is within the allowed window, true or not.</p>
+
+<h3 id="f-be-06">F-BE-06: Secret Key Leaked</h3>
+<p><strong>Cause:</strong> A <code>rai_live_</code> key is committed to a public repo, embedded in frontend code, or logged where it can be read.</p>
+<p><strong>What breaks:</strong> An attacker can submit fabricated conversions with <code>trust_level: high</code>. But the key <strong>cannot</strong> approve rewards, initiate payouts, create campaigns, or touch any CRUD endpoint — those need OAuth2 JWT (API Contract §2). The blast radius is event poisoning only.</p>
+<p><strong>Dominant effect:</strong> Moves money (bounded). <strong>Money impact:</strong> Significant but bounded. Fabricated conversions drive workflow transitions, fraud scoring, and reward evaluation; if auto-approval is enabled and fraud detection misses the pattern, fraudulent rewards may be earned and approved. Payout initiation still requires JWT, a second barrier, and fraud-safe degradation (§4.4) holds payouts under anomaly.</p>
+<p><strong class="err">Silent failure risk: High</strong> until the attack produces visible effects (revenue/fraud anomalies).</p>
+
+<h3 id="f-be-07">F-BE-07: Using API Keys for CRUD Operations</h3>
+<p><strong>Cause:</strong> The client tries to create campaigns, manage rewards, or read analytics with a <code>rai_live_</code> key, assuming broad access (Responsibility Contract §5.9).</p>
+<p><strong>What breaks:</strong> Every such request is cleanly rejected with an authorization error stating that API keys are restricted to ingestion and SDK endpoints. No data is read or written.</p>
+<p><strong>Dominant effect:</strong> None — clean rejection. <strong>Money impact:</strong> None.</p>
+<p><strong class="ok">Silent failure risk: None;</strong> the error is explicit. The only cost is wasted integration time before the auth model is understood.</p>
+
+<h3 id="f-be-08">F-BE-08: Payment-Provider Metadata Not Written (events from billing provider)</h3>
+<p><strong>Cause:</strong> The client configures the billing webhook integration (Stripe, Paddle, or Chargebee — the three events from billing provider inbound receivers, API Contract §6.5; the wider <code>payment_provider</code> enum on <code>payment.completed</code> describes events from backend backend events, not receivers) but never writes the referral code into the customer/payment metadata at creation time (Responsibility Contract §5.10).</p>
+<p><strong>What breaks:</strong> Payment webhooks arrive and are processed, but nothing attributes them to a referral. Revenue exists in the provider's system and in raw conversion volume, but not in referral attribution. The integration looks healthy with zero attribution.</p>
+<p><strong>Dominant effect:</strong> Moves money by omission — under-attribution. <strong>Money impact:</strong> Legitimate referrals go uncompensated.</p>
+<p><strong class="err">Silent failure risk: High.</strong> The webhook path is technically "working." The only signal is "unattributed payments from a connected billing provider" in integration health (§3.1) and the Billing-to-Platform Revenue reconciliation job (§4.3).</p>
+
+<h3 id="f-be-09">F-BE-09: Conversion Missing Invitee Identity Anchor</h3>
+<p><strong>Cause:</strong> The backend sends a conversion with neither <code>invitee_email</code> nor <code>invitee_external_id</code>. The conversion schemas require <strong>one of the two</strong> (an <code>anyOf</code> conditional).</p>
+<p><strong>What breaks:</strong> The event is rejected at schema validation before it reaches the workflow runtime. No conversion is recorded.</p>
+<p><strong>Dominant effect:</strong> Coverage / moves money by omission. <strong>Money impact:</strong> Under-attribution — the conversion never enters the pipeline.</p>
+<p><strong class="warn">Silent failure risk: Low-to-medium.</strong> The rejection is explicit in the response, but a client that does not inspect ingestion responses experiences it as a silent gap. This was a <em>silent</em> missing-field problem under the prior nested model; it is now a <em>hard, observable rejection</em>, which is the safer behaviour. <strong>(New in v3.0.)</strong></p>
+
+<h3 id="f-be-10">F-BE-10: Recurring Conversion Missing <code>revenue_mrr</code></h3>
+<p><strong>Cause:</strong> The client sends <code>conversion.payment_completed</code> or <code>conversion.subscription_renewed</code> with <code>revenue_type: recurring</code> but omits <code>revenue_mrr</code>. The schema makes <code>revenue_mrr</code> conditionally required when <code>revenue_type</code> is <code>recurring</code>.</p>
+<p><strong>What breaks:</strong> The event is rejected at validation. For Renewal-Pulse campaigns (Product Spec §6) and all revenue-first (MRR/ARR) analytics (Product Spec §10), the recurring-revenue signal is the whole point, so the rejection blocks the campaign's core measurement rather than a peripheral field.</p>
+<p><strong>Dominant effect:</strong> Distorts numbers / coverage. <strong>Money impact:</strong> Under-attribution of recurring revenue and any MRR-based reward; the renewal cycle does not register.</p>
+<p><strong class="warn">Silent failure risk: Medium.</strong> Explicit rejection, but easy to miss because one-time payments from the same client succeed — the client sees "most conversions work" while every recurring one fails. <strong>(New in v3.0.)</strong></p>
+
+<h2 id="13-network">1.3 Network / Integration Failures</h2>
+
+<h3 id="f-net-01">F-NET-01: SDK-to-Platform Connectivity Loss</h3>
+<p><strong>Cause:</strong> DNS failure, regional partition, or the ingestion endpoint unreachable from a visitor's geography.</p>
+<p><strong>What breaks:</strong> Touch events buffer in the SDK's in-memory queue, then drop. Attribution degrades in proportion to the outage. The localStorage backup preserves the <code>_rr_ref</code> payload across the outage so context survives even when live touches do not.</p>
+<p><strong>Dominant effect:</strong> Coverage. <strong>Money impact:</strong> Under-attribution only.</p>
+
+<h3 id="f-net-02">F-NET-02: Client Backend-to-Platform Connectivity Loss</h3>
+<p><strong>Cause:</strong> The client's infrastructure cannot reach the ingestion API — firewall change, DNS failure, IP-allowlist misconfiguration (API Contract §8).</p>
+<p><strong>What breaks:</strong> Conversions are not delivered. If the client retries within 30 days with a correct <code>occurred_at</code>, the events backfill cleanly; otherwise they are lost.</p>
+<p><strong>Dominant effect:</strong> Coverage / moves money by omission. <strong>Money impact:</strong> Under-attribution and under-payout during the outage; recoverable if retried within the <code>occurred_at</code> window.</p>
+
+<h3 id="f-net-03">F-NET-03: Outbound Webhook Delivery Failure</h3>
+<p><strong>Cause:</strong> The client's webhook endpoint is down, returns non-2xx, or times out. Retry schedule: 1 min → 5 min → 30 min → 2 h → 12 h → 24 h (7 attempts); 50 consecutive failures auto-disables the endpoint and notifies the client (API Contract §6.3).</p>
+<p><strong>What breaks:</strong> The client does not receive real-time notifications (<code>conversion.recorded</code>, <code>reward.earned</code>, <code>fraud.flagged</code> — the API Contract §6.1 names). If their reward-approval workflow depends on these in a manual-approval campaign, rewards sit in <code>Pending</code> until the client polls or the endpoint recovers.</p>
+<p><strong>Dominant effect:</strong> Distorts the client's view / delays money. <strong>Money impact:</strong> Delayed payouts for manual-approval campaigns; no incorrect amounts.</p>
+<p><strong class="warn">Silent failure risk: Medium.</strong> The auto-disable notification fires only after 50 failures.</p>
+
+<h3 id="f-net-04">F-NET-04: Billing-Provider Inbound Webhook Failure (events from billing provider)</h3>
+<p><strong>Cause:</strong> The provider's webhook to the platform's inbound receiver fails — the provider cannot reach the platform, or the receiver is degraded (API Contract §6.5).</p>
+<p><strong>What breaks:</strong> events from billing provider attribution stalls entirely. Payment events are not processed, conversions are not recorded, referral workflows do not advance.</p>
+<p><strong>Dominant effect:</strong> Coverage / moves money by omission. <strong>Money impact:</strong> Under-attribution for all events from billing provider clients during the outage. Unlike F-NET-02, the client cannot retry — they did not originate the event, the provider did. Recovery depends on the provider's own retry behaviour plus platform-side replay.</p>
+<p><strong class="warn">Silent failure risk: Medium.</strong> The provider's delivery dashboard and the platform's "billing webhook last received" timestamp both show staleness, but the client may monitor neither.</p>
+
+<h2 id="14-ingestion">1.4 Platform Ingestion &amp; Internal Services</h2>
+
+<h3 id="f-ing-01">F-ING-01: Ingestion Pipeline Backpressure</h3>
+<p><strong>Cause:</strong> Traffic spike, SQS/SNS consumer lag, or a degraded downstream dependency (Redis, PostgreSQL). The pipeline is synchronous to <code>202 Accepted</code> (validate → dedup → Ingestion Event Rules Guard → enrich → emit) and asynchronous thereafter through Temporal (API Contract §5.7).</p>
+<p><strong>What breaks:</strong> Events are accepted but processing is delayed. <code>ingested_at</code> and <code>processed_at</code> diverge; <code>processing_status</code> stays at <code>accepted</code> rather than completing processing. Attribution, reward evaluation, fraud checks, and webhook delivery all lag.</p>
+<p><strong>Dominant effect:</strong> Delays everything; eventually consistent. <strong>Money impact:</strong> Delayed payouts; no incorrect attribution, because processing completes correctly once drained.</p>
+
+<h3 id="f-ing-02">F-ING-02: Ingestion Event Rules Guard Rejections</h3>
+<p><strong>Cause:</strong> The Ingestion Event Rules Guard (API Contract §5.5) evaluates campaign-level rules after schema validation and before the workflow runtime. Its responses are specific and must be read precisely:</p>
+<ul>
+<li>Unknown campaign → <code>422</code>.</li>
+<li>Campaign archived → <code>410 Campaign archived</code>; campaign completed → <code>410 Campaign completed</code>; after <code>ends_at</code> → <code>410 Campaign ended</code>.</li>
+<li>Before <code>starts_at</code> → <code>422 Campaign not yet active</code>.</li>
+<li><strong>Paused campaign → touch events <code>202</code> (buffered for resume); conversions for <em>existing</em> referrals <code>202</code>; only <em>new</em> referral creation is blocked.</strong></li>
+<li>Expired/revoked link → <code>410</code> / <code>403</code>.</li>
+</ul>
+<p><strong>What breaks:</strong> For genuinely expired links and not-yet-active campaigns this is correct behaviour. The case that surprises clients is a conversion arriving just after a campaign ends (<code>410</code>), and — importantly — the corrected paused-campaign semantics: a paused campaign does <strong>not</strong> reject conversions for referrals already in flight, so the prior guidance that "paused → conversions rejected" is wrong and must not be used in triage.</p>
+<p><strong>Dominant effect:</strong> Coverage (when timing is off). <strong>Money impact:</strong> Under-attribution if a conversion lands after the campaign ends.</p>
+<p><strong class="ok">Silent failure risk: Low.</strong> The status codes are explicit; only clients that ignore response codes miss them.</p>
+
+<h3 id="f-ing-03">F-ING-03: Deduplication False Positive</h3>
+<p><strong>Cause:</strong> Two genuinely distinct events share <code>tenant_id + external_id</code> because the client reused an <code>external_id</code> across event types or a legitimate second occurrence falls inside the 90-day window.</p>
+<p><strong>What breaks:</strong> A real event is silently discarded as a duplicate; the platform returns <code>202 Accepted</code> with <code>processing_status: "duplicate"</code>.</p>
+<p><strong>Dominant effect:</strong> Coverage / moves money by omission. <strong>Money impact:</strong> Under-attribution if the discarded event was a conversion.</p>
+<p><strong class="err">Silent failure risk: Very high.</strong> The <code>duplicate</code> response is identical to correct deduplication; only cross-source reconciliation reveals the missing event.</p>
+
+<h3 id="f-ing-04">F-ING-04: Schema Validation Rejections (incl. malformed custom events)</h3>
+<p><strong>Cause:</strong> An event fails JSON-Schema validation: a non-integer <code>revenue_amount</code>, a malformed <code>revenue_currency</code>, the missing identity anchor (F-BE-09), the missing <code>revenue_mrr</code> on recurring (F-BE-10), or — for <code>custom.recorded</code> — a nested object, which the schema forbids (custom payloads accept only flat primitives or flat arrays, with a mandatory dot-notation <code>event_name</code>).</p>
+<p><strong>What breaks:</strong> The event is rejected before ingestion. Nothing is recorded.</p>
+<p><strong>Dominant effect:</strong> Coverage. <strong>Money impact:</strong> Under-attribution if a conversion is rejected.</p>
+<p><strong class="warn">Silent failure risk: Low-medium.</strong> Rejections are explicit per-request but invisible to clients who do not inspect responses; they surface in aggregate as a spike in the rejection-by-reason metric.</p>
+
+<h3 id="f-ing-05">F-ING-05: ClickHouse Analytics Lag or Failure</h3>
+<p><strong>Cause:</strong> ClickHouse cluster degradation, replication lag, or query saturation.</p>
+<p><strong>What breaks:</strong> Dashboard KPIs and Program Health roll-ups are stale or unavailable. The transactional pipeline (PostgreSQL + Temporal + Redis) continues unaffected.</p>
+<p><strong>Dominant effect:</strong> Distorts the <em>displayed</em> numbers without distorting the underlying data. <strong>Money impact:</strong> None directly — ClickHouse is a read path.</p>
+
+<h2 id="15-attribution">1.5 Attribution &amp; Reward Logic Failures</h2>
+
+<h3 id="f-att-01">F-ATT-01: Identity Stitching Failure</h3>
+<p><strong>Cause:</strong> A conversion lacks <code>referral_code</code> (key 1), carries no <code>provider_customer_id</code> / <code>invitee_external_id</code> already linked to an open referral (keys 2–3), no <code>click_id</code> correlating to a click (key 4), its <code>session_id</code> matches no touch (key 5), and its <code>actor_email_hash</code> matches no touch (key 6) — the six-key ladder of Product Spec §9/§10. No probabilistic stitching is performed by policy (Event Model §7.3).</p>
+<p><strong>What breaks:</strong> The conversion is recorded as organic; the participant who drove it gets no credit.</p>
+<p><strong>Dominant effect:</strong> Moves money by omission. <strong>Money impact:</strong> Under-payout.</p>
+<p><strong class="err">Silent failure risk: High.</strong> The conversion is recorded correctly — it simply cannot be attributed — and increments the unattributed-conversion counter rather than raising an error.</p>
+
+<h3 id="f-att-02">F-ATT-02: Attribution Window Misconfiguration</h3>
+<p><strong>Cause:</strong> A campaign sets a 7-day window for a product with a 30-day sales cycle. The campaign-level window overrides the program default (API Contract §3.2; Product Spec §10).</p>
+<p><strong>What breaks:</strong> Conversions causally linked to referrals fall outside the window and record as organic.</p>
+<p><strong>Dominant effect:</strong> Distorts numbers / moves money by omission. <strong>Money impact:</strong> Under-payout.</p>
+
+<h3 id="f-att-03">F-ATT-03: Multi-Touch Attribution Disputes</h3>
+<p><strong>Cause:</strong> Multiple participants touched the same invitee. First-touch and last-touch assign 100% to different participants; multi-touch (V2, Product Spec §10) splits by weight.</p>
+<p><strong>What breaks:</strong> Trust in the model. Surfaces as support tickets from the non-credited participant, not as a system error.</p>
+<p><strong>Dominant effect:</strong> Distorts perceived fairness. <strong>Money impact:</strong> Correct by the configured model's definition, disputed by the uncredited participant.</p>
+
+<h3 id="f-att-04">F-ATT-04: Temporal Workflow / Pulse Failure</h3>
+<p><strong>Cause:</strong> A Temporal worker crashes, a workflow times out, or a determinism violation fails a replay. Because each campaign runs a pulse-specific saga (Product Spec §6), the failure surface differs by pulse:</p>
+<ul>
+<li><strong>Conversion Pulse</strong> (single trigger, refund-sensitive): a stuck workflow halts the transition to <code>Converted</code> and defers the refund/clawback path.</li>
+<li><strong>Renewal Pulse</strong> (multi-cycle loop, no clawback of already-paid cycles): a failure mid-loop can stall future cycles; already-paid cycles are never clawed back, so the risk is under-counting later renewals, not reversing past ones.</li>
+<li><strong>Feedback Pulse</strong> (external verification dependency): a failure in the external-verification step leaves the referral unqualified, deferring — never falsely granting — the reward.</li>
+</ul>
+<p><strong>What breaks:</strong> Referral state transitions stall; reward evaluation, fraud checks, and fulfillment do not execute for the affected workflow.</p>
+<p><strong>Dominant effect:</strong> Delays money. <strong>Money impact:</strong> Delayed payouts; permanently stuck workflows require manual intervention. The saga's compensation logic prevents partial half-applied states.</p>
+
+<h3 id="f-att-05">F-ATT-05: Variant Resolution Failure at Enrollment</h3>
+<p><strong>Cause:</strong> Variant resolution happens at enrollment via a priority fallback chain (Product Spec §5; API Contract §3.3). If no variant segment matches and no Default Variant exists, resolution fails. Every campaign is supposed to carry a Default Variant (Product Spec §6), so this should only occur via data inconsistency or a setup race.</p>
+<p><strong>What breaks:</strong> Enrollment fails or the participant gets no link; the relevant enrollment call returns an error.</p>
+<p><strong>Dominant effect:</strong> Coverage. <strong>Money impact:</strong> None — no link means no referral activity, so no money is at stake.</p>
+<p><strong class="ok">Silent failure risk: Low.</strong> The API returns an error, but a client that ignores enrollment responses may leave participants silently without links (caught by the Enrollment-to-Link reconciliation job, §4.3).</p>
+
+<h3 id="f-att-06">F-ATT-06: Reward Lifecycle Stalls and Reversals</h3>
+<p><strong>Cause:</strong> The reward state machine is <code>Pending → Held → Approved → Processing → Paid | Rejected | Reversed</code> (Product Spec §8), emitting the domain events <code>reward.earned</code>, <code>reward.held</code>, <code>reward.approved</code>, <code>reward.rejected</code>, <code>reward.paid</code>, and <code>reward.reversed</code> (Event Model §5.2). Stalls arise from a missing approval (manual mode + lost webhook, F-NET-03), a fulfillment/payout-provider failure, or a clawback triggered by a post-conversion refund or chargeback (payment-reversal fraud signal).</p>
+<p><strong>What breaks:</strong> Rewards sit in <code>Pending</code>/<code>Held</code>/<code>Approved</code> longer than the trust-tier hold period allows, or a <code>Reversed</code> transition (<code>reward.reversed</code>) fires after a refund.</p>
+<p><strong>Dominant effect:</strong> Delays or correctly reverses money. <strong>Money impact:</strong> Delayed legitimate payouts; correct clawback on genuine reversals. The hold periods (14/7/3 days / instant by trust tier — §3) exist precisely so a reversal can land before money leaves. <strong>(New in v3.0.)</strong></p>
+<hr>
+
+<h1 id="2-detection">2. Detection Signals</h1>
+<p>This section defines what is measured, what a change means, and what is done about it. Two categories are kept strictly separate: <strong>hard errors</strong> (rejections, failures, stuck workflows — actionable immediately) and <strong>confidence indicators</strong> (coverage and attribution-quality metrics — surfaced as quality signals, never as request failures). The most dangerous failures in §1 are silent precisely because they live in the second category, so the confidence indicators carry as much weight here as the error rates.</p>
+
+<h2 id="21-metrics">2.1 Metrics That Matter</h2>
+
+<h3>Ingestion Layer</h3>
+<table><thead><tr><th>Metric</th><th>Source</th><th>Normal Range</th><th>Anomaly Indicates</th></tr></thead><tbody>
+<tr><td><code>events.ingested.rate</code> (by class, type, tenant)</td><td>Ingestion Service</td><td>Stable ±20% WoW</td><td>F-BE-01 (conversion → 0), F-NET-02 (all-event drop), F-SDK-01 (touch drop)</td></tr>
+<tr><td><code>events.rejected.rate</code> (by reason, tenant)</td><td>API gateway / validator</td><td>&lt; 2% of ingested</td><td>F-ING-04, F-BE-03, F-BE-09, F-BE-10</td></tr>
+<tr><td><code>events.rejected.reason.distribution</code></td><td>Validator</td><td>Stable mix</td><td>Spike in <code>missing_mrr</code> / <code>missing_identity</code> / <code>invalid_currency</code> isolates the mis-integration</td></tr>
+<tr><td><code>events.deduplicated.rate</code> (by tenant)</td><td>Dedup service</td><td>&lt; 5%</td><td>F-BE-04 (spike → non-deterministic <code>external_id</code>); watch F-ING-03</td></tr>
+<tr><td><code>events.processing_status.distribution</code></td><td>Pipeline</td><td>&gt; 95% complete processing &lt; 60 s</td><td>F-ING-01 (stuck at <code>accepted</code>)</td></tr>
+<tr><td><code>events.ingestion_latency_p99</code></td><td>Ingestion Service</td><td>&lt; 200 ms</td><td>F-ING-01</td></tr>
+<tr><td><code>events.processing_latency_p99</code></td><td>Pipeline</td><td>&lt; 5 s</td><td>F-ING-01, F-ATT-04</td></tr>
+<tr><td><code>ingestion_guard.response.distribution</code> (410/422/403/202-buffered)</td><td>Ingestion Service</td><td>&lt; 1% non-202</td><td>F-ING-02; 410 → expired campaigns/links or blocked participants; 422 → unknown/inactive campaigns</td></tr>
+</tbody></table>
+
+<h3>Attribution Layer</h3>
+<table><thead><tr><th>Metric</th><th>Source</th><th>Normal Range</th><th>Anomaly Indicates</th></tr></thead><tbody>
+<tr><td><code>attribution.coverage_pct</code> (tenant)</td><td>Attribution Engine</td><td>&gt; 80%</td><td>F-BE-02, F-SDK-03, F-ATT-01</td></tr>
+<tr><td><code>attribution.unstitched_conversions.rate</code></td><td>Identity Service</td><td>&lt; 15%</td><td>F-ATT-01, F-BE-02</td></tr>
+<tr><td><code>attribution.window_expired.rate</code> (campaign)</td><td>Attribution Engine</td><td>&lt; 10%</td><td>F-ATT-02, F-BE-05</td></tr>
+<tr><td><code>attribution.stitching_method.distribution</code></td><td>Attribution Engine</td><td>Code-based &gt; 70%</td><td>F-BE-02 (low code-based → leaning on weaker methods)</td></tr>
+<tr><td><code>attribution.method_b.unattributed_payments.rate</code></td><td>Event Ingestion (provider receivers)</td><td>0% if events from billing provider configured</td><td>F-BE-08</td></tr>
+<tr><td><code>revenue.recurring_share</code> &amp; <code>revenue.mrr_present.rate</code></td><td>Attribution Engine</td><td>Stable per tenant</td><td>Drop in MRR-present on recurring → F-BE-10 upstream of rejection</td></tr>
+</tbody></table>
+
+<h3>Reward &amp; Payout Layer</h3>
+<table><thead><tr><th>Metric</th><th>Source</th><th>Normal Range</th><th>Anomaly Indicates</th></tr></thead><tbody>
+<tr><td><code>rewards.earned.rate</code> (campaign)</td><td>Reward Evaluator</td><td>∝ conversion rate</td><td>Spike → F-BE-04; drop → F-BE-01</td></tr>
+<tr><td><code>rewards.pending.age_p95</code></td><td>Reward Service</td><td>Within trust-tier hold (instant → 14 d)</td><td>F-NET-03 (lost approval webhook), F-ATT-06</td></tr>
+<tr><td><code>rewards.paid_to_approved_ratio</code></td><td>Reward Service</td><td>&gt; 90%</td><td>Fulfillment / payout-provider failure</td></tr>
+<tr><td><code>rewards.reversed.rate</code> (campaign)</td><td>Reward Service</td><td>&lt; 3%</td><td>Payment-reversal fraud, or phantom conversions from a client bug</td></tr>
+<tr><td><code>payouts.provider_error.rate</code> (method)</td><td>Payout Service</td><td>&lt; 1%</td><td>Provider-side failures (PayPal/Wise/SEPA)</td></tr>
+</tbody></table>
+
+<h3>Fraud Layer</h3>
+<table><thead><tr><th>Metric</th><th>Source</th><th>Normal Range</th><th>Anomaly Indicates</th></tr></thead><tbody>
+<tr><td><code>fraud.signal.rate</code> (by type, severity)</td><td>Fraud Detector</td><td>Stable per tenant</td><td>Spike in self-referral / device-match (high severity) → coordinated abuse</td></tr>
+<tr><td><code>fraud.action.distribution</code> (approve &lt;0.3 / review 0.3–0.7 / block &gt;0.7)</td><td>Fraud Detector</td><td>Stable</td><td>Shift toward auto-block → attack or scoring regression</td></tr>
+<tr><td><code>fraud.autoblock_to_manual_reject.ratio</code></td><td>Fraud ops</td><td>Stable</td><td>Divergence → threshold mis-calibration</td></tr>
+<tr><td><code>velocity.limit_hits</code> (code 100/h; IP-hash 50/min)</td><td>Rate limiter</td><td>Rare</td><td>Sustained hits → scripted clicks / velocity abuse</td></tr>
+</tbody></table>
+
+<h3>SDK Health (Client-Side Telemetry)</h3>
+<table><thead><tr><th>Metric</th><th>Source</th><th>Normal Range</th><th>Anomaly Indicates</th></tr></thead><tbody>
+<tr><td><code>sdk.load_success.rate</code> (tenant)</td><td>SDK beacon / logs</td><td>&gt; 95%</td><td>F-SDK-01</td></tr>
+<tr><td><code>sdk.init_without_token.rate</code> (tenant)</td><td>SDK init metadata</td><td>0%</td><td>F-SDK-02</td></tr>
+<tr><td><code>sdk.consent_mode.distribution</code> (granted/denied/pending)</td><td>SDK beacon</td><td>Stable per region</td><td>Pending-heavy → F-SDK-04; ~100% granted with no CMP → consent misreported (§2.3)</td></tr>
+<tr><td><code>sdk.cookie_available.rate</code></td><td>SDK beacon</td><td>&gt; 80% (region-dependent)</td><td>F-SDK-03</td></tr>
+<tr><td><code>sdk.localstorage_fallback.rate</code></td><td>SDK beacon</td><td>Low, &gt; 0 only when cookies fail</td><td>F-SDK-03 (localStorage compensating)</td></tr>
+<tr><td><code>sdk.events_dropped.count</code> (session)</td><td>SDK internal</td><td>0</td><td>F-SDK-05</td></tr>
+<tr><td><code>sdk.resolve_link.failure_rate</code> / <code>.expired_410.rate</code></td><td>SDK / gateway</td><td>&lt; 1% / ~0%</td><td>F-SDK-07; 410 spike → dead links <em>or</em> blocked participants</td></tr>
+</tbody></table>
+
+<h3>Webhook &amp; Infrastructure</h3>
+<table><thead><tr><th>Metric</th><th>Source</th><th>Normal Range</th><th>Anomaly Indicates</th></tr></thead><tbody>
+<tr><td><code>webhooks.delivery_success.rate</code> (endpoint)</td><td>Webhook Service</td><td>&gt; 99%</td><td>F-NET-03</td></tr>
+<tr><td><code>webhooks.consecutive_failures.count</code> (endpoint)</td><td>Webhook Service</td><td>0</td><td>Approaching auto-disable (50)</td></tr>
+<tr><td><code>billing_webhooks.last_received_at</code> (integration)</td><td>Event Ingestion (provider receivers)</td><td>Within billing cadence</td><td>F-NET-04</td></tr>
+<tr><td><code>temporal.workflow_stuck.count</code></td><td>Temporal visibility</td><td>0</td><td>F-ATT-04</td></tr>
+<tr><td><code>temporal.task_queue_backlog</code></td><td>Temporal</td><td>&lt; 100 pending</td><td>Processing bottleneck</td></tr>
+<tr><td><code>clickhouse.replication_lag</code></td><td>ClickHouse</td><td>&lt; 10 s</td><td>F-ING-05</td></tr>
+<tr><td><code>sqs.message_age_p99</code></td><td>AWS SQS</td><td>&lt; 30 s</td><td>F-ING-01</td></tr>
+</tbody></table>
+
+<h2 id="22-anomalies">2.2 Anomaly Patterns</h2>
+<table><thead><tr><th>Pattern</th><th>Signature</th><th>Diagnosis</th></tr></thead><tbody>
+<tr><td>Touch events, zero conversions</td><td>Touch ingest normal, conversion ingest zero for tenant</td><td>F-BE-01. Not a platform problem; contact client.</td></tr>
+<tr><td>Conversions, low attribution</td><td>Conversion ingest normal, coverage &lt; 60%, low code-based stitching</td><td>F-BE-02. Code not forwarded.</td></tr>
+<tr><td>Billing webhooks, zero attribution</td><td><code>billing_webhooks.last_received_at</code> recent, unattributed-payments ~100%</td><td>F-BE-08. No customer carries the code in metadata.</td></tr>
+<tr><td>Recurring fail, one-time succeed</td><td><code>missing_mrr</code> rejections concentrated on <code>revenue_type: recurring</code></td><td>F-BE-10. Renewal/MRR analytics blind.</td></tr>
+<tr><td>SDK loaded, widget never rendered</td><td>Load rate normal, <code>init_without_token.rate</code> elevated</td><td>F-SDK-02.</td></tr>
+<tr><td>Revenue per referral implausibly low</td><td>Avg <code>revenue_amount</code> ~100× below expectation</td><td>F-BE-03 (major vs minor units).</td></tr>
+<tr><td>Duplicate rewards earned</td><td>Dedup rate ~0 but <code>rewards.earned.rate</code> elevated, multiple <code>reward.earned</code> per invitee</td><td>F-BE-04. Dedup cannot catch unmarked duplicates.</td></tr>
+<tr><td>410 spike (resolve-link / guard)</td><td>Guard 410s rise</td><td>Separate causes: campaign ended/archived, dead links, <em>or</em> blocked participants (§4.4). Cross-check fraud actions.</td></tr>
+<tr><td>Conversions with almost no touches</td><td>High conversion vs negligible touch volume</td><td>events from billing provider without SDK (benign) <em>or</em> fabricated conversions (F-BE-06). Cross-check fraud + Method-B.</td></tr>
+</tbody></table>
+
+<h2 id="23-silent">2.3 Silent Failures</h2>
+<p>The failures that harm correctness without breaking any request are detected indirectly — through derived metrics, cross-source reconciliation, and fraud patterns rather than error logs.</p>
+<table><thead><tr><th>Silent Failure</th><th>Why It's Silent</th><th>How It Surfaces Indirectly</th></tr></thead><tbody>
+<tr><td>SDK missing on some surfaces</td><td>Platform only sees pages where the SDK loads</td><td>Coverage drops on specific funnels; "not tracked on pricing page"</td></tr>
+<tr><td>Consent <code>denied</code> at high rates</td><td>Sends no events at all; like "no visitors"</td><td>Coverage low, conversions lack matching touches; region-level analysis</td></tr>
+<tr><td>Consent misreported as <code>granted</code></td><td>SDK reports granted while CMP never loaded</td><td><code>consent_mode.distribution</code> ~100% granted with no CMP load; cross-check telemetry</td></tr>
+<tr><td>Backend silently dropping events</td><td>Events vanish before reaching the platform</td><td>Client's own conversion count exceeds the platform's — only reconciliation reveals it</td></tr>
+<tr><td>Referral code stripped by intermediary</td><td>Shorteners, email clients, in-app browsers strip the parameter</td><td>Falls back to email/session; <code>_rr_ref</code> never set</td></tr>
+<tr><td>Plausible-but-wrong <code>occurred_at</code></td><td>"now" rather than true time, within window</td><td>Intermittent attribution failures near window boundaries (F-BE-05)</td></tr>
+<tr><td>events from billing provider metadata never written</td><td>Webhook path works; no attribution possible</td><td>"Unattributed payments" + reconciliation (F-BE-08)</td></tr>
+<tr><td>Dedup false positive</td><td><code>duplicate</code> response looks identical to correct dedup</td><td>Conversion-to-Attribution reconciliation finds a paid-but-unseen conversion (F-ING-03)</td></tr>
+</tbody></table>
+<p>A structural note that aids detection: <strong>platform-sent email touches</strong> (<code>referral.email.opened</code>, <code>referral.email.clicked</code>) are first-party and server-side, tied to participant consent rather than the invitee's browser-cookie consent (Product Spec §12). They therefore keep flowing when the invitee's browser CMP is <code>denied</code>, and act as a more reliable coverage floor than browser-side touches when diagnosing consent-driven coverage loss.</p>
+<p>Everything in this subsection is surfaced as a <strong>confidence indicator</strong>, never as a hard error. A client whose coverage is 60% has a working integration with a measurable quality gap — not a broken one — and the platform communicates it that way (§3.3).</p>
+<hr>
+
+<h1 id="3-client">3. Client-Facing Monitoring</h1>
+<p>This section exists to keep clients honest about integration quality and attribution reliability. The premise is that the client's own analytics will report more referrals than the platform can defensibly attribute, and the platform's job is to show <em>exactly where</em> the gap comes from rather than to paper over it. Two distinct surfaces do this: <strong>Integration Health</strong> (is the data arriving correctly?) and <strong>Program Health</strong> (is the program performing?). They are deliberately separate, because a healthy program reading on bad data is the most expensive illusion the platform can sell.</p>
+
+<h2 id="31-health">3.1 Integration Health Dashboard</h2>
+<p>A per-tenant view (dashboard feature behind OAuth2 JWT — not an API surface) presenting traffic-light indicators with the underlying numbers and a remediation tooltip on each.</p>
+<table><thead><tr><th>Indicator</th><th>Status Logic</th><th>What the Client Sees</th></tr></thead><tbody>
+<tr><td><strong>SDK Status</strong></td><td>Green: touch events &lt; 1 h. Yellow: &lt; 24 h not 1 h. Red: none in 24 h.</td><td>"SDK active" / "No touch events in {N} hours"</td></tr>
+<tr><td><strong>SDK Widget Status</strong></td><td>Green: &gt; 80% loads include a valid backend-signed token. Yellow: 50–80%. Red: &lt; 50%.</td><td>"Widget rendering" / "Loaded {N}× without token"</td></tr>
+<tr><td><strong>Backend Conversion Delivery</strong></td><td>Green: &lt; 24 h. Yellow: &lt; 7 d. Red: none 7 d. Gray: never.</td><td>"Conversions received" / "Last conversion {N} days ago"</td></tr>
+<tr><td><strong>Conversion Schema Health</strong></td><td>Green: &lt; 2% rejected. Yellow/Red by share, broken out by reason.</td><td>"X% rejected — {missing MRR / missing identity / invalid currency}"</td></tr>
+<tr><td><strong>Referral Code Presence</strong></td><td>Share carrying <code>referral_code</code>. Green &gt; 70%, Yellow 30–70%, Red &lt; 30%.</td><td>"X% of conversions include a referral code"</td></tr>
+<tr><td><strong>Attribution Coverage</strong></td><td>Green &gt; 80%, Yellow 50–80%, Red &lt; 50%.</td><td>Percentage + trend + how-to-improve</td></tr>
+<tr><td><strong>Billing Integration (events from billing provider)</strong></td><td>Green: attributed payments &lt; 24 h. Yellow: webhooks, no attribution. Red: no webhooks 7 d. Gray: not configured.</td><td>"Payments being attributed" / "Webhooks arriving but no referral metadata"</td></tr>
+<tr><td><strong>Webhook Health</strong></td><td>Per endpoint: Green &lt; 5% failure, Yellow 5–20%, Red &gt; 20% or disabled.</td><td>Endpoint + status + last successful delivery</td></tr>
+<tr><td><strong>Revenue Sanity</strong></td><td>Green: no anomaly. Yellow: avg &lt; €1. Red: values imply unit confusion.</td><td>"Revenue looks correct" / "Average is €0.47 — did you mean €47.00?"</td></tr>
+</tbody></table>
+<p>An <strong>event timeline</strong> at one-minute resolution overlays touch events (by subtype), conversions (by type), rejections (by reason), domain events (state transitions), and webhook deliveries (by endpoint/status), filterable by campaign, variant, and time range.</p>
+
+<h2 id="32-alerts">3.2 Warnings &amp; Alerts</h2>
+<p>Alerts use thresholds with hysteresis to avoid flapping: a condition must persist beyond its window before firing, and must clear comfortably below the threshold before resolving. No alerts fire for never-active tenants; email is rate-limited to one per alert type per 24 h; dashboard alerts remain visible until resolved.</p>
+<table><thead><tr><th>Alert</th><th>Trigger</th><th>Severity</th><th>Delivery</th></tr></thead><tbody>
+<tr><td>No touch events</td><td>Zero for 6 h (previously active)</td><td>Critical</td><td>Dashboard + email</td></tr>
+<tr><td>No conversion events</td><td>Zero for 48 h (previously active)</td><td>Critical</td><td>Dashboard + email</td></tr>
+<tr><td>Conversions rejected</td><td>Rejection rate &gt; 5% over 1 h, dominant reason named</td><td>Warning</td><td>Dashboard + email</td></tr>
+<tr><td>Recurring conversions failing</td><td><code>missing_mrr</code> rejections concentrated on recurring over 24 h</td><td>Warning</td><td>Dashboard</td></tr>
+<tr><td>Widget not rendering</td><td>&gt; 50% of loads without a backend-signed token over 24 h</td><td>Warning</td><td>Dashboard</td></tr>
+<tr><td>Attribution coverage drop</td><td>Coverage falls &gt; 20 pp over 7 d</td><td>Warning</td><td>Dashboard</td></tr>
+<tr><td>Referral-code presence drop</td><td>Code presence falls &gt; 30 pp over 7 d</td><td>Warning</td><td>Dashboard</td></tr>
+<tr><td>Revenue anomaly</td><td>Avg revenue/referral deviates &gt; 50× from 30-day mean</td><td>Warning</td><td>Dashboard + email</td></tr>
+<tr><td>Unattributed billing payments</td><td>events from billing provider active, &gt; 10 unattributed payments in 7 d</td><td>Warning</td><td>Dashboard</td></tr>
+<tr><td>Webhook endpoint disabled</td><td>50 consecutive failures</td><td>Critical</td><td>Email</td></tr>
+<tr><td>Webhook endpoint degraded</td><td>Success rate &lt; 80% over 1 h</td><td>Warning</td><td>Dashboard</td></tr>
+<tr><td>High deduplication rate</td><td>Dedup &gt; 20% over 1 h</td><td>Warning</td><td>Dashboard</td></tr>
+<tr><td>Reward approval backlog</td><td>Manual-approval rewards <code>Pending</code> beyond the trust-tier hold</td><td>Warning</td><td>Dashboard + email</td></tr>
+<tr><td>Fraud-pressure spike</td><td>Fraud signals &gt; 8% of referrals over 24 h for a campaign</td><td>Critical</td><td>Dashboard + email</td></tr>
+<tr><td>Dead links / blocked codes</td><td>&gt; 100 resolve-link 410s in 24 h for a campaign</td><td>Warning</td><td>Dashboard</td></tr>
+</tbody></table>
+
+<h2 id="33-confidence">3.3 Confidence &amp; Coverage Indicators</h2>
+<p>Every attributed referral carries a confidence level, and every analytics view carries coverage metadata. These are first-class: they appear on dashboards, in exported reports, and as metadata describing the quality of analytics responses — so a number is never presented without a statement of how much of the underlying reality the platform actually observed.</p>
+<p><strong>Per-referral attribution confidence:</strong></p>
+<table><thead><tr><th>Confidence</th><th>Criteria</th><th>Display</th></tr></thead><tbody>
+<tr><td><strong class="ok">High</strong></td><td>Direct <code>referral_code</code> match or linked identity (keys 1–3), single participant, conversion within first half of window</td><td>Green badge</td></tr>
+<tr><td><strong class="warn">Medium</strong></td><td><code>click_id</code> or session stitching (keys 4–5), or multiple participants, or conversion in last quarter of window</td><td>Yellow badge + method used</td></tr>
+<tr><td><strong class="err">Low</strong></td><td>Email-hash stitching only (key 6), or edge-of-window, or attribution computed via replay</td><td>Orange badge + note that code was absent</td></tr>
+</tbody></table>
+<p><strong>Three coverage metrics, reported per tenant and per campaign:</strong></p>
+<ul>
+<li><strong>Touch coverage</strong> — how much of the journey the platform observed, derived from SDK load rate, consent distribution, and cookie availability. Most degraded by §1.1 failures.</li>
+<li><strong>Attribution coverage</strong> — the fraction of conversions that could be attributed (complement of the unstitched rate). Degraded by F-BE-02, F-SDK-03, F-ATT-01/02.</li>
+<li><strong>Revenue coverage</strong> — the fraction of billing revenue that flows through the platform with attribution intact. Degraded by F-BE-08 and Method-B gaps; the reconciliation jobs (§4.3) supply the billing-side denominator.</li>
+</ul>
+<p>Low coverage is communicated as a measured quality gap with a named cause and a remediation step, not as a failure — the goal is an honest, actionable picture, not a clean-looking one.</p>
+
+<h2 id="34-program-health">3.4 Program Health Score (Distinct from Integration Health)</h2>
+<p>Program Health Score (Product Spec §11) is a single 0–100 composite per program, recomputed nightly (emitting <code>health.recomputed</code>) and decomposed into four weighted sub-scores. It drives the AI Insights Panel and proactive alerts and answers "is the program working?"</p>
+<table><thead><tr><th>Sub-score</th><th>Weight</th><th>Measures</th><th>Degrades when…</th></tr></thead><tbody>
+<tr><td>Referral Funnel</td><td>30%</td><td>Share→click→signup→conversion rates vs baseline</td><td>Drop-off rises at any funnel stage</td></tr>
+<tr><td>Revenue Impact</td><td>35%</td><td>Attributed MRR/ARR trend, CAC payback, expansion</td><td>Revenue per participant falls or payback worsens</td></tr>
+<tr><td>Fraud Pressure</td><td>20%</td><td>Share of flagged/blocked/reversed rewards</td><td>Fraud rate climbs, reversals spike</td></tr>
+<tr><td>Audience Saturation</td><td>15%</td><td>% of eligible base enrolled &amp; still converting</td><td>Pool exhausted; new enrollments stop converting</td></tr>
+</tbody></table>
+<p>The reliability-critical point is the interaction with integration quality: <strong>integration failures depress Program Health sub-scores and must not be misread as poor program performance.</strong> F-SDK-01/02 and F-BE-02 depress the Funnel sub-score by erasing observed funnel steps; F-BE-03/08/10 depress the Revenue Impact sub-score by losing or mis-scaling revenue; and a client integration bug that produces phantom or duplicate conversions (F-BE-04) inflates Fraud Pressure through elevated reversals. For this reason, the Insights Panel gates Program Health interpretation on coverage: when touch, attribution, or revenue coverage is low, the panel attributes the sub-score movement to the integration gap first and suppresses program-performance conclusions until coverage recovers. A program reading 60/100 because of a missing SDK on the pricing page is a data problem, and the client is told so rather than being advised to change their incentives.</p>
+<hr>
+
+<h1 id="4-safeguards">4. Platform-Side Safeguards</h1>
+<p>These are internal mechanisms that protect correctness and enable recovery against the failure taxonomy. They rest on the Event Model's hard guarantees: events are append-only and immutable once accepted (Event Model §1.4, §2.6), and stitching never rewrites events — it updates the referral record with the resolved identity and leaves the original events intact (§7.3). Immutability is what makes safe replay possible.</p>
+
+<h2 id="41-dlq">4.1 Dead-Letter Queues</h2>
+<p>Every processing stage routes events that fail after retry exhaustion to a per-service DLQ. A tracked event flows ingestion → SNS/SQS → consumer; on success it continues, and on failure after the consumer's retries it lands in that service's DLQ, where it is held for inspection and raises an alert once depth crosses the service threshold. DLQs are never auto-replayed — an engineer must inspect, diagnose, and decide.</p>
+<table><thead><tr><th>Service</th><th>DLQ</th><th>Alert Threshold</th><th>Typical Contents</th></tr></thead><tbody>
+<tr><td>Event Ingestion</td><td><code>dlq-event-ingestion</code></td><td>&gt; 10 / 5 min</td><td>Events passing HTTP validation but failing internal processing</td></tr>
+<tr><td>Workflow Runtime</td><td><code>dlq-workflow-runtime</code></td><td>&gt; 5 / 5 min</td><td>Domain events that failed to trigger or advance a referral workflow</td></tr>
+<tr><td>Attribution Engine</td><td><code>dlq-attribution</code></td><td>&gt; 5 / 5 min</td><td>Conversions causing unhandled exceptions during attribution</td></tr>
+<tr><td>Reward Evaluator</td><td><code>dlq-reward-eval</code></td><td>&gt; 5 / 5 min</td><td>Attribution results failing reward evaluation</td></tr>
+<tr><td>Fraud Detector</td><td><code>dlq-fraud</code></td><td>&gt; 5 / 5 min</td><td>Events failing fraud scoring. Non-blocking: events proceed to attribution even if scoring fails</td></tr>
+<tr><td>Webhook Dispatcher</td><td><code>dlq-webhooks</code></td><td>&gt; 50 / 1 h</td><td>Payloads that failed all 7 delivery attempts</td></tr>
+<tr><td>Event Ingestion — inbound deployment</td><td><code>dlq-integrations</code></td><td>&gt; 5 / 5 min</td><td>Billing-provider webhook payloads (events from billing provider) that failed processing</td></tr>
+</tbody></table>
+<p>Each DLQ entry retains the full event envelope plus error metadata: the error cause and its classification, the retry count, and the timestamps. Entries are retained 14 days, then archived to durable storage for the tenant's retention period. Depth over the threshold raises a P2 on-call incident; depth over 100 raises a P1. DLQs are surfaced on internal dashboards and through on-call notifications for systemic patterns, with tooling for manual re-inspection and scoped replay.</p>
+
+<h2 id="42-replay">4.2 Replay Mechanisms</h2>
+<p>Replay reprocesses events from the immutable store. It is available for event ingestion, workflow re-driving, and attribution recomputation, and is always platform-initiated — never client-initiated.</p>
+<ul>
+<li><strong>Event replay (by time range + tenant)</strong> reprocesses tracked events from the immutable store; idempotent via <code>event_id</code> deduplication in consumers.</li>
+<li><strong>Event replay (by <code>event_id</code> list)</strong> handles specific events, typically from DLQ investigation, in small batches.</li>
+<li><strong>Attribution replay (per campaign + window)</strong> recomputes attribution over an existing event set without re-ingesting. Rewards already in <code>Paid</code> are not auto-reversed; any reversal is a separate, explicit decision.</li>
+<li><strong>Workflow re-drive</strong> restarts stuck Temporal sagas from a safe point, relying on the saga's compensation logic to avoid half-applied states.</li>
+</ul>
+<p><strong>Guardrails:</strong> replays are time- and tenant-scoped; every replay is logged in the audit trail with the engineer's identity, the scope, and the reason; idempotent processing guarantees a replay cannot double-count; replays above 100,000 events require two-engineer approval; and any attribution replay that could change rewards first produces a "rewards that would change" report for engineer approval before any state is modified.</p>
+
+<h2 id="43-reconciliation">4.3 Reconciliation Jobs</h2>
+<p>Periodic background jobs cross-check independent sources to catch the silent failures that no single request reveals — missing conversions, orphan rewards/payouts, and aggregate-vs-raw drift.</p>
+<table><thead><tr><th>Job</th><th>Schedule</th><th>What It Checks</th><th>Action on Mismatch</th></tr></thead><tbody>
+<tr><td>Conversion-to-Attribution</td><td>6 h</td><td>Every conversion in 24 h has an attribution result or explicit "unattributable" marker</td><td>Flag orphaned conversions; trigger replay (catches F-ING-03)</td></tr>
+<tr><td>Reward-to-Referral</td><td>Daily</td><td>Every <code>Converted</code> referral has a <code>reward.earned</code> (unless no reward); every <code>Paid</code> reward has a payout record</td><td>Flag missing rewards / orphan payouts</td></tr>
+<tr><td>Billing-to-Platform Revenue</td><td>Daily</td><td>Provider revenue reconciles against platform-attributed revenue (the revenue-coverage denominator)</td><td>Flag "billing says paid, platform never saw conversion" (F-BE-08, F-NET-04, F-ING-03)</td></tr>
+<tr><td>Payout-to-Reward</td><td>Daily</td><td>Every payout maps to an approved reward and respects the trust-tier cap</td><td>Flag orphan payouts and cap breaches</td></tr>
+<tr><td>Participant-vs-Trust</td><td>Daily</td><td>Participant state consistent with current trust/fraud signals</td><td>Flag participants whose state and signals disagree</td></tr>
+<tr><td>Event-Count</td><td>Daily</td><td>PostgreSQL and ClickHouse counts agree within 0.1%</td><td>Flag replication gaps; trigger ClickHouse backfill (F-ING-05)</td></tr>
+<tr><td>Webhook-Delivery</td><td>12 h</td><td>Every webhook-eligible domain event in 48 h has a delivery record per endpoint</td><td>Flag dispatcher routing gaps</td></tr>
+<tr><td>Revenue-Sanity</td><td>Daily</td><td>Avg revenue/conversion per tenant within 2 SD of its 30-day mean</td><td>Flag unit errors / integration bugs (F-BE-03)</td></tr>
+<tr><td>Fraud-Score-Coverage</td><td>Daily</td><td>Every referral created in 24 h carries a fraud score</td><td>Flag referrals that bypassed scoring</td></tr>
+<tr><td>Enrollment-to-Link</td><td>Daily</td><td>Every <code>Active</code> participant has at least one generated link</td><td>Flag enrolled-but-linkless participants (F-ATT-05)</td></tr>
+</tbody></table>
+
+<h2 id="44-degradation">4.4 Fraud-Safe Degradation</h2>
+<p>When the system is uncertain, it withholds money. This is the operational expression of principle (1): under-pay rather than over-pay when fraud risk or data quality is in doubt, while ensuring benign data loss never becomes punitive (principle 2). Fraud actions are graduated by score and by checkpoint — auto-approve below 0.3, manual review 0.3–0.7, auto-block and alert above 0.7 — with the auto-block threshold tightening along the journey: referral creation &gt; 0.8, qualification &gt; 0.7, reward approval &gt; 0.7, payout &gt; 0.6 (Product Spec §7). The closer to money, the lower the tolerance.</p>
+<p>When a participant is blocked (or crosses the auto-block threshold), the communication effects are platform-wide and explain several otherwise-confusing symptoms (API Contract §8.2.1): their referral links resolve to <code>410</code> with no cookie set and touches rejected at the guard, the widget config returns hidden, rewards and payouts are held and excluded from new batches, and <code>participant.suspended</code> + <code>fraud.flagged</code> are emitted while reward/payout webhooks are suppressed. A <code>410</code> on resolve-link therefore has two meanings — expired link or blocked participant — and triage must distinguish them.</p>
+<table><thead><tr><th>Component Down</th><th>Degradation Behaviour</th><th>Rationale</th></tr></thead><tbody>
+<tr><td>Fraud detection</td><td>All rewards shift to <code>Pending</code>; auto-approval suspended even for Advocates</td><td>Without scoring, auto-approving is unsafe</td></tr>
+<tr><td>Attribution Engine</td><td>Conversions queued, not attributed; transitions halt; no rewards earned</td><td>Under-paying during an outage beats mis-attributing; replay on recovery</td></tr>
+<tr><td>Reward Evaluator</td><td>Attribution completes; reward evaluation deferred; referrals reach <code>Converted</code> without <code>reward.earned</code></td><td>Rewards computed after recovery</td></tr>
+<tr><td>Temporal runtime</td><td>Workflows pause; new referrals created but do not advance; domain events queue</td><td>Temporal is the state machine; advancing without it is unsafe</td></tr>
+<tr><td>ClickHouse</td><td>Dashboards/Health stale; transactional pipeline continues</td><td>Analytics are read-only</td></tr>
+<tr><td>Redis</td><td>Ingestion latency rises; rate limiting becomes approximate</td><td>System slows, does not stop</td></tr>
+<tr><td>Event Ingestion — inbound deployment (events from billing provider)</td><td>Billing webhooks buffered; no events from billing provider attribution until recovery; events from backend continues</td><td>Provider retries; events processed on recovery</td></tr>
+</tbody></table>
+<p><strong>Payout freeze.</strong> If more than one critical service is degraded at once (for example fraud detection + reward evaluator, or attribution engine + Temporal), payout processing is frozen for affected tenants: <code>Paid</code> rewards are not reversed, <code>Approved</code> rewards do not proceed to <code>Processing</code>, and <code>Pending</code> rewards do not proceed to <code>Approved</code>. The freeze lifts automatically once all critical services are healthy and a reconciliation job confirms consistency.</p>
+<p><strong>Auditability and the benign-loss guarantee.</strong> Every fraud-related action — each signal, the score and the threshold it crossed, the resulting state change, and any manual override — is written to the immutable decision-audit trail (Product Spec §12). Crucially, none of the coverage-loss failures in §1.1 and §1.3 feed the fraud score: a blocked cookie, a dropped beacon, a CMP timeout, or a lost webhook degrades coverage and is surfaced as a confidence indicator, never as a fraud signal, so benign data loss can never suspend a participant or trigger a clawback.</p>
+<hr>
+
+<h1 id="5-support">5. Support &amp; Debugging Workflow</h1>
+<p>This is the stepwise process support, SRE, and product engineers use to investigate, and the deliberate limits on what they can see. It follows the event flow end to end — external event → ingestion → referral → reward → payout — and is aligned with the event model, the attribution model, and the SDK/backend contract.</p>
+
+<h2 id="51-flow">5.1 Investigation Flow</h2>
+<p><strong>Tier 1 — Integration Health check (&lt; 5 min).</strong> Open the tenant's Integration Health dashboard (§3.1), read the traffic-light indicators (each names a likely cause), scan the event timeline around the reported time, and check the alerts tab. Most integration issues are diagnosable here without touching internal tooling.</p>
+<p><strong>Tier 2 — Event trace (&lt; 15 min).</strong> Identify the entity (<code>referral_id</code>, <code>reward_id</code>, <code>external_id</code>, or invitee email hash) and reconstruct the sequence: which touch events exist and with what <code>session_id</code>, <code>referral_code</code>, and <code>anonymous_id</code>; which conversion event(s) exist, whether <code>referral_code</code> was present, and the <code>occurred_at</code>; which domain events were produced and what attribution result and stitching method were used; the reward lifecycle events; and any fraud signals with their detection layer. Filter by <code>processing_status</code> to separate <code>accepted</code> events from <code>duplicate</code> ones and to spot events that failed processing.</p>
+<p><strong>Tier 3 — Platform-side investigation (&lt; 1 h).</strong> Check DLQ depths per service, the Temporal execution for the referral's workflow, recent reconciliation-job outputs, and infrastructure dashboards (SQS backlog, ClickHouse lag, connection-pool utilization).</p>
+<p>Worked investigation paths:</p>
+<ul>
+<li><strong>"Our referrals aren't being attributed as expected."</strong> Tier 1 → Attribution Coverage and Referral-Code-Presence indicators. Low code presence → F-BE-02. Otherwise Tier 2 trace a sample to see which stitching priority engaged and whether the window expired (F-ATT-02).</li>
+<li><strong>"We see fewer referrals than clicks in our own analytics."</strong> Compare the client's click count to platform touch ingest. A gap on the platform side points to F-SDK-01/03/04 (loads, cookies, consent) or code stripping; confirm via SDK Status, consent distribution, and cookie-availability signals.</li>
+<li><strong>"Rewards didn't trigger for a conversion we believe was referred."</strong> Tier 2 trace: confirm a conversion exists (else F-BE-01/F-NET-02 or the invitee never converted); confirm <code>referral_code</code> presence (else fallback stitching, F-BE-02); check the attribution result (another participant credited, F-ATT-03; window expired, F-ATT-02); check fraud signals and whether the participant is blocked/held (§4.4); check the reward lifecycle for a stall (F-ATT-06, often F-NET-03).</li>
+<li><strong>"Payouts don't match what we see in our billing provider."</strong> Run the Billing-to-Platform Revenue reconciliation for the tenant. "Provider paid, platform never saw a conversion" → F-BE-08 (events from billing provider metadata) or F-NET-04 (inbound webhook). A platform-side count below the provider's also implicates F-ING-03 (dedup false positive). Trust-tier caps and hold periods explain timing differences that are not errors.</li>
+</ul>
+
+<h2 id="52-inspectable">5.2 Inspectable Data</h2>
+<p>Three scopes exist, separated on purpose. Everything is scoped by tenant, by correlation id, and by time window.</p>
+<p><strong>Client-accessible</strong> (dashboard, and analytics retrieval endpoints under OAuth2 JWT): tracked touch and conversion events as full envelopes minus redacted PII (IP appears only as <code>ip_hash</code> plus country, never raw — Product Spec §12); referral lifecycle and state transitions; attribution results including model, confidence, stitching method, and contributing participants; reward lifecycle; fraud signals as types, scores, and detection layer (rule/ML/LLM) when a referral is flagged; webhook delivery logs; integration-health indicators; and participant trust scores and levels with a component breakdown.</p>
+<p><strong>Support-accessible (internal only):</strong> the full event-pipeline trace (distributed tracing/logs), DLQ contents, Temporal workflow executions, reconciliation outputs, per-key rate-limit utilization, analytics-store query logs, and raw billing-provider webhook payloads for events from billing provider debugging.</p>
+
+<h2 id="53-opaque">5.3 Intentionally Opaque Areas</h2>
+<p>Some data is withheld even from internal users, to prevent privacy breaches, to avoid leaking fraud heuristics that would let abusers tune around them, and to prevent gaming of attribution or incentives.</p>
+<table><thead><tr><th>Withheld</th><th>Reason</th></tr></thead><tbody>
+<tr><td>Raw IP addresses and low-level device fingerprints</td><td>Only <code>ip_hash</code> + geo are retained (GDPR, Product Spec §12)</td></tr>
+<tr><td>Full fraud feature vectors, weights, and exact thresholds</td><td>Exposure enables gaming; only signal types, scores, and detection layer are shown</td></tr>
+<tr><td>AI model internals (incentive optimization, propensity scoring)</td><td>Only explainable outputs — bounds satisfied, threshold reached, high-level factors (Product Spec §11)</td></tr>
+<tr><td>Other tenants' data</td><td>Absolute tenant isolation (API Contract §2)</td></tr>
+<tr><td>Audit logs via API</td><td>Dashboard-only, to prevent programmatic access that could cover tracks</td></tr>
+<tr><td>Full API-key values</td><td>Last four characters everywhere</td></tr>
+<tr><td>Internal routing/queue metadata</td><td>Clients see effects, not infrastructure causes</td></tr>
+</tbody></table>
+<p>The discipline is "explainable, not exposed": a flagged referral shows which signal types fired and which checkpoint threshold was crossed, never the feature math that produced the score.</p>
+
+<h2 id="54-keys">5.4 Correlation Keys &amp; Checklists</h2>
+<p>The debugging chain runs from the client-provided <code>external_id</code> to the platform-assigned <code>event_id</code> (a ULID), to the <code>referral_id</code> (the workflow instance), through the attribution context (<code>campaign_id</code> → <code>variant_id</code> → <code>participant_id</code>), to the <code>reward_id</code> and finally the <code>payout_id</code>. Supporting links: <code>session_id</code> ties touches within a session; <code>anonymous_id</code> ties sessions for a consented visitor; <code>actor_email_hash</code> links across devices as a fallback; <code>click_id</code> ties a specific click to later events; <code>integration_id</code> identifies the events from billing provider billing integration that produced an event; and the key prefix (last four) plus <code>sdk_version</code> identify the sender and build.</p>
+<p><strong>"Participant referred someone but got no reward."</strong> Find the <code>participant_id</code>; confirm touch events for the claimed invitee exist; confirm a conversion exists (else F-BE-01 or no conversion); check <code>referral_code</code> presence (absent → fallback stitching); check the attribution result (different participant credited → F-ATT-03; window exceeded → F-ATT-02); check fraud signals and whether the participant is blocked or held (§4.4); check the reward lifecycle for a stall (F-ATT-06 / F-NET-03); check the trust level (held rewards for flagged/suspended participants are correct behaviour).</p>
+<p><strong>"Dashboard shows zero conversions but we have real sign-ups."</strong> Check Backend Conversion Delivery — Red/Gray → F-BE-01. If events from billing provider, check Billing Integration — Yellow (webhooks, no attribution) → F-BE-08. If conversions exist but attribution fails, check coverage and stitching. If both are normal, check ClickHouse lag (F-ING-05, stale dashboard).</p>
+<p><strong>"Recurring revenue isn't showing up."</strong> Check Conversion Schema Health for <code>missing_mrr</code> rejections concentrated on <code>revenue_type: recurring</code> → F-BE-10. If recurring conversions are accepted but MRR is absent downstream, check that the client populates <code>revenue_mrr</code> rather than only <code>revenue_amount</code>.</p>
+<p><strong>"Widget not showing for our users."</strong> Check SDK Widget Status — Red → F-SDK-02 (backend-signed token missing). If the token is present and verifies, check enrollment: the widget renders only for pre-enrolled participants — all campaigns use selective enrollment — so a non-enrolled user correctly sees nothing; a <code>Suspended</code>/<code>Banned</code> participant has the widget hidden by design (Product Spec §7; §4.4). A blocked participant also sees their links resolve to <code>410</code>.</p>
+
+<h2 id="55-feedback">5.5 Feedback into Product &amp; Architecture</h2>
+<p>Repeated support categories feed back into the platform rather than staying in tickets. A recurring mis-integration becomes an SDK or API ergonomics change (clearer required-parameter errors, a safer default), a new Integration-Health indicator or alert (the MRR-rejection and missing-identity breakdowns in §3.1–§3.2 exist because those failures were silent before they were surfaced), or a tightened guardrail or default (window defaults, dedup-key guidance, trust-tier holds). The test for whether a fix belongs in the product is simple: if the same ticket arrives more than a handful of times, the failure should have been visible on a dashboard or impossible to make — and the corresponding indicator, default, or validation is added.</p>
+<hr>
+
+<h2 id="changelog">Change Log</h2>
+<blockquote>
+<p><strong>Document status:</strong> Living document. All failure modes, signals, and safeguards are grounded in Product Spec v5.0, API Contract v5.0, Event Model v5.0, and the SDK/Backend Responsibility Contract v5.0. Thresholds and alert configurations are calibrated during implementation.</p>
+<p><strong>Version 5.0 · October 2026.</strong> Suite-wide version alignment: every ReferralAI document now carries v5.0. No content change beyond the two coherence passes recorded below. The entries that follow keep the pre-alignment numbering (this document: 2.0 → 3.0; Product Spec 4.x; API 1.x; Event Model 3.0; Responsibility Contract 3.0).</p>
+<p><strong>Version 3.0 · June 2026.</strong> This revision reconciles the model against the current companion specs. Substantive changes:</p>
+<ul>
+<li><strong>Companion references</strong> updated to Product Spec v4.0, API Contract v1.3, Event Model v3.0.</li>
+<li><strong>Flattened revenue:</strong> all references updated from the nested revenue object / <code>amount</code> to the flat scalar fields (<code>revenue_amount</code>, <code>revenue_currency</code>, <code>revenue_type</code>, <code>revenue_mrr</code>, <code>revenue_arr</code>, <code>revenue_ltv_estimate</code>). F-BE-03 re-expressed on <code>revenue_amount</code>.</li>
+<li><strong>New hard-rejection failures:</strong> F-BE-09 (missing <code>invitee_email</code>/<code>invitee_external_id</code>) and F-BE-10 (recurring conversion missing <code>revenue_mrr</code>); F-ING-04 generalized to schema rejections including malformed <code>custom.recorded</code> payloads.</li>
+<li><strong>Ingestion Event Rules Guard corrected:</strong> paused campaigns buffer touches and accept conversions for existing referrals; only new referral creation is blocked. Added archived/completed/not-yet-active 410/422 semantics. (Replaces the prior "paused → conversions rejected.")</li>
+<li><strong>Program Health Score</strong> added as a first-class client-facing layer (§3.4), with its four weighted sub-scores, kept distinct from Integration Health, and with the coverage-gating interaction spelled out.</li>
+<li><strong>Fraud model sharpened:</strong> graduated score actions and per-checkpoint auto-block thresholds; fraud/trust communication effects (§4.4) integrated into degradation and debugging.</li>
+<li><strong>Renewal Pulse / <code>subscription_renewed</code></strong> and pulse-specific workflow failures added to F-ATT-04; reward lifecycle aligned to <code>Pending → Held → Approved → Processing → Paid|Rejected|Reversed</code> and the <code>earned/pending_approval/approved/rejected/paid/reversed</code> events (F-ATT-06).</li>
+<li><strong>Server-side email touches</strong> noted as consent-independent of the browser CMP — a coverage floor for diagnosing consent-driven loss.</li>
+<li><strong>Rate limits</strong> updated to v1.3 figures and business-level velocity limits added as fraud/velocity signals.</li>
+<li><strong>Style:</strong> code-fenced diagrams converted to prose; reconciliation jobs extended with Billing-to-Platform Revenue and Payout-to-Reward.</li>
+</ul>
+<p><strong>Coherence pass · 2026-10-05.</strong> Re-pinned to Product Spec v4.3 and Responsibility Contract v3.0: F-SDK-02 and every widget-status signal, alert and checklist re-expressed on the backend-signed widget token (Responsibility v3.0 §2.3/§5.5) instead of <code>userId</code>; F-ATT-06 reward lifecycle now includes <code>Held</code> and uses the canonical <code>reward.paid</code>/<code>reward.reversed</code> names (metrics renamed <code>rewards.paid_to_approved_ratio</code>, <code>rewards.reversed.rate</code>); F-NET-03 webhook names aligned to API §6.1 (<code>conversion.recorded</code>, <code>reward.earned</code>, <code>fraud.flagged</code>); duplicate-ingest response corrected to <code>202 Accepted</code> (API §1/§5.3); F-BE-08 scoped to the three events from billing provider receivers; platform email touches named <code>referral.email.opened</code>/<code>referral.email.clicked</code>; Product Spec section references renumbered to v4.3 (§6 Pulses, §10 Attribution, §11 AI, §12 Compliance) and F-SDK-07 cross-ref fixed to API §4.2. Identity-stitching priority order (F-ATT-01, F-BE-02, §3.3) aligned to the six-key resolution ladder (Product Spec §9/§10, Event Model §6.3) on 2026-10-06; <code>reward.pending_approval</code> → <code>reward.held</code> (Event Model §5.2).</p>
+</blockquote>
+</main></body></html>
