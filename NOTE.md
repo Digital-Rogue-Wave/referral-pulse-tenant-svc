@@ -970,3 +970,10 @@ make and the work is unblocked the moment it is:
    since no other standard role holds that relation, but gating a data-subject request on a
    *programs* permission is semantically odd and will read as a copy-paste to the next person. A
    `dsr:*` relation, or `api_keys:manage`-style owner-scoped relation, would say what it means.
+
+---
+
+> **Cross-service decision list.** The consolidated list of everything still open across all four
+> services — the three blockers and their dependency chain, the decisions already taken, the
+> ratifications, and the spec defects — lives in `referral-pulse-event-svc/NOTE.md` §11. This
+> service's own detail stays above.
