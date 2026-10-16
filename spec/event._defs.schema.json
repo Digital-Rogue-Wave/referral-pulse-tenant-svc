@@ -6,25 +6,25 @@
     "identity": {
       "type": "object",
       "properties": {
-        "referee_email": {
+        "invitee_email": {
           "type": "string",
           "format": "email",
-          "description": "Referee email. Required unless referee_external_id is provided."
+          "description": "Invitee email. Required unless invitee_external_id is provided."
         },
-        "referee_external_id": {
+        "invitee_external_id": {
           "type": "string",
-          "description": "Client identifier for the Referee. Required unless referee_email is provided."
+          "description": "Client identifier for the Invitee. Required unless invitee_email is provided."
         }
       },
       "anyOf": [
         {
           "required": [
-            "referee_email"
+            "invitee_email"
           ]
         },
         {
           "required": [
-            "referee_external_id"
+            "invitee_external_id"
           ]
         }
       ]
