@@ -11,10 +11,10 @@ model User {
   emailHash        String    @map("email_hash") @db.Char(64)
   name             String?   @db.VarChar(255)
   role             String    @default("OPERATOR") @db.VarChar(50)
-  // One Ory identity belongs to exactly one tenant (DB Model v2 §3 `users` UNIQUE(kratos_identity_id)).
+  // One Ory identity belongs to exactly one tenant (DB Model §3 `users` UNIQUE(kratos_identity_id)).
   kratosIdentityId String    @unique @map("kratos_identity_id") @db.VarChar(64)
   lastLoginAt      DateTime? @map("last_login_at") @db.Timestamptz
-  // `invited` | `active` | `disabled` (DB Model v2 §3). A removed operator is `disabled` with `deleted_at` set.
+  // `invited` | `active` | `disabled` (DB Model §3). A removed operator is `disabled` with `deleted_at` set.
   status           String    @default("active") @db.VarChar(20)
 
   createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz
@@ -30,7 +30,7 @@ model User {
   @@map("users")
 }
 
-/// Human-readable role catalog (DB Model v5 §3). A projection for dashboard display and bulk
+/// Human-readable role catalog (DB Model §3). A projection for dashboard display and bulk
 /// assignment — NOT the authoritative permission store, which is Ory Keto. `keto_relations` is
 /// seeded from ROLE_GRANTS in permission-catalog.ts so the two cannot drift.
 model Role {

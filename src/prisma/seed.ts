@@ -138,7 +138,7 @@ async function seedPlans() {
             }
         },
         {
-            // DB Model v5 section 3 names a fifth tier between Growth and Enterprise. Seeded
+            // DB Model section 3 names a fifth tier between Growth and Enterprise. Seeded
             // INACTIVE on purpose: no document specifies its limits or price, and these numbers are
             // a dev placeholder interpolated on the existing progression, not a commercial
             // decision. Set real limits and flip isActive before offering it.
@@ -268,7 +268,7 @@ async function seedDefaultTenant() {
 }
 
 /**
- * The role catalog (DB Model v5 §3) — a projection for dashboard display and bulk assignment, not
+ * The role catalog (DB Model §3) — a projection for dashboard display and bulk assignment, not
  * the authoritative permission store, which is Ory Keto.
  *
  * `keto_relations` is derived from ROLE_GRANTS rather than written out here. That file is what the

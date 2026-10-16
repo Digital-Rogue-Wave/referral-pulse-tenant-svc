@@ -27,7 +27,7 @@ const TENANT = {
     updatedAt: new Date()
 };
 
-/** The account_verification workflow reports into `tenant_verifications` (DB Model v2 §3). */
+/** The account_verification workflow reports into `tenant_verifications` (DB Model §3). */
 describe('TenantService.applyVerificationReport', () => {
     let service: TenantService;
     let prisma: MockProxy<DatabaseService>;

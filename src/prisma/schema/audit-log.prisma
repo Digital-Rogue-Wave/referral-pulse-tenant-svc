@@ -1,4 +1,4 @@
-// Platform-wide operator-action trail (DB Model v2 §3 `audit_log`, API Contract v1.3 §8.3: tenant lifetime
+// Platform-wide operator-action trail (DB Model §3 `audit_log`, API Contract §8.3: tenant lifetime
 // + 12 months, dashboard only). Append-only: rows are written in the same transaction as the action they
 // record and are never updated; they are deleted only by the retention sweep.
 model AuditLog {

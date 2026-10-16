@@ -3,7 +3,7 @@ import type { Prisma } from '@prisma-gen/generated/client';
 import { isPublishedEvent, toPublishedEvents } from '@common/events/outbox/published-events';
 import type { BaseDomainEvent } from '@domains/common/events';
 
-/** What one audited action records (DB Model v2 §3 `audit_log`), before the request context is added. */
+/** What one audited action records (DB Model §3 `audit_log`), before the request context is added. */
 export interface AuditEntry {
     action: string;
     targetType: string;
@@ -20,7 +20,7 @@ type EventWithPayload = BaseDomainEvent & { payload?: Record<string, unknown>; c
 /** Published events that are not operator actions: sign-ins, meters and trial clocks. */
 const NOT_OPERATOR_ACTIONS = new Set(['user.logged_in', 'usage.threshold_crossed', 'usage.monthly_summary', 'trial.reminder', 'trial.expired']);
 
-/** Recorded even when the system performs them (DB Model v2 §0.5: erasure is always audited). */
+/** Recorded even when the system performs them (DB Model §0.5: erasure is always audited). */
 const AUDITED_WHEN_SYSTEM = new Set(['tenant.deleted', 'user.anonymised']);
 
 /** Operator actions that are not published on the bus, keyed by in-process event type. */

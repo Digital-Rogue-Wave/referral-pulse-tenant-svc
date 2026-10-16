@@ -372,7 +372,7 @@ export interface IJwtPayload {
     [key: string]: unknown; // Additional claims
 }
 
-/** Where a principal's credential came from (API Contract v1.3 §2 internal JWT `source`). */
+/** Where a principal's credential came from (API Contract §2 internal JWT `source`). */
 export type PrincipalSource = 'dashboard' | 'api_key' | 'client_credentials';
 
 /**

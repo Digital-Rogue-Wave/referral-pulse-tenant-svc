@@ -19,7 +19,7 @@ const human = (perms: string[] = []): IAuthenticatedUser => ({ userId: 'user-1',
 const service: IAuthenticatedUser = { userId: '', tenantId: '', source: 'client_credentials', isServiceToken: true, clientId: 'workflow-svc' };
 const apiKey: IAuthenticatedUser = { userId: '', tenantId: 'tenant-1', source: 'api_key', keyType: 'secret', keyId: 'key-1' };
 
-describe('PermissionGuard — deny-by-default authorization (API Contract v1.3 §2)', () => {
+describe('PermissionGuard — deny-by-default authorization (API Contract §2)', () => {
     let authorization: MockProxy<AuthorizationService>;
 
     beforeEach(() => {

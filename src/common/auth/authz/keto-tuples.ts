@@ -4,7 +4,7 @@ import type { KetoRelationTuple } from '../keto.service';
 import { Permission, ROLE_GRANTS, splitPermission } from './permission-catalog';
 
 /**
- * Keto tuple shapes (API Contract v1.3 §2 "Relation Tuple Examples").
+ * Keto tuple shapes (API Contract §2 "Relation Tuple Examples").
  *
  *   membership   role:{tenant_id}:{role}#member@user:{user_id}
  *   grant        campaigns:{tenant_id}#write@(role:{tenant_id}:operator#member)

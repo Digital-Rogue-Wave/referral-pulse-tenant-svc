@@ -1,7 +1,7 @@
 import { RoleEnum } from '@common/enums/role.enum';
 
 /**
- * The platform permission catalog — API Contract v5 §2 "Keto Namespace & Relations".
+ * The platform permission catalog — API Contract §2 "Keto Namespace & Relations".
  *
  * tenant-service owns Ory Keto, so this file is the single definition of every namespace/relation the
  * platform checks, which role grants what, and which permissions must never be trusted from the JWT
@@ -46,7 +46,7 @@ const withoutNamespaces = (...excluded: PermissionNamespace[]): Permission[] =>
     ALL_PERMISSIONS.filter((permission) => !excluded.includes(permission.split(':')[0] as PermissionNamespace));
 
 /**
- * Role → permission grants (API Contract v5 §2 "Role → Permission Mapping").
+ * Role → permission grants (API Contract §2 "Role → Permission Mapping").
  *
  * Operator and Viewer additionally read their own tenant profile, which the dashboard needs on every
  * page; Admin is the custom role v5 does not define, kept at "all namespaces except billing" with

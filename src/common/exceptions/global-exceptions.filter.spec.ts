@@ -8,7 +8,7 @@ import { TenantContextService } from '@common/tenant-aware/tenant-context.servic
 import { BaseException } from './base.exceptions';
 import { ErrorEnvelope, GlobalExceptionsFilter } from './global-exceptions.filter';
 
-/** The API Contract v1.3 error body: `{ error: { type, code, message, param, request_id, doc_url, details } }`. */
+/** The API Contract error body: `{ error: { type, code, message, param, request_id, doc_url, details } }`. */
 describe('GlobalExceptionsFilter', () => {
     const capture = (exception: unknown, requestId: string | null = 'req_1') => {
         const response = { setHeader: jest.fn(), status: jest.fn(), type: jest.fn(), json: jest.fn() };

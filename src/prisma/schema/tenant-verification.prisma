@@ -1,4 +1,4 @@
-// KYB verification records backing `tenants.verification_status` (DB Model v2 §3 `tenant_verifications`).
+// KYB verification records backing `tenants.verification_status` (DB Model §3 `tenant_verifications`).
 // Only `company` verifications drive the tenant's status; `tax` and `payout_provider` are recorded as-is.
 model TenantVerification {
   id                 String    @id @default(ulid()) @db.VarChar(26)

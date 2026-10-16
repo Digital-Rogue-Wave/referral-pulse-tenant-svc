@@ -1,5 +1,5 @@
 /**
- * Key-case conversion at the HTTP boundary (API Contract v1.3 §1: `snake_case` for all fields and query
+ * Key-case conversion at the HTTP boundary (API Contract §1: `snake_case` for all fields and query
  * parameters). Services and DTOs stay camelCase; the wire is snake_case. Only object keys change — values,
  * dates, buffers and decimals pass through untouched.
  */

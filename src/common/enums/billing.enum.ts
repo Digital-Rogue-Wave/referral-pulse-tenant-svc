@@ -1,5 +1,5 @@
 /**
- * Subscription tiers. DB Model v5 §3 names five: free, starter, growth, **scale**, enterprise.
+ * Subscription tiers. DB Model §3 names five: free, starter, growth, **scale**, enterprise.
  *
  * The values stay title-case. v5 puts `plan` on `tenants` with a lower-case CHECK, but this service
  * holds it on `billing.plan` — v5's DB Model defines no billing tables at all, so it had nowhere

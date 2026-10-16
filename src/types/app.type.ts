@@ -496,7 +496,7 @@ export type SqsQueueName =
     | typeof AI_INTELLIGENCE_SVC_FIFO;
 
 /**
- * SNS topics tenant-service publishes to. Architecture v1.3 §3.2 gives it exactly one: `tenant-events`
+ * SNS topics tenant-service publishes to. Architecture §3.2 gives it exactly one: `tenant-events`
  * (logical name; the AWS topic is `tenant-events.fifo`, mapped through SNS_TOPICS). Every published event,
  * identity and billing alike, goes there through the transactional outbox; consumers filter on the
  * `eventType` message attribute.

@@ -6,7 +6,7 @@ model ApiKey {
   keyHash    String    @unique @map("key_hash") @db.VarChar(64)
   // Last 4 characters of the raw key: the only part ever shown in dashboards or logs (API §8.3).
   keyPrefix  String    @map("key_prefix") @db.Char(4)
-  // text + CHECK: secret | publishable (DB Model v2 §3)
+  // text + CHECK: secret | publishable (DB Model §3)
   keyType    String    @default("secret") @map("key_type") @db.VarChar(20)
   createdBy  String    @map("created_by") @db.VarChar(26)
   lastUsedAt DateTime? @map("last_used_at") @db.Timestamptz

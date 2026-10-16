@@ -1,16 +1,16 @@
-// Transactional outbox for domain events (DB Model v2 §0.6). Rows are written in the same transaction as
+// Transactional outbox for domain events (DB Model §0.6). Rows are written in the same transaction as
 // the state change they describe; EventOutboxRelayWorker publishes them to SNS `tenant-events`.
 model EventOutbox {
   // = the envelope event_id
   id            String    @id @db.Char(26)
   tenantId      String    @map("tenant_id") @db.VarChar(26)
   eventType     String    @map("event_type") @db.VarChar(128)
-  // Deterministic dedup key derived from the domain fact (Event Model v3 §2.1)
+  // Deterministic dedup key derived from the domain fact (Event Model §2.1)
   externalId    String    @map("external_id") @db.VarChar(256)
   schemaVersion Int       @default(1) @map("schema_version") @db.SmallInt
   aggregateType String    @map("aggregate_type") @db.VarChar(64)
   aggregateId   String    @map("aggregate_id") @db.VarChar(64)
-  // The full canonical envelope (Event Model v3 §2)
+  // The full canonical envelope (Event Model §2)
   payload       Json
   // text + CHECK: pending | published | failed
   status        String    @default("pending") @db.VarChar(16)

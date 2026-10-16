@@ -15,7 +15,7 @@ type KeyProvider = (request: Request, rawJwtToken: string, done: (err: unknown, 
 type InternalPayload = IJwtPayload & IInternalTokenClaims;
 
 /**
- * Verifies the two token kinds a service may receive (Architecture §13.1, API Contract v1.3 §2):
+ * Verifies the two token kinds a service may receive (Architecture §13.1, API Contract §2):
  *
  * 1. The internal JWT minted by tenant-service's /internal/validate-token — every dashboard and API-key
  *    request, after the gateway exchanged the credential. Carries tenant_id, user_id, source, key_type, perms.

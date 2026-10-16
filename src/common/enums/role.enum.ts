@@ -1,7 +1,7 @@
 /**
  * Platform operator roles.
  *
- * API Contract v5 §2 "Role → Permission Mapping" names four **standard** roles — `owner`,
+ * API Contract §2 "Role → Permission Mapping" names four **standard** roles — `owner`,
  * `operator`, `viewer`, `support` — mapped to the Product Spec §4 actors Owner, Campaign Manager,
  * Analyst and Support Agent.
  *
@@ -18,7 +18,7 @@ export enum RoleEnum {
     VIEWER = 'VIEWER'
 }
 
-/** The four v5 standard roles. `roles.tenant_id` is null for exactly these (DB Model v5 §3). */
+/** The four v5 standard roles. `roles.tenant_id` is null for exactly these (DB Model §3). */
 export const STANDARD_ROLES: readonly RoleEnum[] = [RoleEnum.OWNER, RoleEnum.OPERATOR, RoleEnum.VIEWER, RoleEnum.SUPPORT];
 
 /** Roles outside v5's standard set, carried for backwards compatibility. Tenant-scoped in `roles`. */

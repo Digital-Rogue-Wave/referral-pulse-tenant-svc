@@ -37,16 +37,16 @@ import type {
     UserRoleChangedEvent
 } from '@domains/user';
 
-/** Event Model v3 §2.3 `object.object_type`, extended with tenant-service's aggregates (additive enum values). */
+/** Event Model §2.3 `object.object_type`, extended with tenant-service's aggregates (additive enum values). */
 export type PublishedObjectType = 'tenant' | 'user' | 'api_key' | 'subscription' | 'invitation';
 
-/** Flat properties (Event Model v3 §2.5): primitive values only, snake_case keys. */
+/** Flat properties (Event Model §2.5): primitive values only, snake_case keys. */
 export type FlatProperties = Record<string, string | number | boolean | null>;
 
 /** What a domain event becomes on the bus; the envelope builder adds everything else. */
 export interface PublishedEventDraft {
     eventType: string;
-    /** Deterministic per domain fact (Event Model v3 §2.1) — a replay of the same fact produces the same key. */
+    /** Deterministic per domain fact (Event Model §2.1) — a replay of the same fact produces the same key. */
     externalId: string;
     object: { type: PublishedObjectType; id: string };
     properties: FlatProperties;

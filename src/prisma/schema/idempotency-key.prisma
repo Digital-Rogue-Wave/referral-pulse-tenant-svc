@@ -1,4 +1,4 @@
-// Request idempotency for non-ingestion POST/PATCH (API Contract v1.3 §1, DB Model v2 §0.7).
+// Request idempotency for non-ingestion POST/PATCH (API Contract §1, DB Model §0.7).
 // Keyed per principal scope + key for 24 h; stores the original response so a retry gets it back verbatim.
 model IdempotencyKey {
   // The caller's scope: the tenant id, or `identity:{id}` / `service:{client}` for tenant-less callers.

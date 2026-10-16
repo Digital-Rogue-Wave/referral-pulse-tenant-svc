@@ -15,7 +15,7 @@ import {
 } from './keto-tuples';
 import { ALL_PERMISSIONS, Permission, splitPermission } from './permission-catalog';
 
-/** DB Model v2 §3 Redis: `keto:decision:*`, 30–60 s — short enough that a role change lands within a minute. */
+/** DB Model §3 Redis: `keto:decision:*`, 30–60 s — short enough that a role change lands within a minute. */
 const DECISION_TTL_SECONDS = 45;
 
 /**

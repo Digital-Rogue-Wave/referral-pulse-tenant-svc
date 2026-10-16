@@ -15,7 +15,7 @@ import { LIVE_CHECK_PERMISSIONS, Permission } from './authz/permission-catalog';
 import { PERMISSIONS_KEY, PLATFORM_ADMIN_KEY, SERVICE_CAPABILITIES_KEY } from './require-permission.decorator';
 
 /**
- * Deny-by-default authorization (API Contract v1.3 §2).
+ * Deny-by-default authorization (API Contract §2).
  *
  * - API-key principals never reach this service: keys are gated to ingestion/SDK, and tenant-service
  *   exposes neither.

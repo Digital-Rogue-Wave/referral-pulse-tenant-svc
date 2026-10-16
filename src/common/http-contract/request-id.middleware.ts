@@ -5,7 +5,7 @@ import { ulid } from 'ulid';
 const ACCEPTABLE_ID = /^[A-Za-z0-9_.:-]{1,128}$/;
 
 /**
- * `request_id` on every response (API Contract v1.3 §1): taken from `X-Request-Id` when the gateway sent a
+ * `request_id` on every response (API Contract §1): taken from `X-Request-Id` when the gateway sent a
  * sane one, generated otherwise (`req_<ulid>`), and set before guards run so even an authentication failure
  * carries the id the logs use.
  */

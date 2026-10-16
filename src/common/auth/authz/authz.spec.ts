@@ -9,7 +9,7 @@ import { KetoProvisioningService } from './keto-provisioning.service';
 import { membershipTuple, roleObject, tenantGrantTuples, ServiceCapability } from './keto-tuples';
 import { ALL_PERMISSIONS, LIVE_CHECK_PERMISSIONS, PERMISSION_CATALOG, ROLE_GRANTS } from './permission-catalog';
 
-describe('Permission catalog (API Contract v5 §2)', () => {
+describe('Permission catalog (API Contract §2)', () => {
     it('covers every namespace the spec defines, with the spec relations', () => {
         expect(PERMISSION_CATALOG.campaigns).toEqual(['read', 'write', 'activate', 'pause', 'complete']);
         // v5 adds `adjust` and `resend_email` for the Support Agent.

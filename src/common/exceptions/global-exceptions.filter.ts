@@ -12,7 +12,7 @@ import type { IApiError, IValidationErrorDetail } from '@app/types';
 
 import { toSnakeCase } from '@common/http-contract/wire-case';
 
-/** API Contract v1.3 §1 "Error Model": the `type` for each HTTP status. 402 is this service's billing extension. */
+/** API Contract §1 "Error Model": the `type` for each HTTP status. 402 is this service's billing extension. */
 const ERROR_TYPE_BY_STATUS: Readonly<Record<number, string>> = {
     400: 'invalid_request',
     401: 'authentication_error',
@@ -27,7 +27,7 @@ const ERROR_TYPE_BY_STATUS: Readonly<Record<number, string>> = {
 
 const DOC_URL_BASE = 'https://docs.referralai.com/errors/';
 
-/** The error body every service returns (API Contract v1.3 §1). */
+/** The error body every service returns (API Contract §1). */
 export interface ErrorEnvelope {
     error: {
         type: string;
@@ -91,7 +91,7 @@ export class GlobalExceptionsFilter implements ExceptionFilter {
     }
 
     /**
-     * The filter's internal error shape, in the API Contract v1.3 wire envelope. Parameter names are
+     * The filter's internal error shape, in the API Contract wire envelope. Parameter names are
      * snake_case, like every other field on the wire.
      */
     private toErrorEnvelope(apiError: IApiError, status: HttpStatus): ErrorEnvelope {

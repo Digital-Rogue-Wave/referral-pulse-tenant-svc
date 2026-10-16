@@ -88,7 +88,7 @@ const EVENTS: BaseDomainEvent[] = [
 ];
 
 describe('Published events — the wire contract of every tenant-service event', () => {
-    it.each(EVENTS.map((event) => [event.eventType, event] as const))('%s maps to a valid Event Model v3 draft', (type, event) => {
+    it.each(EVENTS.map((event) => [event.eventType, event] as const))('%s maps to a valid Event Model draft', (type, event) => {
         expect(isPublishedEvent(type)).toBe(true);
         const drafts = toPublishedEvents(type, event);
 

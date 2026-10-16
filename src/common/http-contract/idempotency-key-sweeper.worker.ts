@@ -15,7 +15,7 @@ import { DatabaseService } from '@app/database/database.service';
 
 const QUEUE = 'idempotency-key-sweeper';
 
-/** Hourly purge of request-idempotency rows past their 24 h window (DB Model v2 §0.7 `idx_idem_expiry`). */
+/** Hourly purge of request-idempotency rows past their 24 h window (DB Model §0.7 `idx_idem_expiry`). */
 @Injectable()
 export class IdempotencyKeySweeperWorker extends BaseWorkerService<IBaseJobData> {
     constructor(

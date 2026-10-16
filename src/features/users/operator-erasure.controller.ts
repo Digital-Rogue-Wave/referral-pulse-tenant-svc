@@ -9,7 +9,7 @@ import { DomainMetrics } from '@common/monitoring/domain-metrics.service';
 import { OperatorErasureService } from './operator-erasure.service';
 
 /**
- * Identity's step of the data-subject erasure fan-out (Product Spec v4 "DSR Propagation"). Called by the
+ * Identity's step of the data-subject erasure fan-out (Product Spec "DSR Propagation"). Called by the
  * compliance orchestrator's workflow activity with a client-credentials token holding `dsr.erase`; the
  * response is this service's receipt for `erasure.completed`.
  */

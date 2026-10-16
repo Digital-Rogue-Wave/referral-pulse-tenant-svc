@@ -6,7 +6,7 @@ export const DEFAULT_PAGE_LIMIT = 25;
 export const MAX_PAGE_LIMIT = 100;
 
 /**
- * List query (API Contract v1.3 §1 "Pagination & Filtering"): `limit`, `starting_after`, `ending_before`.
+ * List query (API Contract §1 "Pagination & Filtering"): `limit`, `starting_after`, `ending_before`.
  * Cursors are resource ids — ULIDs are time-ordered, so the id is a stable, opaque position.
  */
 export class ListQueryDto {

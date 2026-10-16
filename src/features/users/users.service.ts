@@ -51,7 +51,7 @@ const PRIVILEGED_ROLES: RoleEnum[] = [RoleEnum.OWNER, RoleEnum.ADMIN];
  *
  * `users` + `user_roles` are the write model; every change emits a domain event after commit, and
  * KetoSyncListener mirrors it into Ory Keto through the outbox (the Keto reconciler repairs any gap).
- * Ory Kratos owns credentials; one identity belongs to exactly one tenant (DB Model v2 §3).
+ * Ory Kratos owns credentials; one identity belongs to exactly one tenant (DB Model §3).
  */
 @Injectable()
 export class UsersService {
@@ -284,7 +284,7 @@ export class UsersService {
         }
     }
 
-    /** The `user_roles` display projection (DB Model v2 §3) — one row per member, replaced on change. */
+    /** The `user_roles` display projection (DB Model §3) — one row per member, replaced on change. */
     private async replaceRoleProjection(tx: Prisma.TransactionClient, user: UserProps, roleName: RoleEnum, assignedBy: string | null): Promise<void> {
         const role = await tx.role.findUnique({ where: { name: roleName }, select: { id: true } });
         if (!role) {

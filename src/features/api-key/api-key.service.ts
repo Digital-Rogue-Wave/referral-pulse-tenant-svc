@@ -28,7 +28,7 @@ import {
 } from '@domains/api-key';
 import { PlanLimitService } from '@app/features/billing/plan-limit.service';
 
-/** DB Model v2 §3 Redis `apikey:{key_prefix}:{key_hash8}` — 300 s, dropped on revoke and rotate. */
+/** DB Model §3 Redis `apikey:{key_prefix}:{key_hash8}` — 300 s, dropped on revoke and rotate. */
 const KEY_CACHE_TTL_SECONDS = 300;
 /** `last_used_at` is written at most this often per key, instead of on every request. */
 const LAST_USED_WRITE_INTERVAL_SECONDS = 60;
@@ -43,7 +43,7 @@ export interface ResolvedApiKey {
 }
 
 /**
- * API keys for ingestion and the SDK (API Contract v1.3 §2 — keys never reach configuration endpoints).
+ * API keys for ingestion and the SDK (API Contract §2 — keys never reach configuration endpoints).
  *
  * The stored hash is HMAC-SHA256 with a server-side pepper: a 256-bit random key needs no slow hash,
  * and a deterministic hash makes validation a single indexed lookup with a cache that revocation can

@@ -18,11 +18,11 @@ import { DatabaseService } from '@app/database/database.service';
 const QUEUE = 'retention-sweeper';
 const DAY_MS = 86_400_000;
 
-/** API Contract v1.3 §8.3: the audit trail lives for the tenant's lifetime plus 12 months. */
+/** API Contract §8.3: the audit trail lives for the tenant's lifetime plus 12 months. */
 export const AUDIT_AFTER_CLOSE_DAYS = 365;
 /** An invitation that can no longer be accepted keeps the invitee's address this long, then is deleted. */
 export const INVITATION_AFTER_END_DAYS = 30;
-/** Delivered side effects are kept this long for troubleshooting (DB Model v2 §0.6 keeps published events 7 days). */
+/** Delivered side effects are kept this long for troubleshooting (DB Model §0.6 keeps published events 7 days). */
 export const SIDE_EFFECT_AFTER_DONE_DAYS = 7;
 /** Applied Stripe events are kept this long to explain billing state, then pruned (Stripe keeps its own 30 days). */
 export const STRIPE_EVENT_AFTER_DONE_DAYS = 90;
