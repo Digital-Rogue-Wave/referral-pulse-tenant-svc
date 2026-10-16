@@ -15,9 +15,13 @@ export const RAW_WIRE_KEY = 'http:raw_wire';
 export const RawWire = (): CustomDecorator<string> => SetMetadata(RAW_WIRE_KEY, true);
 
 /**
- * snake_case on the wire, camelCase inside (API Contract v1.3 §1). Runs before the ValidationPipe, so DTOs
- * are validated in their camelCase form, and maps the handler's result back to snake_case. Error bodies
- * are produced by the exception filter directly in wire shape and never pass through here.
+ * snake_case on the wire, camelCase inside — API Contract v5 §1: "snake_case for all fields, query
+ * parameters, and enum values". Event Model §2.5 makes the same rule unavoidable for `properties`,
+ * whose keys must match `^[a-z][a-z0-9_]{0,63}$` and so cannot carry an uppercase letter at all.
+ *
+ * Runs before the ValidationPipe, so DTOs are validated in their camelCase form, and maps the
+ * handler's result back to snake_case. Error bodies are produced by the exception filter directly in
+ * wire shape and never pass through here.
  */
 @Injectable()
 export class WireCaseInterceptor implements NestInterceptor {
