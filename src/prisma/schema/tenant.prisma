@@ -40,6 +40,9 @@ model Tenant {
   apiKeys                     ApiKey[]
   verifications               TenantVerification[]
   userNotificationPreferences UserNotificationPreference[]
+  consents                    Consent[]
+  dsrRequests                 DsrRequest[]
+  providerConnections         ProviderConnection[]
 
   @@index([status])
   @@index([slug])

@@ -971,6 +971,106 @@ make and the work is unblocked the moment it is:
    *programs* permission is semantically odd and will read as a copy-paste to the next person. A
    `dsr:*` relation, or `api_keys:manage`-style owner-scoped relation, would say what it means.
 
+## V5.12 D5 — the compliance and provider-connection tables, built
+
+§V5.10 recommended four tables and asked for approval rather than implementing them silently. The
+approval came on 2026-10-19 ("we are not even on staging — as long as we follow the v5 we can do
+them now"), so they exist as of
+`src/prisma/migrations/20261019120000_v5_compliance_and_provider_connections`:
+`consents`, `dsr_requests`, `dsr_receipts`, `provider_connections`, with models in
+`src/prisma/schema/compliance.prisma` and `src/prisma/schema/provider-connection.prisma`.
+
+They are the schema only. **No endpoint, workflow or service code was added** — see "What still has
+no code" below for why each piece is still open rather than forgotten.
+
+### Decisions taken, with what was rejected
+
+**D5-a — single-key ULID, against DB Model §0.1.** §0.1 specifies a dual-key model: `pk bigint
+GENERATED ALWAYS AS IDENTITY` as the physical key plus `id text` ULID as the business key. Not one
+of this service's 22 existing tables does that; all of them are `@id @default(ulid()) @db.VarChar(26)`
+under the 2026-09-02 platform ruling recorded in CLAUDE.md, and `20260903003657_ulid_id_harmonize`
+converted the last of them. These four follow the 22.
+
+*Rejected:* building them to §0.1 as written. It would make them the only dual-key tables in the
+schema, so every join, every repository and every reader would have to know which era a table came
+from. If the fleet does move to dual keys, it moves as one migration across all 26 tables, not as
+four tables that got there first. **This is a divergence from a written spec, so it is the lead's to
+ratify, not mine to settle** — the same §0.1 conflict applies to every table this service already
+has, so ratifying it closes 26 cases rather than 4.
+
+**D5-b — the DSR lifecycle states are invented.** R-CPL-02 names the three request *types* (access,
+erasure, portability) and the one-month deadline, but no status values. `pending | in_progress |
+completed | failed`, shaped after `tenant_verifications.status` so the two operator-facing workflows
+read the same way.
+
+*Rejected:* no status column, deriving state from `completed_at` and the receipt count. It cannot
+express a failed fan-out, which is exactly the state someone has to act on before the deadline.
+
+**D5-c — the provider list comes from DB Model §10.** `provider_connections.provider` is checked
+against `stripe | paddle | chargebee | paypal | wise | gift_card | crm`, which is the list §10
+already constrains `inbound_webhook_receipts.provider` to. A connection and the receipt it produces
+therefore cannot disagree about who sent a callback.
+
+*Rejected:* a free-text provider column. It is how the retired-event-name problem started — a value
+nothing validates becomes a value nothing can rely on.
+
+**D5-d — the webhook secret sits in an encrypted column, and this is the part wanting review.**
+`signing_secret` is AES-256-GCM encrypted at rest, matching notification-service's existing
+`InboundIntegration.signingSecret`. That is deliberate: Architecture §2.8 moves those receivers to
+ingestion (D4), so the secret keeps the handling it already has and the move stays a move.
+
+*Rejected:* a secret-manager reference, which §V5.10 recommended and which is genuinely stronger.
+It is a one-column change and no data has to migrate, because nothing is stored yet. **Flagged, not
+assumed:** this column should not hold a live provider credential until someone with a security hat
+has looked at the encryption and rotation design. Pre-staging is not a reason to skip that, it is
+the cheapest moment to do it.
+
+**D5-e — tenant FK with `ON DELETE CASCADE` on all four.** Consistent with `tenant_verifications`
+and the other tenant-scoped tables. `dsr_receipts` gets no second FK to `tenants`; it reaches its
+tenant through its request, and one cascade path is enough.
+
+*Rejected:* no FK, like `audit_log` and `idempotency_keys`. Those are append-only logs whose rows
+outlive their subject on purpose. A consent record with no tenant is not evidence of anything —
+you cannot tell whose consent it was — so orphaning it is worse than cascading it.
+
+**D5-f — `idx_provider_conn_live` is a partial unique index.** One live connection per tenant per
+provider, `WHERE revoked_at IS NULL`. A plain unique on `(tenant_id, provider)` would make a revoked
+connection block its own replacement. Prisma cannot express a partial index, so it lives in the
+migration SQL — the same place the CHECK constraints live, for the same reason.
+
+### Verified, not assumed
+
+The migration was applied against the dev Postgres inside a transaction and rolled back, and the
+constraints were probed with savepoints in the same transaction. Observed:
+
+- all four tables and all ten CHECK constraints create cleanly; nothing was left behind (confirmed
+  by re-querying `information_schema.tables` afterwards — none of the four exist)
+- a second *live* `(tenant, stripe)` connection is rejected; after revoking the first, the
+  replacement is accepted — the partial index does what it is there for
+- `provider = 'monzo'` rejected, `request_type = 'deletion'` rejected (v5's word is `erasure`), a
+  consent row with no subject reference rejected
+- a second receipt from the same service for the same request rejected; deleting the request takes
+  its receipts with it
+- `pnpm test` 497/497 pass; `tsc --noEmit` reports 28 errors, the unchanged pre-existing baseline
+
+### What still has no code, and why
+
+1. **`POST /v1/dsr`, the consent registry endpoints, and the fan-out workflow.** The fan-out is a
+   cross-service contract: the coordinator has to know all eight other services' erasure endpoints
+   and aggregate their receipts. This repo can answer for its own handler
+   (`POST /internal/erasures/operators`, capability `dsr.erase`, already implemented in
+   `src/features/users/operator-erasure.controller.ts`); it cannot invent the other eight. Six of
+   them are not mine.
+2. **Provider-connection CRUD and the encryption helper** — gated on D5-d's security review.
+3. **Exposing connections to ingestion through a cache**, which Architecture §2.1 requires and which
+   D4 depends on. The table is the half this service owns; the cache contract is a cross-service
+   item and belongs with D4.
+4. **§V5.11 defects 6 and 7 are still open and bear on this.** Architecture §2.1 says this service
+   consumes nothing while Product Spec §474 has it consuming erasure receipts from every service —
+   `dsr_receipts` is built for the Product Spec reading, because R-CPL-01 cannot work under the
+   other one. And `POST /v1/dsr` is still gated on `programs:write` (§618), which resolves to
+   Owner-only but says the wrong thing.
+
 ---
 
 > **Cross-service decision list.** The consolidated list of everything still open across all four
