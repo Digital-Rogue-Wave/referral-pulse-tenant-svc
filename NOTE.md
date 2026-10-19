@@ -1204,6 +1204,36 @@ The migration was amended rather than superseded by a second one: it has never b
     revised for the 2026-10-12 receivers move, which is also what makes it the lagging document in
     the D4 tiebreak.
 
+## V5.15 D4 step 3 — the email-tracking token key
+
+Architecture v5 §2.1 puts the tracking-token key in this service, and Product Spec §12 lists it among
+Event Ingestion's cached inputs. Notification-service signs the `/t/o/{token}` and `/t/c/{token}`
+tokens at send time; ingestion verifies them when the recipient opens or clicks. Both read the value
+from `GET /v1/internal/tracking-token-key`, under the new capability `tracking_token.read`.
+
+**D4-16 — one platform key, not one per tenant.** §2.1 names it in the singular, next to the plural
+"webhook signing secrets", and the token carries the tenant id *under* the signature — so a per-tenant
+key would add rotation surface without adding isolation.
+
+*Rejected:* a per-tenant key. It would also mean the verifier has to decide which key to use from an
+unverified payload, which is a worse shape than one key over a signed tenant id.
+
+**D4-17 — its own capability, separate from `provider_connection.read`.** Notification needs the
+tracking key and must never get provider secrets; ingestion needs both, but as two grants. One
+capability covering "the secrets tenant-service holds for others" would have given notification the
+billing credentials.
+
+**D4-18 — 503 when the key is unset, never an empty string.** A caller that received `""` would sign
+and verify with it and every forged token would pass. The correct caller response is to fail and
+retry, which is what 503 says.
+
+**No tenant-facing route.** No operator needs this value, and an endpoint returning it to a dashboard
+session would be a way to mint tracking touches for another tenant.
+
+The value is one per environment (Helm `TRACKING_TOKEN_KEY`), and rotating it invalidates the tokens
+in mail already sent — tracked in the Helm comment, because that is where someone will be when they
+consider rotating it.
+
 ---
 
 > **Cross-service decision list.** The consolidated list of everything still open across all four

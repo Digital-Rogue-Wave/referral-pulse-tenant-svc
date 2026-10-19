@@ -157,6 +157,12 @@ export class InternalConnectionDto {
     enabled!: boolean;
 }
 
+/** The key `/t/o` and `/t/c` tokens are signed and verified with (Architecture §2.1). */
+export class TrackingTokenKeyDto {
+    @ApiProperty({ description: '32 bytes as 64 hex characters' })
+    key!: string;
+}
+
 // ============================================================
 // Mapper
 // ============================================================

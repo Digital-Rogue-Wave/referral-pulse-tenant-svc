@@ -253,6 +253,10 @@ secretVars:
   # service boots but refuses to create or resolve a provider connection, rather than storing a secret
   # nothing can read back.
   PROVIDER_SECRET_ENCRYPTION_KEY: ""
+  # Signs and verifies the /t/o and /t/c email-tracking tokens (64 hex chars). Notification signs with
+  # it, ingestion verifies with it, and both read it from this service — so it is one value per
+  # environment, and changing it invalidates the tokens in mail already sent.
+  TRACKING_TOKEN_KEY: ""
   CH_PASSWORD: "sa"
   REDIS_USERNAME: "appuser"
   REDIS_PASSWORD: "super-secret"
