@@ -16,6 +16,7 @@ import { ApiKeyModule } from '@app/features/api-key/api-key.module';
 import { AuditLogModule } from '@app/features/audit-log/audit-log.module';
 import { BillingModule } from '@app/features/billing/billing.module';
 
+import { ConnectionModule } from '@app/features/connection/connection.module';
 import { DnsModule } from '@app/features/dns/dns.module';
 import { FilesModule } from '@app/features/files/files.module';
 import { IdentityGatewayModule } from '@app/features/identity-gateway/identity-gateway.module';
@@ -60,6 +61,7 @@ import { WireCaseInterceptor } from '@common/http-contract/wire-case.interceptor
         ApiKeyModule,
         AuditLogModule,
         BillingModule,
+        ConnectionModule,
         DnsModule,
         FilesModule,
         IdentityGatewayModule,

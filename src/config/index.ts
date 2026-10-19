@@ -2,6 +2,7 @@ import appConfig from './app.config';
 import authConfig from './auth.config';
 import awsConfig from './aws.config';
 import billingConfig from './billing.config';
+import connectionConfig from './connection.config';
 import databaseConfig from './database.config';
 import httpConfig from './http.config';
 import oryConfig from './ory.config';
@@ -28,6 +29,7 @@ export type { TemporalConfig } from './temporal.config';
 export type { BillingConfig } from './billing.config';
 export type { StripeConfig } from './stripe.config';
 export type { TokenIssuerConfig } from './token-issuer.config';
+export type { ConnectionConfig } from './connection.config';
 
 export const configLoaders = [
     appConfig,
@@ -43,7 +45,8 @@ export const configLoaders = [
     temporalConfig,
     billingConfig,
     stripeConfig,
-    tokenIssuerConfig
+    tokenIssuerConfig,
+    connectionConfig
 ];
 
 export {
@@ -60,5 +63,6 @@ export {
     temporalConfig,
     billingConfig,
     stripeConfig,
-    tokenIssuerConfig
+    tokenIssuerConfig,
+    connectionConfig
 };

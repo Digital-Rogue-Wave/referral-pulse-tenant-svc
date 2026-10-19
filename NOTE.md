@@ -1071,6 +1071,139 @@ constraints were probed with savepoints in the same transaction. Observed:
    other one. And `POST /v1/dsr` is still gated on `programs:write` (§618), which resolves to
    Owner-only but says the wrong thing.
 
+## V5.13 D4 step 1 — provider connections, the half this service owns
+
+D4 moves the inbound provider receivers and the email-tracking endpoints from notification-service to
+ingestion-service (Architecture v5 §2.4/§2.8 and API Contract §6.5, both carrying the dated
+2026-10-12 addendum; DB Model §10 still assigns them to notification and is the lagging document —
+tiebreak recorded in `event-svc/NOTE.md` §11.9). Ingestion cannot verify a provider callback without
+the connection secret, and Product Spec §12 lists "connection config and tracking-token key (cache
+from Identity & Access)" among Event Ingestion's inputs — so this service goes first.
+
+Built here: `POST /v1/connections`, `GET /v1/connections`, `DELETE /v1/connections/{id}`, and
+`GET /v1/internal/connections/{provider}/{connectionId}` for ingestion's cache, over the
+`provider_connections` table from §V5.12.
+
+### Decisions taken, with what was rejected
+
+**D4-1 — the `POST /v1/connections` body is this service's proposal, not a contract.** API Contract
+§6.5 names the endpoint and its authorization ("Owner, `api_keys:manage`") but §3.1 marks the body
+"still to author". The shape is `{ provider, connection_type, name?, signing_secret, config? }`, and
+the response carries `receiver_url` so the operator gets the URL to paste into the provider's console.
+
+*Rejected:* waiting for §3.1 to be authored. Nothing downstream can be built without a connection to
+read, and a body this small is cheap to change. It is flagged so a later §3.1 is a diff against a
+stated proposal rather than a surprise.
+
+**D4-2 — `api_keys:manage`, not a new `connections:*` relation.** §6.5 names that relation, and it is
+already the platform's relation for "credentials that let something talk to the platform". A new
+relation would need provisioning in Keto for every existing tenant.
+
+*Rejected:* a `connections:manage` relation, which would say what it means more precisely. Worth
+raising with §V5.11 defect 7 (`POST /v1/dsr` gated on `programs:write`) as one naming question
+rather than two.
+
+**D4-3 — the provider list is the category list, not API §6.5's revision line.** §6.5's revision
+names `stripe, paddle, chargebee, paypal, wise, tremendous`; the table directly below it and DB
+Model §10's CHECK both name `… wise, gift_card, crm`. Two of three mentions name categories and one
+names a vendor, so categories win and `gift_card` covers Tremendous/Tango.
+
+*Rejected:* following the revision line as the newest text. It would make `provider` a mix of six
+categories and one vendor, and would drop CRM — which §6.5's own table lists as a source. Recorded
+as a spec defect in §V5.14.
+
+**D4-4 — one live connection per tenant per provider, enforced in the database.** `idx_provider_conn_live`
+is partial on `revoked_at IS NULL`, so a second live Stripe connection is a 409 and cannot quietly
+take over the first one's callbacks, while a revoked one steps aside for its replacement.
+
+*Rejected:* allowing several and letting the path disambiguate. The path does identify the
+connection, but two live secrets for one provider means a callback verified by the wrong one is
+indistinguishable from a legitimate one at the audit level.
+
+**D4-5 — rotation is replacement.** There is no `PUT` on a connection's secret: revoke and create.
+That changes the receiver URL, which is the point — the provider has to be reconfigured, so there is
+no window where the old secret still verifies.
+
+*Rejected:* a rotate endpoint mirroring `POST /v1/api-keys/{id}/rotate`. An API key is presented by
+our own SDK, which we can update; a provider secret is held in the provider's console, which we
+cannot.
+
+**D4-6 — the internal read is the one endpoint that returns a decrypted secret.** Service-token only,
+with its own capability `provider_connection.read` rather than reusing `tenant_entitlements.read`, so
+granting ingestion the ability to read connections does not also grant it anything else. It resolves
+across tenants on purpose: a provider callback carries no tenant context, and the connection id in
+the path is what establishes it.
+
+*Rejected:* having ingestion verify through a call to this service ("send me the body, tell me if the
+signature is good"). It would put this service on ingestion's per-callback path and make it a
+latency and availability dependency of the most internet-exposed surface. The cache is what §2.1
+specifies, and caching requires handing over the secret.
+
+**D4-7 — `connection.created|revoked` are a cache-invalidation contract.** Product Spec §12 lists
+them among this service's published events; because ingestion caches connections, their arrival is
+what makes a revoked connection stop verifying before the cache TTL. The payload carries the
+connection id, provider and actor, and never the secret (asserted in the specs).
+
+**D4-8 — no `last_received_at` on the connection.** It was in §V5.12's first cut and is now removed
+from the model and the migration. Ingestion is what receives the callbacks and holds no RDS, so
+stamping the column would mean a write to this service on every verified callback — exactly the
+hot-path dependency D4-6 refuses. "Last received" is a `(provider, received_at desc)` read over the
+receipt audit, which DB Model §10 already indexes for it.
+
+The migration was amended rather than superseded by a second one: it has never been applied anywhere
+(dev Postgres holds none of the four tables), so there is nothing forward-only to respect yet.
+
+### Verified
+
+- `pnpm test` 518/518; `pnpm test:bdd` 34 scenarios / 183 steps, exit 0 — the BDD run boots the whole
+  app, so the new module's wiring is exercised, not just compiled
+- `tsc --noEmit` at the unchanged 28-error baseline; `pnpm build` compiles; `pnpm lint` 0 errors
+- the secret is asserted absent from the create response, from the published event and from the
+  stored column in the clear; a tampered ciphertext is refused by the GCM tag rather than returning
+  garbage; a missing encryption key fails the create instead of storing something unreadable
+
+### Still open for D4
+
+1. **`PROVIDER_SECRET_ENCRYPTION_KEY` is in Helm as an empty secret var.** Without it this service
+   boots but refuses to create or resolve a connection. That is deliberate (fail loudly, never store
+   a secret nothing can read back), but it means the value has to be supplied before the receivers
+   can work in any environment.
+2. **The security review from §V5.12 D5-d is now concrete:** there is an endpoint that returns a
+   decrypted provider secret to a service token. The authorization is deny-by-default and
+   capability-scoped, and the secret never reaches a human-facing response or a log — but this is the
+   part to put in front of someone before it holds a live credential.
+3. **The tracking-token key** (Architecture §2.1, Product Spec §12) is not built. Notification signs
+   the token and ingestion verifies it, so both need the key from here — that lands with the
+   `/t/o`, `/t/c` step.
+4. **Where the `inbound_webhook_receipts` audit lives is still undecided.** DB Model §10 and §13 put
+   it in notification_db with a Redis dedup key in notification's namespace; Architecture §2.4 gives
+   ingestion no RDS and §2.8 makes notification outbound-only, so as v5 stands nobody can write the
+   table that Failure §4.3's revenue reconciliation reads. The recommendation is that ingestion
+   publishes a payload-less receipt event and notification keeps the table and writes it from the bus
+   — which honours "the payload is dropped, not queued" (the dropped-signature receipt stores no
+   payload anyway, per §10) while keeping the table where the DB Model puts it. Recorded here because
+   it is the one D4 question that is not mine to settle quietly.
+
+## V5.14 Spec defects — additions
+
+8. **API Contract §6.5's revision line and its own table disagree on the provider list.** The revision
+   names `stripe, paddle, chargebee, paypal, wise, tremendous`; the table below it lists Stripe,
+   Paddle, Chargebee, PayPal/Wise, "Gift-card (Tremendous/Tango)" and "CRM (HubSpot/Salesforce)", and
+   DB Model §10's CHECK is `('stripe','paddle','chargebee','paypal','wise','gift_card','crm')`. The
+   revision swaps a category for one vendor inside it and drops CRM entirely. Implemented as the
+   category list (NOTE.md §V5.13 D4-3).
+9. **`inbound_webhook_receipts` has no owner once the receivers move.** DB Model §10 puts the table
+   and its `inbounddedup:{integration_id}:{provider_event_id}` Redis key in notification-service, and
+   §13's matrix repeats it; Architecture §2.4 gives ingestion no RDS at all and §2.8 makes
+   notification outbound-only, never receiving these callbacks. Failure §4.3's Billing-to-Platform
+   Revenue reconciliation reads that table. As the suite stands, no service can write it. §V5.13's
+   open item 4 carries the proposed resolution.
+10. **DB Model §13 does not list an inbound dedup key for ingestion.** Ingestion's Redis row is
+    "dedup, touch dedup, 3× rate-limit, campaign cache, code mirror, session map"; the inbound dedup
+    key is still in notification's row. Mechanical consequence of defect 9 — the DB Model was not
+    revised for the 2026-10-12 receivers move, which is also what makes it the lagging document in
+    the D4 tiebreak.
+
 ---
 
 > **Cross-service decision list.** The consolidated list of everything still open across all four

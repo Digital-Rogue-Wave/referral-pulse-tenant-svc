@@ -93,7 +93,6 @@ CREATE TABLE "provider_connections" (
     "signing_secret" TEXT,
     "config" JSONB NOT NULL DEFAULT '{}',
     "enabled" BOOLEAN NOT NULL DEFAULT true,
-    "last_received_at" TIMESTAMPTZ,
     "created_by" VARCHAR(26),
     "created_at" TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updated_at" TIMESTAMPTZ NOT NULL,

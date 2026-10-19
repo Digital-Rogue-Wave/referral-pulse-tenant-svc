@@ -15,6 +15,7 @@ import {
     UsageThresholdCrossedEvent
 } from '@domains/billing';
 import type { BaseDomainEvent } from '@domains/common/events';
+import { ConnectionCreatedEvent, ConnectionRevokedEvent } from '@domains/connection';
 import {
     TenantCreatedEvent,
     TenantDeletedEvent,
@@ -84,7 +85,9 @@ const EVENTS: BaseDomainEvent[] = [
     new PaymentDisputedEvent('b1', T, 'evt4', 'closed', 'dp1', 'ch1', 4900, 'eur', 'fraudulent', 'lost'),
     new PaymentRefundedEvent('b1', T, 'evt5', 'ch1', 4900, 'eur', true),
     new UsageThresholdCrossedEvent(T, T, 'email_sends', 80, 80, 100, 80, '2026-09', ISO),
-    new UsageMonthlySummaryEvent(T, T, 'email_sends', '2026-08', 90, 100, '2026-08-31', ISO)
+    new UsageMonthlySummaryEvent(T, T, 'email_sends', '2026-08', 90, 100, '2026-08-31', ISO),
+    new ConnectionCreatedEvent('c1', T, { connectionId: 'c1', provider: 'stripe', connectionType: 'billing', createdBy: 'u1' }, 'u1'),
+    new ConnectionRevokedEvent('c1', T, { connectionId: 'c1', provider: 'stripe', revokedBy: 'u1' }, 'u1')
 ];
 
 describe('Published events — the wire contract of every tenant-service event', () => {

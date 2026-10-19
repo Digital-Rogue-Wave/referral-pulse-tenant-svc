@@ -249,6 +249,10 @@ secretVars:
   # are not. Supply them per environment (or via a secret store) - billing fails closed without them.
   STRIPE_SECRET_KEY: ""
   STRIPE_WEBHOOK_SECRET: ""
+  # Encrypts provider_connections.signing_secret at rest (AES-256-GCM, 64 hex chars). Without it this
+  # service boots but refuses to create or resolve a provider connection, rather than storing a secret
+  # nothing can read back.
+  PROVIDER_SECRET_ENCRYPTION_KEY: ""
   CH_PASSWORD: "sa"
   REDIS_USERNAME: "appuser"
   REDIS_PASSWORD: "super-secret"

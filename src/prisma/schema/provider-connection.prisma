@@ -35,9 +35,11 @@ model ProviderConnection {
   config Json @default("{}")
 
   enabled Boolean @default(true)
-  /// Last verified callback — the integration-health "last received" signal (Failure F-NET-04).
-  lastReceivedAt DateTime? @map("last_received_at") @db.Timestamptz
 
+  /// No `last_received_at` here on purpose. Event Ingestion is what receives the callbacks and it holds
+  /// no RDS, so stamping this column would mean a write to this service on every verified callback —
+  /// the hot-path dependency the connection cache exists to avoid. "Last received" is already a
+  /// `(provider, received_at desc)` read over the receipt audit (DB Model §10 `idx_inbound_provider`).
   createdBy String? @map("created_by") @db.VarChar(26)
   createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz
   updatedAt DateTime  @updatedAt @map("updated_at") @db.Timestamptz

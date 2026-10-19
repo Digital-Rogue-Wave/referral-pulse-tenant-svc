@@ -46,7 +46,8 @@ export type EventCategory =
     | 'subscription'
     | 'trial'
     | 'usage'
-    | 'payment';
+    | 'payment'
+    | 'connection';
 
 /**
  * Event actions (what happened)

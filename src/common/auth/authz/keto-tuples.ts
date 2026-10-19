@@ -30,7 +30,9 @@ export enum ServiceCapability {
     TENANT_VERIFICATION_WRITE = 'tenant_verification.write',
     TENANT_SUSPEND = 'tenant.suspend',
     USAGE_WRITE = 'usage.write',
-    DSR_ERASE = 'dsr.erase'
+    DSR_ERASE = 'dsr.erase',
+    /** Event Ingestion reading a provider connection and its secret to verify a callback (Architecture §2.1/§2.4). */
+    PROVIDER_CONNECTION_READ = 'provider_connection.read'
 }
 
 export const userSubject = (userId: string): string => `user:${userId}`;
