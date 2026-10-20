@@ -1,5 +1,6 @@
 import type { BaseDomainEvent } from '@domains/common/events';
 import type { ApiKeyCreatedEvent, ApiKeyDeletedEvent, ApiKeyRotatedEvent } from '@domains/api-key';
+import type { ConnectionCreatedEvent, ConnectionRevokedEvent } from '@domains/connection';
 import type {
     SubscriptionCancelledEvent,
     SubscriptionChangedEvent,
@@ -37,16 +38,16 @@ import type {
     UserRoleChangedEvent
 } from '@domains/user';
 
-/** Event Model v3 §2.3 `object.object_type`, extended with tenant-service's aggregates (additive enum values). */
-export type PublishedObjectType = 'tenant' | 'user' | 'api_key' | 'subscription' | 'invitation';
+/** Event Model §2.3 `object.object_type`, extended with tenant-service's aggregates (additive enum values). */
+export type PublishedObjectType = 'tenant' | 'user' | 'api_key' | 'subscription' | 'invitation' | 'connection';
 
-/** Flat properties (Event Model v3 §2.5): primitive values only, snake_case keys. */
+/** Flat properties (Event Model §2.5): primitive values only, snake_case keys. */
 export type FlatProperties = Record<string, string | number | boolean | null>;
 
 /** What a domain event becomes on the bus; the envelope builder adds everything else. */
 export interface PublishedEventDraft {
     eventType: string;
-    /** Deterministic per domain fact (Event Model v3 §2.1) — a replay of the same fact produces the same key. */
+    /** Deterministic per domain fact (Event Model §2.1) — a replay of the same fact produces the same key. */
     externalId: string;
     object: { type: PublishedObjectType; id: string };
     properties: FlatProperties;
@@ -252,6 +253,37 @@ const MAPPERS: Record<string, Mapper<never>> = {
             externalId: `api_key.rotated:${e.payload.apiKeyId}:${e.payload.newKeyPrefix}`,
             object: { type: 'api_key', id: e.payload.apiKeyId },
             properties: { key_id: e.payload.apiKeyId, key_type: e.payload.keyType, tenant_id: e.tenantId, rotated_by: e.payload.rotatedBy }
+        }
+    ],
+
+    // ── Provider connections (Product Spec §12 lists `connection.created|revoked` here) ──
+    // Event Ingestion caches connection config and drops its entry on these, so the names are a cache
+    // invalidation contract, not only an audit trail. The secret is never in the payload.
+    'connection.created': (e: ConnectionCreatedEvent) => [
+        {
+            eventType: 'connection.created',
+            externalId: `connection.created:${e.payload.connectionId}`,
+            object: { type: 'connection', id: e.payload.connectionId },
+            properties: {
+                connection_id: e.payload.connectionId,
+                tenant_id: e.tenantId,
+                provider: e.payload.provider,
+                connection_type: e.payload.connectionType,
+                created_by: e.payload.createdBy
+            }
+        }
+    ],
+    'connection.revoked': (e: ConnectionRevokedEvent) => [
+        {
+            eventType: 'connection.revoked',
+            externalId: `connection.revoked:${e.payload.connectionId}`,
+            object: { type: 'connection', id: e.payload.connectionId },
+            properties: {
+                connection_id: e.payload.connectionId,
+                tenant_id: e.tenantId,
+                provider: e.payload.provider,
+                revoked_by: e.payload.revokedBy
+            }
         }
     ],
 

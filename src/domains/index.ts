@@ -4,6 +4,7 @@ export * from './common';
 // Domain modules
 export * from './api-key';
 export * from './billing';
+export * from './connection';
 export * from './dns';
 export * from './files';
 export * from './invitation';

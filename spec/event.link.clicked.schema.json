@@ -54,7 +54,7 @@
     },
     "is_repeat_visit": {
       "type": "boolean",
-      "description": "Whether the Referee clicked this code before."
+      "description": "Whether the Invitee clicked this code before."
     }
   },
   "required": [

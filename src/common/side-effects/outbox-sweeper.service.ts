@@ -23,7 +23,7 @@ const STALE_PROCESSING_MS = 5 * 60_000;
 const SWEEP_BATCH = 200;
 
 /**
- * The outbox's safety net (DB Model v2 §0.6 — "an acknowledged event is eventually processed").
+ * The outbox's safety net (DB Model §0.6 — "an acknowledged event is eventually processed").
  * Every minute, re-enqueues rows whose BullMQ job was lost, and releases rows held by a crashed worker.
  * Rows that exhausted their retries stay `failed` for an operator.
  */

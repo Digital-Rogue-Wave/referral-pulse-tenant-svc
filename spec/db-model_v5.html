@@ -1,0 +1,1399 @@
+<!DOCTYPE html><html lang="en"><head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>ReferralAI — DB Model per Microservice v5.0</title><style>
+
+@import url('https://fonts.googleapis.com/css2?family=Instrument+Serif&family=Geist:wght@400;500;600&family=Geist+Mono:wght@400&display=swap');
+:root{
+  --ink:#1c1917;--ink2:#44403c;--ink3:#78716c;--ink4:#a8a29e;
+  --paper:#FDFCFA;--card:#fff;--line:#e7e5e4;--wash:#f5f5f4;
+  --acc:#b45309;--acc2:#92400e;--accbg:#fef3c7;
+  --mint:#047857;--mintbg:#d1fae5;
+  --slate:#1e40af;--slatebg:#dbeafe;
+  --rose:#be123c;--rosebg:#ffe4e6;
+  --sw:220px
+}
+*{margin:0;padding:0;box-sizing:border-box}
+html{scroll-behavior:smooth;scroll-padding-top:20px}
+body{font-family:Geist,system-ui,sans-serif;background:var(--paper);color:var(--ink);font-size:14.5px;line-height:1.75;display:flex;-webkit-font-smoothing:antialiased}
+
+/* SIDEBAR */
+nav.sd{position:fixed;top:0;left:0;width:var(--sw);height:100vh;border-right:1px solid var(--line);overflow-y:auto;padding:24px 0;background:var(--paper)}
+.sd-b{padding:0 16px 16px}
+.sd-b h2{font-family:'Instrument Serif',serif;font-size:20px;color:var(--acc2);font-weight:400}
+.sd-b small{font-size:11px;color:var(--ink4);display:block;margin-top:2px;letter-spacing:.04em;text-transform:uppercase}
+.sd a{display:block;padding:2px 16px;color:var(--ink3);text-decoration:none;font-size:12px;line-height:1.6;transition:color .1s}
+.sd a:hover{color:var(--ink)}
+.sd a.n1{color:var(--ink2);font-weight:600;margin-top:12px;font-size:12px}
+.sd a.n2{padding-left:28px;font-size:11.5px;color:var(--ink4)}
+.sd a.active{color:var(--acc);font-weight:500}
+
+/* MAIN */
+main{margin-left:var(--sw);max-width:780px;padding:40px 48px 100px}
+h1{font-family:'Instrument Serif',serif;font-size:28px;font-weight:400;color:var(--ink);margin:56px 0 16px;letter-spacing:-.02em}
+h1:first-of-type{margin-top:0}
+h2{font-size:16px;font-weight:600;margin:32px 0 10px;letter-spacing:-.01em}
+h3{font-size:14px;font-weight:600;color:var(--acc2);margin:24px 0 6px}
+h4{font-size:13px;font-weight:600;margin:16px 0 4px}
+p{margin:0 0 12px;color:var(--ink2)}
+strong{color:var(--ink);font-weight:600}
+em{color:var(--ink3)}
+a{color:var(--acc);text-decoration:none;border-bottom:1px solid var(--accbg)}
+a:hover{border-color:var(--acc)}
+hr{border:none;height:1px;background:var(--line);margin:36px 0}
+ul,ol{margin:0 0 12px 20px;color:var(--ink2)}
+li{margin-bottom:3px}
+
+table{width:100%;border-collapse:collapse;margin:12px 0 20px;font-size:13px}
+th{text-align:left;padding:8px 10px;font-weight:500;font-size:10.5px;text-transform:uppercase;letter-spacing:.08em;color:var(--ink4);border-bottom:2px solid var(--line)}
+td{padding:7px 10px;border-bottom:1px solid var(--wash);color:var(--ink2)}
+tr:hover td{background:var(--wash)}
+
+code{font-family:'Geist Mono',monospace;font-size:12.5px;background:var(--wash);color:var(--acc2);padding:1px 4px;border-radius:3px}
+pre{background:var(--wash);border-radius:8px;padding:16px 20px;overflow-x:auto;margin:12px 0 20px;line-height:1.6;border:1px solid var(--line)}
+pre code{background:none;padding:0;color:var(--ink2);font-size:12px}
+pre.asc{border-left:3px solid var(--acc);background:var(--accbg)}
+
+blockquote{border-left:3px solid var(--acc);padding:10px 16px;margin:12px 0 20px;background:var(--accbg);border-radius:0 6px 6px 0}
+blockquote p:last-child{margin:0}
+
+/* ═══ DIAGRAMS ═══ */
+figure{margin:20px 0 28px;padding:20px;background:var(--card);border:1px solid var(--line);border-radius:10px}
+figure.fig-sm{padding:14px 20px}
+figcaption{font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:.14em;color:var(--ink4);margin-bottom:14px}
+
+.node{text-align:center;padding:8px 20px;border-radius:6px;font-weight:600;font-size:13px;display:inline-block}
+.nd-root{background:var(--ink);color:var(--paper);margin:0 auto;display:block;width:fit-content}
+.nd-root span{font-weight:400;opacity:.7;margin-left:6px;font-size:12px}
+.nd-mid{background:var(--slatebg);color:var(--slate);margin:0 auto;display:block;width:fit-content}
+
+.edge{width:2px;height:16px;background:var(--line);margin:0 auto}
+.edge.lg{height:24px}
+
+.tags{display:flex;flex-wrap:wrap;gap:6px;justify-content:center;margin:8px 0;font-size:12px;color:var(--ink3)}
+
+.cols{display:flex;gap:10px;flex-wrap:wrap}
+.trio{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}
+.leaf{flex:1;min-width:140px;padding:12px;border-radius:8px;font-size:13px;line-height:1.5;border:1px solid var(--line);background:var(--wash)}
+.lf-a{border-left:3px solid var(--mint);background:var(--mintbg)}
+.lf-b{border-left:3px solid var(--acc);background:var(--accbg)}
+.lf-c{border-left:3px solid var(--ink4);background:var(--wash)}
+
+.grid8{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin-bottom:6px}
+.grid6{display:grid;grid-template-columns:repeat(3,1fr);gap:6px}
+.cell{padding:12px;border-radius:6px;font-size:12.5px;text-align:center;background:var(--wash);border:1px solid var(--line);line-height:1.4}
+.cell small{color:var(--ink3);font-size:11px}
+.cell-w{margin-top:4px}
+
+.duo{display:flex;gap:10px}
+.duo-col{flex:1;border-radius:8px;overflow:hidden;border:1px solid var(--line)}
+.duo-h{padding:8px 14px;font-weight:600;font-size:12.5px;color:var(--paper)}
+.dh-l{background:var(--ink)}
+.dh-r{background:var(--mint)}
+.dh-r2{background:var(--mint)}
+.dh-r3{background:var(--rose)}
+.duo-b{padding:10px 14px}
+
+.step-list div{font-size:13px;padding:4px 0;border-bottom:1px solid var(--wash);color:var(--ink2)}
+.step-list div:last-child{border:none}
+.step-list.compact div{padding:2px 0;font-size:12.5px}
+.step-list .hl,.hl{background:var(--accbg);padding:3px 8px;border-radius:4px;border-bottom-color:transparent}
+.verdict{margin-top:8px;padding:6px 10px;border-radius:4px;font-size:12px;font-weight:600}
+.verdict.ok{background:var(--mintbg);color:var(--mint)}
+.verdict.bad{background:var(--rosebg);color:var(--rose)}
+
+.pipe{display:flex;align-items:center;gap:4px;flex-wrap:wrap}
+.pk{padding:6px 14px;border-radius:6px;font-weight:500;font-size:12px;color:var(--paper);position:relative}
+.pk::after{content:'→';position:absolute;right:-12px;color:var(--ink4);font-size:12px}
+.pk:last-child::after{content:''}
+.pk-0{background:#a8a29e}.pk-1{background:var(--slate)}.pk-2{background:var(--mint)}
+.pk-3{background:var(--acc)}.pk-4{background:var(--rose)}.pk-5{background:var(--ink3)}
+
+.waterfall{display:flex;flex-direction:column;gap:6px}
+.waterfall.numbered{counter-reset:wf}
+.waterfall.numbered .wf{counter-increment:wf}
+.waterfall.numbered .wf::before{content:counter(wf)'.';font-weight:600;margin-right:6px;color:var(--acc)}
+.wf{padding:10px 16px;border-radius:6px;font-size:13px;background:var(--wash);border-left:3px solid var(--line);line-height:1.5;color:var(--ink2)}
+.wf-w{border-left-color:var(--acc);background:var(--accbg)}
+.wf-d{border-left-color:var(--rose);background:var(--rosebg)}
+.wf-ok2{border-left-color:var(--mint);background:var(--mintbg)}
+.wf-branch{display:flex;flex-wrap:wrap;gap:6px}
+.wf-r{flex:1;min-width:120px;padding:8px 12px;border-radius:6px;font-size:12.5px;background:var(--wash);border:1px solid var(--line)}
+.wf-ok{border-left:3px solid var(--mint);background:var(--mintbg)}
+.wf-warn{border-left:3px solid var(--acc);background:var(--accbg)}
+.wf-err{border-left:3px solid var(--rose);background:var(--rosebg)}
+
+.checklist{display:flex;flex-direction:column;gap:4px}
+.cl-ok,.cl-no,.cl-warn{padding:8px 14px;border-radius:6px;font-size:13px;line-height:1.5}
+.cl-ok{background:var(--mintbg);border-left:3px solid var(--mint)}
+.cl-no{background:var(--rosebg);border-left:3px solid var(--rose)}
+.cl-warn{background:var(--accbg);border-left:3px solid var(--acc)}
+
+.box-nest{display:flex;flex-direction:column;align-items:center;gap:4px}
+.bn-outer{border:1px solid var(--line);border-radius:10px;padding:14px;width:100%;background:var(--wash)}
+.bn-inner{border:1px solid var(--slatebg);border-radius:8px;padding:12px;background:var(--slatebg)}
+.bn-label{font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:.08em;color:var(--ink4);margin-bottom:8px;display:block}
+.bn-label.accent{color:var(--slate)}
+.sm .cell{min-width:0}
+
+.note{font-size:12px;color:var(--ink3);margin-top:8px;font-style:italic;text-align:center}
+.mt-sm{margin-top:8px}.mb-sm{margin-bottom:10px}
+strong.err{color:var(--rose)}
+strong.ok{color:var(--mint)}
+strong.warn{color:var(--acc)}
+
+@media(max-width:800px){nav.sd{display:none}main{margin-left:0;padding:20px}
+.grid8{grid-template-columns:repeat(2,1fr)}.grid6{grid-template-columns:repeat(2,1fr)}
+.duo,.cols,.trio{flex-direction:column}}
+@media print{nav.sd{display:none}main{margin-left:0;max-width:100%}figure{break-inside:avoid;box-shadow:none}}
+::-webkit-scrollbar{width:3px}::-webkit-scrollbar-thumb{background:var(--line);border-radius:2px}
+</style></head><body>
+<nav class="sd"><div class="sd-b"><h2>ReferralAI</h2><small>DB Model v5.0</small></div>
+<a href="#db-model" class="n1">Database Model per Microservice</a>
+<a href="#0-conventions-apply-to-every-table" class="n1">0. Conventions (apply to every table)</a>
+<a href="#0-1-identifiers-dual-key-model-db-generated-physical-pk-app-generated-ulid" class="n2">0.1 Identifiers — dual-key model (DB-generated physical PK + app-generated ULID)</a>
+<a href="#0-2-standard-columns" class="n2">0.2 Standard columns</a>
+<a href="#0-3-enums" class="n2">0.3 Enums</a>
+<a href="#0-4-soft-delete-lifecycle" class="n2">0.4 Soft delete &amp;amp; lifecycle</a>
+<a href="#0-5-auditability" class="n2">0.5 Auditability</a>
+<a href="#0-6-reliable-event-emission-transactional-outbox" class="n2">0.6 Reliable event emission — transactional outbox</a>
+<a href="#0-7-request-idempotency-non-ingestion-mutations" class="n2">0.7 Request idempotency (non-ingestion mutations)</a>
+<a href="#1-reconciliation-decisions-deltas-vs-the-working-doc" class="n1">1. Reconciliation Decisions (deltas vs the working doc)</a>
+<a href="#2-per-service-overview" class="n1">2. Per-Service Overview</a>
+<a href="#3-tenant-service-tenant-db" class="n1">3. tenant-service — tenant_db</a>
+<a href="#tenant-service-redis" class="n2">tenant-service Redis</a>
+<a href="#4-campaign-service-campaign-db" class="n1">4. campaign-service — campaign_db</a>
+<a href="#campaign-service-redis" class="n2">campaign-service Redis</a>
+<a href="#5-segmentation-service-segmentation-db" class="n1">5. segmentation-service — segmentation_db</a>
+<a href="#segmentation-service-redis" class="n2">segmentation-service Redis</a>
+<a href="#6-ingestion-service-no-rds-redis-only" class="n1">6. ingestion-service — no RDS (Redis only)</a>
+<a href="#ingestion-service-redis" class="n2">ingestion-service Redis</a>
+<a href="#7-referral-service-referral-db" class="n1">7. referral-service — referral_db</a>
+<a href="#referral-service-redis" class="n2">referral-service Redis</a>
+<a href="#8-reward-service-reward-db" class="n1">8. reward-service — reward_db</a>
+<a href="#reward-service-redis" class="n2">reward-service Redis</a>
+<a href="#9-analytics-service-analytics-db-postgresql-only" class="n1">9. analytics-service — analytics_db (PostgreSQL only)</a>
+<a href="#analytics-service-redis" class="n2">analytics-service Redis</a>
+<a href="#10-notification-service-notification-db" class="n1">10. notification-service — notification_db</a>
+<a href="#notification-service-redis" class="n2">notification-service Redis</a>
+<a href="#11-ai-service-ai-db" class="n1">11. ai-service — ai_db</a>
+<a href="#ai-service-redis" class="n2">ai-service Redis</a>
+<a href="#12-cross-service-data-considerations" class="n1">12. Cross-Service Data Considerations</a>
+<a href="#12-1-foreign-references-without-cross-db-fks" class="n2">12.1 Foreign references without cross-DB FKs</a>
+<a href="#12-2-idempotency-replay" class="n2">12.2 Idempotency &amp;amp; replay</a>
+<a href="#12-3-audit-trails" class="n2">12.3 Audit trails</a>
+<a href="#12-4-ai-fraud-support-what-is-persisted-for-it" class="n2">12.4 AI &amp;amp; fraud support (what is persisted for it)</a>
+<a href="#12-5-tie-back-to-the-three-governing-models" class="n2">12.5 Tie-back to the three governing models</a>
+<a href="#13-summary-matrix" class="n1">13. Summary Matrix</a>
+</nav>
+<main>
+<h1 id="db-model">ReferralAI — Database Model per Microservice</h1><div style="border:1px solid #fde68a;background:#fffbeb;border-radius:8px;padding:12px 16px;margin:0 0 24px;font-size:13px;line-height:1.6">
+<strong>Revision 2026-10-12 — applied from the product-spec rework (Product Spec Appendix A #25–#46).</strong> Mechanical changes applied in this file: Program Admin → <strong>Owner</strong>; referee / referee_* → <strong>invitee / invitee_*</strong>; referrer (prose) → <strong>participant</strong> (wire names <code>/v1/referrers</code>, Keto <code>referrers</code> unchanged); Method A / Method B → <strong>events from backend / events from billing provider</strong>; touch events renamed <code>referral.link.clicked</code>, <code>referral.link.shared</code>, <code>referral.page.viewed</code>, <code>referral.email.opened|clicked</code>, <code>referral.widget.viewed</code>; <code>reward.calculated</code> → <code>reward.earned</code>; Partner actor removed from V1; payout partner → payout provider. <strong>Structural changes applied below:</strong> <code>referrals.status</code> gains <code>completed</code>; touch subtype enum renamed. <strong>Still to author:</strong> <code>invitations</code> table (referral_db: id, participant_id, campaign_id, invitee_email_hash, email_encrypted, sent_at, status, suppression); <code>rewards.cycle_number</code>, <code>referrals.cycles_earned / completion_reason</code>; campaign and tenant fields above; <code>health_scores</code> only in analytics_db (drop <code>campaign_db.programs.health_score</code>); <code>subscription.cancelled</code> in event enums.
+</div>
+<p><strong>Status:</strong> Implementation-ready model — refines and supersedes the <em>Database Tables per Microservice</em> working hypothesis<br>
+<strong>Document Version:</strong> 5.0 — suite-wide version alignment (2026-10-09); content of 2 + reconciliation rows R10–R11. Earlier change-log entries keep the pre-alignment numbering.<br>
+<strong>Derived from (ground truth, all v5.0):</strong> Architecture · Product Specification · API Contract · Event Model · Responsibility Contract · Failure &amp; Observability Model<br>
+<strong>Date:</strong> October 2026<br>
+<strong>Audience:</strong> 2-senior-engineer build team<br>
+<strong>ID model:</strong> dual-key — DB-generated <code>bigint</code> identity as the physical primary key (latency); app-generated ULID <code>id</code> as the business/domain identifier (API, events, cross-service refs)</p>
+<hr>
+
+<h1 id="0-conventions-apply-to-every-table">0. Conventions (apply to every table)</h1>
+<p>These rules hold platform-wide and are not repeated per table.</p>
+<h2 id="0-1-identifiers-dual-key-model-db-generated-physical-pk-app-generated-ulid">0.1 Identifiers — dual-key model (DB-generated physical PK + app-generated ULID)</h2>
+<p>Every table carries <strong>two</strong> keys, each with a distinct job. The split is deliberate: the database owns the <em>physical</em> key (fast), the application owns the <em>business</em> key (portable).</p>
+<ul>
+<li><strong><code>pk</code> — physical primary key, DB-generated.</strong> <code>bigint GENERATED ALWAYS AS IDENTITY</code>, the clustered <code>PRIMARY KEY</code> and the target of every <em>intra-service</em> foreign key. It is monotonic and 8 bytes, so B-tree indexes stay dense, inserts append instead of page-splitting, secondary indexes (which all carry the PK) stay narrow, and joins are integer-cheap. <strong>This is the latency win</strong> — and the reason the physical key is <em>not</em> a 26-char string. Never exposed in the API, on the event bus, or across service boundaries.</li>
+<li><strong><code>id</code> — business / domain identifier, app-generated ULID.</strong> <code>text NOT NULL UNIQUE</code>, 26-char Crockford Base32, time-ordered, assigned in domain code before persistence. This is the <strong>only</strong> id that appears in the public API, the event envelope (<code>event_id</code>), and any cross-service reference. ULIDs live in the business/domain layer; the database never generates them.</li>
+</ul>
+<p><strong>Reading convention for the rest of this document:</strong>
+- A table's <strong>"Primary Key: (<code>id</code>)"</strong> line names the <em>business</em> uniqueness contract (the ULID). The <em>physical</em> <code>PRIMARY KEY</code> is always the surrogate <code>pk</code>, plus <code>UNIQUE (id)</code>. Likewise "<code>id</code> … ULID, PK" in a column list means "the ULID <code>id</code>, <code>NOT NULL UNIQUE</code>, app-generated — with a DB-generated <code>pk bigint</code> underneath."
+- A column marked <strong>local FK</strong> is a <code>bigint</code> referencing the parent's <code>pk</code>, regardless of the logical <code>&lt;entity&gt;_id</code> name used in the column list — the app resolves the parent ULID → <code>pk</code> at write time (it already holds the parent), so the integer FK costs nothing extra and joins fast.
+- <strong>Cross-service references</strong> (<code>campaign_id</code>, <code>participant_id</code>, <code>reward_id</code>, …) carry the <strong><code>id</code> ULID by value</strong> as <code>text</code>, validated in service logic — never a DB <code>FOREIGN KEY</code>, since another service's <code>pk</code> is local and meaningless abroad.
+- The exceptions are pure lookup/junction tables whose <strong>natural composite key</strong> is the PK (e.g. <code>idempotency_keys</code>, <code>cap_ledgers</code>, <code>user_roles</code>); those need no surrogate <code>pk</code> and say so.</p>
+<h2 id="0-2-standard-columns">0.2 Standard columns</h2>
+<p>Unless a table is explicitly append-only, every table carries:</p>
+<table>
+<thead>
+<tr>
+<th>Column</th>
+<th>Type</th>
+<th>Notes</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>pk</code></td>
+<td>bigint</td>
+<td>DB-generated <code>GENERATED ALWAYS AS IDENTITY</code>; physical <code>PRIMARY KEY</code>; internal only, never exposed</td>
+</tr>
+<tr>
+<td><code>id</code></td>
+<td>text</td>
+<td>app-generated ULID; business identifier; <code>NOT NULL UNIQUE</code>; the value used in the API, events, and cross-service refs</td>
+</tr>
+<tr>
+<td><code>tenant_id</code></td>
+<td>text</td>
+<td>ULID, not null on all tenant-scoped tables; first column of nearly every composite index. Platform-level tables (<code>playbooks</code>, platform <code>notification_templates</code>, platform <code>fraud_rules</code>) allow <code>tenant_id</code> null.</td>
+</tr>
+<tr>
+<td><code>created_at</code></td>
+<td>timestamptz</td>
+<td>not null, set by app</td>
+</tr>
+<tr>
+<td><code>updated_at</code></td>
+<td>timestamptz</td>
+<td>not null, bumped on every mutation</td>
+</tr>
+</tbody>
+</table>
+<p>Append-only tables (<code>touches</code>, <code>*_events</code>, ledgers, audit, decision logs) carry <code>id</code>, <code>tenant_id</code>, and a single occurrence timestamp instead of <code>updated_at</code>; they are never <code>UPDATE</code>d or <code>DELETE</code>d.</p>
+<h2 id="0-3-enums">0.3 Enums</h2>
+<p>Enum-valued columns are modeled as <strong><code>text</code> + a <code>CHECK</code> constraint</strong> (not native PG <code>ENUM</code>), because Event Model v5.0 §8.2 treats <em>adding an enum value</em> as a non-breaking additive change — and <code>text</code>+<code>CHECK</code> evolves with a cheap constraint swap, whereas <code>ALTER TYPE … ADD VALUE</code> cannot run in a transaction and cannot remove values. Allowed values are listed per column.</p>
+<h2 id="0-4-soft-delete-lifecycle">0.4 Soft delete &amp; lifecycle</h2>
+<ul>
+<li>Programs, Campaigns, Segments, Webhook endpoints, API keys use <strong>soft delete</strong> (<code>archived_at</code> / <code>revoked_at</code> / <code>disabled_at</code> / <code>deleted_at</code> timestamptz, null = live). Hard <code>DELETE</code> is reserved for GDPR erasure tooling only.</li>
+<li>Events, touches, ledgers, decision logs, and audit rows are <strong>append-only and immutable</strong> (Event Model §1.4). Correction = a new compensating row, never an edit.</li>
+</ul>
+<h2 id="0-5-auditability">0.5 Auditability</h2>
+<p>Sensitive rows (clawbacks, reversals, manual approvals/rejections, blocks, trust changes, payout confirms, fraud verdicts, erasure) carry <code>created_by</code> (operator ULID or <code>system</code>), and where a reason is mandated by the contract, a non-null <code>reason</code>. A dedicated <code>audit_log</code> table exists in <code>tenant_db</code> as the platform-wide operator-action trail (API Contract §8.3: <em>"Audit trail: tenant lifetime + 12 months"</em>).</p>
+<h2 id="0-6-reliable-event-emission-transactional-outbox">0.6 Reliable event emission — transactional outbox</h2>
+<p>Every service that <strong>emits domain events</strong> writes them to a local <code>event_outbox</code> table <strong>in the same transaction</strong> as the state change, and a relay publishes them to SNS/SQS at-least-once. This is what makes Failure Model §4 ("an acknowledged event is eventually processed") true without 2-phase commit. The shape is identical everywhere, defined once here and referenced per service:</p>
+<p><strong>Table:</strong> <code>event_outbox</code>
+<strong>Purpose:</strong> Durable buffer of domain events awaiting publication to the bus.
+<strong>Primary Key:</strong> (<code>id</code>) — ULID; this <em>is</em> the event envelope <code>event_id</code>.
+<strong>Columns:</strong>
+- <code>id</code> — text (ULID = <code>event_id</code>), PK.
+- <code>tenant_id</code> — text, not null.
+- <code>event_type</code> — text, not null (e.g. <code>reward.approved</code>).
+- <code>external_id</code> — text, not null. Deterministic dedup key (Event Model §2.1) — for domain events derived from a domain fact (e.g. <code>reward.approved:{reward_id}</code>).
+- <code>schema_version</code> — smallint, not null, default 1.
+- <code>aggregate_type</code> — text (e.g. <code>reward</code>).
+- <code>aggregate_id</code> — text — the row that produced it.
+- <code>payload</code> — jsonb, not null. Full canonical envelope (<code>source</code>, <code>actor</code>, <code>object</code>, <code>attribution_context</code>, <code>properties</code>).
+- <code>status</code> — text, <code>CHECK in ('pending','published','failed')</code>, default <code>pending</code>.
+- <code>attempt_count</code> — smallint, default 0.
+- <code>occurred_at</code> — timestamptz, not null.
+- <code>published_at</code> — timestamptz, null until relayed.
+- <code>created_at</code> — timestamptz, not null.</p>
+<p><strong>Unique Constraints:</strong> (<code>tenant_id</code>, <code>event_type</code>, <code>external_id</code>) — guards double emission on retry/replay.
+<strong>Indexes:</strong> <code>idx_outbox_pending</code> on (<code>status</code>, <code>created_at</code>) <code>WHERE status = 'pending'</code> (partial — the relay's hot path).
+<strong>Notes:</strong> Append-then-mark; rows are retained ~7 days after <code>published</code>, then pruned. The bus is at-least-once and out-of-order (API Contract §6.3), so the <code>external_id</code> uniqueness here plus consumer-side idempotency are what prevent double-processing.</p>
+<h2 id="0-7-request-idempotency-non-ingestion-mutations">0.7 Request idempotency (non-ingestion mutations)</h2>
+<p>API Contract §1 Idempotency: all non-ingestion <code>POST</code>/<code>PATCH</code> require an <code>Idempotency-Key</code> header, deduped <strong>per tenant + per key for 24 h</strong>, returning the <em>original stored response</em> on replay. Each service exposing mutating endpoints owns an <code>idempotency_keys</code> table (defined once, referenced per service):</p>
+<p><strong>Table:</strong> <code>idempotency_keys</code>
+<strong>Primary Key:</strong> (<code>tenant_id</code>, <code>idempotency_key</code>)
+<strong>Columns:</strong> <code>tenant_id</code> text; <code>idempotency_key</code> text; <code>request_fingerprint</code> char(64) (SHA-256 of method+path+body, to detect key reuse with a different body → <code>409</code>); <code>response_status</code> smallint; <code>response_body</code> jsonb; <code>target_resource_id</code> text (the ULID created); <code>created_at</code> timestamptz; <code>expires_at</code> timestamptz (<code>created_at + 24h</code>).
+<strong>Indexes:</strong> <code>idx_idem_expiry</code> on (<code>expires_at</code>) for the TTL sweeper.
+<strong>Notes:</strong> Distinct from ingestion dedup (which is Redis-only, per tenant + <code>external_id</code>, 90-day — see §4). The two regimes never share an identifier (Responsibility Contract §4.1).</p>
+<hr />
+<h1 id="1-reconciliation-decisions-deltas-vs-the-working-doc">1. Reconciliation Decisions (deltas vs the working doc)</h1>
+<p>The working hypothesis was written against the older v2.x/v3.2 docs. These are the substantive changes made to align with v1.3 / v4.0 / v3.0, each flagged inline where it applies.</p>
+<table>
+<thead>
+<tr>
+<th>#</th>
+<th>Revised Decision</th>
+<th>Rationale</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>R1</td>
+<td><strong><code>identity_db</code> → <code>tenant_db</code></strong>; service renamed <code>identity-service</code> → <code>tenant-service</code>. Ory (Kratos/Keto/Hydra) tables are treated as <strong>external but colocated</strong> in the same RDS cluster and are not counted.</td>
+<td>Architecture v5.0 service list names <code>tenant-service</code>.</td>
+</tr>
+<tr>
+<td>R2</td>
+<td><strong>ClickHouse removed entirely</strong> from this document — <code>analytics_db</code> is PostgreSQL-only. The four OLAP tables/views from the working doc are explicitly <strong>out of scope</strong> (separate document).</td>
+<td>Task scope: "Do NOT define ClickHouse schemas."</td>
+</tr>
+<tr>
+<td>R3</td>
+<td><strong><code>referral_code_registry</code> deleted from <code>campaign_db</code>.</strong> <code>referral_db.referral_links</code> is the single authoritative <code>referral_code → campaign/variant/participant</code> map; ingestion resolves codes from a <strong>Redis mirror</strong> of it.</td>
+<td>The Referral Workflow Service generates links (<code>link.generated</code>, Event Model §5.4) and owns the code. A second registry in <code>campaign_db</code> would be a cross-service duplicate with no owner.</td>
+</tr>
+<tr>
+<td>R4</td>
+<td><strong>Reward <code>status</code> = one seven-value enum with a single cross-document mapping</strong>: <code>earned</code> (Pending) → <code>held</code> → <code>approved</code> → <code>processing</code> → <code>paid</code>, branches <code>rejected</code> / <code>reversed</code> — Product Spec §8 / API §3.8 / Event Model §5.2 now agree, and <code>reward.pending_approval</code> was renamed <code>reward.held</code> in the Event Model (2026-10-06). See §8, table <code>rewards</code>. (Superseded: the eight-value superset with a separate <code>pending_approval</code> status.)</td>
+<td>API §3.8 and the Pulse saga (Product §6 step 7: <em>approve | HOLD | reject</em>) require <code>Held</code>; the working doc lacked it.</td>
+</tr>
+<tr>
+<td>R5</td>
+<td><strong><code>trust_tier</code> enum = <code>new / established / trusted / advocate</code></strong> — the Product Spec §7 levels (0–25/26–50/51–75/76–100), which are also the wire enum of Event Model <code>participant.trust_changed</code> since the 2026-10-06 coherence pass. The numeric <code>trust_score</code> remains the source of truth; <code>trust_tier</code> is derived from it and drives the payout-limit / hold / approval-mode lookup. (Superseded: the earlier <code>unknown/new/trusted/ambassador</code> wire enum and the separate <code>trust_band</code> column.)</td>
+<td>Product Spec §7 is authoritative on tier names; API v1.3 had already dropped the invented Ambassador tier, and the Event Model enum was corrected to match. One column, one enum.</td>
+</tr>
+<tr>
+<td>R6</td>
+<td><strong><code>participants</code> stays in <code>referral_db</code></strong> (not split into <code>tenant_db</code>). Participant state/trust <strong>domain events are emitted from <code>referral_db</code></strong> via its outbox.</td>
+<td>Participants are external advocates with <strong>no platform login</strong> (Product §7) — they are a referral-domain aggregate, not an identity/access (operator) aggregate. Trust inputs (success rate, conversion quality) are all local to <code>referral_db</code>. Event Model §5.3's "produced by Identity &amp; Access / Program &amp; Campaign" is noted as a doc imprecision; placement follows the working doc and data locality.</td>
+</tr>
+<tr>
+<td>R7</td>
+<td>Added platform plumbing the working doc omitted: per-service <strong><code>event_outbox</code></strong> (§0.6), <strong><code>idempotency_keys</code></strong> (§0.7), <strong><code>temporal_workflow_id</code> + <code>temporal_run_id</code></strong> on workflow-backed aggregates, <strong><code>schema_version</code></strong> on event-bearing tables, <strong><code>event_outbox</code></strong>-fed inbound-receiver and ledger tables.</td>
+<td>Failure &amp; Observability Model §4 (DLQ/replay/reconciliation) and Temporal durability (Product §6) require these to be persisted.</td>
+</tr>
+<tr>
+<td>R8</td>
+<td><strong>Dual-key ID model</strong> — physical primary keys are now <strong>DB-generated <code>bigint</code> identity</strong> columns (<code>pk</code>); ULIDs (<code>id</code>) are retained <strong>only as the business/domain identifier</strong> (API, events, cross-service refs). This <strong>reverses</strong> the earlier "no DB-generated IDs / no sequences" rule. See §0.1.</td>
+<td>A 26-char string clustered key widens every secondary index and causes insert page-splits; a compact monotonic <code>bigint</code> keeps indexes dense and joins integer-cheap (the latency win), while ULIDs still give portable, opaque, externally-safe identifiers.</td>
+</tr>
+<tr>
+<td>R9</td>
+<td><strong>Enrollment is <code>selective</code> only, platform-wide.</strong> The <code>open</code> value and the §4.2 self-enrollment flow are being <strong>removed from API Contract v1.3</strong> to match Product Spec v4; the data model carries <code>enrollment_model CHECK in ('selective')</code> with no self-enrollment path. Also: <strong>one live Program per tenant</strong> is enforced via <code>UNIQUE(programs.tenant_id) WHERE archived_at IS NULL</code>; and the campaign terminal state is <strong><code>ended</code></strong> (Product §6) while the public webhook stays <strong><code>campaign.completed</code></strong> (API §6, an intentional internal-state vs public-event split).</td>
+<td>Product Spec v5.0 §2 &amp; §7 states selective-enrollment and one-Program-per-client as <em>immutable</em> constraints. With <code>open</code>/self-enrollment struck from the API contract, all specs now agree; the single-value <code>enrollment_model</code> column is retained to document the constraint explicitly and leave room if the model is ever re-expanded.</td>
+</tr>
+<tr>
+<td>R10</td>
+<td><strong>Coherence pass (2026-10-05).</strong> Removed-feature drift purged: <code>auto_rule</code> dropped from <code>participant_enrollments.enrollment_method</code>; <code>candidate</code>/<code>reactivated</code> dropped from <code>participants.lifecycle_state</code> (five operational states); <code>touches.consent_status</code> uses <code>pending</code>, not <code>unknown</code>; <code>participant_payout_methods</code> no longer references the magic-link portal. Naming aligned to Event Model v5.0 / API v5.0: <code>linear</code> (not <code>multi_touch_linear</code>), <code>referral.email.opened</code>/<code>referral.email.clicked</code> concrete touch types, <code>participant.trust_changed</code>, <code>fraud.flagged</code>; <code>reconciliation_runs.job_name</code> carries the ten Failure §4.3 jobs.</td>
+<td>Product Spec v5.0 Appendix A #13/#14, canonical five-state operational axis (API §3.5), consent enum <code>granted/denied/pending</code> (Event Model §2.4), Event Model §4/§5 event names, Failure &amp; Observability v5.0 §4.3. The trust-tier enum (R5) and the <code>pending_approval</code>/<code>held</code> split (R4) were then arbitrated — see R11.</td>
+</tr>
+<tr>
+<td>R11</td>
+<td><strong>Arbitration pass (2026-10-06).</strong> R4 and R5 rewritten: seven reward statuses with <code>held</code> (no <code>pending_approval</code>) and a <code>hold_reason</code> enum; one <code>trust_tier</code> column on the Product Spec enum (<code>trust_band</code> dropped). Roles = <code>owner/operator/viewer/support</code>. Attribution models = the six of Product §10, program defaults <code>first_touch</code> / 90 days. <code>identity_stitching.stitch_method</code> carries the six-key ladder (+ <code>click_id</code>). Product Spec 4.3 (now v5.0) fields added: <code>campaigns.enrollment_trigger</code>, <code>pulses.allowed_enrollment_triggers</code>/<code>default_enrollment_trigger</code>/<code>trigger_discriminator</code>, <code>playbooks.default_enrollment_trigger</code>, <code>participant_enrollments.self_converted_at</code>, <code>segments.on_missing_attribute</code>. analytics_db gains an <code>event_outbox</code>. ai_db gains <code>assistant_conversations</code>; <code>recommendations</code> gains <code>campaign_config</code>, <code>rejected</code>, <code>conversation_id</code>, <code>profile</code>. <code>payouts.fulfillment_method</code> aligned to the Event Model enum.</td>
+<td>Product Spec v5.0 §4/§5/§6/§7/§10; Event Model v5.0 §2.4/§5.2/§5.3/§6.3 (coherence pass); API v5.0 §2/§3.1/§3.2/§3.4/§3.14; Architecture v5.0 §2.7; Creation Assistant Placement v5.0 §3–§4. Total core tables: 54.</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h1 id="2-per-service-overview">2. Per-Service Overview</h1>
+<table>
+<thead>
+<tr>
+<th>#</th>
+<th>Service (Architecture v5.0)</th>
+<th>DB</th>
+<th>Redis?</th>
+<th>Emits domain events?</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>1</td>
+<td><code>tenant-service</code> (Tenant / Identity &amp; Access)</td>
+<td><code>tenant_db</code> (+ colocated Ory)</td>
+<td>Sessions, Keto decision cache</td>
+<td>yes</td>
+</tr>
+<tr>
+<td>2</td>
+<td><code>campaign-service</code> (Program &amp; Campaign)</td>
+<td><code>campaign_db</code></td>
+<td>active-campaign + budget projection</td>
+<td>yes</td>
+</tr>
+<tr>
+<td>3</td>
+<td><code>segmentation-service</code> (Segmentation &amp; Eligibility)</td>
+<td><code>segmentation_db</code></td>
+<td>eligibility + variant-assignment cache</td>
+<td>yes</td>
+</tr>
+<tr>
+<td>4</td>
+<td><code>ingestion-service</code> (Event Ingestion)</td>
+<td><strong>none</strong></td>
+<td>dedup, rate-limit, campaign cache, touch dedup, session map</td>
+<td>publishes tracked events (no outbox — Redis dedup is the guard)</td>
+</tr>
+<tr>
+<td>5</td>
+<td><code>referral-service</code> (Referral Workflow &amp; Attribution)</td>
+<td><code>referral_db</code></td>
+<td>hot referral state, session→invitee map, code mirror, velocity counters</td>
+<td>yes</td>
+</tr>
+<tr>
+<td>6</td>
+<td><code>reward-service</code> (Reward &amp; Payout)</td>
+<td><code>reward_db</code></td>
+<td>cap counters (atomic)</td>
+<td>yes</td>
+</tr>
+<tr>
+<td>7</td>
+<td><code>analytics-service</code> (Analytics)</td>
+<td><code>analytics_db</code> (PostgreSQL only — ClickHouse out of scope, R2)</td>
+<td>real-time KPI counters</td>
+<td>yes (kpi.computed, analytics.goal_reached, analytics.anomaly_detected, health.recomputed)</td>
+</tr>
+<tr>
+<td>8</td>
+<td><code>notification-service</code> (Notification &amp; Webhook)</td>
+<td><code>notification_db</code></td>
+<td>delivery in-flight locks, endpoint health</td>
+<td>yes (delivery domain events optional)</td>
+</tr>
+<tr>
+<td>9</td>
+<td><code>ai-service</code> (AI Intelligence)</td>
+<td><code>ai_db</code></td>
+<td>inference cache, event dedup</td>
+<td>yes (recommendation/fraud signals)</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h1 id="3-tenant-service-tenant-db">3. <code>tenant-service</code> — <code>tenant_db</code></h1>
+<p><strong>Responsibilities (Architecture v5.0):</strong> tenant accounts, operator users &amp; roles, API keys, OAuth2 clients, sessions, company verification, platform audit trail. Wraps Ory Kratos (credentials/sessions), Keto (permissions), Hydra (OAuth2 clients). <strong>Aggregates:</strong> Tenant, User, ApiKey, Verification.
+<strong>Redis:</strong> session lookup cache; short-TTL Keto permission-decision cache.
+<strong>Emits:</strong> <code>tenant.*</code>, operator-driven <code>participant.state_changed</code>/<code>participant.trust_changed</code> only when an operator action triggers them (the trust <em>computation</em> lives in <code>referral_db</code>, R6).</p>
+<blockquote>
+<p><strong>Revised Decision (R1):</strong> <code>identity_db</code> → <code>tenant_db</code>. Ory-managed tables (Kratos identities &amp; credentials, Keto relation tuples, Hydra clients/consent) live in the same RDS cluster but follow Ory's own schema and are excluded from the table count.</p>
+</blockquote>
+<p><strong>Table:</strong> <code>tenants</code>
+<strong>Purpose:</strong> Client account; tenant-isolation root. Exactly one live Program per tenant (Product Spec immutable constraint), enforced by a unique index on <code>programs.tenant_id</code> in <code>campaign_db</code>.
+<strong>Primary Key:</strong> (<code>id</code>)
+<strong>Unique:</strong> (<code>slug</code>) where non-null.
+<strong>Columns:</strong>
+- <code>id</code> text (ULID) PK · <code>name</code> text not null · <code>slug</code> text · <code>plan</code> text <code>CHECK in ('free','starter','growth','scale','enterprise')</code> · <code>status</code> text <code>CHECK in ('active','suspended','closed')</code> not null · <code>verification_status</code> text <code>CHECK in ('unverified','pending','verified','rejected')</code> not null default <code>unverified</code> · <code>data_region</code> text not null default <code>eu-central-1</code> (Product §12 EU-first) · <code>retention_months</code> smallint not null default 24 <code>CHECK between 6 and 36</code> (API §8.3) · <code>metadata</code> jsonb · <code>created_at</code> · <code>updated_at</code> · <code>archived_at</code> timestamptz null.
+<strong>Indexes:</strong> <code>idx_tenants_status</code> (<code>status</code>).
+<strong>Notes:</strong> <code>verification_status</code> is driven by the <code>tenant_verifications</code> workflow below.</p>
+<p><strong>Table:</strong> <code>users</code>
+<strong>Purpose:</strong> Platform operator accounts (admins, marketers, analysts, support). Not participants.
+<strong>Primary Key:</strong> (<code>id</code>)
+<strong>Unique:</strong> (<code>tenant_id</code>, <code>email</code>); (<code>kratos_identity_id</code>).
+<strong>Columns:</strong>
+- <code>id</code> text PK · <code>tenant_id</code> text not null · <code>email</code> text not null · <code>email_hash</code> char(64) · <code>name</code> text · <code>kratos_identity_id</code> text (Ory owns credentials) · <code>status</code> text <code>CHECK in ('invited','active','disabled')</code> not null · <code>last_login_at</code> timestamptz · <code>created_at</code> · <code>updated_at</code> · <code>disabled_at</code> timestamptz null.
+<strong>Indexes:</strong> <code>idx_users_tenant</code> (<code>tenant_id</code>).
+<strong>Notes:</strong> Authorization is <strong>not</strong> stored here — it lives in Ory Keto relation tuples (API §2). <code>roles</code>/<code>user_roles</code> below are a <strong>projection</strong> for dashboard display and bulk assignment, not the authoritative permission store.</p>
+<p><strong>Table:</strong> <code>roles</code>
+<strong>Purpose:</strong> Human-readable role catalog mapped to Keto group memberships.
+<strong>Primary Key:</strong> (<code>id</code>)
+<strong>Unique:</strong> (<code>tenant_id</code>, <code>name</code>) — <code>tenant_id</code> null for the four platform-standard roles.
+<strong>Columns:</strong> <code>id</code> · <code>tenant_id</code> text null · <code>name</code> text <code>CHECK in ('owner','operator','viewer','support')</code> or custom (Owner / Campaign Manager / Analyst / Support Agent — API §2) · <code>description</code> text · <code>keto_relations</code> jsonb (the relation set this role grants, e.g. <code>["campaigns:write","rewards:approve"]</code>) · <code>created_at</code> · <code>updated_at</code>.</p>
+<p><strong>Table:</strong> <code>user_roles</code>
+<strong>Purpose:</strong> Operator→role assignment projection (authoritative copy is Keto).
+<strong>Primary Key:</strong> (<code>user_id</code>, <code>role_id</code>) — both <strong>local FK</strong> to <code>users.id</code> / <code>roles.id</code>.
+<strong>Columns:</strong> <code>user_id</code> · <code>role_id</code> · <code>tenant_id</code> · <code>assigned_at</code> timestamptz · <code>assigned_by</code> text (operator ULID).
+<strong>Indexes:</strong> <code>idx_user_roles_tenant</code> (<code>tenant_id</code>).</p>
+<p><strong>Table:</strong> <code>api_keys</code>
+<strong>Purpose:</strong> Ingestion &amp; SDK API keys (API §2 — these <em>cannot</em> reach config endpoints).
+<strong>Primary Key:</strong> (<code>id</code>)
+<strong>Unique:</strong> (<code>key_hash</code>); (<code>tenant_id</code>, <code>key_prefix</code>).
+<strong>Columns:</strong>
+- <code>id</code> text PK · <code>tenant_id</code> text not null · <code>key_hash</code> text not null (bcrypt/argon2 of full key) · <code>key_prefix</code> char(4) not null (last 4 chars — the <em>only</em> part ever shown in logs/dashboards, API §8.3) · <code>key_type</code> text <code>CHECK in ('secret','publishable')</code> not null (prefixes <code>rai_live_</code> / <code>rai_pub_</code>) · <code>label</code> text · <code>keto_scope_note</code> text · <code>created_by</code> text not null · <code>last_used_at</code> timestamptz · <code>created_at</code> · <code>revoked_at</code> timestamptz null.
+<strong>Indexes:</strong> <code>idx_api_keys_tenant_active</code> (<code>tenant_id</code>) <code>WHERE revoked_at IS NULL</code>.
+<strong>Notes:</strong> Full key returned <strong>once</strong> at creation, never stored in plaintext. <code>key_type</code> gates trust at ingestion (Event Model §3.3: publishable = touch-only, <code>low</code> trust).</p>
+<p><strong>Table:</strong> <code>oauth2_clients</code>
+<strong>Purpose:</strong> OAuth2 client registrations (dashboard SPA, machine clients). Mirrors/augments Ory Hydra.
+<strong>Primary Key:</strong> (<code>id</code>)
+<strong>Unique:</strong> (<code>client_id</code>).
+<strong>Columns:</strong> <code>id</code> · <code>tenant_id</code> · <code>client_id</code> text not null · <code>client_secret_hash</code> text · <code>redirect_uris</code> jsonb (array) · <code>grant_types</code> jsonb (array) · <code>client_type</code> text <code>CHECK in ('dashboard_spa','client_credentials')</code> · <code>created_at</code> · <code>updated_at</code> · <code>revoked_at</code>.</p>
+<p><strong>Table:</strong> <code>sessions</code>
+<strong>Purpose:</strong> Active dashboard session index (Ory Kratos authoritative; this is a fast local lookup + revocation list).
+<strong>Primary Key:</strong> (<code>id</code>)
+<strong>Columns:</strong> <code>id</code> · <code>user_id</code> (<strong>local FK</strong>) · <code>tenant_id</code> · <code>token_hash</code> char(64) not null · <code>ip_hash</code> char(64) · <code>user_agent</code> text · <code>expires_at</code> timestamptz not null · <code>created_at</code> · <code>revoked_at</code>.
+<strong>Indexes:</strong> <code>idx_sessions_token</code> (<code>token_hash</code>); <code>idx_sessions_expiry</code> (<code>expires_at</code>).
+<strong>Notes:</strong> Mirrored to Redis (§3 Redis) for sub-ms validation; Postgres is the durable/recoverable copy.</p>
+<p><strong>Table:</strong> <code>tenant_verifications</code>
+<strong>Purpose:</strong> Company (KYB) verification workflow backing <code>tenants.verification_status</code>.
+<strong>Primary Key:</strong> (<code>id</code>)
+<strong>Columns:</strong> <code>id</code> · <code>tenant_id</code> not null · <code>verification_type</code> text <code>CHECK in ('company','tax','payout_provider')</code> · <code>status</code> text <code>CHECK in ('pending','in_review','verified','rejected')</code> not null · <code>evidence</code> jsonb (uploaded-doc references, never raw docs) · <code>temporal_workflow_id</code> text · <code>temporal_run_id</code> text · <code>reviewed_by</code> text · <code>reviewed_at</code> timestamptz · <code>reason</code> text · <code>created_at</code> · <code>updated_at</code>.
+<strong>Indexes:</strong> <code>idx_verif_tenant</code> (<code>tenant_id</code>, <code>status</code>).
+<strong>Notes:</strong> <code>temporal_workflow_id</code>/<code>run_id</code> added (R7) so a crashed verification workflow is resumable.</p>
+<p><strong>Table:</strong> <code>audit_log</code> <em>(append-only)</em>
+<strong>Purpose:</strong> Platform-wide operator-action trail (API §8.3: tenant lifetime + 12 months, dashboard-only).
+<strong>Primary Key:</strong> (<code>id</code>)
+<strong>Columns:</strong> <code>id</code> · <code>tenant_id</code> not null · <code>actor_user_id</code> text not null · <code>action</code> text not null (e.g. <code>api_key.revoked</code>, <code>user.role_changed</code>) · <code>target_type</code> text · <code>target_id</code> text · <code>reason</code> text · <code>request_id</code> text (the <code>X-Request-Id</code>, ties to logs) · <code>ip_hash</code> char(64) · <code>before</code> jsonb · <code>after</code> jsonb · <code>occurred_at</code> timestamptz not null.
+<strong>Indexes:</strong> <code>idx_audit_tenant_time</code> (<code>tenant_id</code>, <code>occurred_at</code> desc); <code>idx_audit_target</code> (<code>tenant_id</code>, <code>target_type</code>, <code>target_id</code>).</p>
+<p><strong>Plus:</strong> <code>event_outbox</code> (§0.6), <code>idempotency_keys</code> (§0.7).</p>
+<h2 id="tenant-service-redis"><code>tenant-service</code> Redis</h2>
+<table>
+<thead>
+<tr>
+<th>Key pattern</th>
+<th>Value</th>
+<th>TTL</th>
+<th>Authoritative store</th>
+<th>Recompute if lost?</th>
+<th>Concurrency</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>session:{tenant_id}:{token_hash}</code></td>
+<td>JSON <code>{user_id, exp, roles}</code></td>
+<td>= session exp</td>
+<td><code>sessions</code> + Ory Kratos</td>
+<td>Yes (rehydrate from Postgres/Kratos)</td>
+<td>plain <code>SET</code></td>
+</tr>
+<tr>
+<td><code>keto:decision:{user_id}:{relation}:{object}</code></td>
+<td><code>"allow"</code>/<code>"deny"</code></td>
+<td>30–60 s</td>
+<td>Ory Keto</td>
+<td>Yes (re-query Keto)</td>
+<td>plain <code>SET</code>; short TTL bounds staleness after a role change</td>
+</tr>
+<tr>
+<td><code>apikey:{key_prefix}:{key_hash8}</code></td>
+<td>JSON <code>{tenant_id,key_type,key_id,revoked}</code></td>
+<td>300 s</td>
+<td><code>api_keys</code></td>
+<td>Yes</td>
+<td>invalidated on revoke</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h1 id="4-campaign-service-campaign-db">4. <code>campaign-service</code> — <code>campaign_db</code></h1>
+<p><strong>Responsibilities (Architecture v5.0):</strong> program lifecycle, campaign CRUD + state machine, variant configuration, pulses, playbooks. <strong>Aggregates:</strong> Program, Campaign, Variant, Pulse, Playbook.
+<strong>Redis:</strong> active-campaign flag for the ingestion guard; budget-spend projection counter.
+<strong>Emits:</strong> <code>campaign.activated/paused/completed/budget_threshold</code>, <code>program.*</code>, <code>variant.*</code>.</p>
+<blockquote>
+<p><strong>Revised Decision (R3):</strong> <code>referral_code_registry</code> is removed from this DB. Code resolution is owned by <code>referral_db.referral_links</code> and served to ingestion via a Redis mirror.</p>
+</blockquote>
+<p><strong>Table:</strong> <code>programs</code>
+<strong>Purpose:</strong> Top-level container; carries default attribution policy. Soft-delete cascades to campaigns (API §3.1).
+<strong>Primary Key:</strong> (<code>id</code>)
+<strong>Unique:</strong> (<code>tenant_id</code>) <code>WHERE archived_at IS NULL</code> — <strong>one live Program per tenant</strong> (Product Spec immutable constraint: one Program per client).
+<strong>Columns:</strong>
+- <code>id</code> · <code>tenant_id</code> not null · <code>name</code> text not null · <code>description</code> text · <code>status</code> text <code>CHECK in ('active','archived')</code> not null default <code>active</code> · <code>default_attribution_model</code> text <code>CHECK in ('first_touch','last_touch','linear','time_decay','position_based','ai_weighted')</code> not null default <code>first_touch</code> (MVP: first/last touch; the other four are V2 — Product §10) · <code>default_attribution_window_days</code> smallint not null default 90 (click→conversion, Product §10) · <code>health_score</code> smallint null (0–100, computed by <code>analytics-service</code>, projected here for the <code>GET /programs/{id}/health</code> read) · <code>health_computed_at</code> timestamptz · <code>metadata</code> jsonb · <code>created_at</code> · <code>updated_at</code> · <code>archived_at</code>.
+<strong>Indexes:</strong> <code>idx_programs_tenant</code> (<code>tenant_id</code>) <code>WHERE archived_at IS NULL</code>.</p>
+<p><strong>Table:</strong> <code>campaigns</code>
+<strong>Purpose:</strong> Time-bound execution unit; selects an immutable Pulse, holds shared budget, runs the state machine (Product §6, API §3.2).
+<strong>Primary Key:</strong> (<code>id</code>)
+<strong>Unique:</strong> (<code>tenant_id</code>, <code>slug</code>).
+<strong>Columns:</strong>
+- <code>id</code> · <code>program_id</code> (<strong>local FK</strong>) · <code>tenant_id</code> not null · <code>name</code> text not null · <code>slug</code> text not null · <code>pulse_type</code> text <code>CHECK in ('signup','conversion','reactivation','cross_sell','renewal','feedback','newsletter','switch_up','product_education')</code> not null <strong>(immutable after create)</strong> · <code>pulse_id</code> text (<strong>local FK</strong> → <code>pulses</code>) · <code>status</code> text <code>CHECK in ('draft','scheduled','active','paused','ended','archived')</code> not null default <code>draft</code> · <code>enrollment_model</code> text <code>CHECK in ('selective')</code> not null default <code>selective</code> · <code>enrollment_trigger</code> text <code>CHECK in ('signup','on_self_conversion','manual')</code> not null (must be in <code>pulses.allowed_enrollment_triggers</code>; defaults to the pulse's default — Product §6, API §3.2) · <code>starts_at</code> timestamptz · <code>ends_at</code> timestamptz · <code>attribution_window_days</code> smallint · <code>budget_amount</code> bigint (minor units) · <code>budget_currency</code> char(3) · <code>spent_amount</code> bigint not null default 0 (<strong>cached projection</strong> — authoritative spend = Σ rewards in <code>reward_db</code>; updated on <code>reward.*</code> events and reconciled by the Reward-to-Referral job, Failure §4.3) · <code>auto_paused_at</code> timestamptz null (set when <code>spent_amount ≥ budget_amount</code>) · <code>metadata</code> jsonb · <code>created_at</code> · <code>updated_at</code> · <code>archived_at</code>.
+<strong>Indexes:</strong> <code>idx_campaigns_program</code> (<code>program_id</code>); <code>idx_campaigns_tenant_status</code> (<code>tenant_id</code>, <code>status</code>).
+<strong>Notes:</strong> State machine transitions are guarded in app; each emits the matching <code>campaign.*</code> domain event via outbox. <code>spent_amount</code>/<code>auto_paused_at</code> back the budget auto-pause (API §3.2) and the ingestion guard's "campaign paused" branch. The terminal state is <strong><code>ended</code></strong> to match the Product Spec v5.0 §6 vocabulary (Draft → Scheduled → Active → Paused → Ended → Archived); the corresponding <strong>public webhook event remains <code>campaign.completed</code></strong> (API §6) — an intentional internal-state vs public-event split, like rewards. <code>enrollment_model</code> is <strong><code>selective</code> only</strong>: Product Spec v5.0 §2/§7 makes selective enrollment an immutable constraint (no self-enrollment widget path), and the <code>open</code> value plus §4.2 self-enrollment flow are being removed from the API contract — so selective-only is consistent across all specs (see R9).</p>
+<p><strong>Table:</strong> <code>variants</code>
+<strong>Purpose:</strong> Binds Segment (who) + Reward Config (what) + messaging + allocation weight. The core config unit (API §3.3).
+<strong>Primary Key:</strong> (<code>id</code>)
+<strong>Unique:</strong> partial unique <code>(campaign_id) WHERE is_default</code> → at most one default variant per campaign.
+<strong>Columns:</strong>
+- <code>id</code> · <code>campaign_id</code> (<strong>local FK</strong>) · <code>tenant_id</code> not null · <code>name</code> text · <code>is_default</code> boolean not null default false · <code>priority</code> smallint not null default 0 (resolution order) · <code>allocation_weight</code> smallint not null default 100 · <code>segment_id</code> text null (reference into <code>segmentation_db</code>) · <code>inline_segment_rules</code> jsonb null · <code>reward_config</code> jsonb not null (Reward Configuration schema, API §3.3 — reward_type, amount/percentage, caps, recipient split, cooling period) · <code>messaging</code> jsonb · <code>eligibility_rules</code> jsonb (array of rule refs/inline) · <code>approval_mode</code> text <code>CHECK in ('auto','manual','auto_below_threshold','ai_assisted')</code> not null · <code>enabled</code> boolean not null default true · <code>created_at</code> · <code>updated_at</code>.
+<strong>Indexes:</strong> <code>idx_variants_campaign</code> (<code>campaign_id</code>, <code>priority</code>).
+<strong>Notes:</strong> Variant is resolved <strong>at enrollment</strong> (Product §6, Responsibility §3) — the resolved <code>variant_id</code> is then stored on the participant's enrollment and link in <code>referral_db</code>. <code>reward_config</code> is read by <code>reward-service</code> at reward calculation; it is referenced by value (no cross-DB FK).</p>
+<p><strong>Table:</strong> <code>pulses</code>
+<strong>Purpose:</strong> Reusable Temporal workflow template definition for a pulse type.
+<strong>Primary Key:</strong> (<code>id</code>)
+<strong>Columns:</strong> <code>id</code> · <code>tenant_id</code> null (platform-default pulses allowed) · <code>name</code> text · <code>pulse_type</code> text (same CHECK set as <code>campaigns.pulse_type</code>) · <code>trigger_event_type</code> text (the tracked event bound to the pulse, e.g. <code>payment.completed</code> — Product §6 trigger binding) · <code>trigger_discriminator</code> jsonb null (e.g. <code>{"is_reactivation": true}</code>, <code>{"event_name": "milestone.completed"}</code>) · <code>allowed_enrollment_triggers</code> jsonb not null (subset of <code>signup</code> / <code>on_self_conversion</code> / <code>manual</code>) · <code>default_enrollment_trigger</code> text <code>CHECK in ('signup','on_self_conversion','manual')</code> not null · <code>default_window_days</code> smallint · <code>workflow_definition</code> jsonb (saga step config — fraud gate, eligibility checkpoints, wait timer, reward formula, hold) · <code>temporal_task_queue</code> text · <code>created_at</code> · <code>updated_at</code>.
+<strong>Notes:</strong> <code>workflow_definition</code> encodes the shared Pulse skeleton (Product §6) with the per-pulse trigger/formula swap.</p>
+<p><strong>Table:</strong> <code>playbooks</code>
+<strong>Purpose:</strong> Vertical-specific curated bundles (platform-level, not tenant-scoped). Read-only catalog; instantiated into a draft Campaign (API §3.11).
+<strong>Primary Key:</strong> (<code>id</code>)
+<strong>Columns:</strong> <code>id</code> · <code>tenant_id</code> null (platform catalog) · <code>name</code> text not null · <code>vertical</code> text <code>CHECK in ('b2b_saas','agency','creator','ai_tool','ecommerce','fintech')</code> · <code>default_pulse_type</code> text · <code>default_enrollment_trigger</code> text null (preset within the pulse's allowed set, Product §6) · <code>recommended_pulses</code> jsonb · <code>default_reward_config</code> jsonb · <code>default_messaging</code> jsonb · <code>default_segment_strategy</code> jsonb · <code>is_active</code> boolean not null default true · <code>created_at</code> · <code>updated_at</code>.
+<strong>Notes:</strong> Playbooks are curated by the team, not AI (Product §6); the AI only <em>recommends</em> which playbook fits.</p>
+<p><strong>Plus:</strong> <code>event_outbox</code> (§0.6), <code>idempotency_keys</code> (§0.7).</p>
+<h2 id="campaign-service-redis"><code>campaign-service</code> Redis</h2>
+<table>
+<thead>
+<tr>
+<th>Key pattern</th>
+<th>Value</th>
+<th>TTL</th>
+<th>Authoritative</th>
+<th>Recompute if lost?</th>
+<th>Concurrency</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>campaign:active:{tenant_id}:{campaign_id}</code></td>
+<td>JSON <code>{status,starts_at,ends_at,enrollment_model}</code></td>
+<td>none (explicit invalidation on <code>campaign.*</code>)</td>
+<td><code>campaigns</code></td>
+<td>Yes</td>
+<td><code>SET</code> on state change</td>
+</tr>
+<tr>
+<td><code>campaign:spend:{campaign_id}</code></td>
+<td>integer (minor units)</td>
+<td>none</td>
+<td><code>reward_db</code> (Σ rewards) → projected to <code>campaigns.spent_amount</code></td>
+<td>Yes (recompute from reward ledger)</td>
+<td><code>INCRBY</code> on reward events; budget auto-pause reads this</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h1 id="5-segmentation-service-segmentation-db">5. <code>segmentation-service</code> — <code>segmentation_db</code></h1>
+<p><strong>Responsibilities (Architecture v5.0):</strong> segment definitions and evaluation, eligibility rules and the five-checkpoint Eligibility Chain, optional AI-generated segment insights. Segmentation is the <strong>sole allocation mechanism</strong> (API §3.4) — experiments are random segments, not a separate framework. <strong>Aggregates:</strong> Segment, EligibilityRule.
+<strong>Redis:</strong> real-time eligibility-result cache; deterministic random-segment / variant-assignment cache.
+<strong>Emits:</strong> <code>segment.*</code> (out of this finalization's scope but on the bus); a translated <code>conversion.recorded</code> when a <code>custom.recorded</code> event matches a running Pulse trigger (Event Model §4.10).</p>
+<p><strong>Table:</strong> <code>segments</code>
+<strong>Purpose:</strong> Reusable audience definition. Standalone; referenced by variants across campaigns.
+<strong>Primary Key:</strong> (<code>id</code>)
+<strong>Unique:</strong> (<code>tenant_id</code>, <code>name</code>).
+<strong>Columns:</strong>
+- <code>id</code> · <code>tenant_id</code> not null · <code>name</code> text not null · <code>type</code> text <code>CHECK in ('rule_based','behavioral','temporal','composite','random','ai_generated')</code> not null · <code>rules</code> jsonb not null (attribute/AND-OR/temporal predicate tree) · <code>on_missing_attribute</code> text <code>CHECK in ('default','block')</code> not null default <code>default</code> (Product §5 Targeting vs Gating: a missing attribute is a non-match that falls through to the Default Variant unless the segment is a compliance gate) · <code>hash_seed</code> text null (deterministic seed for <code>random</code> segments — <code>SHA256(actor_id + seed) mod 100</code>, Product §5) · <code>estimated_size</code> integer null (cached audience estimate for <code>GET /segments/{id}/estimate</code>) · <code>estimated_at</code> timestamptz · <code>source</code> text <code>CHECK in ('operator','ai_generated')</code> not null default <code>operator</code> · <code>metadata</code> jsonb · <code>created_at</code> · <code>updated_at</code> · <code>deleted_at</code> timestamptz null (soft delete; blocked while in use, API §3.4).
+<strong>Indexes:</strong> <code>idx_segments_tenant</code> (<code>tenant_id</code>) <code>WHERE deleted_at IS NULL</code>; <code>idx_segments_type</code> (<code>tenant_id</code>, <code>type</code>).</p>
+<p><strong>Table:</strong> <code>segment_members</code>
+<strong>Purpose:</strong> Materialized membership for non-real-time (behavioral/AI/random-precomputed) segments.
+<strong>Primary Key:</strong> (<code>segment_id</code>, <code>participant_id</code>) — <code>segment_id</code> is <strong>local FK</strong>.
+<strong>Columns:</strong> <code>segment_id</code> · <code>participant_id</code> (reference into <code>referral_db</code>) · <code>tenant_id</code> not null · <code>added_at</code> timestamptz not null · <code>removed_at</code> timestamptz null · <code>source</code> text <code>CHECK in ('rule_evaluation','ai_suggestion','manual')</code> not null.
+<strong>Indexes:</strong> <code>idx_segmember_participant</code> (<code>tenant_id</code>, <code>participant_id</code>).
+<strong>Notes:</strong> Set semantics — re-adding a present member is a no-op (idempotent). <code>removed_at</code> keeps history rather than deleting (tombstone), so membership churn is auditable.</p>
+<p><strong>Table:</strong> <code>eligibility_rules</code>
+<strong>Purpose:</strong> Reusable rule definitions evaluated at the five Eligibility-Chain checkpoints.
+<strong>Primary Key:</strong> (<code>id</code>)
+<strong>Unique:</strong> (<code>tenant_id</code>, <code>name</code>).
+<strong>Columns:</strong> <code>id</code> · <code>tenant_id</code> not null · <code>name</code> text not null · <code>checkpoint</code> text <code>CHECK in ('campaign_entry','referral_creation','conversion_validation','reward_approval','payout')</code> not null · <code>rule_definition</code> jsonb not null · <code>enabled</code> boolean not null default true · <code>priority</code> smallint · <code>created_at</code> · <code>updated_at</code>.
+<strong>Indexes:</strong> <code>idx_elig_rules_checkpoint</code> (<code>tenant_id</code>, <code>checkpoint</code>).</p>
+<p><strong>Table:</strong> <code>eligibility_evaluations</code> <em>(append-only)</em>
+<strong>Purpose:</strong> Audit log of every eligibility decision (feeds <code>referral.qualified.rules_evaluated</code>, audit, and AI).
+<strong>Primary Key:</strong> (<code>id</code>)
+<strong>Columns:</strong> <code>id</code> · <code>tenant_id</code> not null · <code>participant_id</code> · <code>referral_id</code> null · <code>campaign_id</code> · <code>variant_id</code> null · <code>checkpoint</code> text (same CHECK set) · <code>result</code> text <code>CHECK in ('pass','fail')</code> not null · <code>failed_rule_id</code> text null · <code>rules_evaluated</code> jsonb (per-rule trace: name, pass/fail, detail) · <code>evaluated_at</code> timestamptz not null.
+<strong>Indexes:</strong> <code>idx_elig_eval_referral</code> (<code>tenant_id</code>, <code>referral_id</code>); <code>idx_elig_eval_participant_time</code> (<code>tenant_id</code>, <code>participant_id</code>, <code>evaluated_at</code> desc).
+<strong>Notes:</strong> Hot results cached in Redis 5 min; this table is the durable, replayable record.</p>
+<p><strong>Table:</strong> <code>segment_insights</code> <em>(optional, AI-fed)</em>
+<strong>Purpose:</strong> AI-detected segment patterns surfaced as read-only <code>ai_generated</code> candidates (Product AI map).
+<strong>Primary Key:</strong> (<code>id</code>)
+<strong>Columns:</strong> <code>id</code> · <code>tenant_id</code> not null · <code>segment_id</code> null (set if materialized into a segment) · <code>ai_decision_log_id</code> text (reference into <code>ai_db</code> for explainability) · <code>pattern</code> jsonb · <code>confidence</code> numeric(4,3) · <code>status</code> text <code>CHECK in ('suggested','accepted','dismissed')</code> not null default <code>suggested</code> · <code>created_at</code> · <code>updated_at</code>.
+<strong>Notes:</strong> Included because <code>type='ai_generated'</code> segments exist; kept minimal — the reasoning chain lives in <code>ai_db</code>, not duplicated here.</p>
+<p><strong>Plus:</strong> <code>event_outbox</code> (§0.6), <code>idempotency_keys</code> (§0.7).</p>
+<h2 id="segmentation-service-redis"><code>segmentation-service</code> Redis</h2>
+<table>
+<thead>
+<tr>
+<th>Key pattern</th>
+<th>Value</th>
+<th>TTL</th>
+<th>Authoritative</th>
+<th>Recompute?</th>
+<th>Concurrency</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>elig:{tenant_id}:{participant_id}:{campaign_id}:{checkpoint}</code></td>
+<td><code>pass</code>/<code>fail</code>+<code>failed_rule_id</code></td>
+<td>300 s</td>
+<td><code>eligibility_evaluations</code></td>
+<td>Yes</td>
+<td><code>SET</code></td>
+</tr>
+<tr>
+<td><code>varassign:{campaign_id}:{participant_id}</code></td>
+<td><code>variant_id</code></td>
+<td>none (sticky)</td>
+<td><code>referral_db.participant_enrollments</code></td>
+<td>Yes</td>
+<td><code>SETNX</code> (sticky assignment must not flip)</td>
+</tr>
+<tr>
+<td><code>randseg:{segment_id}:{actor_id}</code></td>
+<td>bucket 0–99</td>
+<td>none (deterministic)</td>
+<td>recomputable from <code>hash_seed</code></td>
+<td>Yes (pure function)</td>
+<td>none — deterministic</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h1 id="6-ingestion-service-no-rds-redis-only">6. <code>ingestion-service</code> — <strong>no RDS (Redis only)</strong></h1>
+<p><strong>Responsibilities (Architecture v5.0, API §5):</strong> highest-throughput stateless gateway. Validate → dedup → Business-Rules Guard → enrich → emit to SNS/SQS → return <code>202</code>. Owns <strong>no durable relational state</strong>. Latency SLA &lt; 100 ms (p99).
+<strong>Why no outbox:</strong> the durable record of an accepted event is the <strong>bus</strong> (SNS/SQS, at-least-once) plus the Redis dedup key; the immutable event store is populated downstream. The dedup key is the idempotency guard that an outbox would otherwise provide.</p>
+<blockquote>
+<p>All four keyspaces are <strong>Redis-authoritative for in-flight control only</strong>. None hold business truth: if Redis is lost, the worst case is a window of re-accepted duplicates (absorbed by downstream <code>event_id</code>/<code>external_id</code> idempotency) and reset rate-limit counters — never lost or corrupted business data.</p>
+</blockquote>
+<h2 id="ingestion-service-redis"><code>ingestion-service</code> Redis</h2>
+<table>
+<thead>
+<tr>
+<th>Key pattern</th>
+<th>Value</th>
+<th>TTL</th>
+<th>Purpose</th>
+<th>If lost</th>
+<th>Concurrency</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>dedup:{tenant_id}:{external_id}</code></td>
+<td><code>"1"</code></td>
+<td>90 d (API §1, §5.3)</td>
+<td><strong>Primary dedup</strong> — same business event never recorded twice</td>
+<td>Possible re-accept; downstream dedup on <code>event_id</code>/<code>external_id</code> catches it</td>
+<td><code>SET NX</code></td>
+</tr>
+<tr>
+<td><code>touchdedup:{referral_code}:{session_id}:{bucket_5m}</code></td>
+<td><code>"1"</code></td>
+<td>~6 min</td>
+<td><strong>Secondary touch dedup</strong> for degraded SDK conditions (Responsibility §4.1)</td>
+<td>Brief duplicate touches; attribution tolerant</td>
+<td><code>SET NX</code></td>
+</tr>
+<tr>
+<td><code>ratelimit:{api_key_prefix}:{window}</code></td>
+<td>integer counter</td>
+<td>= window</td>
+<td>Per-key rate limits (API §8.1: 5k/10k/etc per min)</td>
+<td>Limits reset (fail-open within burst)</td>
+<td><code>INCR</code> + <code>EXPIRE</code></td>
+</tr>
+<tr>
+<td><code>ratelimit:code:{referral_code}:{hour}</code></td>
+<td>integer</td>
+<td>1 h</td>
+<td>Business limit: 100 touches/code/hour (API §8.1)</td>
+<td>resets</td>
+<td><code>INCR</code></td>
+</tr>
+<tr>
+<td><code>ratelimit:ip:{ip_hash}:{min}</code></td>
+<td>integer</td>
+<td>1 min</td>
+<td>Business limit: 50 touches/min/IP (API §8.1)</td>
+<td>resets</td>
+<td><code>INCR</code></td>
+</tr>
+<tr>
+<td><code>campaign:active:{tenant_id}:{campaign_id}</code></td>
+<td>JSON flag</td>
+<td>none (invalidated on <code>campaign.*</code>)</td>
+<td>Business-Rules Guard campaign-state check (API §5.5)</td>
+<td>Re-fetch from <code>campaign-service</code></td>
+<td>mirror</td>
+</tr>
+<tr>
+<td><code>code:{referral_code}</code></td>
+<td>JSON <code>{campaign_id,variant_id,participant_id,program_id,status,expires_at}</code></td>
+<td>none (invalidated on <code>link.*</code>)</td>
+<td><strong>Code resolution mirror of <code>referral_db.referral_links</code></strong> (R3) — resolves code → campaign/variant at ingestion</td>
+<td>Re-fetch from <code>referral-service</code></td>
+<td>mirror</td>
+</tr>
+<tr>
+<td><code>session:{tenant_id}:{session_id}</code></td>
+<td><code>anonymous_id</code> / <code>invitee_id</code></td>
+<td>= attribution window</td>
+<td>Session map seeding stitching (handed to <code>referral-service</code>)</td>
+<td>Re-derive on next identified event</td>
+<td><code>SET</code></td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h1 id="7-referral-service-referral-db">7. <code>referral-service</code> — <code>referral_db</code></h1>
+<p><strong>Responsibilities (Architecture v5.0):</strong> touch capture, link/code management, referral Temporal workflows, identity stitching, <strong>attribution computed on the critical path</strong> (conversion → attribution → reward), participant lifecycle &amp; trust. <strong>Aggregates:</strong> Participant, Invitee, ReferralLink, Referral, Touch, AttributionRecord.
+<strong>Redis:</strong> hot referral-state cache, session→invitee map, code mirror source, velocity counters for fraud.
+<strong>Emits:</strong> <code>referral.*</code>, <code>link.*</code>, <code>participant.state_changed</code>, <code>participant.trust_changed</code> (R6), and the <code>attribution.computed</code> signal consumed by <code>reward-service</code>.</p>
+<blockquote>
+<p><strong>Revised Decision (R3 + R6):</strong> <code>referral_links</code> is the authoritative <code>referral_code</code> registry (mirrored to Redis for ingestion). <code>participants</code> and trust computation live here, not in <code>tenant_db</code>, because participants are login-less referral-domain actors and all trust inputs are local.</p>
+</blockquote>
+<p><strong>Table:</strong> <code>participants</code>
+<strong>Purpose:</strong> Participant (external advocate) profile + trust state.
+<strong>Primary Key:</strong> (<code>id</code>)
+<strong>Unique:</strong> (<code>tenant_id</code>, <code>email</code>) where email non-null; (<code>tenant_id</code>, <code>external_id</code>) where external_id non-null.
+<strong>Columns:</strong>
+- <code>id</code> · <code>tenant_id</code> not null · <code>email</code> text null · <code>email_hash</code> char(64) null (SHA-256; cross-event linking key) · <code>name</code> text null · <code>external_id</code> text null (client's identifier; idempotency anchor for enrollment, API §3.5) · <code>lifecycle_state</code> text <code>CHECK in ('active','dormant','flagged','suspended','banned')</code> not null · <code>trust_tier</code> text <code>CHECK in ('new','established','trusted','advocate')</code> not null default <code>new</code> <strong>(derived from <code>trust_score</code> bands 0–25/26–50/51–75/76–100 → drives payout limit, hold and approval mode, Product §7; wire enum of <code>participant.trust_changed</code>, R5)</strong> · <code>trust_score</code> smallint not null default 0 <code>CHECK between 0 and 100</code> <strong>(source of truth, R5)</strong> · <code>tags</code> jsonb · <code>attributes</code> jsonb (segment-eval inputs: plan, country, account_age) · <code>verification_status</code> text <code>CHECK in ('none','email','phone','id')</code> not null default <code>none</code> · <code>created_at</code> · <code>updated_at</code> · <code>blocked_at</code> timestamptz null · <code>metadata</code> jsonb.
+<strong>Indexes:</strong> <code>idx_participants_tenant_email_hash</code> (<code>tenant_id</code>, <code>email_hash</code>); <code>idx_participants_tenant_external</code> (<code>tenant_id</code>, <code>external_id</code>); <code>idx_participants_trust</code> (<code>tenant_id</code>, <code>trust_tier</code>, <code>updated_at</code> desc) (frequent fraud/AI queries on tier + recent activity).
+<strong>Notes:</strong> Trust score = weighted sum of Account Age 15% / Success Rate 25% / Conversion Quality 20% / Fraud Incidents 25% / Verification 15% (Product §7). <code>lifecycle_state</code> and <code>trust_tier</code> move on <strong>independent axes</strong> (Product §7) — a <code>trusted</code> participant can be <code>flagged</code>.</p>
+<p><strong>Table:</strong> <code>participant_trust_events</code> <em>(append-only — added, R7)</em>
+<strong>Purpose:</strong> History of every trust recompute, for audit, the <code>participant.trust_changed</code> event, and AI training.
+<strong>Primary Key:</strong> (<code>id</code>)
+<strong>Columns:</strong> <code>id</code> · <code>tenant_id</code> not null · <code>participant_id</code> not null · <code>previous_score</code> smallint · <code>new_score</code> smallint not null · <code>previous_tier</code> text · <code>new_tier</code> text · <code>contributing_factors</code> jsonb (flat factor weights) · <code>trigger</code> text <code>CHECK in ('scheduled_recompute','conversion','fraud_signal','manual_override','verification')</code> · <code>changed_by</code> text · <code>occurred_at</code> timestamptz not null.
+<strong>Indexes:</strong> <code>idx_trustev_participant_time</code> (<code>tenant_id</code>, <code>participant_id</code>, <code>occurred_at</code> desc).</p>
+<p><strong>Table:</strong> <code>invitees</code>
+<strong>Purpose:</strong> Invitee profile; progressive identification (anonymous → email → external id).
+<strong>Primary Key:</strong> (<code>id</code>)
+<strong>Unique:</strong> (<code>tenant_id</code>, <code>email</code>) where non-null; (<code>tenant_id</code>, <code>external_id</code>) where non-null.
+<strong>Columns:</strong> <code>id</code> · <code>tenant_id</code> not null · <code>email</code> text null · <code>email_hash</code> char(64) null · <code>external_id</code> text null · <code>anonymous_id</code> text null · <code>first_seen_at</code> timestamptz · <code>identified_at</code> timestamptz null · <code>created_at</code> · <code>updated_at</code> · <code>metadata</code> jsonb.
+<strong>Indexes:</strong> <code>idx_invitees_email_hash</code> (<code>tenant_id</code>, <code>email_hash</code>); <code>idx_invitees_anon</code> (<code>tenant_id</code>, <code>anonymous_id</code>).</p>
+<p><strong>Table:</strong> <code>referral_links</code> <em>(authoritative code registry — R3)</em>
+<strong>Purpose:</strong> Generated referral links; the <code>referral_code → campaign/variant/participant</code> map mirrored to Redis for ingestion.
+<strong>Primary Key:</strong> (<code>id</code>)
+<strong>Unique:</strong> (<code>tenant_id</code>, <code>referral_code</code>).
+<strong>Columns:</strong>
+- <code>id</code> text PK (= <code>link_id</code> in <code>link.generated</code>) · <code>tenant_id</code> not null · <code>referral_code</code> text not null · <code>participant_id</code> not null (<strong>local FK</strong>) · <code>campaign_id</code> · <code>variant_id</code> · <code>program_id</code> · <code>short_url</code> text · <code>destination_url</code> text · <code>custom_slug</code> text null · <code>cookie_ttl_days</code> smallint · <code>channel</code> text <code>CHECK in ('link','email','widget','api')</code> · <code>generation_source</code> text <code>CHECK in ('enrollment','api_explicit','sdk_widget','bulk_generation')</code> not null <strong>(Event Model v5.0 <code>link.generated</code>; <code>sdk_widget</code> = lazy generation for an already-enrolled participant on widget render — not self-enrollment)</strong> · <code>status</code> text <code>CHECK in ('active','expired','revoked')</code> not null default <code>active</code> · <code>total_clicks</code> integer not null default 0 · <code>total_referrals_created</code> integer not null default 0 · <code>created_at</code> · <code>updated_at</code> · <code>expires_at</code> timestamptz null · <code>revoked_at</code> timestamptz null · <code>revocation_reason</code> text null · <code>revocation_source</code> text null.
+<strong>Indexes:</strong> <code>idx_links_code</code> (<code>tenant_id</code>, <code>referral_code</code>) unique; <code>idx_links_participant</code> (<code>tenant_id</code>, <code>participant_id</code>); <code>idx_links_campaign</code> (<code>campaign_id</code>).
+<strong>Notes:</strong> Variant resolved at <strong>generation</strong> time, not click time (Product §6). A blocked participant's links resolve to <code>410</code> (API §8.2.1) — enforced by <code>status</code>/participant <code>lifecycle_state</code>. Every insert/state change emits <code>link.generated</code>/<code>link.expired</code>/<code>link.revoked</code> and updates the Redis <code>code:{referral_code}</code> mirror.</p>
+<p><strong>Table:</strong> <code>participant_enrollments</code>
+<strong>Purpose:</strong> Which campaigns a participant is enrolled in + their resolved variant.
+<strong>Primary Key:</strong> (<code>participant_id</code>, <code>campaign_id</code>) — <code>participant_id</code> <strong>local FK</strong>.
+<strong>Columns:</strong> <code>participant_id</code> · <code>campaign_id</code> · <code>variant_id</code> not null (resolved at enrollment) · <code>tenant_id</code> not null · <code>enrollment_method</code> text <code>CHECK in ('api_single','api_bulk','csv_import','crm_connector')</code> not null · <code>link_id</code> text null (<strong>local FK</strong> → <code>referral_links</code>) · <code>enrolled_at</code> timestamptz not null (clock 1, Product §7) · <code>self_converted_at</code> timestamptz null (clock 2 — set when the participant's own qualifying conversion is recorded; emits <code>participant.self_converted</code>, Event Model §5.3) · <code>created_by</code> text.
+<strong>Indexes:</strong> <code>idx_enroll_campaign</code> (<code>tenant_id</code>, <code>campaign_id</code>).
+<strong>Notes:</strong> Backs the Enrollment-to-Link reconciliation job (Failure §4.3): every <code>active</code> participant must have ≥1 link.</p>
+<p><strong>Table:</strong> <code>referrals</code>
+<strong>Purpose:</strong> Referral workflow instance (one Temporal workflow each). State machine <code>created→qualified→converted→rewarded</code> + branches <code>rejected</code>/<code>expired</code> (Event Model §5.1, Product Spec §2). <strong>Reward reversal is <em>not</em> a referral state</strong> — it is modeled at the reward level as <code>reward.reversed</code>; a referral whose reward is later reversed stays in <code>rewarded</code>.
+<strong>Primary Key:</strong> (<code>id</code>)
+<strong>Unique:</strong> (<code>tenant_id</code>, <code>external_id</code>) where external_id non-null.
+<strong>Columns:</strong>
+- <code>id</code> text PK · <code>tenant_id</code> not null · <code>referral_code</code> text not null · <code>participant_id</code> not null (participant) · <code>invitee_id</code> text null (resolved by stitching) · <code>campaign_id</code> · <code>variant_id</code> · <code>program_id</code> · <code>status</code> text <code>CHECK in ('created','qualified','converted','rewarded','completed','rejected','expired')</code> not null default <code>created</code> · <code>creation_source</code> text <code>CHECK in ('touch_event','api_explicit','provider_receiver')</code> not null · <code>temporal_workflow_id</code> text not null · <code>temporal_run_id</code> text · <code>attribution_window_opens_at</code> timestamptz · <code>attribution_window_closes_at</code> timestamptz · <code>first_touch_at</code> timestamptz · <code>last_touch_at</code> timestamptz · <code>touch_count</code> integer not null default 0 · <code>fraud_score</code> numeric(4,3) null (0.000–1.000, latest) · <code>conversion_event_id</code> text null · <code>converted_at</code> timestamptz null · <code>rejection_reason</code> text null · <code>rejection_source</code> text null · <code>created_at</code> · <code>updated_at</code> · <code>external_id</code> text null · <code>metadata</code> jsonb.
+<strong>Indexes:</strong> <code>idx_referrals_code</code> (<code>tenant_id</code>, <code>referral_code</code>); <code>idx_referrals_participant</code> (<code>tenant_id</code>, <code>participant_id</code>); <code>idx_referrals_status</code> (<code>tenant_id</code>, <code>status</code>); <code>idx_referrals_window</code> (<code>attribution_window_closes_at</code>) <code>WHERE status IN ('created','qualified')</code> (expiry sweep); <code>idx_referrals_wf</code> (<code>temporal_workflow_id</code>).
+<strong>Notes:</strong> <code>temporal_workflow_id</code>/<code>run_id</code> (R7) make a stuck workflow inspectable (Failure §5.1) and a crashed worker resumable (Product §6). Idempotency on workflow side-effects keyed by <code>event_id</code>.</p>
+<p><strong>Table:</strong> <code>touches</code> <em>(append-only)</em>
+<strong>Purpose:</strong> Every tracked touch (the six concrete <code>touch.*</code> types: the five tracked touch <code>event_name</code>s of Event Model §4.1–§4.5 plus <code>referral.widget.viewed</code>). Primary attribution input.
+<strong>Primary Key:</strong> (<code>id</code>) — <code>id</code> = platform <code>event_id</code> (ULID).
+<strong>Unique:</strong> (<code>tenant_id</code>, <code>external_id</code>) — domain dedup mirror of the ingestion guard.
+<strong>Columns:</strong>
+- <code>id</code> text PK · <code>tenant_id</code> not null · <code>external_id</code> text not null · <code>schema_version</code> smallint not null default 1 · <code>concrete_type</code> text <code>CHECK in ('touch.referral_link_clicked','touch.referral_link_shared','touch.referral_page_viewed','touch.referral_email_opened','touch.referral_email_clicked','touch.referral_widget_viewed')</code> not null · <code>referral_id</code> text null · <code>referral_code</code> text not null · <code>participant_id</code> text null · <code>session_id</code> text null · <code>anonymous_id</code> text null · <code>click_id</code> text null · <code>channel</code> text · <code>trust_level</code> text <code>CHECK in ('high','low')</code> not null · <code>api_key_prefix</code> char(4) null (envelope <code>source.api_key_prefix</code> — sender identification, Failure §5.4) · <code>sdk_version</code> text null (envelope <code>source.sdk_version</code> — build identification, Failure §5.4) · <code>ip_hash</code> char(64) null (server-derived) · <code>user_agent</code> text null (server-derived) · <code>device_type</code> text null · <code>geo_country</code> char(2) null · <code>geo_region</code> text null · <code>consent_status</code> text <code>CHECK in ('granted','denied','pending')</code> not null · <code>touch_sequence_number</code> integer null · <code>utm_source</code> text null · <code>utm_medium</code> text null · <code>utm_campaign</code> text null · <code>utm_content</code> text null · <code>utm_term</code> text null · <code>properties</code> jsonb (flat, type-specific: <code>link_url</code>, <code>share_channel</code>, <code>page_url</code>, <code>invitation_id</code>, <code>link_id</code>, etc.) · <code>occurred_at</code> timestamptz not null · <code>ingested_at</code> timestamptz not null.
+<strong>Indexes:</strong> <code>idx_touches_referral_seq</code> (<code>tenant_id</code>, <code>referral_id</code>, <code>touch_sequence_number</code>); <code>idx_touches_code_time</code> (<code>tenant_id</code>, <code>referral_code</code>, <code>occurred_at</code>); <code>idx_touches_session</code> (<code>tenant_id</code>, <code>session_id</code>); <code>idx_touches_utm</code> (<code>tenant_id</code>, <code>utm_source</code>, <code>utm_medium</code>) (channel analytics).
+<strong>Notes:</strong> UTMs are <strong>first-class indexed columns</strong>, not inside <code>properties</code> (API §5.2). Append-only; <code>touch_sequence_number</code> enables AI sequence models (Event Model §8.4). For <code>low</code>-trust touches, <code>ip_hash</code>/<code>user_agent</code> are server-derived and the body values ignored.</p>
+<p><strong>Table:</strong> <code>identity_stitching</code> <em>(append-only)</em>
+<strong>Purpose:</strong> Session/anonymous → invitee linkage records. Stitching updates <code>referrals.invitee_id</code>; it never edits prior events (Event Model §7.3).
+<strong>Primary Key:</strong> (<code>id</code>)
+<strong>Columns:</strong> <code>id</code> · <code>tenant_id</code> not null · <code>session_id</code> text null · <code>anonymous_id</code> text null · <code>invitee_id</code> text null · <code>referral_code</code> text null · <code>stitch_method</code> text <code>CHECK in ('code_based','linked_identity_based','click_id_based','session_based','email_based')</code> not null (the six-key ladder, Product §9/§10: keys 2–3 = linked identity) · <code>click_id</code> text null · <code>confidence</code> text <code>CHECK in ('high','medium','low')</code> · <code>stitched_at</code> timestamptz not null.
+<strong>Indexes:</strong> <code>idx_stitch_session</code> (<code>tenant_id</code>, <code>session_id</code>); <code>idx_stitch_invitee</code> (<code>tenant_id</code>, <code>invitee_id</code>).</p>
+<p><strong>Table:</strong> <code>attribution_records</code> <em>(immutable)</em>
+<strong>Purpose:</strong> The frozen attribution result per referral conversion. Computed as a Temporal activity on the critical path before reward creation.
+<strong>Primary Key:</strong> (<code>id</code>)
+<strong>Unique:</strong> (<code>tenant_id</code>, <code>referral_id</code>, <code>conversion_event_id</code>).
+<strong>Columns:</strong> <code>id</code> · <code>tenant_id</code> not null · <code>referral_id</code> not null (<strong>local FK</strong>) · <code>conversion_event_id</code> text not null · <code>model_used</code> text <code>CHECK in ('first_touch','last_touch','linear','time_decay','position_based','ai_weighted')</code> not null <strong>(the six models of Product §10; MVP uses first/last touch)</strong> · <code>window_days</code> smallint · <code>total_attributed_revenue</code> bigint (minor units) · <code>currency</code> char(3) null · <code>revenue_mrr</code> bigint null · <code>revenue_arr</code> bigint null · <code>confidence</code> numeric(4,3) null (AI-weighted only) · <code>ai_decision_log_id</code> text null (reference into <code>ai_db</code> when <code>ai_weighted</code>) · <code>computed_at</code> timestamptz not null.
+<strong>Indexes:</strong> <code>idx_attr_referral</code> (<code>tenant_id</code>, <code>referral_id</code>).
+<strong>Notes:</strong> Immutable — a re-attribution (replay) writes a new row (new <code>id</code>); the Failure §4.2 "rewards that would change" report diffs old vs new before any reward mutation.</p>
+<p><strong>Table:</strong> <code>attribution_touches</code> <em>(immutable)</em>
+<strong>Purpose:</strong> Per-touch credit allocation for multi-touch models.
+<strong>Primary Key:</strong> (<code>id</code>)
+<strong>Columns:</strong> <code>id</code> · <code>attribution_record_id</code> (<strong>local FK</strong>) · <code>tenant_id</code> · <code>touch_id</code> (<strong>local FK</strong> → <code>touches</code>) · <code>participant_id</code> · <code>channel</code> text · <code>credit_weight</code> numeric(5,4) <code>CHECK between 0 and 1</code> · <code>occurred_at</code> timestamptz.
+<strong>Indexes:</strong> <code>idx_attr_touches_record</code> (<code>attribution_record_id</code>).</p>
+<p><strong>Table:</strong> <code>experiment_results</code>
+<strong>Purpose:</strong> Variant A/B statistical comparison (sequential testing, α=0.05, power 0.80, early stopping).
+<strong>Primary Key:</strong> (<code>id</code>)
+<strong>Columns:</strong> <code>id</code> · <code>tenant_id</code> not null · <code>campaign_id</code> · <code>variant_a_id</code> · <code>variant_b_id</code> · <code>metric</code> text · <code>p_value</code> numeric · <code>significance_level</code> numeric · <code>power</code> numeric · <code>sample_size_a</code> integer · <code>sample_size_b</code> integer · <code>conclusion</code> text <code>CHECK in ('significant','not_significant','insufficient_data')</code> · <code>computed_at</code> timestamptz.
+<strong>Notes:</strong> Colocated here (R per working doc) because variant resolution + referral data are local; experiments are random segments, not a separate framework (API §3.4).</p>
+<p><strong>Plus:</strong> <code>event_outbox</code> (§0.6), <code>idempotency_keys</code> (§0.7).</p>
+<h2 id="referral-service-redis"><code>referral-service</code> Redis</h2>
+<table>
+<thead>
+<tr>
+<th>Key pattern</th>
+<th>Value</th>
+<th>TTL</th>
+<th>Authoritative</th>
+<th>Recompute?</th>
+<th>Concurrency</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>referral:state:{referral_id}</code></td>
+<td>JSON snapshot</td>
+<td>optional</td>
+<td><code>referrals</code></td>
+<td>Yes</td>
+<td><code>SET</code> on transition</td>
+</tr>
+<tr>
+<td><code>session:{tenant_id}:{session_id}</code></td>
+<td><code>invitee_id</code>/<code>anonymous_id</code></td>
+<td>= attribution window</td>
+<td><code>identity_stitching</code> / <code>invitees</code></td>
+<td>Yes</td>
+<td><code>SET</code></td>
+</tr>
+<tr>
+<td><code>code:{referral_code}</code> (source)</td>
+<td>JSON resolution</td>
+<td>none (invalidated on <code>link.*</code>)</td>
+<td><code>referral_links</code></td>
+<td>Yes</td>
+<td>mirror → ingestion</td>
+</tr>
+<tr>
+<td><code>velocity:{participant_id}:{window}</code></td>
+<td>integer</td>
+<td>window</td>
+<td>derived from <code>touches</code>/<code>referrals</code></td>
+<td>Yes</td>
+<td><code>INCR</code> — fraud velocity signal</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h1 id="8-reward-service-reward-db">8. <code>reward-service</code> — <code>reward_db</code></h1>
+<p><strong>Responsibilities (Architecture v5.0):</strong> reward calculation from variant <code>reward_config</code>, the reward state machine, approval (auto/manual/AI-assisted), caps &amp; trust ceilings, clawbacks/reversals, the two-step payout batch process, payout-method capture, tax thresholds. <strong>Aggregates:</strong> Reward, CapLedger, Clawback, Payout, PayoutItem, Ledger.
+<strong>Redis:</strong> atomic cap counters (the one place strict atomicity is required).
+<strong>Emits:</strong> <code>reward.earned/held/approved/rejected/paid/reversed</code>, <code>payout.created/confirmed/completed/failed</code>.</p>
+<blockquote>
+<p><strong>Revised Decision (R4):</strong> reward <code>status</code> is one superset enum with an explicit cross-doc mapping, and a first-class <code>held</code> state is added.</p>
+</blockquote>
+<p><strong>Reward status mapping</strong></p>
+<table>
+<thead>
+<tr>
+<th><code>rewards.status</code> (stored)</th>
+<th>Event Model §5.2 bus event</th>
+<th>Product §8 / API §6.1</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>earned</code></td>
+<td><code>reward.earned</code> (public webhook: <code>reward.earned</code>)</td>
+<td>Pending</td>
+</tr>
+<tr>
+<td><code>held</code></td>
+<td><code>reward.held</code></td>
+<td><strong>Held</strong></td>
+</tr>
+<tr>
+<td><code>approved</code></td>
+<td><code>reward.approved</code></td>
+<td>Approved</td>
+</tr>
+<tr>
+<td><code>processing</code></td>
+<td>(processing state; dispatch in flight)</td>
+<td>Processing</td>
+</tr>
+<tr>
+<td><code>paid</code></td>
+<td><code>reward.paid</code></td>
+<td>Paid</td>
+</tr>
+<tr>
+<td><code>rejected</code></td>
+<td><code>reward.rejected</code></td>
+<td>Rejected</td>
+</tr>
+<tr>
+<td><code>reversed</code></td>
+<td><code>reward.reversed</code></td>
+<td>Reversed</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Table:</strong> <code>rewards</code>
+<strong>Purpose:</strong> Reward instance per referral conversion.
+<strong>Primary Key:</strong> (<code>id</code>)
+<strong>Unique:</strong> (<code>tenant_id</code>, <code>referral_id</code>, <code>recipient_type</code>, <code>triggering_conversion_event_id</code>) — idempotency: one reward per (referral, recipient, conversion).
+<strong>Columns:</strong>
+- <code>id</code> · <code>tenant_id</code> not null · <code>referral_id</code> · <code>participant_id</code> · <code>campaign_id</code> · <code>variant_id</code> · <code>recipient_type</code> text <code>CHECK in ('participant','invitee')</code> not null · <code>recipient_id</code> text not null · <code>reward_type</code> text <code>CHECK in ('cash','gift_card','account_credit','feature_unlock','extended_trial','discount_code','custom')</code> not null <strong>(what the reward <em>is</em> — Product §8 Reward Types)</strong> · <code>reward_structure</code> text <code>CHECK in ('fixed','percentage','tiered','recurring','milestone','capped')</code> not null <strong>(how it is <em>calculated</em> — Product §8 Reward Structures)</strong> · <code>amount</code> bigint not null default 0 (minor units; 0 for non-monetary) · <code>currency</code> char(3) null (required when amount&gt;0) · <code>status</code> text (CHECK = the 7 mapped values above) not null default <code>earned</code> · <code>approval_mode</code> text <code>CHECK in ('auto','manual','auto_below_threshold','ai_assisted')</code> not null · <code>approved_by_type</code> text <code>CHECK in ('system_auto','ai_assisted','operator')</code> null · <code>approved_by_id</code> text null · <code>approval_reason</code> text null · <code>fraud_score_at_submission</code> numeric(4,3) null · <code>fraud_score_at_approval</code> numeric(4,3) null <strong>(labeled training data, Event Model §8.4)</strong> · <code>hold_reason</code> text <code>CHECK in ('fraud_review_band','over_trust_ceiling','participant_flagged','manual_mode','ai_hold','self_conversion_gate')</code> null (Event Model §5.2 <code>reward.held</code>) · <code>cooling_period_ends_at</code> timestamptz null · <code>hold_until</code> timestamptz null (trust-tier hold period) · <code>triggering_conversion_event_id</code> text not null · <code>temporal_workflow_id</code> text · <code>paid_at</code> timestamptz null · <code>created_at</code> · <code>updated_at</code> · <code>metadata</code> jsonb.
+<strong>Indexes:</strong> <code>idx_rewards_referral</code> (<code>tenant_id</code>, <code>referral_id</code>); <code>idx_rewards_recipient</code> (<code>tenant_id</code>, <code>recipient_id</code>, <code>status</code>); <code>idx_rewards_status</code> (<code>tenant_id</code>, <code>status</code>); <code>idx_rewards_hold</code> (<code>hold_until</code>) <code>WHERE status='held'</code> (release sweep).
+<strong>Notes:</strong> <code>held</code> fires when fraud score is in the 0.3–0.7 band or amount exceeds the trust ceiling (API §3.8, Product §6 step 7). Every transition emits the matching <code>reward.*</code> event via outbox.</p>
+<p><strong>Table:</strong> <code>cap_ledgers</code>
+<strong>Purpose:</strong> Per-referrer / per-campaign / per-program reward caps (count and amount, per period).
+<strong>Primary Key:</strong> (<code>id</code>)
+<strong>Unique:</strong> (<code>tenant_id</code>, <code>cap_type</code>, <code>scope_id</code>, <code>cap_period</code>, <code>period_start</code>).
+<strong>Columns:</strong> <code>id</code> · <code>tenant_id</code> not null · <code>cap_type</code> text <code>CHECK in ('per_referrer','per_campaign','per_program')</code> not null · <code>scope_id</code> text not null (participant/campaign/program ULID) · <code>participant_id</code> text null · <code>campaign_id</code> text null · <code>program_id</code> text null · <code>cap_period</code> text <code>CHECK in ('day','week','month','campaign_lifetime')</code> not null · <code>period_start</code> date not null · <code>current_count</code> integer not null default 0 · <code>max_count</code> integer null · <code>current_amount</code> bigint not null default 0 · <code>max_amount</code> bigint null · <code>currency</code> char(3) null · <code>updated_at</code>.
+<strong>Indexes:</strong> unique constraint above doubles as the lookup index.
+<strong>Notes:</strong> Enforced atomically. The <strong>authoritative</strong> counter is this row, guarded by a PostgreSQL <strong>advisory lock</strong> (<code>pg_advisory_xact_lock(hashtext(key))</code>) during increment; Redis (<code>cap:*</code>) is a hot read cache only and is recomputable from this table.</p>
+<p><strong>Table:</strong> <code>reward_ledger_entries</code> <em>(append-only — added, R7)</em>
+<strong>Purpose:</strong> Immutable money ledger per participant — earned / paid / reversed. Backs the monthly payout-limit carry-over (Product §7: "withdraws €500 now; rest carries over") and the saga's <strong>negative ledger entry</strong> on late reversal (Product §6).
+<strong>Primary Key:</strong> (<code>id</code>)
+<strong>Columns:</strong> <code>id</code> · <code>tenant_id</code> not null · <code>participant_id</code> not null · <code>reward_id</code> text null · <code>payout_item_id</code> text null · <code>entry_type</code> text <code>CHECK in ('reward_earned','payout_paid','clawback_negative','adjustment')</code> not null · <code>amount</code> bigint not null (signed; negative for clawback) · <code>currency</code> char(3) not null · <code>balance_after</code> bigint null (optional running balance) · <code>reason</code> text null · <code>occurred_at</code> timestamptz not null.
+<strong>Indexes:</strong> <code>idx_ledger_participant_time</code> (<code>tenant_id</code>, <code>participant_id</code>, <code>occurred_at</code> desc).</p>
+<p><strong>Table:</strong> <code>clawbacks</code> <em>(append-only)</em>
+<strong>Purpose:</strong> Reversal audit records (reason mandatory, API §3.8). "Clawback" is the internal term for the recovery action; the corresponding reward transition is <code>status='reversed'</code> and the bus event is <code>reward.reversed</code> (Event Model §5.2) — there is no <code>reward.clawed_back</code> event.
+<strong>Primary Key:</strong> (<code>id</code>)
+<strong>Columns:</strong> <code>id</code> · <code>tenant_id</code> not null · <code>reward_id</code> (<strong>local FK</strong>) · <code>referral_id</code> · <code>clawback_reason</code> text <strong>not null</strong> · <code>clawback_amount</code> bigint not null · <code>currency</code> char(3) not null · <code>initiated_by_type</code> text <code>CHECK in ('system_auto','operator')</code> not null · <code>initiated_by_id</code> text null · <code>trigger</code> text <code>CHECK in ('refund','chargeback','fraud_post_payout','manual')</code> · <code>ledger_entry_id</code> text null (<strong>local FK</strong> → <code>reward_ledger_entries</code>, the negative entry) · <code>created_at</code>.
+<strong>Indexes:</strong> <code>idx_clawbacks_reward</code> (<code>tenant_id</code>, <code>reward_id</code>).</p>
+<p><strong>Table:</strong> <code>participant_payout_methods</code>
+<strong>Purpose:</strong> Payout destination captured in the SDK widget or on the payout provider's hosted page (Product §8, API §3.5/§8.2) — never on a platform-hosted page. <strong>No raw bank data</strong> (Product §8 — providers hold it).
+<strong>Primary Key:</strong> (<code>id</code>)
+<strong>Unique:</strong> partial unique <code>(tenant_id, participant_id) WHERE is_default</code>.
+<strong>Columns:</strong> <code>id</code> · <code>tenant_id</code> not null · <code>participant_id</code> not null · <code>method_type</code> text <code>CHECK in ('paypal','wise','sepa','gift_card','credit')</code> not null · <code>provider_reference_id</code> text null (token/ref at provider — never a bank number) · <code>paypal_email_hash</code> char(64) null · <code>is_default</code> boolean not null default true · <code>status</code> text <code>CHECK in ('pending','verified','disabled')</code> not null · <code>created_at</code> · <code>updated_at</code>.
+<strong>Notes:</strong> Stores only method type, provider reference, and (for PayPal) email hash.</p>
+<p><strong>Table:</strong> <code>participant_tax_records</code> <em>(added — Product §8)</em>
+<strong>Purpose:</strong> Tax-threshold tracking (USA $600 W-9/1099; EU none).
+<strong>Primary Key:</strong> (<code>id</code>)
+<strong>Unique:</strong> (<code>tenant_id</code>, <code>participant_id</code>, <code>tax_year</code>).
+<strong>Columns:</strong> <code>id</code> · <code>tenant_id</code> not null · <code>participant_id</code> not null · <code>tax_year</code> smallint not null · <code>jurisdiction</code> char(2) · <code>ytd_reward_amount</code> bigint not null default 0 · <code>currency</code> char(3) · <code>w9_status</code> text <code>CHECK in ('not_required','requested','received')</code> not null default <code>not_required</code> · <code>form_1099_filed</code> boolean not null default false · <code>backup_withholding</code> boolean not null default false · <code>updated_at</code>.</p>
+<p><strong>Table:</strong> <code>payouts</code>
+<strong>Purpose:</strong> Payout batch (two-step: create → confirm → processing → completed/partially_failed/failed).
+<strong>Primary Key:</strong> (<code>id</code>)
+<strong>Columns:</strong> <code>id</code> · <code>tenant_id</code> not null · <code>status</code> text <code>CHECK in ('pending','processing','completed','partially_failed','failed')</code> not null default <code>pending</code> · <code>fulfillment_method</code> text <code>CHECK in ('paypal','wise','sepa','gift_card','credit','discount_code','manual')</code> not null (Event Model §5.2 <code>reward.paid.fulfillment_method</code>) · <code>total_amount</code> bigint not null · <code>currency</code> char(3) not null · <code>item_count</code> integer not null · <code>description</code> text · <code>confirmed_by</code> text null · <code>confirmed_at</code> timestamptz null · <code>completed_at</code> timestamptz null · <code>total_disbursed</code> bigint null · <code>temporal_workflow_id</code> text · <code>created_at</code> · <code>metadata</code> jsonb.
+<strong>Indexes:</strong> <code>idx_payouts_status</code> (<code>tenant_id</code>, <code>status</code>).
+<strong>Notes:</strong> Confirm is a separate Keto <code>payouts:confirm</code> action (API §3.10). Items for blocked participants are excluded from new batches (API §8.2.1).</p>
+<p><strong>Table:</strong> <code>payout_items</code>
+<strong>Purpose:</strong> Line items linking rewards to a batch.
+<strong>Primary Key:</strong> (<code>id</code>)
+<strong>Unique:</strong> (<code>payout_id</code>, <code>reward_id</code>).
+<strong>Columns:</strong> <code>id</code> · <code>payout_id</code> (<strong>local FK</strong>) · <code>tenant_id</code> · <code>participant_id</code> · <code>reward_id</code> (<strong>local FK</strong> logical to <code>rewards</code>) · <code>amount</code> bigint · <code>currency</code> char(3) · <code>status</code> text <code>CHECK in ('pending','completed','failed')</code> not null · <code>external_transfer_id</code> text null · <code>failure_reason</code> text null · <code>created_at</code> · <code>updated_at</code>.
+<strong>Indexes:</strong> <code>idx_payout_items_payout</code> (<code>payout_id</code>); <code>idx_payout_items_reward</code> (<code>tenant_id</code>, <code>reward_id</code>).</p>
+<p><strong>Plus:</strong> <code>event_outbox</code> (§0.6), <code>idempotency_keys</code> (§0.7).</p>
+<h2 id="reward-service-redis"><code>reward-service</code> Redis</h2>
+<table>
+<thead>
+<tr>
+<th>Key pattern</th>
+<th>Value</th>
+<th>TTL</th>
+<th>Authoritative</th>
+<th>Recompute?</th>
+<th>Concurrency</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>cap:{cap_type}:{scope_id}:{period}:{period_start}</code></td>
+<td>JSON <code>{count,amount}</code></td>
+<td>end of period</td>
+<td><code>cap_ledgers</code></td>
+<td>Yes</td>
+<td><strong>read cache only</strong>; authoritative increment uses PG advisory lock + <code>cap_ledgers</code></td>
+</tr>
+<tr>
+<td><code>payoutlimit:{participant_id}:{month}</code></td>
+<td>integer (disbursed minor units)</td>
+<td>end of month</td>
+<td><code>reward_ledger_entries</code></td>
+<td>Yes</td>
+<td><code>INCRBY</code> on payout; gated by <code>trust_tier</code> limit</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h1 id="9-analytics-service-analytics-db-postgresql-only">9. <code>analytics-service</code> — <code>analytics_db</code> (PostgreSQL only)</h1>
+<p><strong>Responsibilities (Architecture v5.0):</strong> dashboard KPIs, funnel/revenue/leaderboard reads, <strong>Program Health Score</strong> computation, periodic snapshots. Eventual consistency (5–30 s) is acceptable. <strong>Attribution is <em>not</em> here</strong> — it is on the critical path in <code>referral-service</code> (§7).
+<strong>Redis:</strong> real-time KPI counters bridging the gap before snapshots refresh.</p>
+<blockquote>
+<p><strong>Revised Decision (R2):</strong> all ClickHouse tables/views are <strong>out of scope</strong> for this document. Heavy OLAP (the wide <code>events</code> table and materialized views) is deferred to a separate ClickHouse specification. <code>analytics_db</code> holds only the small PostgreSQL projection tables below.</p>
+</blockquote>
+<p><strong>Table:</strong> <code>kpi_snapshots</code> <em>(append-only)</em>
+<strong>Purpose:</strong> Periodic KPI computations for dashboards (pure reporting projection).
+<strong>Primary Key:</strong> (<code>id</code>)
+<strong>Unique:</strong> (<code>tenant_id</code>, <code>scope_type</code>, <code>scope_id</code>, <code>kpi_type</code>, <code>period_start</code>, <code>period_end</code>).
+<strong>Columns:</strong> <code>id</code> · <code>tenant_id</code> not null · <code>scope_type</code> text <code>CHECK in ('program','campaign','variant','participant','tenant')</code> · <code>scope_id</code> text · <code>program_id</code> text null · <code>campaign_id</code> text null · <code>variant_id</code> text null · <code>kpi_type</code> text (e.g. <code>conversion_rate</code>, <code>revenue_attributed</code>, <code>clicks</code>, <code>rewards_paid</code>) · <code>value</code> numeric · <code>currency</code> char(3) null · <code>period_start</code> timestamptz · <code>period_end</code> timestamptz · <code>computed_at</code> timestamptz not null.
+<strong>Indexes:</strong> <code>idx_kpi_scope_time</code> (<code>tenant_id</code>, <code>scope_type</code>, <code>scope_id</code>, <code>period_end</code> desc).</p>
+<p><strong>Table:</strong> <code>health_scores</code> <em>(append-only)</em>
+<strong>Purpose:</strong> Program Health Score (Product §11) — nightly 0–100 composite + four weighted sub-scores. Projected to <code>campaign_db.programs.health_score</code> for the <code>GET /programs/{id}/health</code> read.
+<strong>Primary Key:</strong> (<code>id</code>)
+<strong>Unique:</strong> (<code>tenant_id</code>, <code>program_id</code>, <code>computed_for_date</code>).
+<strong>Columns:</strong> <code>id</code> · <code>tenant_id</code> not null · <code>program_id</code> not null · <code>composite_score</code> smallint <code>CHECK between 0 and 100</code> · <code>funnel_score</code> smallint (weight 30%) · <code>revenue_score</code> smallint (35%) · <code>fraud_pressure_score</code> smallint (20%) · <code>saturation_score</code> smallint (15%) · <code>deltas</code> jsonb (week-over-week sub-score changes feeding the Insights Panel) · <code>computed_for_date</code> date not null · <code>computed_at</code> timestamptz not null.
+<strong>Indexes:</strong> <code>idx_health_program_date</code> (<code>tenant_id</code>, <code>program_id</code>, <code>computed_for_date</code> desc).
+<strong>Notes:</strong> Decomposition and weights match Product §11 exactly. Anomalies/deltas here are read by <code>ai-service</code> to generate Insights recommendations.</p>
+<p><strong>Table:</strong> <code>reconciliation_runs</code> <em>(added — Failure §4.3)</em>
+<strong>Purpose:</strong> Outcomes of the periodic cross-source reconciliation jobs (orphan conversions, orphan payouts, count drift, etc.).
+<strong>Primary Key:</strong> (<code>id</code>)
+<strong>Columns:</strong> <code>id</code> · <code>tenant_id</code> text null (some jobs are platform-wide) · <code>job_name</code> text <code>CHECK in ('conversion_to_attribution','reward_to_referral','billing_to_platform_revenue','payout_to_reward','participant_vs_trust','webhook_delivery','revenue_sanity','enrollment_to_link','event_count','fraud_score_coverage')</code> not null <strong>(the ten jobs of Failure §4.3)</strong> · <code>window_start</code> timestamptz · <code>window_end</code> timestamptz · <code>checked_count</code> integer · <code>mismatch_count</code> integer · <code>mismatches</code> jsonb (sample of flagged ids + cause) · <code>action_taken</code> text (e.g. <code>replay_triggered</code>, <code>flagged_only</code>) · <code>status</code> text <code>CHECK in ('ok','mismatch','error')</code> · <code>ran_at</code> timestamptz not null.
+<strong>Indexes:</strong> <code>idx_recon_job_time</code> (<code>job_name</code>, <code>ran_at</code> desc).
+<strong>Notes:</strong> This is the persisted, queryable evidence the on-call debugging checklists (Failure §5) reference ("recent reconciliation-job outputs").</p>
+<p><strong>Plus:</strong> <code>event_outbox</code> (§0.6) — analytics emits <code>kpi.computed</code>, <code>analytics.goal_reached</code>, <code>analytics.anomaly_detected</code> and <code>health.recomputed</code> (Architecture §2.7, Product §11), consumed by Campaign (auto-complete) and AI (off-cycle optimization). <code>idempotency_keys</code> only if it exposes mutating endpoints (<code>POST /v1/analytics/query</code> is read-only; typically none).</p>
+<h2 id="analytics-service-redis"><code>analytics-service</code> Redis</h2>
+<table>
+<thead>
+<tr>
+<th>Key pattern</th>
+<th>Value</th>
+<th>TTL</th>
+<th>Authoritative</th>
+<th>Recompute?</th>
+<th>Concurrency</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>kpi:live:{tenant_id}:{campaign_id}:{kpi}</code></td>
+<td>integer/float counter</td>
+<td>rolling</td>
+<td><code>kpi_snapshots</code> (and the OLAP store, out of scope)</td>
+<td>Yes</td>
+<td><code>INCR</code>/<code>INCRBYFLOAT</code> on domain events</td>
+</tr>
+<tr>
+<td><code>leaderboard:{tenant_id}:{campaign_id}</code></td>
+<td>Redis Sorted Set (participant → revenue)</td>
+<td>rolling</td>
+<td>recomputable from referral/reward data</td>
+<td>Yes</td>
+<td><code>ZINCRBY</code></td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h1 id="10-notification-service-notification-db">10. <code>notification-service</code> — <code>notification_db</code></h1>
+<p><strong>Responsibilities (Architecture v5.0):</strong> outbound webhooks (config, delivery, retry, signing, auto-disable), transactional emails (SES), in-app notifications, <strong>inbound provider receivers</strong> (events from billing provider callbacks → <code>conversion.recorded</code>), endpoint health. <strong>Aggregates:</strong> WebhookEndpoint, WebhookDelivery, NotificationTemplate, NotificationDelivery, InboundReceipt.
+<strong>Redis:</strong> delivery in-flight locks, endpoint-health counters.
+<strong>Emits:</strong> optional delivery domain events; relays inbound callbacks as tracked <code>conversion.recorded</code> into ingestion.</p>
+<p><strong>Table:</strong> <code>webhook_endpoints</code>
+<strong>Purpose:</strong> Client webhook subscription config.
+<strong>Primary Key:</strong> (<code>id</code>)
+<strong>Columns:</strong> <code>id</code> · <code>tenant_id</code> not null · <code>url</code> text not null · <code>secret</code> text not null (HMAC-SHA256 signing key, encrypted at rest) · <code>api_version</code> text not null (pinned per subscription, API §6.4 — locks payload schema) · <code>event_filters</code> jsonb not null (array; wildcards <code>referral.*</code>, <code>reward.*</code>, <code>*</code>) · <code>status</code> text <code>CHECK in ('active','disabled')</code> not null default <code>active</code> · <code>consecutive_failures</code> smallint not null default 0 · <code>created_at</code> · <code>updated_at</code> · <code>disabled_at</code> timestamptz null.
+<strong>Indexes:</strong> <code>idx_webhook_ep_tenant</code> (<code>tenant_id</code>) <code>WHERE status='active'</code>.
+<strong>Notes:</strong> Auto-disabled after <strong>50 consecutive failures</strong> + owner notification (API §6.3).</p>
+<p><strong>Table:</strong> <code>webhook_deliveries</code> <em>(append-only per attempt-state)</em>
+<strong>Purpose:</strong> Per-event delivery log with retry schedule.
+<strong>Primary Key:</strong> (<code>id</code>)
+<strong>Unique:</strong> (<code>webhook_endpoint_id</code>, <code>event_id</code>) — dedup on the delivery <code>id</code>/<code>event_id</code> (API §6.2/§6.3).
+<strong>Columns:</strong> <code>id</code> · <code>webhook_endpoint_id</code> (<strong>local FK</strong>) · <code>tenant_id</code> not null · <code>event_id</code> text not null (the envelope delivery id) · <code>event_type</code> text not null · <code>payload</code> jsonb (the pinned-version envelope) · <code>signature</code> text · <code>status</code> text <code>CHECK in ('pending','delivered','failed','exhausted')</code> not null default <code>pending</code> · <code>http_status_code</code> smallint null · <code>attempt_count</code> smallint not null default 0 · <code>next_retry_at</code> timestamptz null · <code>last_attempted_at</code> timestamptz null · <code>delivered_at</code> timestamptz null · <code>error_message</code> text null · <code>created_at</code>.
+<strong>Indexes:</strong> <code>idx_wh_deliv_retry</code> (<code>next_retry_at</code>) <code>WHERE status='pending'</code>; <code>idx_wh_deliv_endpoint</code> (<code>webhook_endpoint_id</code>, <code>created_at</code> desc).
+<strong>Notes:</strong> Retry schedule 1m→5m→30m→2h→12h→24h (7 attempts, API §6.3). Backs the Webhook-Delivery reconciliation job (Failure §4.3). Exhausted deliveries route to <code>dlq-webhooks</code> (infra, not a DB table). The stored <code>event_type</code> uses the <strong>public webhook vocabulary</strong> (API §6.1) — <code>reward.earned/held/approved/paid/reversed</code>, <code>payout.sent/failed</code>, <code>campaign.activated/paused/completed/budget_threshold</code>. This is <em>almost</em> identical to the internal domain events (Event Model §5): the reward terminal names already match (<code>reward.paid</code>, <code>reward.reversed</code>), and the only translations are <code>reward.earned</code>→<code>reward.earned</code> and the internal campaign state <code>ended</code>→public <code>campaign.completed</code>. Public events are pinned per subscription <code>api_version</code>.</p>
+<p><strong>Table:</strong> <code>notification_templates</code>
+<strong>Purpose:</strong> Email/in-app templates (platform-level when <code>tenant_id</code> null).
+<strong>Primary Key:</strong> (<code>id</code>)
+<strong>Columns:</strong> <code>id</code> · <code>tenant_id</code> text null · <code>template_type</code> text <code>CHECK in ('enrollment','reward_earned','reward_approved','reward_paid','payout_sent','campaign_activated','fraud_alert','nudge_reengagement','endpoint_disabled')</code> not null · <code>channel</code> text <code>CHECK in ('email','in_app')</code> not null · <code>subject_template</code> text · <code>body_template</code> text · <code>locale</code> text · <code>is_active</code> boolean not null default true · <code>created_at</code> · <code>updated_at</code>.</p>
+<p><strong>Table:</strong> <code>notification_deliveries</code> <em>(append-only)</em>
+<strong>Purpose:</strong> Outbound email/in-app delivery log (SES).
+<strong>Primary Key:</strong> (<code>id</code>)
+<strong>Columns:</strong> <code>id</code> · <code>tenant_id</code> not null · <code>template_id</code> text null (<strong>local FK</strong>) · <code>template_type</code> text · <code>recipient_email_hash</code> char(64) null · <code>recipient_id</code> text null (participant/operator) · <code>channel</code> text · <code>status</code> text <code>CHECK in ('queued','sent','delivered','bounced','failed','suppressed')</code> not null · <code>provider_message_id</code> text null · <code>consent_checked</code> boolean (participant consent gate, Responsibility §3) · <code>sent_at</code> timestamptz null · <code>created_at</code> · <code>metadata</code> jsonb.
+<strong>Indexes:</strong> <code>idx_notif_deliv_recipient</code> (<code>tenant_id</code>, <code>recipient_id</code>, <code>created_at</code> desc).
+<strong>Notes:</strong> Stores <code>recipient_email_hash</code>, not raw email, consistent with no-raw-PII rules.</p>
+<p><strong>Table:</strong> <code>endpoint_health</code>
+<strong>Purpose:</strong> Webhook endpoint health state driving auto-disable + health dashboard.
+<strong>Primary Key:</strong> (<code>webhook_endpoint_id</code>) — <strong>local FK</strong>, 1:1 with <code>webhook_endpoints</code>.
+<strong>Columns:</strong> <code>webhook_endpoint_id</code> · <code>tenant_id</code> not null · <code>consecutive_failures</code> smallint not null default 0 · <code>total_deliveries</code> bigint not null default 0 · <code>total_failures</code> bigint not null default 0 · <code>last_success_at</code> timestamptz null · <code>last_failure_at</code> timestamptz null · <code>auto_disabled_at</code> timestamptz null · <code>owner_notified_at</code> timestamptz null · <code>updated_at</code>.</p>
+<p><strong>Table:</strong> <code>inbound_webhook_receipts</code> <em>(append-only — added, API §6.5 / Failure §4)</em>
+<strong>Purpose:</strong> Idempotent audit of third-party provider callbacks (Stripe/Paddle/Chargebee/PayPal/Wise/gift-card/CRM) before translation to <code>conversion.recorded</code> / payout state. "Data, never commands" (API §6.5).
+<strong>Primary Key:</strong> (<code>id</code>)
+<strong>Unique:</strong> (<code>tenant_id</code>, <code>integration_id</code>, <code>provider_event_id</code>) — idempotent by the provider's native event id (mapped to <code>external_id</code>).
+<strong>Columns:</strong> <code>id</code> · <code>tenant_id</code> text null (null until tenant resolved → <code>404</code> if unknown) · <code>provider</code> text <code>CHECK in ('stripe','paddle','chargebee','paypal','wise','gift_card','crm')</code> not null · <code>integration_id</code> text null · <code>provider_event_id</code> text not null · <code>provider_event_type</code> text · <code>signature_verified</code> boolean not null · <code>raw_payload</code> jsonb (retained for events from billing provider debugging, Failure §5.2) · <code>translated_to</code> text <code>CHECK in ('conversion.recorded','payout.sent','payout.failed','reward.paid','reward.reversed','participant.enrolled','dropped_signature_fail','dropped_unknown_tenant')</code> · <code>refrev_ref_code</code> text null (events from billing provider correlation from provider metadata) · <code>received_at</code> timestamptz not null.
+<strong>Indexes:</strong> <code>idx_inbound_provider</code> (<code>provider</code>, <code>received_at</code> desc); <code>idx_inbound_refcode</code> (<code>tenant_id</code>, <code>refrev_ref_code</code>).
+<strong>Notes:</strong> Signature failure → <code>401</code>, payload <strong>dropped not queued</strong> (recorded here as <code>dropped_signature_fail</code>). Backs the Billing-to-Platform Revenue reconciliation (Failure §4.3) and "unattributed payments" debugging.</p>
+<p><strong>Plus:</strong> <code>event_outbox</code> (§0.6), <code>idempotency_keys</code> (§0.7).</p>
+<h2 id="notification-service-redis"><code>notification-service</code> Redis</h2>
+<table>
+<thead>
+<tr>
+<th>Key pattern</th>
+<th>Value</th>
+<th>TTL</th>
+<th>Authoritative</th>
+<th>Recompute?</th>
+<th>Concurrency</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>whdeliver:lock:{delivery_id}</code></td>
+<td><code>"1"</code></td>
+<td>~30 s</td>
+<td><code>webhook_deliveries</code></td>
+<td>Yes</td>
+<td><code>SET NX</code> — single-flight a delivery attempt across workers</td>
+</tr>
+<tr>
+<td><code>ephealth:{webhook_endpoint_id}</code></td>
+<td>integer consecutive_failures</td>
+<td>none</td>
+<td><code>endpoint_health</code></td>
+<td>Yes</td>
+<td><code>INCR</code>/reset; triggers auto-disable at 50</td>
+</tr>
+<tr>
+<td><code>inbounddedup:{integration_id}:{provider_event_id}</code></td>
+<td><code>"1"</code></td>
+<td>90 d</td>
+<td><code>inbound_webhook_receipts</code></td>
+<td>Yes</td>
+<td><code>SET NX</code></td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h1 id="11-ai-service-ai-db">11. <code>ai-service</code> — <code>ai_db</code></h1>
+<p><strong>Responsibilities (Architecture v5.0):</strong> fraud scoring (rule + ML), recommendations (campaign setup, optimization, segmentation, incentive), insights, AI-weighted attribution support, decision logging &amp; explainability, model registry. <strong>AI is advisory except two narrow autonomous decisions</strong> — Incentive Optimization (sub-threshold reward tweaks) and Fraud auto-block (Product §11). <strong>Aggregates:</strong> AiDecisionLog, Recommendation, FraudRule, FraudReview, ModelArtifact, PromptVersion.
+<strong>Redis:</strong> inference cache (fraud scores), event dedup.
+<strong>Emits:</strong> <code>fraud.flagged</code>, <code>recommendation.created</code>; consumes referral/conversion/reward events.</p>
+<p><strong>Table:</strong> <code>ai_decision_logs</code> <em>(append-only)</em>
+<strong>Purpose:</strong> Single source of truth for "what did AI do, when, why, at what cost." Explainability + reproducibility. Retained 24 months.
+<strong>Primary Key:</strong> (<code>id</code>)
+<strong>Columns:</strong>
+- <code>id</code> · <code>tenant_id</code> not null · <code>decision_type</code> text <code>CHECK in ('fraud_score','recommendation','insight','segment_suggestion','health_insight','attribution_weighting','incentive_optimization')</code> not null · <code>is_autonomous</code> boolean not null default false (true only for incentive-optimization tweaks + fraud auto-block) · <code>compute_tier</code> text <code>CHECK in ('rule_based','ml_based','llm')</code> not null (the cost tier of Architecture §4.3 — Tier A / B / C; distinct from the Event Model <code>detection_layer</code> enum, which is stored on <code>fraud_reviews</code>; <code>rule_based</code> = zero LLM cost) · <code>model_used</code> text null (e.g. model id/version; null for pure rules) · <code>prompt_version_id</code> text null (<strong>local FK</strong> → <code>prompt_versions</code>) · <code>model_artifact_id</code> text null (<strong>local FK</strong> → <code>model_artifacts</code>) · <code>subject_type</code> text <code>CHECK in ('referral','participant','campaign','variant','program','conversion')</code> · <code>subject_id</code> text · <code>input_context</code> jsonb (≤8000 tokens; consent-respecting features only) · <code>output</code> jsonb · <code>reasoning_chain</code> text null · <code>bounds_satisfied</code> jsonb null (for autonomous decisions: the guardrail bounds it stayed within, e.g. <code>max_increase=25%</code>) · <code>triggering_recommendation_id</code> text null (<strong>local FK</strong> — links a Decision to its Recommendation, Product §11 discipline) · <code>confidence</code> numeric(4,3) null · <code>latency_ms</code> integer · <code>token_count</code> integer null · <code>cost_estimate</code> numeric(10,5) null · <code>created_at</code> timestamptz not null.
+<strong>Indexes:</strong> <code>idx_ai_decisions_subject</code> (<code>tenant_id</code>, <code>subject_type</code>, <code>subject_id</code>, <code>created_at</code> desc); <code>idx_ai_decisions_type</code> (<code>tenant_id</code>, <code>decision_type</code>, <code>created_at</code> desc).
+<strong>Notes:</strong> Every autonomous Decision logs its triggering Recommendation + the bounds it satisfied and is reversible by Human Override (Product §11) — enforced structurally by the non-null links above. <code>fraud_score</code> rows here feed <code>referrals.fraud_score</code> and the Participant-vs-Trust reconciliation (Failure §4.3).</p>
+<p><strong>Table:</strong> <code>prompt_versions</code>
+<strong>Purpose:</strong> Versioned LLM prompt templates (A/B testing, audit). Retained indefinitely.
+<strong>Primary Key:</strong> (<code>id</code>)
+<strong>Unique:</strong> (<code>prompt_name</code>, <code>version</code>).
+<strong>Columns:</strong> <code>id</code> · <code>tenant_id</code> text null (platform prompts) · <code>prompt_name</code> text not null · <code>version</code> integer not null · <code>template</code> text not null · <code>model_target</code> text · <code>is_active</code> boolean not null default false · <code>created_by</code> text · <code>created_at</code>.
+<strong>Indexes:</strong> <code>idx_prompt_active</code> (<code>prompt_name</code>) <code>WHERE is_active</code>.</p>
+<p><strong>Table:</strong> <code>recommendations</code>
+<strong>Purpose:</strong> AI suggestions (advisory) operators accept/dismiss (API §3.12).
+<strong>Primary Key:</strong> (<code>id</code>)
+<strong>Columns:</strong> <code>id</code> · <code>tenant_id</code> not null · <code>recommendation_type</code> text <code>CHECK in ('campaign_setup','campaign_config','optimization','segmentation','incentive','playbook_fit')</code> not null (<code>campaign_config</code> = a Creation Assistant proposal, API §3.14) · <code>subject_type</code> text · <code>subject_id</code> text null · <code>payload</code> jsonb not null (the proposed change + natural-language explanation) · <code>ai_decision_log_id</code> text (<strong>local FK</strong> — explainability) · <code>status</code> text <code>CHECK in ('pending','accepted','dismissed','rejected','expired')</code> not null default <code>pending</code> (<code>dismissed</code> = operator dismiss via <code>POST /recommendations/{id}/dismiss</code>; <code>rejected</code> = sibling proposal auto-rejected when another was accepted, Placement v5.0 §4) · <code>conversation_id</code> text null (<strong>local FK</strong> → <code>assistant_conversations</code>, for Creation Assistant proposals) · <code>profile</code> text <code>CHECK in ('baseline','balanced','aggressive')</code> null · <code>accepted_by</code> text null · <code>accepted_at</code> timestamptz null · <code>dismissed_reason</code> text null · <code>applied_resource_id</code> text null (the campaign/variant created/updated on accept) · <code>created_at</code> · <code>expires_at</code> timestamptz null.
+<strong>Indexes:</strong> <code>idx_recos_status</code> (<code>tenant_id</code>, <code>status</code>, <code>created_at</code> desc).
+<strong>Notes:</strong> Accept applies via <code>campaigns:write</code> or <code>rewards:approve</code> (API §3.12) and is recorded; dismiss feeds AI feedback.</p>
+<p><strong>Table:</strong> <code>assistant_conversations</code> (added — Creation Assistant Placement v5.0 §3, API §3.14)
+<strong>Purpose:</strong> Persisted conversation state of the Campaign Creation Assistant. Every turn is a stateless agent invocation that replays this row; the agent holds no memory. Proposals are <code>recommendations</code> rows (type <code>campaign_config</code>) referencing this conversation.
+<strong>Primary Key:</strong> (<code>id</code>) — the public <code>conversation_id</code>.
+<strong>Columns:</strong> <code>id</code> · <code>tenant_id</code> not null · <code>operator_id</code> text not null · <code>program_id</code> text not null · <code>phase</code> text <code>CHECK in ('goal_pulse','economics_reward','audience_saturation','measure_quality_budget','proposals_ready','abandoned')</code> not null default <code>goal_pulse</code> · <code>asked</code> jsonb not null default '{}' (answers to <em>ask</em>/<em>gate</em> inputs, by input id) · <code>inferred</code> jsonb not null default '{}' (<em>infer-and-confirm</em> values with their confirmed/overridden flag) · <code>derived</code> jsonb null (CAC/payback ceiling, saturation pacing, targeting, hold/clawback defaults — recomputed each turn, stored for audit) · <code>pulse_type</code> text null (resolved in phase 1) · <code>enrollment_trigger</code> text null (derived from the pulse) · <code>lawful_basis_blocked</code> boolean not null default false (the one gate that may stop a campaign) · <code>prompt_version_id</code> text not null (<strong>local FK</strong> → <code>prompt_versions</code>) · <code>model_role_last</code> text <code>CHECK in ('primary','verification','fallback')</code> · <code>turn_count</code> smallint not null default 0 · <code>last_decision_log_id</code> text null (<strong>local FK</strong> → <code>ai_decision_logs</code>) · <code>created_at</code> · <code>updated_at</code> · <code>completed_at</code> timestamptz null.
+<strong>Indexes:</strong> <code>idx_assistant_conv_tenant</code> (<code>tenant_id</code>, <code>operator_id</code>, <code>updated_at</code> desc).
+<strong>Notes:</strong> No campaign data is authoritative here — accepting a proposal materialises the campaign through the Campaign service's public API (Placement v5.0 §4); regenerate/abandon never touches <code>campaign_db</code>. Retained 90 days after <code>completed_at</code>, then pruned (proposals in <code>recommendations</code> are retained for audit).</p>
+<p><strong>Table:</strong> <code>fraud_rules</code>
+<strong>Purpose:</strong> Deterministic (rule-based) fraud rule configs — zero LLM cost.
+<strong>Primary Key:</strong> (<code>id</code>)
+<strong>Columns:</strong> <code>id</code> · <code>tenant_id</code> text null (platform-level rules) · <code>rule_name</code> text not null · <code>signal_type</code> text <code>CHECK in ('self_referral','velocity_abuse','disposable_email','vpn_proxy','device_fingerprint_match','payment_reversal','geographic_mismatch','bot_pattern','collusion_pattern','reward_harvesting')</code> not null · <code>condition</code> jsonb not null · <code>checkpoint</code> text <code>CHECK in ('referral_creation','qualification','reward_approval','payout')</code> · <code>auto_action</code> text <code>CHECK in ('reward_held','participant_flagged','auto_blocked','none')</code> not null default <code>none</code> · <code>threshold</code> numeric(4,3) null · <code>enabled</code> boolean not null default true · <code>created_at</code> · <code>updated_at</code>.
+<strong>Notes:</strong> Per-checkpoint auto-block thresholds (Product §7): creation &gt;0.8, qualification &gt;0.7, reward approval &gt;0.7, payout &gt;0.6.</p>
+<p><strong>Table:</strong> <code>fraud_reviews</code>
+<strong>Purpose:</strong> Human-in-the-loop fraud review queue. <strong>Only humans can ban.</strong>
+<strong>Primary Key:</strong> (<code>id</code>)
+<strong>Columns:</strong> <code>id</code> · <code>tenant_id</code> not null · <code>participant_id</code> text null · <code>referral_id</code> text null · <code>signal_type</code> text (same CHECK set as <code>fraud_rules.signal_type</code>) · <code>severity</code> text <code>CHECK in ('low','medium','high','critical')</code> not null · <code>detection_layer</code> text <code>CHECK in ('rule_based','ml_based','aggregate_analysis')</code> · <code>evidence</code> jsonb (flat key/value pairs, Event Model §5.3) · <code>fraud_report</code> jsonb (reasoning chain) · <code>ai_decision_log_id</code> text (<strong>local FK</strong>) · <code>review_status</code> text <code>CHECK in ('pending','approved','rejected','banned')</code> not null default <code>pending</code> · <code>reviewed_by</code> text null · <code>reviewed_at</code> timestamptz null · <code>reason</code> text null · <code>temporal_workflow_id</code> text null · <code>created_at</code>.
+<strong>Indexes:</strong> <code>idx_fraud_reviews_status</code> (<code>tenant_id</code>, <code>review_status</code>, <code>severity</code>); <code>idx_fraud_reviews_participant</code> (<code>tenant_id</code>, <code>participant_id</code>).
+<strong>Notes:</strong> Benign coverage-loss signals (dropped beacon, CMP timeout, lost webhook) <strong>never</strong> feed the fraud score (Failure §4.4) — they are not written here as signals.</p>
+<p><strong>Table:</strong> <code>model_artifacts</code>
+<strong>Purpose:</strong> ML model metadata registry. Weights in S3, metadata here, <strong>no PII in training</strong>.
+<strong>Primary Key:</strong> (<code>id</code>)
+<strong>Unique:</strong> (<code>model_type</code>, <code>version</code>).
+<strong>Columns:</strong> <code>id</code> · <code>model_type</code> text <code>CHECK in ('fraud_ml','propensity','attribution_ai','churn')</code> not null · <code>version</code> text not null · <code>s3_path</code> text not null · <code>training_dataset_description</code> text · <code>performance_metrics</code> jsonb · <code>is_active</code> boolean not null default false · <code>created_at</code>.
+<strong>Indexes:</strong> <code>idx_model_active</code> (<code>model_type</code>) <code>WHERE is_active</code>.</p>
+<p><strong>Plus:</strong> <code>event_outbox</code> (§0.6), <code>idempotency_keys</code> (§0.7).</p>
+<h2 id="ai-service-redis"><code>ai-service</code> Redis</h2>
+<table>
+<thead>
+<tr>
+<th>Key pattern</th>
+<th>Value</th>
+<th>TTL</th>
+<th>Authoritative</th>
+<th>Recompute?</th>
+<th>Concurrency</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>fraudscore:{participant_id}</code></td>
+<td>float 0–1 + signals</td>
+<td>300 s</td>
+<td><code>ai_decision_logs</code></td>
+<td>Yes (re-score)</td>
+<td><code>SET</code></td>
+</tr>
+<tr>
+<td><code>aidedup:{event_id}</code></td>
+<td><code>"1"</code></td>
+<td>24 h</td>
+<td>n/a (idempotency only)</td>
+<td>n/a</td>
+<td><code>SET NX</code> — don't double-score an event</td>
+</tr>
+<tr>
+<td><code>infer:cache:{decision_type}:{input_hash}</code></td>
+<td>JSON output</td>
+<td>varies</td>
+<td><code>ai_decision_logs</code></td>
+<td>Yes</td>
+<td><code>SET</code>; cost control on repeat LLM calls</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h1 id="12-cross-service-data-considerations">12. Cross-Service Data Considerations</h1>
+<h2 id="12-1-foreign-references-without-cross-db-fks">12.1 Foreign references without cross-DB FKs</h2>
+<p>Within a service, integrity is enforced by <strong>real <code>FOREIGN KEY</code>s on the DB-generated <code>pk</code></strong> (the <strong>local FK</strong>s marked above: e.g. <code>variants.campaign_pk → campaigns.pk</code>, <code>payout_items.payout_pk → payouts.pk</code>) — integer joins, no string comparison. Across services there are <strong>no</strong> database FKs: every inter-service reference (<code>campaign_id</code>, <code>variant_id</code>, <code>participant_id</code>, <code>referral_id</code>, <code>reward_id</code>, <code>program_id</code>, <code>segment_id</code>) is stored as the <strong>app-generated ULID <code>id</code> by value</strong> (<code>text</code>) and validated in service logic, because a sibling service's <code>pk</code> is a local integer with no meaning abroad. This preserves the Architecture v5.0 hard constraint (no shared tables, no cross-service FKs) while keeping intra-aggregate joins cheap.</p>
+<h2 id="12-2-idempotency-replay">12.2 Idempotency &amp; replay</h2>
+<p>Two <strong>separate</strong> regimes (Responsibility §4.1), never sharing an id:
+- <strong>Ingestion / domain dedup:</strong> <code>tenant_id</code> + <code>external_id</code>, 90-day window. Redis-authoritative at ingestion (<code>dedup:*</code>); mirrored as <code>UNIQUE (tenant_id, external_id)</code> on the durable landing tables (<code>touches</code>, <code>event_outbox</code>). Domain events derive <code>external_id</code> deterministically from a domain fact (e.g. <code>reward.approved:{reward_id}</code>) so retries/replays reproduce it.
+- <strong>Request idempotency:</strong> <code>Idempotency-Key</code> header, per tenant + key, 24 h, in each service's <code>idempotency_keys</code> table; returns the original stored response, <code>409</code> on key reuse with a different body.
+- <strong>Replay safety:</strong> the immutable append-only stores (<code>touches</code>, ledgers, <code>*_decision_logs</code>, <code>event_outbox</code>) plus consumer-side <code>event_id</code> idempotency guarantee a replay (Failure §4.2) cannot double-count. Attribution replay first emits a "rewards that would change" diff for approval before mutating <code>rewards</code>.</p>
+<h2 id="12-3-audit-trails">12.3 Audit trails</h2>
+<p><code>created_by</code> / <code>reason</code> are mandatory on every money- or trust-affecting row: <code>clawbacks</code> (reason not-null), <code>rewards</code> (<code>approved_by_*</code>, <code>approval_reason</code>), <code>fraud_reviews</code> (<code>reviewed_by</code>, <code>reason</code>), <code>payouts</code> (<code>confirmed_by</code>), participant block/trust changes (<code>participant_trust_events.changed_by</code>), and the platform-wide <code>tenant_db.audit_log</code> (operator actions, tenant lifetime + 12 months, API §8.3). Append-only ledgers (<code>reward_ledger_entries</code>) make money movement reconstructable.</p>
+<h2 id="12-4-ai-fraud-support-what-is-persisted-for-it">12.4 AI &amp; fraud support (what is persisted for it)</h2>
+<ul>
+<li><code>participants.trust_tier</code> + <code>trust_score</code> + <code>participant_trust_events</code> history (trust model inputs &amp; labels).</li>
+<li><code>referrals.fraud_score</code>; <code>rewards.fraud_score_at_submission</code> / <code>fraud_score_at_approval</code> (labeled training data, Event Model §8.4); later <code>clawbacks</code> close the label loop.</li>
+<li><code>touches</code> with <code>touch_sequence_number</code> + indexed UTMs (sequence &amp; channel features for AI-weighted attribution).</li>
+<li><code>attribution_records.confidence</code> + <code>ai_decision_log_id</code> for AI-weighted attribution explainability.</li>
+<li><code>ai_db</code>: full decision logs (model, prompt version, tokens, cost, reasoning, bounds, triggering recommendation), fraud rules &amp; reviews, model registry.</li>
+<li><code>analytics_db.health_scores</code> + <code>reconciliation_runs</code> (anomaly inputs + correctness evidence).</li>
+</ul>
+<h2 id="12-5-tie-back-to-the-three-governing-models">12.5 Tie-back to the three governing models</h2>
+<ul>
+<li><strong>Event Model v5.0</strong> — column names mirror envelope/<code>properties</code> fields (<code>external_id</code>, <code>event_id</code>→<code>id</code>, <code>schema_version</code>, <code>consent_status</code>, flat <code>revenue_*</code> on conversions, <code>touch_sequence_number</code>, attribution-context fields on <code>referrals</code>/<code>touches</code>). Enums (<code>signal_type</code>, <code>reward_type</code>, <code>model_used</code>, <code>checkpoint</code>, lifecycle states) match the event enums exactly; trust-tier reconciliation per R5.</li>
+<li><strong>Responsibility Contract v5.0</strong> — SDK never persists decisions; all monetary/identity truth lands under secret-key paths into <code>referral_db</code>/<code>reward_db</code>; server-derived <code>ip_hash</code>/<code>user_agent</code> stored, never client-claimed; deterministic <code>external_id</code> ownership reflected by the dedup uniqueness constraints.</li>
+<li><strong>Failure &amp; Observability Model v5.0</strong> — persisted for recovery/debugging: <code>temporal_workflow_id</code>/<code>run_id</code> (stuck-workflow inspection &amp; resume), <code>event_outbox</code> (at-least-once emission), <code>inbound_webhook_receipts</code> (events from billing provider reconciliation &amp; "unattributed payments"), <code>reconciliation_runs</code> (job evidence), correlation keys (<code>external_id</code>→<code>id</code>→<code>referral_id</code>→ attribution context <code>campaign_id</code>→<code>variant_id</code>→<code>participant_id</code> →<code>reward_id</code>→<code>payout_id</code>, plus <code>session_id</code>/<code>anonymous_id</code>/<code>actor_email_hash</code>/<code>click_id</code>/<code>integration_id</code>/<code>api_key_prefix</code>/<code>sdk_version</code>) all present as indexed columns across the chain. DLQs remain SQS infrastructure (not DB tables); DLQ <em>entries</em> retain the full envelope, which the <code>event_outbox</code> payload reproduces on scoped replay.</li>
+</ul>
+<hr />
+<h1 id="13-summary-matrix">13. Summary Matrix</h1>
+<table>
+<thead>
+<tr>
+<th>#</th>
+<th>Service</th>
+<th>Database</th>
+<th>Core tables</th>
+<th>+ plumbing</th>
+<th>Redis</th>
+<th>ClickHouse</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>1</td>
+<td>tenant-service</td>
+<td><code>tenant_db</code> (+ Ory colocated)</td>
+<td>tenants, users, roles, user_roles, api_keys, oauth2_clients, sessions, tenant_verifications, audit_log (9)</td>
+<td>outbox, idempotency</td>
+<td>sessions, Keto cache, key cache</td>
+<td>— (out of scope)</td>
+</tr>
+<tr>
+<td>2</td>
+<td>campaign-service</td>
+<td><code>campaign_db</code></td>
+<td>programs, campaigns, variants, pulses, playbooks (5)</td>
+<td>outbox, idempotency</td>
+<td>active-campaign, budget spend</td>
+<td>—</td>
+</tr>
+<tr>
+<td>3</td>
+<td>segmentation-service</td>
+<td><code>segmentation_db</code></td>
+<td>segments, segment_members, eligibility_rules, eligibility_evaluations, segment_insights (5)</td>
+<td>outbox, idempotency</td>
+<td>eligibility, variant assignment, random bucket</td>
+<td>—</td>
+</tr>
+<tr>
+<td>4</td>
+<td>ingestion-service</td>
+<td><strong>none</strong></td>
+<td>0</td>
+<td>—</td>
+<td>dedup, touch dedup, 3× rate-limit, campaign cache, code mirror, session map</td>
+<td>—</td>
+</tr>
+<tr>
+<td>5</td>
+<td>referral-service</td>
+<td><code>referral_db</code></td>
+<td>participants, participant_trust_events, invitees, referral_links, participant_enrollments, referrals, touches, identity_stitching, attribution_records, attribution_touches, experiment_results (11)</td>
+<td>outbox, idempotency</td>
+<td>referral state, session map, code source, velocity</td>
+<td>—</td>
+</tr>
+<tr>
+<td>6</td>
+<td>reward-service</td>
+<td><code>reward_db</code></td>
+<td>rewards, cap_ledgers, reward_ledger_entries, clawbacks, participant_payout_methods, participant_tax_records, payouts, payout_items (8)</td>
+<td>outbox, idempotency</td>
+<td>cap counters, payout limit</td>
+<td>—</td>
+</tr>
+<tr>
+<td>7</td>
+<td>analytics-service</td>
+<td><code>analytics_db</code></td>
+<td>kpi_snapshots, health_scores, reconciliation_runs (3)</td>
+<td>outbox</td>
+<td>live KPI counters, leaderboard</td>
+<td><strong>deferred (separate doc)</strong></td>
+</tr>
+<tr>
+<td>8</td>
+<td>notification-service</td>
+<td><code>notification_db</code></td>
+<td>webhook_endpoints, webhook_deliveries, notification_templates, notification_deliveries, endpoint_health, inbound_webhook_receipts (6)</td>
+<td>outbox, idempotency</td>
+<td>delivery lock, endpoint health, inbound dedup</td>
+<td>—</td>
+</tr>
+<tr>
+<td>9</td>
+<td>ai-service</td>
+<td><code>ai_db</code></td>
+<td>ai_decision_logs, prompt_versions, recommendations, assistant_conversations, fraud_rules, fraud_reviews, model_artifacts (7)</td>
+<td>outbox, idempotency</td>
+<td>fraud cache, event dedup, inference cache</td>
+<td>—</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Totals:</strong> 8 PostgreSQL databases (ingestion has none), <strong>54 core tables</strong> + per-service <code>event_outbox</code>/<code>idempotency_keys</code> plumbing, Redis across 8 services, Ory tables colocated in <code>tenant_db</code> (uncounted). ClickHouse is excluded by design (R2) and specified separately.</p>
+<p><strong>Load-bearing design decisions, restated:</strong>
+1. <strong>Dual-key model</strong> — every table has a <strong>DB-generated <code>bigint</code> identity <code>pk</code></strong> (the physical key: dense indexes, append-only inserts, cheap integer joins — the latency win) <strong>plus an app-generated ULID <code>id</code></strong> (the business/domain identifier exposed in the API, events, and all cross-service references). The database owns physical keys; ULIDs stay in the domain layer. Intra-service FKs target <code>pk</code>; cross-service refs carry the ULID by value.
+2. <strong>Attribution lives in <code>referral_db</code></strong>, on the critical path (conversion → attribution → reward), so heavy reporting never starves it.
+3. <strong>One authoritative code registry</strong> (<code>referral_db.referral_links</code>), mirrored to Redis for sub-100ms ingestion resolution (R3).
+4. <strong>Redis holds only in-flight control and recomputable caches</strong>; every Redis value can be rebuilt from PostgreSQL, except atomic cap/limit increments which are guarded by PG advisory locks with <code>cap_ledgers</code>/<code>reward_ledger_entries</code> as the durable truth.
+5. <strong>Outbox + idempotency + immutable ledgers/logs</strong> make the Failure Model's at-least-once, replayable, reconcilable guarantees real without cross-service transactions.</p>
+<blockquote>
+<p><strong>Note:</strong> Column types and names are implementation-ready but remain subject to migration-time refinement. Enum value sets track the Event Model; adding a value is a non-breaking change (text+CHECK swap). Ory-managed schemas follow Ory's own definitions.</p>
+</blockquote>
+</main>
+<script>
+const o=new IntersectionObserver(e=>{e.forEach(e=>{if(e.isIntersecting){document.querySelectorAll('.sd a').forEach(a=>a.classList.remove('active'));const l=document.querySelector(`.sd a[href="#${e.target.id}"]`);l&&l.classList.add('active')}})},{rootMargin:'-20% 0px -75% 0px'});
+document.querySelectorAll('h1[id],h2[id]').forEach(h=>o.observe(h));
+</script></body></html>

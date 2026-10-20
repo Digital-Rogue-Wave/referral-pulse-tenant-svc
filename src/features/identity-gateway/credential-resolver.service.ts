@@ -28,7 +28,7 @@ export interface ResolvedCredential extends IssuedToken {
 
 /**
  * Turns whatever credential the caller presented into the platform's internal JWT
- * (Architecture §13.1, API Contract v1.3 §2):
+ * (Architecture §13.1, API Contract §2):
  *
  * - `rai_live_` / `rai_pub_` API key → `{ source: 'api_key', key_type, key_id, tenant_id }`, no `perms`
  *   (keys are gated to ingestion/SDK and are never Keto subjects).

@@ -546,7 +546,8 @@ export class BillingService {
             throw new HttpException('Target plan must be different from current plan', HttpStatus.BAD_REQUEST);
         }
 
-        const planOrder = [BillingPlanEnum.FREE, BillingPlanEnum.STARTER, BillingPlanEnum.GROWTH, BillingPlanEnum.ENTERPRISE];
+        // DB Model §3 order: free, starter, growth, scale, enterprise.
+        const planOrder = [BillingPlanEnum.FREE, BillingPlanEnum.STARTER, BillingPlanEnum.GROWTH, BillingPlanEnum.SCALE, BillingPlanEnum.ENTERPRISE];
 
         const currentIndex = planOrder.indexOf(billing.plan as BillingPlanEnum);
         const targetIndex = planOrder.indexOf(targetPlan);

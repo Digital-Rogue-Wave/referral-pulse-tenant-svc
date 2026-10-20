@@ -4,7 +4,7 @@ import type { Counter } from '@opentelemetry/api';
 import { MetricsService } from './metrics.service';
 
 /**
- * Business metrics of tenant-service (Failure & Observability v3: every critical flow is observable).
+ * Business metrics of tenant-service (Failure & Observability: every critical flow is observable).
  * Alert on: `tenant_outbox_pending_oldest_seconds` growing, any `tenant_outbox_failed_total`,
  * `tenant_deletions_total{result="failed"}`, `stripe_events` left `failed` (billing_subscription_events_total
  * with result=error).

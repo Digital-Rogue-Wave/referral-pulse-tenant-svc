@@ -1,0 +1,117 @@
+/// Consent registry, data-subject requests and their per-service receipts.
+///
+/// Product Spec R-CPL-01 makes this service the single coordinating owner of compliance: "the Tenant
+/// service hosts the consent registry, the DSR endpoint and the DSR fan-out workflow and the audit
+/// sink; every other service implements its own erasure handler and returns a receipt." Architecture
+/// §2.1 repeats it. DB Model §3 lists none of these tables, so the shapes are derived from the
+/// prose that assigns the responsibility — recorded in NOTE.md §V5.12.
+///
+/// Identifiers follow this service's existing 22 tables: single-key ULID. DB Model §0.1 specifies a
+/// dual-key `bigint pk` + ULID `id`, which no table here uses and which the 2026-09-02 platform
+/// ruling superseded; three dual-key tables in a single-key schema would be worse than consistent
+/// ones. The divergence is recorded rather than silently resolved.
+
+/// Append-only consent record. A withdrawal is a new row, never an edit (DB Model §0.4: "Correction
+/// = a new compensating row"), because the proof of what was consented to and when is the point.
+/// Current state for a subject is its latest row.
+model Consent {
+  id       String @id @default(ulid()) @db.VarChar(26)
+  tenantId String @map("tenant_id") @db.VarChar(26)
+
+  /// The data subject is a Participant or Invitee (R-CPL-01), whose identity lives in
+  /// workflow-service — referenced by value, never by FK (DB Model §0.1 cross-service rule).
+  subjectId         String? @map("subject_id") @db.VarChar(26)
+  /// SHA-256 of the lower-cased email. The only address form stored anywhere (GDPR: no raw PII).
+  subjectEmailHash  String? @map("subject_email_hash") @db.Char(64)
+  subjectExternalId String? @map("subject_external_id") @db.VarChar(255)
+
+  /// Event Model §2.4 `consent.tracking_consent` — granted | denied | pending.
+  trackingConsent String @map("tracking_consent") @db.VarChar(20)
+  /// Event Model §2.4 `consent.marketing_consent`. Null when never captured; marketing and
+  /// transactional bases must stay distinguishable (GDPR rules).
+  marketingConsent String? @map("marketing_consent") @db.VarChar(20)
+  /// Event Model §2.4 `consent.consent_source` — cmp_banner | signup_form | api | widget | inherited.
+  consentSource String? @map("consent_source") @db.VarChar(20)
+
+  /// Event Model §2.4 `consent.consent_recorded_at` — when the signal was captured, not when stored.
+  recordedAt  DateTime  @map("recorded_at") @db.Timestamptz
+  withdrawnAt DateTime? @map("withdrawn_at") @db.Timestamptz
+
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  /// Latest-row-per-subject reads, by both identifiers a subject may be known under.
+  @@index([tenantId, subjectId, recordedAt(sort: Desc)], map: "idx_consent_subject")
+  @@index([tenantId, subjectEmailHash, recordedAt(sort: Desc)], map: "idx_consent_email")
+  @@map("consents")
+}
+
+/// A data-subject request. Product Spec R-CPL-02: access, erasure or portability, submitted by the
+/// Owner through POST /v1/dsr, "executed within the client's legal deadline (one month)".
+model DsrRequest {
+  id       String @id @default(ulid()) @db.VarChar(26)
+  tenantId String @map("tenant_id") @db.VarChar(26)
+
+  subjectId         String? @map("subject_id") @db.VarChar(26)
+  subjectEmailHash  String? @map("subject_email_hash") @db.Char(64)
+  subjectExternalId String? @map("subject_external_id") @db.VarChar(255)
+
+  /// `access` | `erasure` | `portability` (R-CPL-02).
+  requestType String @map("request_type") @db.VarChar(20)
+  /// `pending` | `in_progress` | `completed` | `failed`. R-CPL-02 names the request types but not
+  /// the lifecycle states, so these are this service's — flagged in NOTE.md §V5.12.
+  status String @default("pending") @db.VarChar(20)
+
+  /// The Owner who submitted it, or null when Super Admin logged it on the subject's behalf
+  /// (R-CPL-02: "or logged by Super Admin when a subject writes to the platform directly").
+  requestedBy String? @map("requested_by") @db.VarChar(26)
+  /// R-CPL-02's one-month deadline, stamped at creation so overdue requests are a query.
+  dueAt       DateTime  @map("due_at") @db.Timestamptz
+  completedAt DateTime? @map("completed_at") @db.Timestamptz
+
+  /// The same resumability pattern DB Model §3 applies to `tenant_verifications` (R7): a crashed
+  /// fan-out workflow can be found and resumed rather than silently abandoned mid-erasure.
+  temporalWorkflowId String? @map("temporal_workflow_id") @db.VarChar(255)
+  temporalRunId      String? @map("temporal_run_id") @db.VarChar(255)
+
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz
+
+  tenant   Tenant       @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  receipts DsrReceipt[]
+
+  @@index([tenantId, status, dueAt], map: "idx_dsr_tenant_status")
+  @@index([tenantId, subjectEmailHash], map: "idx_dsr_subject_email")
+  @@map("dsr_requests")
+}
+
+/// One receipt per service per request. R-CPL-02: "each service anonymises its share and returns a
+/// receipt; erasure.completed carries all receipts" — so they are stored, not just counted, and the
+/// unique constraint makes a re-delivered receipt idempotent rather than a duplicate.
+model DsrReceipt {
+  id           String @id @default(ulid()) @db.VarChar(26)
+  dsrRequestId String @map("dsr_request_id") @db.VarChar(26)
+  tenantId     String @map("tenant_id") @db.VarChar(26)
+
+  /// The service that answered, e.g. `workflow-service`, `reward-service`.
+  serviceName String @map("service_name") @db.VarChar(60)
+  /// `completed` | `partial` | `failed`.
+  status String @db.VarChar(20)
+  /// What the service erased or exported. Evidence of the erasure, which GDPR requires logging.
+  receipt Json?
+  /// Set when a service reports it retained rows under legal obligation — R-CPL-02: "Monetary
+  /// ledger entries are retained under legal obligation, stripped of identifying fields beyond what
+  /// tax law requires, and the subject is told so." Without this the subject cannot be told.
+  retainedUnderObligation Boolean @default(false) @map("retained_under_obligation")
+
+  receivedAt DateTime @default(now()) @map("received_at") @db.Timestamptz
+
+  /// No second FK to `tenants`: a receipt reaches its tenant through the request, and one cascade
+  /// path is enough to keep it from outliving the subject's data.
+  request DsrRequest @relation(fields: [dsrRequestId], references: [id], onDelete: Cascade)
+
+  @@unique([dsrRequestId, serviceName])
+  @@index([tenantId], map: "idx_dsr_receipt_tenant")
+  @@map("dsr_receipts")
+}

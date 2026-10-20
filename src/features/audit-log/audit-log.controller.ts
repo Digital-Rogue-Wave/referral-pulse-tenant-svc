@@ -7,7 +7,7 @@ import { AuditLogQueryDto, AuditLogResponse } from '@domains/audit-log';
 
 import { AuditLogService } from './audit-log.service';
 
-/** Operator-action trail for the dashboard (API Contract v1.3 §8.3: "dashboard only"). */
+/** Operator-action trail for the dashboard (API Contract §8.3: "dashboard only"). */
 @ApiTags('Audit log')
 @ApiBearerAuth()
 @Controller({ path: 'audit-log', version: '1' })

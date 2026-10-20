@@ -1,0 +1,324 @@
+<!DOCTYPE html><html lang="en"><head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>ReferralAI — Campaign Creation Assistant: Interview Script v5.0</title><style>
+
+@import url('https://fonts.googleapis.com/css2?family=Instrument+Serif&family=Geist:wght@400;500;600&family=Geist+Mono:wght@400&display=swap');
+:root{
+  --ink:#1c1917;--ink2:#44403c;--ink3:#78716c;--ink4:#a8a29e;
+  --paper:#FDFCFA;--card:#fff;--line:#e7e5e4;--wash:#f5f5f4;
+  --acc:#b45309;--acc2:#92400e;--accbg:#fef3c7;
+  --mint:#047857;--mint2:#065f46;--mintbg:#d1fae5;
+  --slate:#1e40af;--slate2:#1e3a8a;--slatebg:#dbeafe;
+  --rose:#be123c;--rose2:#9f1239;--rosebg:#ffe4e6;
+  --sw:230px
+}
+*{margin:0;padding:0;box-sizing:border-box}
+html{scroll-behavior:smooth;scroll-padding-top:20px}
+body{font-family:Geist,system-ui,sans-serif;background:var(--paper);color:var(--ink);font-size:14.5px;line-height:1.75;display:flex;-webkit-font-smoothing:antialiased}
+
+nav.sd{position:fixed;top:0;left:0;width:var(--sw);height:100vh;border-right:1px solid var(--line);overflow-y:auto;padding:24px 0;background:var(--paper)}
+.sd-b{padding:0 16px 16px}
+.sd-b h2{font-family:'Instrument Serif',serif;font-size:20px;color:var(--acc2);font-weight:400}
+.sd-b small{font-size:11px;color:var(--ink4);display:block;margin-top:2px;letter-spacing:.04em;text-transform:uppercase}
+.sd a{display:block;padding:2px 16px;color:var(--ink3);text-decoration:none;font-size:12px;line-height:1.6;transition:color .1s}
+.sd a:hover{color:var(--ink)}
+.sd a.n1{color:var(--ink2);font-weight:600;margin-top:12px;font-size:12px}
+.sd a.n2{padding-left:28px;font-size:11.5px;color:var(--ink4)}
+
+main{margin-left:var(--sw);max-width:830px;padding:40px 48px 100px}
+h1{font-family:'Instrument Serif',serif;font-size:28px;font-weight:400;color:var(--ink);margin:56px 0 16px;letter-spacing:-.02em}
+h1:first-of-type{margin-top:0}
+h2{font-size:16px;font-weight:600;margin:32px 0 10px;letter-spacing:-.01em}
+h3{font-size:14px;font-weight:600;color:var(--acc2);margin:24px 0 6px}
+h4{font-size:13px;font-weight:600;margin:16px 0 4px}
+p{margin:0 0 12px;color:var(--ink2)}
+strong{color:var(--ink);font-weight:600}
+strong.err{color:var(--rose)}strong.ok{color:var(--mint)}strong.warn{color:var(--acc)}
+em{color:var(--ink3)}
+a{color:var(--acc);text-decoration:none;border-bottom:1px solid var(--accbg)}
+a:hover{border-color:var(--acc)}
+hr{border:none;height:1px;background:var(--line);margin:36px 0}
+ul,ol{margin:0 0 14px 20px;color:var(--ink2)}
+li{margin-bottom:4px}
+code{font-family:'Geist Mono',monospace;font-size:12.5px;background:var(--wash);color:var(--acc2);padding:1px 4px;border-radius:3px}
+
+blockquote{border-left:3px solid var(--acc);padding:10px 16px;margin:14px 0 20px;background:var(--accbg);border-radius:0 6px 6px 0;font-size:13.5px}
+blockquote p{color:var(--acc2)}
+blockquote p:last-child{margin:0}
+
+table{width:100%;border-collapse:collapse;margin:12px 0 20px;font-size:12.5px}
+th{text-align:left;padding:8px 10px;font-weight:500;font-size:10.5px;text-transform:uppercase;letter-spacing:.08em;color:var(--ink4);border-bottom:2px solid var(--line)}
+td{padding:7px 10px;border-bottom:1px solid var(--wash);color:var(--ink2);vertical-align:top}
+tr:hover td{background:var(--wash)}
+.q{font-weight:600;color:var(--ink)}
+.tag{font-size:9.5px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;padding:2px 7px;border-radius:20px;white-space:nowrap;display:inline-block}
+.t-ask{background:var(--slatebg);color:var(--slate2)}
+.t-conf{background:var(--mintbg);color:var(--mint2)}
+.t-deriv{background:var(--accbg);color:var(--acc2)}
+.t-gate{background:var(--rosebg);color:var(--rose2)}
+
+figure{margin:22px 0 28px;padding:20px;background:var(--card);border:1px solid var(--line);border-radius:10px}
+figcaption{font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:.14em;color:var(--ink4);margin-bottom:14px}
+figure svg{display:block}
+figure svg text{font-family:Geist,system-ui,sans-serif}
+.s-h{font-size:13px;font-weight:600}
+.s-b{font-size:11.5px}
+.s-t{font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:.1em}
+.z-rose{fill:var(--rose2)}.z-rose2{fill:var(--rose)}
+.z-mint{fill:var(--mint2)}.z-mint2{fill:var(--mint)}
+.z-slate{fill:var(--slate2)}.z-slate2{fill:var(--slate)}
+.z-acc{fill:var(--acc2)}.z-acc2{fill:var(--acc)}
+.z-ink{fill:var(--ink)}.z-ink2{fill:var(--ink2)}.z-ink3{fill:var(--ink3)}.z-ink4{fill:var(--ink4)}
+
+.boundary{font-size:13px;padding:8px 14px;border-radius:6px;line-height:1.5;margin:4px 0}
+.b-must{background:var(--mintbg);border-left:3px solid var(--mint)}
+.b-mustnot{background:var(--rosebg);border-left:3px solid var(--rose)}
+.b-should{background:var(--slatebg);border-left:3px solid var(--slate)}
+.b-can{background:var(--wash);border-left:3px solid var(--ink4)}
+.blab{font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:.1em;display:block;margin:18px 0 6px}
+.blab.must{color:var(--mint)}.blab.mustnot{color:var(--rose)}.blab.should{color:var(--slate)}.blab.can{color:var(--ink3)}
+
+@media(max-width:800px){nav.sd{display:none}main{margin-left:0;padding:20px}}
+@media print{nav.sd{display:none}main{margin-left:0;max-width:100%}figure{break-inside:avoid}}
+::-webkit-scrollbar{width:3px}::-webkit-scrollbar-thumb{background:var(--line);border-radius:2px}
+
+</style></head><body>
+<nav class="sd"><div class="sd-b"><h2>ReferralAI</h2><small>Creation Assistant — Interview Script v5.0</small></div>
+<a href="#doc" class="n1">Interview Script</a>
+<a href="#purpose" class="n2">Purpose &amp; Stance</a>
+<a href="#portability" class="n2">Model Portability</a>
+<a href="#0-rules" class="n1">0. Operating Rules</a>
+<a href="#buckets" class="n2">The Three Buckets</a>
+<a href="#funnel-diagram" class="n2">Input Funnel</a>
+<a href="#asklist" class="n2">The Whole Ask List</a>
+<a href="#turn-diagram" class="n2">Per-Input Logic</a>
+<a href="#p1" class="n1">Phase 1 — Goal, Pulse &amp; Trigger</a>
+<a href="#pulse-map" class="n2">Nine-Pulse Map</a>
+<a href="#p2" class="n1">Phase 2 — Economics &amp; Reward</a>
+<a href="#p3" class="n1">Phase 3 — Audience &amp; Saturation</a>
+<a href="#p4" class="n1">Phase 4 — Measure, Quality, Budget</a>
+<a href="#proposals" class="n1">From Inputs to 3 Proposals</a>
+</nav>
+<main>
+
+<h1 id="doc">Campaign Creation Assistant — Interview Script</h1>
+<p><strong>Version:</strong> 5.0 — suite-wide version alignment (2026-10-09); content of 2.0 (which superseded 1.0). Earlier change-log entries keep the pre-alignment numbering ("v1" / "v2" below).<br>
+<strong>Status:</strong> Draft for review<br>
+<strong>Last Updated:</strong> June 2026<br>
+<strong>Precondition:</strong> the client's website is already scraped — vertical, pricing tiers, value props, social proof, brand assets known<br>
+<strong>Companion (all v5.0):</strong> Creation Assistant — Service Placement · Product Spec (§6 Pulse Workflows, §11 AI/Health) · Failure &amp; Observability (§3.4) · Responsibility Contract</p>
+
+<blockquote><p><strong>What changed from v1.</strong> v1 listed three pulses; the platform has <strong>nine</strong>, each with its own enrollment trigger and safety profile — so Phase 1 now maps a goal across all nine and <em>derives</em> the trigger. v1 also missed the inputs that actually separate a great campaign from a merely valid one: audience saturation, measurability, the hold/clawback quality bar, optimization latitude, and the advocacy signal. v2 folds those in and re-sorts every input into <strong>ask / infer-and-confirm / derive</strong>, so the assistant asks as little as possible.</p></blockquote>
+
+<h3 id="purpose">Purpose &amp; Stance</h3>
+<p>The assistant interviews an operator and produces three candidate campaign configurations (Baseline / Balanced / Aggressive) for review. Its value is <strong>not</strong> a thorough questionnaire — it is the opposite. A great campaign needs many inputs, but a great <em>assistant</em> obtains most of them without asking: from the scrape, from vertical benchmarks, and from analytics the platform already holds. Every input below is therefore tagged by how it is obtained, and the design goal is to move as much as possible out of <span class="tag t-ask">ask</span>.</p>
+
+<h3 id="portability">Model Portability</h3>
+<p>This runs on the primary model, a verification model, or a fallback, chosen by configuration — Claude and ChatGPT among them. The script must execute identically regardless. Every decision a model might otherwise improvise — which pulse a goal maps to, what to skip, what to derive, when to block — is fixed below, so the interview is reproducible across providers.</p>
+
+<hr>
+
+<h1 id="0-rules">0. Operating Rules</h1>
+
+<h3 id="buckets">The Three Buckets</h3>
+<p>Every input the assistant needs falls into exactly one bucket. The bucket, not the model's discretion, decides whether a turn is spent on it.</p>
+<table>
+<thead><tr><th style="width:130px">Bucket</th><th>Meaning</th><th>Cost to the operator</th></tr></thead>
+<tbody>
+<tr><td><span class="tag t-ask">ask</span></td><td>Only the client knows it; no scrape or benchmark can supply it. A real question.</td><td>One turn each — keep this list short</td></tr>
+<tr><td><span class="tag t-conf">infer&nbsp;+&nbsp;confirm</span></td><td>The scrape or a benchmark supplies a strong value; the assistant states it and lets the operator correct.</td><td>A glance, not a question</td></tr>
+<tr><td><span class="tag t-deriv">derive</span></td><td>Computed by the assistant from other inputs + platform analytics. The operator never sees it as a question.</td><td>Zero — surfaced only in the proposals</td></tr>
+<tr><td><span class="tag t-gate">gate</span></td><td>A special <span class="tag t-ask">ask</span> that can <em>block</em> rather than fall to a default.</td><td>One turn; non-negotiable</td></tr>
+</tbody>
+</table>
+
+<span class="blab must">Always</span>
+<div class="boundary b-must"><strong>1 · Minimize asks.</strong> If a value can be inferred or derived, never ask it. Asking something the scrape already answers is a defect, not thoroughness.</div>
+<div class="boundary b-must"><strong>2 · Confirm, don't ask.</strong> For any inferred fact, state it in one line and let the operator correct. Record the value as <em>inferred</em> so an override is always possible.</div>
+<div class="boundary b-must"><strong>3 · One thing per turn.</strong> The chat is a sequence of persisted single-turn calls; running answers are replayed from conversation state each turn, never held in memory.</div>
+
+<span class="blab mustnot">Never</span>
+<div class="boundary b-mustnot"><strong>4 · Never invent.</strong> Inference works off scrape and benchmarks; derivation off real inputs. If neither exists for a needed value, it is an <span class="tag t-ask">ask</span> — list price is never a stand-in for customer value.</div>
+
+<span class="blab should">Gates</span>
+<div class="boundary b-should"><strong>5 · Pulse&times;Reward gate.</strong> Once the pulse is set, only reward forms valid for that pulse are offered or proposed. <strong>6 · Enrollment-trigger safety.</strong> The trigger is derived from the pulse, never chosen freely; payout is never a trigger. <strong>7 · Lawful basis can block</strong> — the one input allowed to stop a campaign rather than default.</div>
+
+<figure id="funnel-diagram">
+<figcaption>Input funnel — most inputs never become questions</figcaption>
+<svg viewBox="0 0 680 286" width="100%" role="img"><title>How campaign inputs are sourced</title><desc>A short list of asked inputs, a larger set inferred from scrape and benchmarks then confirmed, and a derived set computed from analytics all feed a single reasoning pass that emits three candidate proposals.</desc>
+<defs><marker id="af" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M2 1L8 5L2 9" fill="none" stroke="context-stroke" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></marker></defs>
+
+<rect x="24" y="34" width="240" height="50" rx="10" fill="#dbeafe" stroke="#1e40af" stroke-width="0.5"/>
+<text class="s-h z-slate" x="40" y="56">Ask the client</text>
+<text class="s-b z-slate2" x="40" y="74">~11 inputs — the short list</text>
+
+<rect x="24" y="118" width="240" height="50" rx="10" fill="#d1fae5" stroke="#047857" stroke-width="0.5"/>
+<text class="s-h z-mint" x="40" y="140">Infer + confirm</text>
+<text class="s-b z-mint2" x="40" y="158">scrape · vertical benchmarks</text>
+
+<rect x="24" y="202" width="240" height="50" rx="10" fill="#fef3c7" stroke="#b45309" stroke-width="0.5"/>
+<text class="s-h z-acc" x="40" y="224">Derive</text>
+<text class="s-b z-acc2" x="40" y="242">analytics · propensity · formulas</text>
+
+<rect x="320" y="108" width="150" height="70" rx="10" fill="#f5f5f4" stroke="#a8a29e" stroke-width="0.5"/>
+<text class="s-b z-ink" x="334" y="138">Reasoning pass</text>
+<text class="s-b z-ink3" x="334" y="156">posture × 3</text>
+
+<rect x="510" y="108" width="146" height="70" rx="10" fill="#fff" stroke="#047857" stroke-width="0.5"/>
+<text class="s-b z-mint" x="524" y="138">3 proposals</text>
+<text class="s-b z-mint2" x="524" y="156">Recommendation</text>
+
+<line x1="264" y1="59" x2="316" y2="120" stroke="#a8a29e" stroke-width="1.5" marker-end="url(#af)"/>
+<line x1="264" y1="143" x2="316" y2="143" stroke="#a8a29e" stroke-width="1.5" marker-end="url(#af)"/>
+<line x1="264" y1="227" x2="316" y2="166" stroke="#a8a29e" stroke-width="1.5" marker-end="url(#af)"/>
+<line x1="470" y1="143" x2="506" y2="143" stroke="#047857" stroke-width="1.5" marker-end="url(#af)"/>
+</svg>
+</figure>
+
+<h3 id="asklist">The Whole Ask List</h3>
+<p>The complete set of things the assistant actually asks. If the list grows past this, an input has been mis-bucketed.</p>
+<ol>
+<li><strong>Primary outcome</strong> — what the program is for (maps to a pulse).</li>
+<li><strong>Existing advocacy &amp; the value moment</strong> — are customers already recommending you, and when do they first "get it"?</li>
+<li><strong>Customer value</strong> — typical first payment / monthly value and rough margin.</li>
+<li><strong>Optimization latitude</strong> — how much may the platform auto-tune rewards without sign-off?</li>
+<li><strong>Eligible base — who &amp; roughly how many</strong> (the saturation input).</li>
+<li><strong>One offer or segmented</strong> (+ the splitting attribute, if segmented).</li>
+<li><strong>Success target</strong> — what "working" looks like in a number.</li>
+<li><strong>Abuse tolerance</strong> — how strict the quality bar should be.</li>
+<li><strong>Budget</strong> — total or per period.</li>
+<li><strong>Schedule</strong> — start, and end date if any.</li>
+<li><span class="tag t-gate">gate</span> <strong>Lawful basis</strong> — markets + basis to market referrals.</li>
+</ol>
+<p>Several collapse further when the scrape or benchmarks are strong — schedule and success target are often inferred and merely confirmed. Eleven is the ceiling, not the target.</p>
+
+<figure id="turn-diagram">
+<figcaption>Per-input logic — identical on every model</figcaption>
+<svg viewBox="0 0 680 270" width="100%" role="img"><title>Decision logic for each input</title><desc>For each input the assistant checks whether scrape or a prior answer supplies it; if so it confirms in one line, if it can be computed it derives silently, otherwise it asks one question. The result passes the gates and is written to conversation state.</desc>
+<defs><marker id="at" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M2 1L8 5L2 9" fill="none" stroke="context-stroke" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></marker></defs>
+
+<rect x="24" y="100" width="120" height="54" rx="10" fill="#f5f5f4" stroke="#a8a29e" stroke-width="0.5"/>
+<text class="s-h z-ink" x="38" y="124">Next input</text>
+<text class="s-b z-ink3" x="38" y="142">(phase N)</text>
+
+<rect x="170" y="94" width="150" height="66" rx="10" fill="#fef3c7" stroke="#b45309" stroke-width="0.5"/>
+<text class="s-b z-acc" x="184" y="122">Which bucket?</text>
+<text class="s-b z-acc2" x="184" y="142">scrape · compute · client</text>
+
+<rect x="346" y="28" width="222" height="44" rx="10" fill="#d1fae5" stroke="#047857" stroke-width="0.5"/>
+<text class="s-b z-mint" x="360" y="55">infer → confirm in one line</text>
+
+<rect x="346" y="106" width="222" height="44" rx="10" fill="#fef3c7" stroke="#b45309" stroke-width="0.5"/>
+<text class="s-b z-acc" x="360" y="133">derive → compute silently</text>
+
+<rect x="346" y="184" width="222" height="44" rx="10" fill="#dbeafe" stroke="#1e40af" stroke-width="0.5"/>
+<text class="s-b z-slate" x="360" y="211">ask → one single-turn question</text>
+
+<rect x="592" y="106" width="64" height="44" rx="10" fill="#ffe4e6" stroke="#be123c" stroke-width="0.5"/>
+<text class="s-b z-rose" x="606" y="128">gates</text>
+<text class="s-b z-rose2" x="606" y="144">+ save</text>
+
+<line x1="144" y1="127" x2="166" y2="127" stroke="#a8a29e" stroke-width="1.5" marker-end="url(#at)"/>
+<line x1="320" y1="112" x2="342" y2="58" stroke="#a8a29e" stroke-width="1.5" marker-end="url(#at)"/>
+<line x1="320" y1="127" x2="342" y2="128" stroke="#a8a29e" stroke-width="1.5" marker-end="url(#at)"/>
+<line x1="320" y1="142" x2="342" y2="200" stroke="#a8a29e" stroke-width="1.5" marker-end="url(#at)"/>
+<line x1="568" y1="50" x2="600" y2="104" stroke="#a8a29e" stroke-width="1.5" marker-end="url(#at)"/>
+<line x1="568" y1="128" x2="588" y2="128" stroke="#a8a29e" stroke-width="1.5" marker-end="url(#at)"/>
+<line x1="568" y1="206" x2="600" y2="152" stroke="#a8a29e" stroke-width="1.5" marker-end="url(#at)"/>
+</svg>
+</figure>
+
+<hr>
+
+<h1 id="p1">Phase 1 — Goal, Pulse &amp; Trigger</h1>
+<p><strong>Sets:</strong> which of the nine pulses runs, its enrollment trigger, and whether referral is even the right lever. This is the spine — every downstream input bends to it.</p>
+<table>
+<thead><tr><th style="width:96px">How</th><th>Input / question</th><th>Drives</th></tr></thead>
+<tbody>
+<tr><td><span class="tag t-ask">ask</span></td><td class="q">"What's the main outcome you want — more paying customers, retention, winning back churned users, expanding existing customers, leads, reviews, or taking share from a competitor?"</td><td>Maps to one of the nine pulses (table below)</td></tr>
+<tr><td><span class="tag t-ask">ask</span></td><td class="q">"Are customers already recommending you unprompted — and what's the moment they first see the value?"</td><td>Whether referral will work at all; the sharing-moment timing</td></tr>
+<tr><td><span class="tag t-conf">infer + confirm</span></td><td class="q">Vertical → playbook → default pulse &amp; reward structure (e.g. B2B SaaS → SaaS Growth → Conversion, % of first-year).</td><td>Pulse prior, reward-structure prior</td></tr>
+<tr><td><span class="tag t-deriv">derive</span></td><td class="q">Enrollment trigger, from the pulse's allowed set and the two safety tests — (a) is there a downstream payout floor, (b) is entry cheap-if-wrong. Payout is never a trigger.</td><td><code>signup</code> / <code>on_self_conversion</code> / <code>manual</code></td></tr>
+<tr><td><span class="tag t-deriv">derive</span></td><td class="q">The sharing moment — placed at the value moment the operator described, not a generic email blast.</td><td>When the invite is surfaced</td></tr>
+<tr><td><span class="tag t-conf">infer + confirm</span></td><td class="q">"One-off push or always-on?" — usually inferable from outcome; confirm.</td><td>Fixed window vs ongoing</td></tr>
+</tbody>
+</table>
+
+<h3 id="pulse-map">Nine-Pulse Map</h3>
+<p>The deterministic mapping from a stated outcome to a pulse, its default trigger, and its reward shape. The assistant picks from this table — it does not invent a mechanic.</p>
+<table>
+<thead><tr><th>Client says…</th><th>Pulse</th><th>Default trigger</th><th>Typical reward</th></tr></thead>
+<tbody>
+<tr><td>More paying customers / revenue</td><td><strong>Conversion</strong></td><td><code>signup</code></td><td>% of first payment or first-year</td></tr>
+<tr><td>Keep customers renewing (retention)</td><td><strong>Renewal</strong></td><td><code>manual</code></td><td>Recurring commission, N cycles capped</td></tr>
+<tr><td>Win back churned users</td><td><strong>Reactivation</strong></td><td><code>signup</code></td><td>Fixed bonus + small recurring</td></tr>
+<tr><td>Expand customers to another product</td><td><strong>Cross-Sell</strong></td><td><code>on_self_conversion</code></td><td>% of new-product value</td></tr>
+<tr><td>Leads / signups / list growth</td><td><strong>Signup</strong></td><td><code>manual</code></td><td>Fixed per signup, often one-sided</td></tr>
+<tr><td>Reviews / social proof</td><td><strong>Feedback</strong></td><td><code>manual</code></td><td>Small / gift card; on verified review</td></tr>
+<tr><td>Newsletter / content audience</td><td><strong>Newsletter</strong></td><td><code>manual</code></td><td>Micro-reward or milestone</td></tr>
+<tr><td>Take a competitor's customers</td><td><strong>Switch-Up</strong></td><td><code>on_self_conversion</code> (verified)</td><td>High bounty — verify before opening link</td></tr>
+<tr><td>Drive activation / onboarding</td><td><strong>Product Education</strong></td><td><code>on_self_conversion</code></td><td>Milestone unlock / credit, rarely cash</td></tr>
+</tbody>
+</table>
+<blockquote><p><strong>Why the trigger is derived, not asked.</strong> The enrollment trigger is intrinsic to the pulse's fraud profile. Enrolling at <code>signup</code> and showing the widget immediately is safe only when a downstream payout floor contains the risk <em>and</em> entry is cheap-if-wrong. Pulses that fail those tests (Signup, Newsletter, Switch-Up) default to <code>manual</code> or require verification first. Financial risk after early enrollment is managed by <em>reward holds</em>, never by asking the operator to pick a trigger.</p></blockquote>
+
+<h1 id="p2">Phase 2 — Economics &amp; Reward</h1>
+<p><strong>Sets:</strong> the reward configuration and the headroom the three profiles spread across. Reward forms are constrained by the Pulse&times;Reward gate.</p>
+<table>
+<thead><tr><th style="width:96px">How</th><th>Input / question</th><th>Drives</th></tr></thead>
+<tbody>
+<tr><td><span class="tag t-ask">ask</span></td><td class="q">"Roughly what is one new customer worth — typical first payment or monthly value, and a rough margin?"</td><td>Reward sizing without eroding unit economics. <strong>Never inferred from list price.</strong></td></tr>
+<tr><td><span class="tag t-ask">ask</span></td><td class="q">"How much can the platform adjust rewards on its own before it needs your sign-off?"</td><td>Optimization latitude — the <code>auto_approve_below</code> bound for Incentive Optimization</td></tr>
+<tr><td><span class="tag t-conf">infer + confirm</span></td><td class="q">Pricing tiers from the scrape → candidate reward range; category reward norms from benchmarks.</td><td>Reward range, anchoring</td></tr>
+<tr><td><span class="tag t-deriv">derive</span></td><td class="q">CAC / payback ceiling — the reward must stay cheaper than paid acquisition for the vertical; expansion revenue widens the ceiling.</td><td>Hard upper bound on reward</td></tr>
+<tr><td><span class="tag t-deriv">derive</span></td><td class="q">Give-get framing recommendation (one-sided vs two-sided) and best-fit reward form for the audience — cash, credit, discount — within the gate.</td><td>Reward structure &amp; form</td></tr>
+</tbody>
+</table>
+<blockquote><p>Margin is not the ceiling — <strong>CAC payback is</strong>. A great campaign pays a reward that still beats paid acquisition, which is exactly the Revenue Impact sub-score the platform tracks. Sizing to margin alone underprices the reward and leaves growth unclaimed.</p></blockquote>
+
+<h1 id="p3">Phase 3 — Audience &amp; Saturation</h1>
+<p><strong>Sets:</strong> who refers, how many variants, and — new in v2 — whether the eligible pool is large enough to sustain the chosen posture before it saturates.</p>
+<table>
+<thead><tr><th style="width:96px">How</th><th>Input / question</th><th>Drives</th></tr></thead>
+<tbody>
+<tr><td><span class="tag t-ask">ask</span></td><td class="q">"Who's allowed to refer — all customers, paying only, a specific plan, a list you'll provide — and roughly how many is that?"</td><td>Eligible enrollment population <em>and its size</em> (enrollment is selective and backend-owned)</td></tr>
+<tr><td><span class="tag t-ask">ask</span></td><td class="q">"Same offer for everyone, or different rewards for different groups?"</td><td>Single default variant vs segmented variants</td></tr>
+<tr><td><span class="tag t-deriv">derive</span></td><td class="q">Best-referrer targeting — the platform's trust tiers and propensity scores surface who is likely to advocate, so targeting need not be asked.</td><td>Who the campaign leans on</td></tr>
+<tr><td><span class="tag t-deriv">derive</span></td><td class="q">Saturation pacing — base size × window predicts how fast the pool exhausts, which postures are viable, and whether always-on beats a one-off push.</td><td>Profile viability; pacing</td></tr>
+<tr><td><span class="tag t-conf">infer + confirm</span></td><td class="q">(If segmented) the splitting attribute and whether it's reliably known at enrollment.</td><td>Segment key vs analytics dimension</td></tr>
+</tbody>
+</table>
+<blockquote><p><strong>Saturation is a first-class signal, not an afterthought.</strong> Audience Saturation is one of the four Program Health sub-scores ("% of eligible base enrolled &amp; still converting"). A 400-customer base cannot sustain an Aggressive always-on program; a 50,000 base can. So base size co-decides which of the three profiles is even offered. Missing or non-matching segment attributes fall through to the default variant — they never block.</p></blockquote>
+
+<h1 id="p4">Phase 4 — Measurability, Quality Bar, Budget &amp; Compliance</h1>
+<p><strong>Sets:</strong> whether the campaign can be measured, how abuse is contained, the budget, the schedule, and the lawful-basis gate.</p>
+<table>
+<thead><tr><th style="width:96px">How</th><th>Input / question</th><th>Drives</th></tr></thead>
+<tbody>
+<tr><td><span class="tag t-conf">infer + confirm</span></td><td class="q">Likely sharing mechanics (link vs code, same-device vs cross-device) → expected attribution method &amp; coverage. Set honest expectations up front.</td><td>Measurability; realistic targets</td></tr>
+<tr><td><span class="tag t-ask">ask</span></td><td class="q">"What would make this a success — a number you'd want to hit?"</td><td>Target the three profiles aim at (often inferable from benchmarks, then confirm)</td></tr>
+<tr><td><span class="tag t-ask">ask</span></td><td class="q">"How strict should the quality bar be — how long must a referral stick before you'll pay?"</td><td>Abuse tolerance</td></tr>
+<tr><td><span class="tag t-deriv">derive</span></td><td class="q">Hold window + clawback policy from the abuse answer and pulse — refunds/chargebacks during the hold reverse the reward; this is the quality bar in mechanism form.</td><td>Reward lifecycle holds; Fraud Pressure exposure</td></tr>
+<tr><td><span class="tag t-ask">ask</span></td><td class="q">"Total budget — overall, or per period?"</td><td>Shared budget; auto-pauses at 100%</td></tr>
+<tr><td><span class="tag t-ask">ask</span></td><td class="q">"When should it start, and is there an end date?"</td><td>Schedule / campaign state machine</td></tr>
+<tr><td><span class="tag t-gate">gate</span></td><td class="q">"Which markets, and do you already have a lawful basis to market referrals to your customers and their referees?"</td><td><strong>Can block.</strong> In the EU this basis is separate from product signup</td></tr>
+</tbody>
+</table>
+<blockquote><p><strong>Measurability is an input, not a given.</strong> The platform grades every campaign on attribution confidence and touch / attribution / revenue coverage. If sharing will be cross-device or key pages lack the SDK, coverage drops — so the reward model and the success target must be set against what can actually be observed, and the operator is told so plainly rather than promised a clean number.</p></blockquote>
+
+<hr>
+
+<h1 id="proposals">From Inputs to Three Proposals</h1>
+<p>Once the gate clears, the same gathered, inferred, and derived inputs are run through three postures in one reasoning pass. The new v2 inputs change what each posture is even allowed to propose.</p>
+<table>
+<thead><tr><th>Posture</th><th>Leans on</th><th>Bias — bounded by the derived ceilings</th></tr></thead>
+<tbody>
+<tr><td><strong>Baseline</strong></td><td>Customer value, budget, saturation floor</td><td>Conservative — rewards near the vertical floor, proven advocates only, slow burn</td></tr>
+<tr><td><strong>Balanced</strong></td><td>Benchmarks, CAC payback</td><td>Benchmark-aligned — the default recommendation</td></tr>
+<tr><td><strong>Aggressive</strong></td><td>CAC headroom, base size, expansion revenue</td><td>Growth-first — higher rewards, broader reach, front-loaded spend, <em>only offered if the base can sustain it</em></td></tr>
+</tbody>
+</table>
+<blockquote><p>All three are candidate proposals only. Each must pass the Pulse&times;Reward gate and sit under the derived CAC ceiling; the operator selects at most one; the Campaign service materialises the chosen one. Posture changes how aggressive a config is — never whether it is valid, measurable, or affordable.</p></blockquote>
+
+</main>
+</body></html>

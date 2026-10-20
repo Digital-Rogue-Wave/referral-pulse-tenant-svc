@@ -22,7 +22,7 @@
         "github",
         "custom"
       ],
-      "description": "How the Referee signed up."
+      "description": "How the Invitee signed up."
     },
     "plan_type": {
       "type": "string",

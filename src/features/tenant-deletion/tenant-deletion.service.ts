@@ -14,7 +14,7 @@ import { erasedMemberData, isErasedMember } from '@app/features/users/member-era
 const SWEEP_BATCH = 20;
 
 /**
- * The tenant deletion saga (API Contract v1.3 §8.3, DB Model v2 §0.4). Runs once a scheduled deletion is due:
+ * The tenant deletion saga (API Contract §8.3, DB Model §0.4). Runs once a scheduled deletion is due:
  *
  * 1. Billing: the Stripe subscription ends now, so a deleted tenant is never charged again.
  * 2. Identity: every member's Ory identity is deleted, which ends all their sessions.

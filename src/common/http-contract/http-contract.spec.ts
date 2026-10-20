@@ -17,7 +17,7 @@ import { validationExceptionFactory } from './validation-exception.factory';
 import { camelCaseKeys, snakeCaseKeys, toSnakeCase } from './wire-case';
 import { WireCaseInterceptor } from './wire-case.interceptor';
 
-describe('Wire case (API Contract v1.3 §1 — snake_case fields and parameters)', () => {
+describe('Wire case (API Contract §1 — snake_case fields and parameters)', () => {
     it('converts keys both ways, deeply, without touching values', () => {
         const date = new Date('2026-09-21T10:00:00.000Z');
         const inside = { tenantId: 't1', createdAt: date, keyPrefix: 'abcd', nestedItems: [{ lastUsedAt: null, planName: 'growthPlan' }] };
@@ -61,7 +61,7 @@ describe('Wire case (API Contract v1.3 §1 — snake_case fields and parameters)
     });
 });
 
-describe('Error envelope (API Contract v1.3 §1 "Error Model")', () => {
+describe('Error envelope (API Contract §1 "Error Model")', () => {
     const run = (exception: unknown, requestId = 'req_1') => {
         const response = {
             setHeader: jest.fn().mockReturnThis(),
@@ -154,7 +154,7 @@ describe('requestIdMiddleware', () => {
     });
 });
 
-describe('cursorPage (API Contract v1.3 §1 "Pagination")', () => {
+describe('cursorPage (API Contract §1 "Pagination")', () => {
     const rows = Array.from({ length: 7 }, (_, i) => ({ id: `id-${String(i).padStart(2, '0')}` }));
     const delegate = {
         findMany: jest.fn(
@@ -196,7 +196,7 @@ describe('cursorPage (API Contract v1.3 §1 "Pagination")', () => {
     });
 });
 
-describe('RequestIdempotencyInterceptor (API Contract v1.3 §1, DB Model v2 §0.7)', () => {
+describe('RequestIdempotencyInterceptor (API Contract §1, DB Model §0.7)', () => {
     type Row = { requestFingerprint: string; responseStatus: number | null; responseBody: unknown; expiresAt: Date };
     let store: Map<string, Row>;
     let prisma: DatabaseService;

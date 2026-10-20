@@ -41,7 +41,7 @@ describe('Published events registry', () => {
         expect(revoked).toMatchObject({ eventType: 'api_key.revoked', properties: { key_id: 'k1', revoked_by: 'u1', revocation_reason: 'leaked' } });
     });
 
-    it('uses snake_case actions on the wire and never nests objects in properties (Event Model v3 §2.5)', () => {
+    it('uses snake_case actions on the wire and never nests objects in properties (Event Model §2.5)', () => {
         const drafts = [
             ...toPublishedEvents('tenant.created', new TenantCreatedEvent('t1', 't1', 'Acme', 'acme', 'k1', new Date(), new Date())),
             ...toPublishedEvents('tenant.locked', new TenantLockedEvent('t1', 't1', 'security', new Date()))

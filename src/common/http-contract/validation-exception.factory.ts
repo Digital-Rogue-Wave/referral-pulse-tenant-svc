@@ -16,7 +16,7 @@ function flatten(errors: ValidationError[], parentPath = ''): Array<{ field: str
 }
 
 /**
- * ValidationPipe → API Contract v1.3 `invalid_request` error: `param` is the first failing field and
+ * ValidationPipe → API Contract `invalid_request` error: `param` is the first failing field and
  * `details` lists them all (the filter snake-cases the paths for the wire).
  */
 export function validationExceptionFactory(errors: ValidationError[]): BaseException {

@@ -1,7 +1,7 @@
 import { RoleEnum } from '@common/enums/role.enum';
 
 /**
- * The platform permission catalog — API Contract v1.3 §2 "Keto Namespace & Relations".
+ * The platform permission catalog — API Contract §2 "Keto Namespace & Relations".
  *
  * tenant-service owns Ory Keto, so this file is the single definition of every namespace/relation the
  * platform checks, which role grants what, and which permissions must never be trusted from the JWT
@@ -16,9 +16,13 @@ export const PERMISSION_CATALOG = {
     campaigns: ['read', 'write', 'activate', 'pause', 'complete'],
     variants: ['read', 'write'],
     segments: ['read', 'write', 'delete'],
-    referrers: ['read', 'write', 'block'],
+    // v5 §2's namespace table calls this one `participants`, but its role mapping, actor table and
+    // tuple examples all say `referrers` — 31 occurrences across the suite against none of the
+    // other. A namespace is an exact string, so `participants:note` would write a tuple nothing
+    // checks. Kept as `referrers`; raised as a spec defect (NOTE.md decision T-2).
+    referrers: ['read', 'write', 'block', 'note'],
     referrals: ['read', 'reject'],
-    rewards: ['read', 'approve', 'reject', 'clawback'],
+    rewards: ['read', 'approve', 'reject', 'clawback', 'adjust', 'resend_email'],
     analytics: ['read'],
     webhooks: ['read', 'write', 'delete'],
     payouts: ['read', 'write', 'confirm'],
@@ -42,10 +46,11 @@ const withoutNamespaces = (...excluded: PermissionNamespace[]): Permission[] =>
     ALL_PERMISSIONS.filter((permission) => !excluded.includes(permission.split(':')[0] as PermissionNamespace));
 
 /**
- * Role → permission grants (API §2 "Role → Permission Mapping").
- * Admin: "all namespaces except billing" — tenant deletion is also Owner-only (irreversible, and it
- * cancels the subscription). Operator and Viewer additionally read their own tenant profile, which
- * the dashboard needs on every page.
+ * Role → permission grants (API Contract §2 "Role → Permission Mapping").
+ *
+ * Operator and Viewer additionally read their own tenant profile, which the dashboard needs on every
+ * page; Admin is the custom role v5 does not define, kept at "all namespaces except billing" with
+ * tenant deletion reserved to the Owner (irreversible, and it cancels the subscription).
  */
 export const ROLE_GRANTS: Readonly<Record<RoleEnum, readonly Permission[]>> = {
     [RoleEnum.OWNER]: ALL_PERMISSIONS,
@@ -55,19 +60,37 @@ export const ROLE_GRANTS: Readonly<Record<RoleEnum, readonly Permission[]>> = {
         'campaigns:write',
         'campaigns:activate',
         'campaigns:pause',
+        'campaigns:complete',
         'variants:read',
         'variants:write',
         'segments:read',
         'segments:write',
         'referrers:read',
         'referrers:write',
+        'referrals:read',
+        'referrals:reject',
         'rewards:read',
         'rewards:approve',
         'rewards:reject',
         'analytics:read',
         'tenants:read'
     ],
-    [RoleEnum.VIEWER]: ['campaigns:read', 'referrals:read', 'rewards:read', 'analytics:read', 'tenants:read']
+    [RoleEnum.VIEWER]: ['programs:read', 'campaigns:read', 'variants:read', 'referrals:read', 'rewards:read', 'analytics:read', 'tenants:read'],
+    /**
+     * Support Agent. v5: "Read on referrers/referrals/rewards; limited write — rewards:adjust,
+     * rewards:resend_email, referrers:note — all live Keto + audit trail." The three writes are in
+     * LIVE_CHECK_PERMISSIONS below, so none of them can be authorized from a stale JWT snapshot.
+     */
+    [RoleEnum.SUPPORT]: [
+        'referrers:read',
+        'referrers:note',
+        'referrals:read',
+        'rewards:read',
+        'rewards:adjust',
+        'rewards:resend_email',
+        'analytics:read',
+        'tenants:read'
+    ]
 };
 
 /**
@@ -79,6 +102,12 @@ export const LIVE_CHECK_PERMISSIONS: ReadonlySet<Permission> = new Set<Permissio
     'rewards:approve',
     'rewards:reject',
     'rewards:clawback',
+    // v5 §2 adds `adjust` to the live-checked set, and the Support Agent row marks its three writes
+    // "all live Keto + audit trail" — a support annotation or a resent reward email must not be
+    // authorized by a token issued before the agent's access was revoked.
+    'rewards:adjust',
+    'rewards:resend_email',
+    'referrers:note',
     'payouts:write',
     'payouts:confirm',
     'api_keys:manage',
@@ -89,9 +118,12 @@ export const LIVE_CHECK_PERMISSIONS: ReadonlySet<Permission> = new Set<Permissio
 
 /** Role hierarchy used to stop a principal granting a role above their own. */
 export const ROLE_RANK: Readonly<Record<RoleEnum, number>> = {
-    [RoleEnum.OWNER]: 4,
-    [RoleEnum.ADMIN]: 3,
-    [RoleEnum.OPERATOR]: 2,
+    [RoleEnum.OWNER]: 5,
+    [RoleEnum.ADMIN]: 4,
+    [RoleEnum.OPERATOR]: 3,
+    // Above Viewer because Support can adjust a reward and resend its email, which Viewer cannot;
+    // below Operator because it cannot approve one. Only the ordering is used, never the numbers.
+    [RoleEnum.SUPPORT]: 2,
     [RoleEnum.VIEWER]: 1
 };
 

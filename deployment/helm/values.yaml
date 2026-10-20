@@ -177,6 +177,17 @@ envVars:
   TP_HTTP_RETRY_BASE_DELAY_MS: "400"
   TP_HTTP_RETRY_STATUSES: "429,500,502,503,504"
 
+  # STRIPE (client billing). Price IDs are public Stripe identifiers, not secrets.
+  # Five tiers per DB Model v5 section 3: free, starter, growth, scale, enterprise.
+  STRIPE_FREE_PRICE_ID: "price_change_me"
+  STRIPE_STARTER_PRICE_ID: "price_change_me"
+  STRIPE_GROWTH_PRICE_ID: "price_change_me"
+  STRIPE_SCALE_PRICE_ID: "price_change_me"
+  STRIPE_ENTERPRISE_PRICE_ID: "price_change_me"
+  STRIPE_SUCCESS_URL: "https://app.example.com/billing/success"
+  STRIPE_CANCEL_URL: "https://app.example.com/billing/cancel"
+  STRIPE_AUTOMATIC_TAX: "false"
+
   INTRA_CB_TIMEOUT_MS: "2500"
   INTRA_CB_VOLUME_THRESHOLD: "20"
   INTRA_CB_ERR_PCT: "50"
@@ -234,6 +245,18 @@ envVars:
 
 # -------- Secret (sensitive env) --------
 secretVars:
+  # Stripe credentials. The price IDs below are public identifiers and live in envVars; these two
+  # are not. Supply them per environment (or via a secret store) - billing fails closed without them.
+  STRIPE_SECRET_KEY: ""
+  STRIPE_WEBHOOK_SECRET: ""
+  # Encrypts provider_connections.signing_secret at rest (AES-256-GCM, 64 hex chars). Without it this
+  # service boots but refuses to create or resolve a provider connection, rather than storing a secret
+  # nothing can read back.
+  PROVIDER_SECRET_ENCRYPTION_KEY: ""
+  # Signs and verifies the /t/o and /t/c email-tracking tokens (64 hex chars). Notification signs with
+  # it, ingestion verifies with it, and both read it from this service — so it is one value per
+  # environment, and changing it invalidates the tokens in mail already sent.
+  TRACKING_TOKEN_KEY: ""
   CH_PASSWORD: "sa"
   REDIS_USERNAME: "appuser"
   REDIS_PASSWORD: "super-secret"

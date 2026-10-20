@@ -4,7 +4,7 @@ import type { KetoRelationTuple } from '../keto.service';
 import { Permission, ROLE_GRANTS, splitPermission } from './permission-catalog';
 
 /**
- * Keto tuple shapes (API Contract v1.3 §2 "Relation Tuple Examples").
+ * Keto tuple shapes (API Contract §2 "Relation Tuple Examples").
  *
  *   membership   role:{tenant_id}:{role}#member@user:{user_id}
  *   grant        campaigns:{tenant_id}#write@(role:{tenant_id}:operator#member)
@@ -30,7 +30,15 @@ export enum ServiceCapability {
     TENANT_VERIFICATION_WRITE = 'tenant_verification.write',
     TENANT_SUSPEND = 'tenant.suspend',
     USAGE_WRITE = 'usage.write',
-    DSR_ERASE = 'dsr.erase'
+    DSR_ERASE = 'dsr.erase',
+    /** Event Ingestion reading a provider connection and its secret to verify a callback (Architecture §2.1/§2.4). */
+    PROVIDER_CONNECTION_READ = 'provider_connection.read',
+    /**
+     * The email-tracking token key. Notification-service signs `/t/o` and `/t/c` tokens with it and
+     * Event Ingestion verifies them, so both hold this capability — separate from
+     * `provider_connection.read` so neither service gets the other's secrets by holding one grant.
+     */
+    TRACKING_TOKEN_READ = 'tracking_token.read'
 }
 
 export const userSubject = (userId: string): string => `user:${userId}`;

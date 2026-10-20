@@ -12,7 +12,7 @@ import { UserAnonymisedEvent, UserRemovedEvent } from '@domains/user';
 
 import { erasedMemberData, isErasedMember } from './member-erasure';
 
-/** What erasure keeps, and why — returned in every receipt so the subject can be told (Product Spec v4). */
+/** What erasure keeps, and why — returned in every receipt so the subject can be told (Product Spec). */
 const RETAINED = ['audit_log: the operator id (not identifying) on past actions, for tenant lifetime + 12 months (API §8.3)'];
 
 type Member = { id: string; tenantId: string; role: string; email: string; kratosIdentityId: string; deletedAt: Date | null };

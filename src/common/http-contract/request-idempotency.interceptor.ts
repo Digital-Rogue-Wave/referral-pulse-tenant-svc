@@ -13,7 +13,7 @@ import { BaseException } from '@common/exceptions/base.exceptions';
 import { sha256Hex } from '@common/helper/hashing';
 import { DatabaseService } from '@app/database/database.service';
 
-/** API Contract v1.3 §1: request-level dedup window. */
+/** API Contract §1: request-level dedup window. */
 const IDEMPOTENCY_WINDOW_MS = 24 * 60 * 60 * 1000;
 const KEY_FORMAT = /^[\x21-\x7e]{1,255}$/;
 const IDEMPOTENT_METHODS = new Set(['POST', 'PATCH']);
@@ -26,7 +26,7 @@ export const SkipIdempotency = (): CustomDecorator<string> => SetMetadata(SKIP_I
 type Claim = { replay: { status: number; body: unknown } } | { claimed: true };
 
 /**
- * `Idempotency-Key` for every non-ingestion POST and PATCH (API Contract v1.3 §1, DB Model v2 §0.7).
+ * `Idempotency-Key` for every non-ingestion POST and PATCH (API Contract §1, DB Model §0.7).
  *
  * - Required from dashboard callers; optional for service callers, which dedupe on business keys.
  * - Same key + same request within 24 h → the original response, verbatim (`Idempotent-Replayed: true`).

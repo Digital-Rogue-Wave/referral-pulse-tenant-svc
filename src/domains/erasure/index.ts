@@ -2,8 +2,8 @@ import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { IsOptional, IsString, Length, Matches, ValidateIf } from 'class-validator';
 
 /**
- * One data-subject erasure, as the compliance orchestrator asks it of tenant-service (Product Spec v4 "DSR
- * Propagation"). The subject is named by their email hash (DB Model v2 `email_hash`: SHA-256 of the
+ * One data-subject erasure, as the compliance orchestrator asks it of tenant-service (Product Spec "DSR
+ * Propagation"). The subject is named by their email hash (DB Model `email_hash`: SHA-256 of the
  * lower-cased address) or, when the orchestrator already knows it, by the operator id.
  */
 export class OperatorErasureDto {

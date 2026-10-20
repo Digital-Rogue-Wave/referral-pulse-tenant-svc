@@ -22,15 +22,15 @@ const RELAY_EVERY_MS = 2_000;
 const BATCH_SIZE = 100;
 /** After this many failed publishes a row is parked as `failed` for an operator (and alerts). */
 const MAX_ATTEMPTS = 10;
-/** Published rows are kept this long for replay and audit, then pruned (DB Model v2 §0.6). */
+/** Published rows are kept this long for replay and audit, then pruned (DB Model §0.6). */
 const RETENTION_DAYS = 7;
 
 type Envelope = { actor?: { actor_id?: string }; metadata?: { correlation_id?: string | null } };
 
 /**
- * Publishes `event_outbox` rows to SNS `tenant-events` (Architecture v1.3 §3.2), oldest first,
+ * Publishes `event_outbox` rows to SNS `tenant-events` (Architecture §3.2), oldest first,
  * at least once. The transport wrapper keeps the platform's message envelope (consumers built on the
- * shared template read it); its `payload` is the canonical Event Model v3 envelope, its deduplication id
+ * shared template read it); its `payload` is the canonical Event Model envelope, its deduplication id
  * is `event_id` and its idempotency key is the event's `external_id` (already namespaced by event type).
  *
  * One relay job runs at a time (concurrency 1), so rows are never published concurrently, and a tenant's

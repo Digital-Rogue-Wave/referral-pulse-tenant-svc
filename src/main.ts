@@ -91,7 +91,7 @@ async function bootstrap(): Promise<void> {
         if (nodeEnv !== 'production') {
             const swaggerConfig = new DocumentBuilder()
                 .setTitle('Tenant Service API')
-                .setDescription('ReferralAI tenant, identity and billing service (API Contract v1.3)')
+                .setDescription('ReferralAI tenant, identity and billing service (API Contract)')
                 .setVersion('1.0')
                 .addBearerAuth()
                 .build();

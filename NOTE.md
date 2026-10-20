@@ -659,3 +659,584 @@ removed — it is currently registered in `BillingModule`.
 tenant writes/imports into events) plus moving the Stripe webhook + billing broadcasts + DB. Nothing in
 the identity/tenant core depends on billing internals, so the split is clean once those tendrils are
 event-driven. No code changed in this pass.
+
+---
+
+# V5 spec alignment (2026-10-14)
+
+The spec suite was rewritten. The **only** source of truth is now
+`D:\Projects\Work\REFERRAL\referral-scope-ahmed\referral spec\referral spec` — the ten v5 documents
+plus eleven JSON Schemas. The copies in this repo's `spec/` are superseded and are to be replaced,
+but not in this pass: alignment comes first.
+
+Phases are `T1`…`T5`, one cherry-pickable commit each.
+
+## V5.1 What changed for this service
+
+Two kinds of change. The first is field- and value-level drift against documents that mostly kept
+their shape. The second is new: **Architecture v5 §2.1 assigns tenant-service four responsibilities
+it did not have**, and three of them have nowhere to live (§V5.4).
+
+### Auth and roles — API Contract v5 §2
+
+This is the substance of the alignment, because `permission-catalog.ts` is the single definition the
+tuple writer, the `perms` resolver and the guards all read from, so every gap in it is a gap in
+authorization platform-wide.
+
+| # | v5 says | code has |
+|---|---|---|
+| P1 | `rewards` relations include `adjust` and `resend_email` | neither — so a Support Agent cannot be granted either |
+| P2 | `referrers` relations include `note` | missing |
+| P3 | four standard roles: `owner`, `operator`, `viewer`, **`support`** | `OWNER`, **`ADMIN`**, `OPERATOR`, `VIEWER` — `support` absent, `admin` is not a v5 role |
+| P4 | `operator` also gets `campaigns:complete`, `referrals:read`, `referrals:reject` | all three missing |
+| P5 | `viewer` also gets `programs:read`, `variants:read` | both missing |
+| P6 | `support` gets `referrers:read/note`, `referrals:read`, `rewards:read/adjust/resend_email`, `analytics:read`, and its writes are "live-Keto, reason-mandatory, audit-logged" | the whole role |
+| P7 | the live-check set includes `rewards:adjust` (and §2 marks support's `resend_email` / `note` live-checked too) | missing |
+
+Already correct, checked rather than assumed: the other nine namespaces and their relations; the
+hybrid model (`perms` snapshot in a short JWT, live Keto for money/keys/object-scoped); tenant
+isolation returning 404 rather than 403; `service:{client_id}` subjects for machine callers; and
+tenant-scoped role objects — the spec's own `role:operator#member` example is *not* tenant-scoped,
+which would grant across tenants, and `keto-tuples.ts` already departs from it deliberately.
+
+### Data model — DB Model v5 §3
+
+| # | v5 says | code has |
+|---|---|---|
+| D1 | `tenants.plan CHECK in ('free','starter','growth','scale','enterprise')` | the column is `billing.plan`, a free `varchar(50)` with no CHECK, default `'Free'`; `BillingPlanEnum` is title-case with four values — **`scale` missing**. v5's DB Model defines no billing tables at all, so `tenants` is the only place it could have put `plan` |
+| D2 | `roles` has `tenant_id` (null for the four standard roles) and `keto_relations jsonb` | no `tenant_id` (so no custom per-tenant roles) and the column is `scopes` |
+| D3 | `api_keys.keto_scope_note text` | missing |
+| D4 | `idx_api_keys_tenant_active (tenant_id) WHERE revoked_at IS NULL` | a plain `(tenant_id, revoked_at)` index |
+| D5 | `oauth2_clients` table | missing |
+| D6 | `sessions` table | missing |
+| ~~D7~~ | ~~verification status values~~ | **withdrawn — already correct, see below** |
+
+**D7 withdrawn.** Read from the enum rather than the schema the first time. The migration
+`tenants_verification_status_check` is already `('unverified','pending','verified','rejected')` —
+exactly v5 §3. `DomainVerificationStatusEnum`, whose fourth value is `failed`, governs
+`domain_verification_status`, a different column that v5 does not specify at all.
+
+Two things worth recording while the constraints were open:
+
+- `tenants_status_check` is `('active','suspended','locked','closed')` where v5 §3 says
+  `('active','suspended','closed')`. The extra `locked` is real — the tenant carries
+  `locked_at`/`lock_until`/`lock_reason` and the billing lifecycle drives it. An extension beyond
+  the spec rather than a contradiction, but v5's set is narrower and someone should know.
+- `tenant_verifications_status_check` is `('pending','in_review','verified','rejected')`, matching
+  DB Model §3 exactly. That settles spec defect 2 below: the code follows the DB Model, and
+  Architecture §2.1's `pending_review` is the outlier.
+
+### Already aligned, no work needed
+
+`users`, `user_roles`, `audit_log`, `tenant_verifications`, `event_outbox`, `idempotency_keys` match
+§3 field for field. `tenants` carries `data_region`, `retention_months` and `metadata` as specified.
+`api_keys.key_prefix` is `char(4)` and the full key is returned once — and the DB Model's own
+`char(4)` is what settles the length question against Event Model §2.2.
+
+## V5.2 Decisions
+
+**T-1 — `admin` becomes a custom role, not a deleted one.** v5 names four standard roles and
+`admin` is not among them, but removing a role that may be assigned to live users would orphan them
+mid-session. v5 resolves this itself: `roles.name CHECK in ('owner','operator','viewer','support')
+**or custom**`, with `tenant_id` null only for the standard four. So `admin` stays, reclassified as a
+custom role with its existing grants, and `support` is added as the fourth standard role. Nobody is
+locked out, and the standard set matches the spec.
+*Rejected:* delete `ADMIN` (breaks live assignments for no gain); leave it as a fifth standard role
+(the spec's standard set is closed, and `roles.name`'s CHECK would then disagree with it).
+
+**T-2 — the `referrers` namespace name is correct as-is; the spec's §2 table is the typo.** API
+Contract §2's namespace table calls it `participants`, while its own role mapping, actor table and
+tuple examples all say `referrers` — 31 occurrences of `referrers:` across the v5 suite against zero
+of `participants:`. A Keto namespace is an exact string, so this is not a synonym question: writing
+`participants:note` would produce a tuple nothing checks. No code change; raised as a spec defect.
+
+## V5.3 Phases
+
+| # | Phase | Covers |
+|---|---|---|
+| T1 | permission catalog and roles | P1–P7 |
+| T2 | plan / verification value sets | D1, D7 |
+| T3 | `keto_relations` — the projection fix (the other three §3 items left out, §V5.9) | D2 |
+| T4 | ~~`oauth2_clients` and `sessions` tables~~ | **not building — decision T-4, §V5.8** |
+| T5 | the four new v5 responsibilities | §V5.10 — new scope, not drift |
+
+## V5.4 The new responsibilities have nowhere to live
+
+Architecture v5 §2.1 gives tenant-service four responsibilities it did not have in v3:
+
+1. **consent registry**
+2. **data-subject requests — `POST /v1/dsr` and the DSR fan-out Temporal workflow**
+3. **audit sink** (Product Spec R-CPL-01)
+4. **provider connection config and secrets** — billing, payout, CRM, webhook signing secrets and
+   the tracking-token key, "exposed to Event Ingestion through a cache"
+
+DB Model v5 §3 provides tables for exactly one of them. Its table list is nine — `tenants`, `users`,
+`roles`, `user_roles`, `api_keys`, `oauth2_clients`, `sessions`, `tenant_verifications`,
+`audit_log` — and its own summary matrix (§13) repeats that nine. `audit_log` already existed, so
+the audit sink is covered. There is **no table for the consent registry, none for data-subject
+requests, and none for provider connections or their secrets.**
+
+That last one is the sharpest: Architecture §2.1 and the §2.4 addendum both say Event Ingestion reads
+provider connection secrets from a tenant-service cache, and the ingestion service's own revision
+note says the inbound receivers verify "the provider's signature scheme ... against the connection
+secret cached from tenant-service". So another service's documented ingress path depends on a store
+this service is told to own and given no schema for.
+
+This is not something to design unilaterally — it is secret material for a money path, with
+residency and retention consequences, and the DSR fan-out is a cross-service workflow contract. T5
+stays open pending a DB Model section for the three. The documents are mid-revision and say so: the
+architecture's own header lists "Still to author" items and notes that the §11.2/§12/§13 drawings
+"still show the old provider lane — to redraw".
+
+## V5.5 Spec defects found — for the clean-up round
+
+1. **The §2 namespace table says `participants`; everything else says `referrers`.** Decision T-2.
+   A namespace is an exact string, so one of them produces tuples nothing checks.
+2. **Company verification has two different state sets.** Architecture §2.1 says the
+   `account_verification` workflow runs `unverified → pending_review → verified → rejected`; DB Model
+   §3 types `tenant_verifications.status` as `('pending','in_review','verified','rejected')`.
+   `pending_review` vs `in_review`, and the DB has no `unverified` state while `tenants`
+   `verification_status` does.
+3. **API keys cannot be both bcrypt-hashed and looked up by hash.** API Contract §2 says "API keys
+   are bcrypt-hashed" and DB Model §3 says `key_hash text not null (bcrypt/argon2 of full key)` with
+   `Unique: (key_hash)`. bcrypt and argon2 are salted, so the digest is not reproducible from the
+   presented key — a unique index on it can never be probed, and validation would have to scan every
+   row. This service uses HMAC-SHA256 with a pepper, which is deterministic, indexed and still
+   non-reversible. The spec should say keyed-hash, not bcrypt.
+4. **Four responsibilities assigned with tables for one.** §V5.4.
+5. **Architecture §2.3 still lists `conversion.recorded` under segmentation's Publishes**, while the
+   same document's revision header says "segmentation-service no longer emits a translated
+   conversion.recorded" and Event Model §4.12 says the translation does not happen. Not this
+   service's, but it is a contradiction inside one document.
+
+## V5.6 Progress
+
+| Phase | Status |
+|---|---|
+| T1 permission catalog and roles | done — `feat(authz): align the permission catalog and roles to API Contract v5` |
+| T2 plan tier | done — `feat(billing): add the Scale plan tier v5 defines` |
+| T3 `keto_relations` — the projection fix | done, scoped down — `fix(authz): derive the role projection from ROLE_GRANTS…` (§V5.9) |
+| T4 `oauth2_clients` and `sessions` tables | **not building — decision T-4** (§V5.8) |
+| T5 the four new responsibilities | **new scope, not drift** — proposed shapes awaiting approval (§V5.10) |
+
+Verified after T2: 51 suites / 495 unit tests green, 28 typecheck errors — the same 28 that were
+there before this pass, none in a file it touched — and no new lint errors.
+
+## V5.7 T3 is a migration, so it stops here for approval
+
+Three of the four items need DDL, and this repo treats migrations as an approval gate rather than a
+detail. What is pending, and why each matters:
+
+1. **`roles.keto_relations`, and the fact that `roles.scopes` currently disagrees with the
+   authoritative catalog.** This is more than a rename. DB Model §3 wants
+   `keto_relations jsonb` holding the relation set a role grants, e.g.
+   `["campaigns:write","rewards:approve"]`. The column today is `scopes`, and the seeded values are
+   wildcards from an older vocabulary — `['tenant:*']`, `['users:*','api_keys:*','billing:read']` —
+   which are not Keto relations and do not match `ROLE_GRANTS` in `permission-catalog.ts`. §3 is
+   explicit that `roles`/`user_roles` are "a projection for dashboard display and bulk assignment,
+   not the authoritative permission store", so the projection is simply stale: a dashboard rendering
+   a role's permissions from this table shows something the guards do not enforce.
+   *Recommended:* rename to `keto_relations` and seed it **from `ROLE_GRANTS`** rather than by hand,
+   so the projection is derived from the single source of truth and cannot drift again — the same
+   shape as the ingestion property manifest.
+2. **`roles.tenant_id`**, null for the four standard roles and set for custom ones. Decision T-1
+   keeps `ADMIN` as a custom role, and v5 scopes custom roles to a tenant; without the column
+   `ADMIN` is a global row, which is the one part of T-1 the schema cannot yet express.
+3. **`api_keys.keto_scope_note text`** — missing. A free-text note on what a key is scoped to.
+4. **`idx_api_keys_tenant_active (tenant_id) WHERE revoked_at IS NULL`** — the index today is a
+   plain `(tenant_id, revoked_at)`. The partial form is what §3 specifies, and it is the better
+   index for the only query that uses it (list a tenant's live keys).
+
+Item 4 alone is a safe, non-breaking index swap. Items 1–3 are additive DDL plus a data backfill for
+`keto_relations`.
+
+## V5.8 Decision T-4 — `oauth2_clients` and `sessions` are not being built
+
+DB Model v5 §3 lists both, so this is a deliberate departure rather than an oversight.
+
+Both are described in the spec as **mirrors of Ory**, not as systems of record: `sessions` is
+"Active dashboard session index (Ory Kratos authoritative; this is a fast local lookup + revocation
+list)" and `oauth2_clients` "Mirrors/augments Ory Hydra". This service delegates both entirely to
+Ory today — `kratos.service.ts` for sessions, Hydra via the credential resolver for clients — and
+nothing reads a local copy.
+
+Building them now would add two tables with no reader, which KISS and YAGNI both rule out, and it
+would be worse than merely unnecessary: a mirror that nothing keeps current goes stale, and a stale
+session index used as a revocation list is actively dangerous — it would answer "is this session
+revoked?" with yesterday's answer on a security path.
+
+*Named trigger for revisiting:* a session-revocation feature (log out everywhere, revoke on role
+change), or a measured need for the sub-ms token validation the Redis mirror in §3 is there to
+serve. Either makes the table necessary and gives it a writer in the same change.
+*Rejected:* build both now to match the table count (two unread tables, one of them a security
+hazard); build `sessions` only (same problem, half the surface).
+
+## V5.9 T3 — what was done and what was left, with reasons
+
+Scoped down after reading the code. Of the four §3 items, only one had a consumer, and that one was
+a live defect rather than a missing column.
+
+**Done — the role projection was misreporting permissions.** `roles.scopes` held wildcards from an
+older vocabulary (`tenant:*`, `users:*`, `api_keys:*`) that are not Keto relations and appear nowhere
+in `permission-catalog.ts`. §3 names the column `keto_relations` and defines it as the relation set
+the role grants, and also says `roles`/`user_roles` are a display projection, not the authoritative
+store. So anything rendering a role's permissions from that table showed permissions that are not
+granted and omitted ones that are — `ADMIN` projected five wildcards while actually holding every
+relation except billing. Renamed, and the seed now derives it from `ROLE_GRANTS` so the two cannot
+diverge again. Verified by applying the migration inside a transaction against the dev database
+(it renames the column and rewrites the four existing rows) and rolling back.
+
+**Not done, each for a stated reason:**
+
+| Item | Why not |
+|---|---|
+| `roles.tenant_id` | Nothing creates custom per-tenant roles — the seed is the only writer of `roles`. The column would be unread, and YAGNI is the binding rule here. |
+| `api_keys.keto_scope_note` | Nothing reads or writes it. Same reason. |
+| `idx_api_keys_tenant_active` partial index | Two reasons. It is an optimisation for a query that is not hot, and more importantly I cannot verify offline whether Prisma 7 can express a partial index in `@@index`. Creating it in SQL only would leave the declared model and the database disagreeing, and this repo's convention is that every hand-written index is mirrored in the schema with `map:` (see `AuditLog`). Needs the Prisma docs, not a guess. |
+| `roles` unique → `(tenant_id, name)` | Follows `roles.tenant_id`, and it is not free: `users.service.ts` does `role.findUnique({ where: { name } })`, which stops compiling the moment `name` alone is not unique, and with per-tenant roles a name-only lookup is ambiguous anyway. **Also worth knowing before anyone does it:** Postgres treats NULLs as distinct, so a plain unique index on `(tenant_id, name)` would *not* prevent two global roles with the same name — §3's "tenant_id null for the four standard roles" needs a partial unique index on `name WHERE tenant_id IS NULL` to actually hold. |
+
+## V5.10 T5 — new scope, not alignment drift
+
+Worth separating clearly, because "tenant-service is behind the spec" would be the wrong reading.
+Three of the four responsibilities Architecture v5 §2.1 adds are **new features v5 assigned**, not
+code that drifted.
+
+**Already present, verified rather than assumed:**
+
+- **The audit sink's store.** `audit_log` exists with §3's columns and indexes, and there is a
+  writer, a service and a controller behind it.
+- **This service's own erasure handler.** `POST /internal/erasures/operators` erases an operator and
+  returns a receipt, gated on the `dsr.erase` service capability. That is precisely the part
+  R-CPL-01 assigns to "every other service": each one "implements its own erasure handler and
+  returns a receipt". It was built against the older design, where a separate compliance
+  orchestrator drove the fan-out.
+
+**What v5 actually moved here: the coordinator role.** R-CPL-01 now makes the Tenant service the
+single coordinating owner — it "hosts the consent registry, the DSR endpoint and the DSR fan-out
+workflow and the audit sink". The per-service handler exists; the orchestrator does not.
+
+Product Spec §474 states the full contract this implies:
+
+| | |
+|---|---|
+| Sync APIs | `POST /v1/connections` (provider connections), `POST /v1/dsr` |
+| Publishes | `connection.created|revoked`, `consent.recorded`, `dsr.requested`, `erasure.completed`, `audit.logged` |
+| Consumes | **erasure receipts from every service** |
+
+None of those five events is published today, and nothing is consumed. `POST /v1/dsr` is Owner-only
+and gated on `programs:write` (§618), and it "replaces /v1/erasure-requests under referrers:write"
+(§1934).
+
+**Why this stops here rather than being built.** Not because it is large, but because three specific
+things are missing that cannot be invented responsibly:
+
+1. **No tables.** DB Model v5 §3 gives nine, and none of them is a consent registry, a DSR request,
+   or a provider connection. The data shapes would be mine to invent, including retention and
+   residency behaviour for consent records — which is the one area where guessing wrong is a legal
+   problem rather than a bug.
+2. **Provider secrets are a security design, not a schema.** §2.1 says this service holds "webhook
+   signing secrets, tracking-token key" and exposes them "to Event Ingestion through a cache", and
+   Event Ingestion's own §2.4 addendum already depends on it for verifying provider signatures. That
+   needs an encryption-at-rest and rotation design with a security review — inventing one
+   unilaterally for a money path is worse than not having it.
+3. **The fan-out is a cross-service contract.** The coordinator has to know every service's erasure
+   endpoint and aggregate their receipts. This service's own handler is `POST
+   /internal/erasures/operators` with the `dsr.erase` capability; whether the other eight follow that
+   convention is not something this repo can answer, and six of them are not mine.
+
+**Recommended shape, for approval rather than silent implementation** — so the decision is cheap to
+make and the work is unblocked the moment it is:
+
+- `consents` — subject reference (hashed), tenant, `tracking_consent` / `marketing_consent` (the
+  §2.4 enums), `consent_source`, `recorded_at`, `withdrawn_at`. Append-only, so withdrawal is a new
+  row and the history survives; current state is the latest row per subject.
+- `dsr_requests` — tenant, subject reference, `type ∈ (access, erasure, portability)`, status,
+  `temporal_workflow_id`/`run_id` (the same resumability pattern §3 already applies to
+  `tenant_verifications`), `requested_by`, `due_at` (the one-month deadline R-CPL-02 names),
+  `completed_at`.
+- `dsr_receipts` — one row per service per request, with the receipt payload, so `erasure.completed`
+  can carry all of them as R-CPL-02 requires.
+- `provider_connections` — tenant, provider, `connection_id`, config, and a reference to a secret
+  held in a secret manager rather than the column itself. **The secret handling is the part needing
+  review.**
+
+## V5.11 Spec defects — additions
+
+6. **Architecture §2.1 says tenant-service "Consumes: None. It is a dependency of other services
+   (token validation), not an event reactor."** Product Spec §474 says it consumes "erasure receipts
+   from every service", and R-CPL-01 makes it the DSR coordinator, which cannot work without
+   consuming them. The two statements cannot both hold.
+7. **`POST /v1/dsr` is gated on `programs:write`** (§618). It resolves to Owner-only in practice,
+   since no other standard role holds that relation, but gating a data-subject request on a
+   *programs* permission is semantically odd and will read as a copy-paste to the next person. A
+   `dsr:*` relation, or `api_keys:manage`-style owner-scoped relation, would say what it means.
+
+## V5.12 D5 — the compliance and provider-connection tables, built
+
+§V5.10 recommended four tables and asked for approval rather than implementing them silently. The
+approval came on 2026-10-19 ("we are not even on staging — as long as we follow the v5 we can do
+them now"), so they exist as of
+`src/prisma/migrations/20261019120000_v5_compliance_and_provider_connections`:
+`consents`, `dsr_requests`, `dsr_receipts`, `provider_connections`, with models in
+`src/prisma/schema/compliance.prisma` and `src/prisma/schema/provider-connection.prisma`.
+
+They are the schema only. **No endpoint, workflow or service code was added** — see "What still has
+no code" below for why each piece is still open rather than forgotten.
+
+### Decisions taken, with what was rejected
+
+**D5-a — single-key ULID, against DB Model §0.1.** §0.1 specifies a dual-key model: `pk bigint
+GENERATED ALWAYS AS IDENTITY` as the physical key plus `id text` ULID as the business key. Not one
+of this service's 22 existing tables does that; all of them are `@id @default(ulid()) @db.VarChar(26)`
+under the 2026-09-02 platform ruling recorded in CLAUDE.md, and `20260903003657_ulid_id_harmonize`
+converted the last of them. These four follow the 22.
+
+*Rejected:* building them to §0.1 as written. It would make them the only dual-key tables in the
+schema, so every join, every repository and every reader would have to know which era a table came
+from. If the fleet does move to dual keys, it moves as one migration across all 26 tables, not as
+four tables that got there first. **This is a divergence from a written spec, so it is the lead's to
+ratify, not mine to settle** — the same §0.1 conflict applies to every table this service already
+has, so ratifying it closes 26 cases rather than 4.
+
+**D5-b — the DSR lifecycle states are invented.** R-CPL-02 names the three request *types* (access,
+erasure, portability) and the one-month deadline, but no status values. `pending | in_progress |
+completed | failed`, shaped after `tenant_verifications.status` so the two operator-facing workflows
+read the same way.
+
+*Rejected:* no status column, deriving state from `completed_at` and the receipt count. It cannot
+express a failed fan-out, which is exactly the state someone has to act on before the deadline.
+
+**D5-c — the provider list comes from DB Model §10.** `provider_connections.provider` is checked
+against `stripe | paddle | chargebee | paypal | wise | gift_card | crm`, which is the list §10
+already constrains `inbound_webhook_receipts.provider` to. A connection and the receipt it produces
+therefore cannot disagree about who sent a callback.
+
+*Rejected:* a free-text provider column. It is how the retired-event-name problem started — a value
+nothing validates becomes a value nothing can rely on.
+
+**D5-d — the webhook secret sits in an encrypted column, and this is the part wanting review.**
+`signing_secret` is AES-256-GCM encrypted at rest, matching notification-service's existing
+`InboundIntegration.signingSecret`. That is deliberate: Architecture §2.8 moves those receivers to
+ingestion (D4), so the secret keeps the handling it already has and the move stays a move.
+
+*Rejected:* a secret-manager reference, which §V5.10 recommended and which is genuinely stronger.
+It is a one-column change and no data has to migrate, because nothing is stored yet. **Flagged, not
+assumed:** this column should not hold a live provider credential until someone with a security hat
+has looked at the encryption and rotation design. Pre-staging is not a reason to skip that, it is
+the cheapest moment to do it.
+
+**D5-e — tenant FK with `ON DELETE CASCADE` on all four.** Consistent with `tenant_verifications`
+and the other tenant-scoped tables. `dsr_receipts` gets no second FK to `tenants`; it reaches its
+tenant through its request, and one cascade path is enough.
+
+*Rejected:* no FK, like `audit_log` and `idempotency_keys`. Those are append-only logs whose rows
+outlive their subject on purpose. A consent record with no tenant is not evidence of anything —
+you cannot tell whose consent it was — so orphaning it is worse than cascading it.
+
+**D5-f — `idx_provider_conn_live` is a partial unique index.** One live connection per tenant per
+provider, `WHERE revoked_at IS NULL`. A plain unique on `(tenant_id, provider)` would make a revoked
+connection block its own replacement. Prisma cannot express a partial index, so it lives in the
+migration SQL — the same place the CHECK constraints live, for the same reason.
+
+### Verified, not assumed
+
+The migration was applied against the dev Postgres inside a transaction and rolled back, and the
+constraints were probed with savepoints in the same transaction. Observed:
+
+- all four tables and all ten CHECK constraints create cleanly; nothing was left behind (confirmed
+  by re-querying `information_schema.tables` afterwards — none of the four exist)
+- a second *live* `(tenant, stripe)` connection is rejected; after revoking the first, the
+  replacement is accepted — the partial index does what it is there for
+- `provider = 'monzo'` rejected, `request_type = 'deletion'` rejected (v5's word is `erasure`), a
+  consent row with no subject reference rejected
+- a second receipt from the same service for the same request rejected; deleting the request takes
+  its receipts with it
+- `pnpm test` 497/497 pass; `tsc --noEmit` reports 28 errors, the unchanged pre-existing baseline
+
+### What still has no code, and why
+
+1. **`POST /v1/dsr`, the consent registry endpoints, and the fan-out workflow.** The fan-out is a
+   cross-service contract: the coordinator has to know all eight other services' erasure endpoints
+   and aggregate their receipts. This repo can answer for its own handler
+   (`POST /internal/erasures/operators`, capability `dsr.erase`, already implemented in
+   `src/features/users/operator-erasure.controller.ts`); it cannot invent the other eight. Six of
+   them are not mine.
+2. **Provider-connection CRUD and the encryption helper** — gated on D5-d's security review.
+3. **Exposing connections to ingestion through a cache**, which Architecture §2.1 requires and which
+   D4 depends on. The table is the half this service owns; the cache contract is a cross-service
+   item and belongs with D4.
+4. **§V5.11 defects 6 and 7 are still open and bear on this.** Architecture §2.1 says this service
+   consumes nothing while Product Spec §474 has it consuming erasure receipts from every service —
+   `dsr_receipts` is built for the Product Spec reading, because R-CPL-01 cannot work under the
+   other one. And `POST /v1/dsr` is still gated on `programs:write` (§618), which resolves to
+   Owner-only but says the wrong thing.
+
+## V5.13 D4 step 1 — provider connections, the half this service owns
+
+D4 moves the inbound provider receivers and the email-tracking endpoints from notification-service to
+ingestion-service (Architecture v5 §2.4/§2.8 and API Contract §6.5, both carrying the dated
+2026-10-12 addendum; DB Model §10 still assigns them to notification and is the lagging document —
+tiebreak recorded in `event-svc/NOTE.md` §11.9). Ingestion cannot verify a provider callback without
+the connection secret, and Product Spec §12 lists "connection config and tracking-token key (cache
+from Identity & Access)" among Event Ingestion's inputs — so this service goes first.
+
+Built here: `POST /v1/connections`, `GET /v1/connections`, `DELETE /v1/connections/{id}`, and
+`GET /v1/internal/connections/{provider}/{connectionId}` for ingestion's cache, over the
+`provider_connections` table from §V5.12.
+
+### Decisions taken, with what was rejected
+
+**D4-1 — the `POST /v1/connections` body is this service's proposal, not a contract.** API Contract
+§6.5 names the endpoint and its authorization ("Owner, `api_keys:manage`") but §3.1 marks the body
+"still to author". The shape is `{ provider, connection_type, name?, signing_secret, config? }`, and
+the response carries `receiver_url` so the operator gets the URL to paste into the provider's console.
+
+*Rejected:* waiting for §3.1 to be authored. Nothing downstream can be built without a connection to
+read, and a body this small is cheap to change. It is flagged so a later §3.1 is a diff against a
+stated proposal rather than a surprise.
+
+**D4-2 — `api_keys:manage`, not a new `connections:*` relation.** §6.5 names that relation, and it is
+already the platform's relation for "credentials that let something talk to the platform". A new
+relation would need provisioning in Keto for every existing tenant.
+
+*Rejected:* a `connections:manage` relation, which would say what it means more precisely. Worth
+raising with §V5.11 defect 7 (`POST /v1/dsr` gated on `programs:write`) as one naming question
+rather than two.
+
+**D4-3 — the provider list is the category list, not API §6.5's revision line.** §6.5's revision
+names `stripe, paddle, chargebee, paypal, wise, tremendous`; the table directly below it and DB
+Model §10's CHECK both name `… wise, gift_card, crm`. Two of three mentions name categories and one
+names a vendor, so categories win and `gift_card` covers Tremendous/Tango.
+
+*Rejected:* following the revision line as the newest text. It would make `provider` a mix of six
+categories and one vendor, and would drop CRM — which §6.5's own table lists as a source. Recorded
+as a spec defect in §V5.14.
+
+**D4-4 — one live connection per tenant per provider, enforced in the database.** `idx_provider_conn_live`
+is partial on `revoked_at IS NULL`, so a second live Stripe connection is a 409 and cannot quietly
+take over the first one's callbacks, while a revoked one steps aside for its replacement.
+
+*Rejected:* allowing several and letting the path disambiguate. The path does identify the
+connection, but two live secrets for one provider means a callback verified by the wrong one is
+indistinguishable from a legitimate one at the audit level.
+
+**D4-5 — rotation is replacement.** There is no `PUT` on a connection's secret: revoke and create.
+That changes the receiver URL, which is the point — the provider has to be reconfigured, so there is
+no window where the old secret still verifies.
+
+*Rejected:* a rotate endpoint mirroring `POST /v1/api-keys/{id}/rotate`. An API key is presented by
+our own SDK, which we can update; a provider secret is held in the provider's console, which we
+cannot.
+
+**D4-6 — the internal read is the one endpoint that returns a decrypted secret.** Service-token only,
+with its own capability `provider_connection.read` rather than reusing `tenant_entitlements.read`, so
+granting ingestion the ability to read connections does not also grant it anything else. It resolves
+across tenants on purpose: a provider callback carries no tenant context, and the connection id in
+the path is what establishes it.
+
+*Rejected:* having ingestion verify through a call to this service ("send me the body, tell me if the
+signature is good"). It would put this service on ingestion's per-callback path and make it a
+latency and availability dependency of the most internet-exposed surface. The cache is what §2.1
+specifies, and caching requires handing over the secret.
+
+**D4-7 — `connection.created|revoked` are a cache-invalidation contract.** Product Spec §12 lists
+them among this service's published events; because ingestion caches connections, their arrival is
+what makes a revoked connection stop verifying before the cache TTL. The payload carries the
+connection id, provider and actor, and never the secret (asserted in the specs).
+
+**D4-8 — no `last_received_at` on the connection.** It was in §V5.12's first cut and is now removed
+from the model and the migration. Ingestion is what receives the callbacks and holds no RDS, so
+stamping the column would mean a write to this service on every verified callback — exactly the
+hot-path dependency D4-6 refuses. "Last received" is a `(provider, received_at desc)` read over the
+receipt audit, which DB Model §10 already indexes for it.
+
+The migration was amended rather than superseded by a second one: it has never been applied anywhere
+(dev Postgres holds none of the four tables), so there is nothing forward-only to respect yet.
+
+### Verified
+
+- `pnpm test` 518/518; `pnpm test:bdd` 34 scenarios / 183 steps, exit 0 — the BDD run boots the whole
+  app, so the new module's wiring is exercised, not just compiled
+- `tsc --noEmit` at the unchanged 28-error baseline; `pnpm build` compiles; `pnpm lint` 0 errors
+- the secret is asserted absent from the create response, from the published event and from the
+  stored column in the clear; a tampered ciphertext is refused by the GCM tag rather than returning
+  garbage; a missing encryption key fails the create instead of storing something unreadable
+
+### Still open for D4
+
+1. **`PROVIDER_SECRET_ENCRYPTION_KEY` is in Helm as an empty secret var.** Without it this service
+   boots but refuses to create or resolve a connection. That is deliberate (fail loudly, never store
+   a secret nothing can read back), but it means the value has to be supplied before the receivers
+   can work in any environment.
+2. **The security review from §V5.12 D5-d is now concrete:** there is an endpoint that returns a
+   decrypted provider secret to a service token. The authorization is deny-by-default and
+   capability-scoped, and the secret never reaches a human-facing response or a log — but this is the
+   part to put in front of someone before it holds a live credential.
+3. **The tracking-token key** (Architecture §2.1, Product Spec §12) is not built. Notification signs
+   the token and ingestion verifies it, so both need the key from here — that lands with the
+   `/t/o`, `/t/c` step.
+4. **Where the `inbound_webhook_receipts` audit lives is still undecided.** DB Model §10 and §13 put
+   it in notification_db with a Redis dedup key in notification's namespace; Architecture §2.4 gives
+   ingestion no RDS and §2.8 makes notification outbound-only, so as v5 stands nobody can write the
+   table that Failure §4.3's revenue reconciliation reads. The recommendation is that ingestion
+   publishes a payload-less receipt event and notification keeps the table and writes it from the bus
+   — which honours "the payload is dropped, not queued" (the dropped-signature receipt stores no
+   payload anyway, per §10) while keeping the table where the DB Model puts it. Recorded here because
+   it is the one D4 question that is not mine to settle quietly.
+
+## V5.14 Spec defects — additions
+
+8. **API Contract §6.5's revision line and its own table disagree on the provider list.** The revision
+   names `stripe, paddle, chargebee, paypal, wise, tremendous`; the table below it lists Stripe,
+   Paddle, Chargebee, PayPal/Wise, "Gift-card (Tremendous/Tango)" and "CRM (HubSpot/Salesforce)", and
+   DB Model §10's CHECK is `('stripe','paddle','chargebee','paypal','wise','gift_card','crm')`. The
+   revision swaps a category for one vendor inside it and drops CRM entirely. Implemented as the
+   category list (NOTE.md §V5.13 D4-3).
+9. **`inbound_webhook_receipts` has no owner once the receivers move.** DB Model §10 puts the table
+   and its `inbounddedup:{integration_id}:{provider_event_id}` Redis key in notification-service, and
+   §13's matrix repeats it; Architecture §2.4 gives ingestion no RDS at all and §2.8 makes
+   notification outbound-only, never receiving these callbacks. Failure §4.3's Billing-to-Platform
+   Revenue reconciliation reads that table. As the suite stands, no service can write it. §V5.13's
+   open item 4 carries the proposed resolution.
+10. **DB Model §13 does not list an inbound dedup key for ingestion.** Ingestion's Redis row is
+    "dedup, touch dedup, 3× rate-limit, campaign cache, code mirror, session map"; the inbound dedup
+    key is still in notification's row. Mechanical consequence of defect 9 — the DB Model was not
+    revised for the 2026-10-12 receivers move, which is also what makes it the lagging document in
+    the D4 tiebreak.
+
+## V5.15 D4 step 3 — the email-tracking token key
+
+Architecture v5 §2.1 puts the tracking-token key in this service, and Product Spec §12 lists it among
+Event Ingestion's cached inputs. Notification-service signs the `/t/o/{token}` and `/t/c/{token}`
+tokens at send time; ingestion verifies them when the recipient opens or clicks. Both read the value
+from `GET /v1/internal/tracking-token-key`, under the new capability `tracking_token.read`.
+
+**D4-16 — one platform key, not one per tenant.** §2.1 names it in the singular, next to the plural
+"webhook signing secrets", and the token carries the tenant id *under* the signature — so a per-tenant
+key would add rotation surface without adding isolation.
+
+*Rejected:* a per-tenant key. It would also mean the verifier has to decide which key to use from an
+unverified payload, which is a worse shape than one key over a signed tenant id.
+
+**D4-17 — its own capability, separate from `provider_connection.read`.** Notification needs the
+tracking key and must never get provider secrets; ingestion needs both, but as two grants. One
+capability covering "the secrets tenant-service holds for others" would have given notification the
+billing credentials.
+
+**D4-18 — 503 when the key is unset, never an empty string.** A caller that received `""` would sign
+and verify with it and every forged token would pass. The correct caller response is to fail and
+retry, which is what 503 says.
+
+**No tenant-facing route.** No operator needs this value, and an endpoint returning it to a dashboard
+session would be a way to mint tracking touches for another tenant.
+
+The value is one per environment (Helm `TRACKING_TOKEN_KEY`), and rotating it invalidates the tokens
+in mail already sent — tracked in the Helm comment, because that is where someone will be when they
+consider rotating it.
+
+---
+
+> **Cross-service decision list.** The consolidated list of everything still open across all four
+> services — the three blockers and their dependency chain, the decisions already taken, the
+> ratifications, and the spec defects — lives in `referral-pulse-event-svc/NOTE.md` §11. This
+> service's own detail stays above.

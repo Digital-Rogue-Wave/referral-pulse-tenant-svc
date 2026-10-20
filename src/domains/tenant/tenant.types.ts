@@ -1,5 +1,5 @@
 /**
- * Tenant lifecycle status (DB Model v2 §3 `tenants.status`). `locked` is this service's additive value for the
+ * Tenant lifecycle status (DB Model §3 `tenants.status`). `locked` is this service's additive value for the
  * self-service lock; `closed` is terminal (the tenant was deleted and its PII purged).
  * Payment access tiers live in `payment_status`, not here.
  */
@@ -22,7 +22,7 @@ export enum VerificationStatus {
     REJECTED = 'rejected'
 }
 
-/** What a `tenant_verifications` row verifies (DB Model v2 §3). Only `company` drives the tenant's status. */
+/** What a `tenant_verifications` row verifies (DB Model §3). Only `company` drives the tenant's status. */
 export enum VerificationType {
     COMPANY = 'company',
     TAX = 'tax',

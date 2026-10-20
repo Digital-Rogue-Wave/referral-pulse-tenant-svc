@@ -71,7 +71,7 @@ export class UserRemovedEvent extends BaseDomainEvent {
 }
 
 /**
- * Emitted when an operator is invited to a tenant (Product Spec v4, per-domain events: `user.invited`).
+ * Emitted when an operator is invited to a tenant (Product Spec, per-domain events: `user.invited`).
  * Carries the invitation id and role only — never the invitee's address or the token.
  */
 export class UserInvitedEvent extends BaseDomainEvent {
@@ -88,7 +88,7 @@ export class UserInvitedEvent extends BaseDomainEvent {
 }
 
 /**
- * Emitted when an operator's personal data is erased for a data-subject request (Product Spec v4 "DSR
+ * Emitted when an operator's personal data is erased for a data-subject request (Product Spec "DSR
  * Propagation": Identity anonymises the user record). The record keeps its id; `dsrId` ties the receipt to
  * the request. Services holding the operator's contact details drop them on this event.
  */

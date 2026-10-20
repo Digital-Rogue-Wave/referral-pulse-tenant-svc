@@ -9,7 +9,7 @@ import { UserRegisteredEvent, UserRemovedEvent, UserRoleChangedEvent } from '@do
 import { TenantCreatedEvent, TenantDeletedEvent, TenantEvents } from '@domains/tenant/events/tenant.events';
 
 /**
- * Mirrors membership changes into Ory Keto (API Contract v1.3 §2), through the outbox so a Keto outage
+ * Mirrors membership changes into Ory Keto (API Contract §2), through the outbox so a Keto outage
  * delays permissions instead of losing them. Every operation is idempotent; the daily Keto reconciler
  * rewrites the full state from `users`, which also covers a crash between commit and this listener.
  */

@@ -5,7 +5,8 @@
  * manual testing via Swagger:
  *
  *   1. Currencies       — USD, EUR (required by billing)
- *   2. Plans            — Free / Starter / Growth / Enterprise (public plans with Stripe IDs)
+ *   2. Plans            — Free / Starter / Growth / Scale / Enterprise (public plans with Stripe IDs)
+ *   2b. Roles          — keto_relations derived from ROLE_GRANTS (never hand-written)
  *   3. Test tenant      — id: AZP-772-OMEGA  (use this in the x-tenant-id / tenant-id header)
  *   4. Test billing row — Free plan, no Stripe customer yet
  *
@@ -24,6 +25,8 @@ import * as path from 'path';
 dotenv.config({ path: path.resolve(process.cwd(), '.env.development') });
 dotenv.config(); // fallback to .env
 
+import { ROLE_GRANTS } from '../common/auth/authz/permission-catalog';
+import { RoleEnum } from '../common/enums/role.enum';
 import { PrismaClient } from './generated/client';
 import { PrismaPg } from '@prisma/adapter-pg';
 import pg from 'pg';
@@ -45,6 +48,7 @@ const STRIPE_PRICE = {
     Free: process.env.STRIPE_FREE_PRICE_ID ?? '',
     Starter: process.env.STRIPE_STARTER_PRICE_ID ?? '',
     Growth: process.env.STRIPE_GROWTH_PRICE_ID ?? '',
+    Scale: process.env.STRIPE_SCALE_PRICE_ID ?? '',
     Enterprise: process.env.STRIPE_ENTERPRISE_PRICE_ID ?? ''
 };
 
@@ -53,6 +57,7 @@ const STRIPE_PRODUCT = {
     Free: process.env.STRIPE_FREE_PRODUCT_ID ?? '',
     Starter: process.env.STRIPE_STARTER_PRODUCT_ID ?? '',
     Growth: process.env.STRIPE_GROWTH_PRODUCT_ID ?? '',
+    Scale: process.env.STRIPE_SCALE_PRODUCT_ID ?? '',
     Enterprise: process.env.STRIPE_ENTERPRISE_PRODUCT_ID ?? ''
 };
 
@@ -130,6 +135,25 @@ async function seedPlans() {
                 seats: 15,
                 leaderboard_entries: 10_000,
                 email_sends: 50_000
+            }
+        },
+        {
+            // DB Model section 3 names a fifth tier between Growth and Enterprise. Seeded
+            // INACTIVE on purpose: no document specifies its limits or price, and these numbers are
+            // a dev placeholder interpolated on the existing progression, not a commercial
+            // decision. Set real limits and flip isActive before offering it.
+            name: 'Scale',
+            stripePriceId: STRIPE_PRICE.Scale || null,
+            stripeProductId: STRIPE_PRODUCT.Scale || null,
+            interval: 'month',
+            isActive: false,
+            manualInvoicing: false,
+            limits: {
+                campaigns: 150,
+                referred_users: 35_000,
+                seats: 40,
+                leaderboard_entries: 35_000,
+                email_sends: 150_000
             }
         },
         {
@@ -243,29 +267,42 @@ async function seedDefaultTenant() {
     console.log(`✅ Default billing: plan=${billing.plan}, status=${billing.status}`);
 }
 
-// Platform roles per referralai_db_tables_per_service.md (roles → scopes).
-// Names match the spec roles: Owner / Admin / Operator / Viewer.
+/**
+ * The role catalog (DB Model §3) — a projection for dashboard display and bulk assignment, not
+ * the authoritative permission store, which is Ory Keto.
+ *
+ * `keto_relations` is derived from ROLE_GRANTS rather than written out here. That file is what the
+ * tuple writer, the perms resolver and the guards all read, so deriving the projection from it is
+ * the only way the two cannot disagree — and they did disagree: this seed used to write wildcards
+ * ('tenant:*', 'users:*') that are not Keto relations and appear nowhere in the catalog.
+ *
+ * Descriptions carry the Product Spec §4 actor names (operator = Campaign Manager, viewer =
+ * Analyst, support = Support Agent).
+ */
 async function seedRoles() {
-    const roles = [
-        { name: 'OWNER', description: 'Full access to the tenant', scopes: ['tenant:*'] },
-        {
-            name: 'ADMIN',
-            description: 'Administer users, API keys and settings',
-            scopes: ['tenant:read', 'tenant:write', 'users:*', 'api_keys:*', 'billing:read']
-        },
-        { name: 'OPERATOR', description: 'Operate campaigns and read tenant data', scopes: ['tenant:read', 'campaigns:read', 'campaigns:write'] },
-        { name: 'VIEWER', description: 'Read-only access', scopes: ['tenant:read', 'campaigns:read'] }
-    ];
+    const descriptions: Record<RoleEnum, string> = {
+        [RoleEnum.OWNER]: 'Owner — full access, including billing, API keys and DSR responses',
+        [RoleEnum.ADMIN]: 'Admin — everything except billing and tenant deletion (custom role, not in the v5 standard set)',
+        [RoleEnum.OPERATOR]: 'Campaign Manager — campaigns, variants, segments, referrers; approve and reject rewards',
+        [RoleEnum.SUPPORT]: 'Support Agent — read referrers, referrals and rewards; adjust a reward and resend its email',
+        [RoleEnum.VIEWER]: 'Analyst — read-only'
+    };
+
+    const roles = Object.values(RoleEnum).map((name) => ({
+        name,
+        description: descriptions[name],
+        ketoRelations: [...ROLE_GRANTS[name]]
+    }));
 
     for (const role of roles) {
         await prisma.role.upsert({
             where: { name: role.name },
-            update: { description: role.description, scopes: role.scopes },
+            update: { description: role.description, ketoRelations: role.ketoRelations },
             create: role
         });
     }
 
-    console.log('✅ Roles:', roles.map((r) => r.name).join(', '));
+    console.log('✅ Roles:', roles.map((r) => `${r.name} (${r.ketoRelations.length} relations)`).join(', '));
 }
 
 // ─── Main ─────────────────────────────────────────────────────────────────────

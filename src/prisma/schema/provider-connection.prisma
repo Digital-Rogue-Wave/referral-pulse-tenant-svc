@@ -1,0 +1,56 @@
+/// A tenant's billing, payout or CRM provider connection, with the secret its callbacks are
+/// verified against.
+///
+/// Architecture §2.1 assigns this service "provider connection config and secrets (billing, payout,
+/// CRM; webhook signing secrets; tracking-token key) exposed to Event Ingestion through a cache",
+/// and the §2.4 addendum has ingestion verifying "the provider's signature scheme ... against the
+/// connection secret cached from tenant-service". DB Model §3 provides no table, so the shape is
+/// derived from the prose that assigns the responsibility (NOTE.md §V5.12).
+///
+/// The row's `id` is the `{connection_id}` in ingestion's `/inbound/{provider}/{connection_id}`:
+/// the path names the tenant and the secret, so no callback is attributed by anything the caller
+/// asserts. That is the property worth preserving when the receivers move (D4).
+model ProviderConnection {
+  id       String @id @default(ulid()) @db.VarChar(26)
+  tenantId String @map("tenant_id") @db.VarChar(26)
+
+  /// The provider list DB Model §10 constrains `inbound_webhook_receipts.provider` to, so a
+  /// connection and the receipt it produces cannot disagree about who sent the callback.
+  provider String @db.VarChar(20)
+  /// `billing` | `payout` | `crm` — the three kinds Architecture §2.1 names.
+  connectionType String @map("connection_type") @db.VarChar(20)
+  name           String? @db.VarChar(100)
+
+  /// The provider's webhook secret, encrypted at rest with AES-256-GCM — the same handling
+  /// notification-service already uses for the identical value, so moving the receivers to
+  /// ingestion (D4) is a move rather than a re-architecture.
+  ///
+  /// A reference to a secret manager would be stronger than an encrypted column, and is a
+  /// one-column change if the security review asks for it. Flagged rather than assumed:
+  /// NOTE.md §V5.12 records this as wanting a look before it holds live credentials.
+  signingSecret String? @map("signing_secret") @db.Text
+
+  /// Provider settings that are not secrets — PayPal `clientId`/`webhookId`/`environment`,
+  /// Chargebee `allowedIps`. camelCase inside, snake_case on the wire.
+  config Json @default("{}")
+
+  enabled Boolean @default(true)
+
+  /// No `last_received_at` here on purpose. Event Ingestion is what receives the callbacks and it holds
+  /// no RDS, so stamping this column would mean a write to this service on every verified callback —
+  /// the hot-path dependency the connection cache exists to avoid. "Last received" is already a
+  /// `(provider, received_at desc)` read over the receipt audit (DB Model §10 `idx_inbound_provider`).
+  createdBy String? @map("created_by") @db.VarChar(26)
+  createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt DateTime  @updatedAt @map("updated_at") @db.Timestamptz
+  /// Soft delete per DB Model §0.4: a revoked connection's receipts must stay attributable.
+  revokedAt DateTime? @map("revoked_at") @db.Timestamptz
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  /// One live connection per tenant per provider; the partial uniqueness is in the migration SQL,
+  /// because a revoked row must not block a replacement.
+  @@index([tenantId], map: "idx_provider_conn_tenant")
+  @@index([tenantId, provider], map: "idx_provider_conn_provider")
+  @@map("provider_connections")
+}

@@ -20,8 +20,8 @@ type OutboxClient = Pick<Prisma.TransactionClient, 'eventOutbox'>;
 type Flaggable = BaseDomainEvent & { [OUTBOX_WRITTEN]?: true };
 
 /**
- * Turns publishable domain events into `event_outbox` rows (DB Model v2 §0.6) carrying the canonical
- * Event Model v3 envelope.
+ * Turns publishable domain events into `event_outbox` rows (DB Model §0.6) carrying the canonical
+ * Event Model envelope.
  *
  * - Inside a transaction: rows are written with the transaction client just before commit, so the event
  *   exists if and only if the state change does.

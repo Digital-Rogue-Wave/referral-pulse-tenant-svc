@@ -3,7 +3,7 @@ import type { Prisma } from '@prisma-gen/generated/client';
 import { hashEmail } from '@common/helper/hashing';
 
 /**
- * Replacement values for an erased operator (API Contract v1.3 §8.3: PII is anonymised in place). The row
+ * Replacement values for an erased operator (API Contract §8.3: PII is anonymised in place). The row
  * keeps its id so audit rows and other services' references stay valid; nothing left on it identifies a
  * person. The placeholder address uses the reserved `.invalid` TLD, so it can never be delivered.
  */

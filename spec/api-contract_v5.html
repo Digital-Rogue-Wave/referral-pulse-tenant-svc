@@ -1,0 +1,1271 @@
+<!DOCTYPE html><html lang="en"><head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>ReferralAI — API Contract v5.0</title><style>
+
+@import url('https://fonts.googleapis.com/css2?family=Instrument+Serif&family=Geist:wght@400;500;600&family=Geist+Mono:wght@400&display=swap');
+:root{
+  --ink:#1c1917;--ink2:#44403c;--ink3:#78716c;--ink4:#a8a29e;
+  --paper:#FDFCFA;--card:#fff;--line:#e7e5e4;--wash:#f5f5f4;
+  --acc:#b45309;--acc2:#92400e;--accbg:#fef3c7;
+  --mint:#047857;--mintbg:#d1fae5;
+  --slate:#1e40af;--slatebg:#dbeafe;
+  --rose:#be123c;--rosebg:#ffe4e6;
+  --sw:220px
+}
+*{margin:0;padding:0;box-sizing:border-box}
+html{scroll-behavior:smooth;scroll-padding-top:20px}
+body{font-family:Geist,system-ui,sans-serif;background:var(--paper);color:var(--ink);font-size:14.5px;line-height:1.75;display:flex;-webkit-font-smoothing:antialiased}
+
+/* SIDEBAR */
+nav.sd{position:fixed;top:0;left:0;width:var(--sw);height:100vh;border-right:1px solid var(--line);overflow-y:auto;padding:24px 0;background:var(--paper)}
+.sd-b{padding:0 16px 16px}
+.sd-b h2{font-family:'Instrument Serif',serif;font-size:20px;color:var(--acc2);font-weight:400}
+.sd-b small{font-size:11px;color:var(--ink4);display:block;margin-top:2px;letter-spacing:.04em;text-transform:uppercase}
+.sd a{display:block;padding:2px 16px;color:var(--ink3);text-decoration:none;font-size:12px;line-height:1.6;transition:color .1s}
+.sd a:hover{color:var(--ink)}
+.sd a.n1{color:var(--ink2);font-weight:600;margin-top:12px;font-size:12px}
+.sd a.n2{padding-left:28px;font-size:11.5px;color:var(--ink4)}
+.sd a.active{color:var(--acc);font-weight:500}
+
+/* MAIN */
+main{margin-left:var(--sw);max-width:780px;padding:40px 48px 100px}
+h1{font-family:'Instrument Serif',serif;font-size:28px;font-weight:400;color:var(--ink);margin:56px 0 16px;letter-spacing:-.02em}
+h1:first-of-type{margin-top:0}
+h2{font-size:16px;font-weight:600;margin:32px 0 10px;letter-spacing:-.01em}
+h3{font-size:14px;font-weight:600;color:var(--acc2);margin:24px 0 6px}
+h4{font-size:13px;font-weight:600;margin:16px 0 4px}
+p{margin:0 0 12px;color:var(--ink2)}
+strong{color:var(--ink);font-weight:600}
+em{color:var(--ink3)}
+a{color:var(--acc);text-decoration:none;border-bottom:1px solid var(--accbg)}
+a:hover{border-color:var(--acc)}
+hr{border:none;height:1px;background:var(--line);margin:36px 0}
+ul,ol{margin:0 0 12px 20px;color:var(--ink2)}
+li{margin-bottom:3px}
+
+table{width:100%;border-collapse:collapse;margin:12px 0 20px;font-size:13px}
+th{text-align:left;padding:8px 10px;font-weight:500;font-size:10.5px;text-transform:uppercase;letter-spacing:.08em;color:var(--ink4);border-bottom:2px solid var(--line)}
+td{padding:7px 10px;border-bottom:1px solid var(--wash);color:var(--ink2)}
+tr:hover td{background:var(--wash)}
+
+code{font-family:'Geist Mono',monospace;font-size:12.5px;background:var(--wash);color:var(--acc2);padding:1px 4px;border-radius:3px}
+pre{background:var(--wash);border-radius:8px;padding:16px 20px;overflow-x:auto;margin:12px 0 20px;line-height:1.6;border:1px solid var(--line)}
+pre code{background:none;padding:0;color:var(--ink2);font-size:12px}
+pre.asc{border-left:3px solid var(--acc);background:var(--accbg)}
+
+blockquote{border-left:3px solid var(--acc);padding:10px 16px;margin:12px 0 20px;background:var(--accbg);border-radius:0 6px 6px 0}
+blockquote p:last-child{margin:0}
+
+/* ═══ DIAGRAMS ═══ */
+figure{margin:20px 0 28px;padding:20px;background:var(--card);border:1px solid var(--line);border-radius:10px}
+figure.fig-sm{padding:14px 20px}
+figcaption{font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:.14em;color:var(--ink4);margin-bottom:14px}
+
+.node{text-align:center;padding:8px 20px;border-radius:6px;font-weight:600;font-size:13px;display:inline-block}
+.nd-root{background:var(--ink);color:var(--paper);margin:0 auto;display:block;width:fit-content}
+.nd-root span{font-weight:400;opacity:.7;margin-left:6px;font-size:12px}
+.nd-mid{background:var(--slatebg);color:var(--slate);margin:0 auto;display:block;width:fit-content}
+
+.edge{width:2px;height:16px;background:var(--line);margin:0 auto}
+.edge.lg{height:24px}
+
+.tags{display:flex;flex-wrap:wrap;gap:6px;justify-content:center;margin:8px 0;font-size:12px;color:var(--ink3)}
+
+.cols{display:flex;gap:10px;flex-wrap:wrap}
+.trio{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}
+.leaf{flex:1;min-width:140px;padding:12px;border-radius:8px;font-size:13px;line-height:1.5;border:1px solid var(--line);background:var(--wash)}
+.lf-a{border-left:3px solid var(--mint);background:var(--mintbg)}
+.lf-b{border-left:3px solid var(--acc);background:var(--accbg)}
+.lf-c{border-left:3px solid var(--ink4);background:var(--wash)}
+
+.grid8{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin-bottom:6px}
+.grid6{display:grid;grid-template-columns:repeat(3,1fr);gap:6px}
+.cell{padding:12px;border-radius:6px;font-size:12.5px;text-align:center;background:var(--wash);border:1px solid var(--line);line-height:1.4}
+.cell small{color:var(--ink3);font-size:11px}
+.cell-w{margin-top:4px}
+
+.duo{display:flex;gap:10px}
+.duo-col{flex:1;border-radius:8px;overflow:hidden;border:1px solid var(--line)}
+.duo-h{padding:8px 14px;font-weight:600;font-size:12.5px;color:var(--paper)}
+.dh-l{background:var(--ink)}
+.dh-r{background:var(--mint)}
+.dh-r2{background:var(--mint)}
+.dh-r3{background:var(--rose)}
+.duo-b{padding:10px 14px}
+
+.step-list div{font-size:13px;padding:4px 0;border-bottom:1px solid var(--wash);color:var(--ink2)}
+.step-list div:last-child{border:none}
+.step-list.compact div{padding:2px 0;font-size:12.5px}
+.step-list .hl,.hl{background:var(--accbg);padding:3px 8px;border-radius:4px;border-bottom-color:transparent}
+.verdict{margin-top:8px;padding:6px 10px;border-radius:4px;font-size:12px;font-weight:600}
+.verdict.ok{background:var(--mintbg);color:var(--mint)}
+.verdict.bad{background:var(--rosebg);color:var(--rose)}
+
+.pipe{display:flex;align-items:center;gap:4px;flex-wrap:wrap}
+.pk{padding:6px 14px;border-radius:6px;font-weight:500;font-size:12px;color:var(--paper);position:relative}
+.pk::after{content:'→';position:absolute;right:-12px;color:var(--ink4);font-size:12px}
+.pk:last-child::after{content:''}
+.pk-0{background:#a8a29e}.pk-1{background:var(--slate)}.pk-2{background:var(--mint)}
+.pk-3{background:var(--acc)}.pk-4{background:var(--rose)}.pk-5{background:var(--ink3)}
+
+.waterfall{display:flex;flex-direction:column;gap:6px}
+.waterfall.numbered{counter-reset:wf}
+.waterfall.numbered .wf{counter-increment:wf}
+.waterfall.numbered .wf::before{content:counter(wf)'.';font-weight:600;margin-right:6px;color:var(--acc)}
+.wf{padding:10px 16px;border-radius:6px;font-size:13px;background:var(--wash);border-left:3px solid var(--line);line-height:1.5;color:var(--ink2)}
+.wf-w{border-left-color:var(--acc);background:var(--accbg)}
+.wf-d{border-left-color:var(--rose);background:var(--rosebg)}
+.wf-ok2{border-left-color:var(--mint);background:var(--mintbg)}
+.wf-branch{display:flex;flex-wrap:wrap;gap:6px}
+.wf-r{flex:1;min-width:120px;padding:8px 12px;border-radius:6px;font-size:12.5px;background:var(--wash);border:1px solid var(--line)}
+.wf-ok{border-left:3px solid var(--mint);background:var(--mintbg)}
+.wf-warn{border-left:3px solid var(--acc);background:var(--accbg)}
+.wf-err{border-left:3px solid var(--rose);background:var(--rosebg)}
+
+.checklist{display:flex;flex-direction:column;gap:4px}
+.cl-ok,.cl-no,.cl-warn{padding:8px 14px;border-radius:6px;font-size:13px;line-height:1.5}
+.cl-ok{background:var(--mintbg);border-left:3px solid var(--mint)}
+.cl-no{background:var(--rosebg);border-left:3px solid var(--rose)}
+.cl-warn{background:var(--accbg);border-left:3px solid var(--acc)}
+
+.box-nest{display:flex;flex-direction:column;align-items:center;gap:4px}
+.bn-outer{border:1px solid var(--line);border-radius:10px;padding:14px;width:100%;background:var(--wash)}
+.bn-inner{border:1px solid var(--slatebg);border-radius:8px;padding:12px;background:var(--slatebg)}
+.bn-label{font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:.08em;color:var(--ink4);margin-bottom:8px;display:block}
+.bn-label.accent{color:var(--slate)}
+.sm .cell{min-width:0}
+
+.note{font-size:12px;color:var(--ink3);margin-top:8px;font-style:italic;text-align:center}
+.mt-sm{margin-top:8px}.mb-sm{margin-bottom:10px}
+strong.err{color:var(--rose)}
+strong.ok{color:var(--mint)}
+strong.warn{color:var(--acc)}
+
+@media(max-width:800px){nav.sd{display:none}main{margin-left:0;padding:20px}
+.grid8{grid-template-columns:repeat(2,1fr)}.grid6{grid-template-columns:repeat(2,1fr)}
+.duo,.cols,.trio{flex-direction:column}}
+@media print{nav.sd{display:none}main{margin-left:0;max-width:100%}figure{break-inside:avoid;box-shadow:none}}
+::-webkit-scrollbar{width:3px}::-webkit-scrollbar-thumb{background:var(--line);border-radius:2px}
+
+.swg{margin:.6rem 0 1rem;border:1px solid #e7e5e4;border-radius:8px;overflow:hidden;background:#fcfcfb}
+.op{display:flex;align-items:center;gap:.65rem;padding:.45rem .7rem;border-bottom:1px solid #f0efed;font-size:.86rem;line-height:1.3}
+.op:last-child{border-bottom:none}
+.op .m{flex:none;width:62px;text-align:center;font-weight:700;font-size:.7rem;letter-spacing:.04em;color:#fff;border-radius:5px;padding:.22rem 0}
+.m-get{background:#0d7a4e}.m-post{background:#1e63c4}.m-patch{background:#b4690e}.m-delete{background:#c2334d}.m-put{background:#7c3aed}
+.op .op-path{flex:none;font-family:ui-monospace,'SF Mono',Menlo,monospace;color:#1c1917;font-weight:600;font-size:.82rem}
+.op .op-path code{background:none;padding:0;color:inherit}
+.op .op-sum{flex:1;color:#57534e;min-width:8rem}
+.op .op-tag{flex:none;font-family:ui-monospace,monospace;font-size:.7rem;color:#78716c;background:#f5f5f4;border:1px solid #e7e5e4;border-radius:4px;padding:.12rem .42rem;white-space:nowrap}
+.op .op-tag code,.op .op-tag em{background:none;padding:0;color:inherit;font-style:normal}
+@media(max-width:640px){.op{flex-wrap:wrap}.op .op-sum{flex-basis:100%;order:3}}
+</style></head><body>
+<nav class="sd"><div class="sd-b"><h2>ReferralAI</h2><small>API Contract v5.0</small></div>
+<a href="#api-contract" class="n1">Public API Contract</a>
+<a href="#document-purpose" class="n2">Document Purpose</a>
+<a href="#key-constraints" class="n2">Key Constraints</a>
+<a href="#1-api-design-principles" class="n1">1. API Design Principles</a>
+<a href="#resource-naming" class="n2">Resource Naming</a>
+<a href="#versioning" class="n2">Versioning</a>
+<a href="#idempotency" class="n2">Idempotency</a>
+<a href="#pagination-filtering" class="n2">Pagination & Filtering</a>
+<a href="#error-model" class="n2">Error Model</a>
+<a href="#timestamps-currency" class="n2">Timestamps & Currency</a>
+<a href="#2-authentication-authorization" class="n1">2. Authentication & Authorization</a>
+<a href="#auth-model-overview" class="n2">Auth Model Overview</a>
+<a href="#api-keys" class="n2">API Keys</a>
+<a href="#oauth2-jwt" class="n2">OAuth2 JWT</a>
+<a href="#ory-keto-permissions" class="n2">Ory Keto Permissions</a>
+<a href="#tenant-isolation" class="n2">Tenant Isolation</a>
+<a href="#auth-summary" class="n2">Auth Summary</a>
+<a href="#3-core-resources" class="n1">3. Core Resources & Endpoints</a>
+<a href="#program" class="n2">Program</a>
+<a href="#campaign" class="n2">Campaign</a>
+<a href="#variant" class="n2">Campaign Variant</a>
+<a href="#segment" class="n2">Segment</a>
+<a href="#referrer" class="n2">Participant</a>
+<a href="#referral" class="n2">Referral</a>
+<a href="#event" class="n2">Event</a>
+<a href="#reward" class="n2">Reward</a>
+<a href="#attribution" class="n2">Attribution</a>
+<a href="#payout" class="n2">Payout</a>
+<a href="#playbook" class="n2">Playbook</a>
+<a href="#ai-recommendations" class="n2">AI Recommendations</a>
+<a href="#analytics" class="n2">Analytics</a>
+<a href="#campaign-assistant" class="n2">Campaign Assistant</a>
+<a href="#gdpr" class="n2">GDPR Erasure</a>
+<a href="#4-sdk-widget" class="n1">4. SDK & Widget Endpoints</a>
+<a href="#widget-config" class="n2">Widget Configuration</a>
+<a href="#link-resolution" class="n2">Link Resolution</a>
+<a href="#attribution-retrieval" class="n2">Attribution Retrieval</a>
+<a href="#5-event-ingestion" class="n1">5. Event Ingestion API</a>
+<a href="#event-schema" class="n2">Event Schema</a>
+<a href="#utm-handling" class="n2">UTM Handling</a>
+<a href="#deduplication" class="n2">Deduplication</a>
+<a href="#trust-boundaries" class="n2">Trust Boundaries</a>
+<a href="#business-rules-guard" class="n2">Ingestion Rules Guard</a>
+<a href="#batching" class="n2">Batching & Throughput</a>
+<a href="#processing-pipeline" class="n2">Processing Pipeline</a>
+<a href="#6-webhooks" class="n1">6. Webhooks (Out & In)</a>
+<a href="#webhook-events" class="n2">Outbound Event Types</a>
+<a href="#webhook-envelope" class="n2">Payload Envelope</a>
+<a href="#webhook-delivery" class="n2">Delivery & Retry</a>
+<a href="#webhook-signing" class="n2">Signing & Verification</a>
+<a href="#inbound-webhooks" class="n2">Inbound Receivers</a>
+<a href="#7-emails-links" class="n1">7. Emails, Links & UTM</a>
+<a href="#triggered-emails" class="n2">Triggered Emails</a>
+<a href="#link-types" class="n2">Link Types</a>
+<a href="#tracking-loop" class="n2">Tracking Loop</a>
+<a href="#8-security" class="n1">8. Security & Abuse</a>
+<a href="#rate-limiting" class="n2">Rate Limiting</a>
+<a href="#privilege-separation" class="n2">Privilege Separation</a>
+<a href="#data-residency" class="n2">Data Residency</a>
+<a href="#9-flows" class="n1">9. End-to-End Flows</a>
+<a href="#flow-linkedin" class="n2">Share → Convert → Reward</a>
+<a href="#flow-pulse" class="n2">Conversion Pulse</a>
+<a href="#flow-fraud" class="n2">Fraud → Block</a>
+</nav>
+<main>
+
+<h1 id="api-contract">ReferralAI — Public API Contract</h1><div style="border:1px solid #fde68a;background:#fffbeb;border-radius:8px;padding:12px 16px;margin:0 0 24px;font-size:13px;line-height:1.6">
+<strong>Revision 2026-10-12 — applied from the product-spec rework (Product Spec Appendix A #25–#46).</strong> Mechanical changes applied in this file: Program Admin → <strong>Owner</strong>; referee / referee_* → <strong>invitee / invitee_*</strong>; referrer (prose) → <strong>participant</strong> (wire names <code>/v1/referrers</code>, Keto <code>referrers</code> unchanged); Method A / Method B → <strong>events from backend / events from billing provider</strong>; touch events renamed <code>referral.link.clicked</code>, <code>referral.link.shared</code>, <code>referral.page.viewed</code>, <code>referral.email.opened|clicked</code>, <code>referral.widget.viewed</code>; <code>reward.calculated</code> → <code>reward.earned</code>; Partner actor removed from V1; payout partner → payout provider. <strong>Structural changes applied below:</strong> <code>/v1/erasure-requests</code> → <code>POST /v1/dsr</code> (access · erasure · portability; Owner-only — permission to update to <code>programs:write</code>); <code>referral.completed</code>, <code>reward.earned</code>, <code>invitation.sent|bounced</code> to be added to §6.1. <strong>Still to author:</strong> <code>POST /v1/sdk/invitations</code> (§4); campaign fields <code>max_participants</code>, <code>max_referrals_per_participant</code>, <code>link_ttl_days</code>, <code>invitations_enabled</code> (§3.2); tenant <code>invitation_channel</code>; link <code>expires_at</code> (§3.5); program <code>verification_required_above</code>; <code>RefRev.track</code> removed from §4; service subject <code>service:ai-optimizer</code> (§2).<br><strong>Addendum 2026-10-12 (receivers move, Product Spec #47 / R-DOM-05 / R-SDK-07):</strong> <code>/inbound/{provider}/{connection_id}</code>, <code>/t/o/{token}</code>, <code>/t/c/{token}</code> added to the Ingestion surface (§6.5); <code>POST /v1/connections</code> to author in §3.1; "inbound webhooks" removed from the API-key row in §2.
+</div>
+<p><strong>Version:</strong> 5.0 — suite-wide version alignment (2026-10-09); content of 1.3 + the October 2026 coherence passes. Earlier change-log entries keep the pre-alignment numbering (1.2 → 1.3).<br>
+<strong>Status:</strong> Implementation-Ready Specification<br>
+<strong>Last Updated:</strong> June 2026<br>
+<strong>Companion (all v5.0):</strong> Product Specification · Event Model · DB Model · Architecture · Responsibility Contract · Failure &amp; Observability Model</p>
+<hr>
+
+<h2 id="document-purpose">Document Purpose</h2>
+<p>This document defines the complete public API contract for the ReferralAI platform. This API is the single integration surface — the dashboard UI, the JS SDK, and customer backends all consume the same endpoints. Privilege separation is handled through authentication mechanisms and Ory Keto permission checks, not through separate API surfaces.</p>
+
+<h2 id="key-constraints">Key Constraints</h2>
+<ol>
+<li><strong>REST-based</strong> — No GraphQL. Widest compatibility for diverse client bases.</li>
+<li><strong>Versioned</strong> — <code>/v1</code> prefix. Additive changes only within a version.</li>
+<li><strong>Idempotent</strong> — All mutations support idempotency via headers or domain keys.</li>
+<li><strong>GDPR-compliant</strong> — Consent as event metadata, erasure endpoint, EU-first data residency.</li>
+<li><strong>API keys for ingestion only</strong> — All configuration endpoints require OAuth2 JWT.</li>
+<li><strong>Ory Keto for authorization (source of truth)</strong> — Permissions live as Keto relation tuples. <strong>Resolved permissions are cached in short-lived JWTs at issuance</strong> so downstream services enforce coarse-grained checks without a per-request Keto call; high-risk actions (payouts, reward approval, key management) re-check Keto live.</li>
+<li><strong>Selective enrollment only</strong> — participants are enrolled by the client (API, bulk, CSV, CRM); there is no open/self-enrollment. The widget renders only for users who are already enrolled.</li>
+<li><strong>Participants never access the platform</strong> — no account, no login, no platform-hosted page (not even a tokenized portal). All referrer-visible data flows via the embedded widget and via emails/links.</li>
+</ol>
+<hr>
+
+<h1 id="1-api-design-principles">1. API Design Principles</h1>
+
+<h2 id="resource-naming">Resource Naming Conventions</h2>
+<p>All resource paths use <strong>lowercase plural nouns</strong>. Resources are nested only when the relationship is strict composition (a child cannot exist without its parent). Otherwise, the resource is top-level with filter parameters.</p>
+<figure><figcaption>Path Structure</figcaption>
+<div class="waterfall">
+<div class="wf"><strong>Strict composition (nested)</strong><br><code>/v1/programs/&#123;program_id&#125;/campaigns</code><br><code>/v1/campaigns/&#123;campaign_id&#125;/variants</code></div>
+<div class="wf"><strong>Association (top-level + filters)</strong><br><code>/v1/referrals?campaign_id=xxx</code><br><code>/v1/rewards?referrer_id=xxx</code></div>
+<div class="wf"><strong>SDK surface (publishable key)</strong><br><code>/v1/sdk/widget-config</code><br><code>/v1/sdk/resolve-link</code><br><code>/v1/sdk/attribution</code></div>
+</div></figure>
+<p>Nesting depth never exceeds three segments after the version prefix. Resource identifiers are <strong>opaque ULIDs</strong> — time-ordered, lexicographically sortable, 26-character Crockford Base32 strings.</p>
+<p><strong>Naming rules:</strong> plural nouns for collections, verb sub-resources for actions (<code>/activate</code>, <code>/approve</code>), <code>snake_case</code> for all fields, query parameters, and enum values.</p>
+
+<h2 id="versioning">Versioning</h2>
+<p>URL path prefix: <code>/v1</code>. Additive changes only within a version. Deprecation: 6-month grace period with <code>deprecated: true</code> flag.</p>
+
+<h2 id="idempotency">Idempotency Strategy</h2>
+<table>
+<thead><tr><th>Concern</th><th><code>/v1/events</code> (Ingestion)</th><th>All other <code>POST</code> endpoints</th></tr></thead>
+<tbody>
+<tr><td><strong>Idempotency key</strong></td><td><code>external_id</code> field in body (mandatory)</td><td><code>Idempotency-Key</code> HTTP header (mandatory)</td></tr>
+<tr><td><strong>Scope</strong></td><td>Per tenant</td><td>Per tenant + per key</td></tr>
+<tr><td><strong>Dedup window</strong></td><td>90 days</td><td>24 hours</td></tr>
+<tr><td><strong>Secondary dedup</strong></td><td><code>referral_code + session_id + 5min_bucket</code></td><td>None</td></tr>
+<tr><td><strong>Duplicate response</strong></td><td><code>202 Accepted</code> with <code>processing_status: "duplicate"</code> and the original event id</td><td>Absorbs the retry; never errors (see §5.3)</td></tr>
+<tr><td><strong>In-flight collision</strong></td><td>Accepted (event bus handles)</td><td><code>409 Conflict</code> + <code>Retry-After</code></td></tr>
+<tr><td><strong>Why different?</strong></td><td>Domain-level dedup (same business event never recorded twice)</td><td>Request-level dedup (same HTTP request never creates two resources)</td></tr>
+</tbody></table>
+<p><code>PATCH</code> uses JSON Merge Patch (RFC 7396) and requires <code>Idempotency-Key</code>. <code>PUT</code> and <code>DELETE</code> are naturally idempotent.</p>
+
+<h2 id="pagination-filtering">Pagination & Filtering</h2>
+<p>All list endpoints use <strong>cursor-based pagination</strong>. No offset pagination.</p>
+<table>
+<thead><tr><th>Parameter</th><th>Type</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td><code>limit</code></td><td>integer</td><td>Items per page. Default: 25. Max: 100.</td></tr>
+<tr><td><code>starting_after</code></td><td>string</td><td>Cursor: return items after this ID (forward)</td></tr>
+<tr><td><code>ending_before</code></td><td>string</td><td>Cursor: return items before this ID (backward)</td></tr>
+</tbody></table>
+<p><strong>Filtering:</strong> equality (<code>?status=active</code>), range (<code>?created_at.gte=...</code>), multi-value OR (<code>?status=active,paused</code>). <strong>Sorting:</strong> <code>?sort=-created_at</code>. <strong>Expansion:</strong> <code>?expand=campaign,variant</code> (one level deep).</p>
+
+<p><strong>Response envelope:</strong></p>
+<pre><code>&#123;
+  "data": [ ... ],
+  "has_more": true,
+  "next_cursor": "obj_xxx",
+  "prev_cursor": "obj_yyy"
+&#125;</code></pre>
+
+<h2 id="error-model">Error Model</h2>
+<pre><code>&#123;
+  "error": &#123;
+    "type": "invalid_request",
+    "code": "segment_rule_invalid",
+    "message": "Segment rule references undefined attribute 'plan_tier'.",
+    "param": "segment.rules[0].attribute",
+    "request_id": "req_abc123",
+    "doc_url": "https://docs.referralai.com/errors/segment_rule_invalid"
+  &#125;
+&#125;</code></pre>
+<table>
+<thead><tr><th>Type</th><th>HTTP Status</th><th>Meaning</th></tr></thead>
+<tbody>
+<tr><td><code>invalid_request</code></td><td>400</td><td>Malformed request, validation failure</td></tr>
+<tr><td><code>authentication_error</code></td><td>401</td><td>Missing or invalid credentials</td></tr>
+<tr><td><code>authorization_error</code></td><td>403</td><td>Keto permission denied or wrong key type</td></tr>
+<tr><td><code>not_found</code></td><td>404</td><td>Resource does not exist for this tenant</td></tr>
+<tr><td><code>conflict</code></td><td>409</td><td>State conflict or idempotency key collision</td></tr>
+<tr><td><code>gone</code></td><td>410</td><td>Resource archived, campaign ended, link expired</td></tr>
+<tr><td><code>unprocessable</code></td><td>422</td><td>Semantically invalid (unknown campaign, not yet active)</td></tr>
+<tr><td><code>rate_limit</code></td><td>429</td><td>Rate limit exceeded</td></tr>
+<tr><td><code>internal_error</code></td><td>500</td><td>Platform fault — retry safe</td></tr>
+</tbody></table>
+<p><code>request_id</code> is returned on every response (also as <code>X-Request-Id</code> header).</p>
+
+<h2 id="timestamps-currency">Timestamps & Currency</h2>
+<p><strong>Timestamps:</strong> ISO 8601, UTC, millisecond precision: <code>2026-02-06T14:30:00.000Z</code>. Timezone offsets rejected.</p>
+<p><strong>Currency:</strong> Integers in minor units (cents). Always paired with ISO 4217 <code>currency</code> field.</p>
+<hr>
+
+<h1 id="2-authentication-authorization">2. Authentication & Authorization</h1>
+
+<h2 id="auth-model-overview">Authentication Model Overview</h2>
+<p>Three authentication mechanisms, all resolving to the same internal JWT for identity. <strong>Ory Keto is the authorization source of truth</strong> (relation-based access control, inspired by Google Zanzibar). To avoid a Keto round-trip on every request, the gateway <strong>resolves the caller's permissions from Keto at token issuance and embeds them as a snapshot claim (<code>perms</code>) in a short-lived internal JWT</strong>. Downstream services enforce coarse-grained permissions directly from the JWT; <strong>high-risk or fine-grained actions (payouts, reward approval, clawbacks, key management, object-scoped checks) re-query Keto live</strong>. Short JWT TTLs bound how stale a cached permission can be.</p>
+
+<figure><figcaption>Authentication & Authorization Flow</figcaption>
+<div class="box-nest">
+<div class="bn-outer"><span class="bn-label">External Callers</span>
+<div class="cols">
+<div class="leaf lf-a"><strong>API Keys</strong><br><code>rai_live_</code> · <code>rai_pub_</code><br><small>Event ingestion + SDK</small></div>
+<div class="leaf lf-b"><strong>Dashboard Sessions</strong><br>Ory Kratos<br><small>All config endpoints</small></div>
+</div></div>
+<div class="edge lg"></div>
+<div class="node nd-root">API Gateway <span>ALB + Traefik + NestJS Auth Guard — resolves perms from Keto at issuance</span></div>
+<div class="edge lg"></div>
+<div class="cols">
+<div class="leaf lf-c"><strong>Internal JWT</strong><br><code>&#123; tenant_id, user_id, source, key_type, perms[] &#125;</code><br><small>Identity + resolved permission snapshot</small></div>
+<div class="leaf lf-b"><strong>Keto (source of truth)</strong><br><code>keto.check(user, relation, object)</code><br><small>Live check for high-risk / object-scoped only</small></div>
+</div>
+<div class="edge lg"></div>
+<div class="node nd-mid">Downstream NestJS Service <span>coarse check from JWT · live Keto for money/config</span></div>
+</div></figure>
+
+<table>
+<thead><tr><th>Mechanism</th><th>Who Uses It</th><th>Endpoints</th><th>How It Works</th></tr></thead>
+<tbody>
+<tr><td><strong>API Keys</strong></td><td>Client backends, JS SDK</td><td><code>/v1/events</code>, <code>/v1/sdk/*</code></td><td>Gateway validates key → mints internal JWT (no <code>perms</code> — keys are key-gated to ingestion, never Keto subjects) → forwards</td></tr>
+<tr><td><strong>OAuth2 JWT</strong></td><td>Dashboard UI</td><td>All non-ingestion endpoints</td><td>Ory Kratos session → gateway resolves perms from Keto → mints short-lived JWT with <code>perms[]</code> → downstream enforces from JWT (live Keto only for high-risk)</td></tr>
+<tr><td><strong>Client Credentials</strong></td><td>Internal batch processors, cron jobs</td><td>Internal service mesh</td><td>Machine-to-machine auth for scheduled jobs. Not exposed externally.</td></tr>
+</tbody></table>
+
+<h2 id="api-keys">API Keys (Ingestion & SDK Only)</h2>
+<p>API keys authenticate event ingestion and SDK-facing endpoints. They <strong>cannot</strong> access Programs, Campaigns, Rewards, or any configuration resource.</p>
+<table>
+<thead><tr><th>Key Type</th><th>Prefix</th><th>Purpose</th><th>Allowed Endpoints</th></tr></thead>
+<tbody>
+<tr><td><strong>Secret</strong></td><td><code>rai_live_</code></td><td>Client backend → event ingestion</td><td><code>POST /v1/events</code>, <code>POST /v1/events/batch</code></td></tr>
+<tr><td><strong>Publishable</strong></td><td><code>rai_pub_</code></td><td>JS SDK, browser widgets</td><td><code>POST /v1/events</code> (touch only), <code>/v1/sdk/*</code></td></tr>
+</tbody></table>
+<p><strong>Key exchange at gateway:</strong> Auth Guard validates key → resolves <code>tenant_id</code>, <code>key_type</code> → mints short-lived internal JWT with <code>&#123; tenant_id, source: "api_key", key_type, key_id &#125;</code> → forwards to downstream service. Downstream services only see a JWT — no API key knowledge.</p>
+<p><strong>Key management</strong> (<code>/v1/api-keys</code>) requires OAuth2 JWT + Keto <code>api_keys:manage</code> permission.</p>
+
+<h2 id="oauth2-jwt">OAuth2 JWT (Dashboard & Configuration)</h2>
+<p>All non-ingestion, non-SDK endpoints require OAuth2 JWT. The JWT carries identity <strong>plus a resolved permission snapshot</strong> taken from Keto at issuance:</p>
+<pre><code>&#123;
+  "tenant_id": "tenant_xyz",
+  "user_id": "user_nizar",
+  "source": "dashboard",       // "dashboard" | "api_key" | "client_credentials"
+  "key_type": null,            // "secret" | "publishable" | null
+  "perms": [                   // resolved from Keto at issuance (same claim in architecture §13.1)
+    "campaigns:read", "campaigns:write", "campaigns:activate",
+    "rewards:read", "analytics:read"
+  ],
+  "iat": 1706190600,
+  "exp": 1706194200            // short TTL (≤15 min) bounds permission staleness
+&#125;</code></pre>
+<p><strong>Enforcement split.</strong> Downstream guards authorize coarse-grained operations directly against <code>perms</code> — no Keto call. <strong>High-risk and object-scoped operations always re-check Keto live</strong> (a stale token must never authorize a payout): <code>rewards:approve</code>, <code>rewards:reject</code>, <code>rewards:clawback</code>, <code>rewards:adjust</code>, <code>payouts:write/confirm</code>, <code>api_keys:manage</code>, and any "can user X act on object Y" check. If a permission is revoked mid-session, the live-checked actions deny immediately; coarse actions deny on the next token refresh.</p>
+
+<h2 id="ory-keto-permissions">Ory Keto Permission Model</h2>
+<p>Ory Keto is the <strong>source of truth</strong>, storing permissions as <strong>relation tuples</strong> following the Zanzibar model: <code>(subject, relation, object)</code>. The gateway resolves a caller's tuples into the JWT <code>perms</code> snapshot at issuance; downstream guards read that snapshot, and call <code>keto.check()</code> only for the high-risk / object-scoped cases above.</p>
+
+<h3>Keto Namespace & Relations</h3>
+<table>
+<thead><tr><th>Namespace</th><th>Relations</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td><code>programs</code></td><td><code>read</code>, <code>write</code>, <code>archive</code></td><td>Program lifecycle management</td></tr>
+<tr><td><code>campaigns</code></td><td><code>read</code>, <code>write</code>, <code>activate</code>, <code>pause</code>, <code>complete</code></td><td>Campaign lifecycle + state transitions</td></tr>
+<tr><td><code>variants</code></td><td><code>read</code>, <code>write</code></td><td>Variant configuration</td></tr>
+<tr><td><code>segments</code></td><td><code>read</code>, <code>write</code>, <code>delete</code></td><td>Segment management</td></tr>
+<tr><td><code>participants</code></td><td><code>read</code>, <code>write</code>, <code>block</code>, <code>note</code></td><td>Participant management; <code>note</code> = support annotation</td></tr>
+<tr><td><code>referrals</code></td><td><code>read</code>, <code>reject</code></td><td>Referral viewing + manual rejection</td></tr>
+<tr><td><code>rewards</code></td><td><code>read</code>, <code>approve</code>, <code>reject</code>, <code>clawback</code>, <code>adjust</code>, <code>resend_email</code></td><td>Reward lifecycle actions; <code>adjust</code> = support manual adjustment (live Keto)</td></tr>
+<tr><td><code>analytics</code></td><td><code>read</code></td><td>KPIs, dashboards, attribution</td></tr>
+<tr><td><code>webhooks</code></td><td><code>read</code>, <code>write</code>, <code>delete</code></td><td>Webhook configuration</td></tr>
+<tr><td><code>payouts</code></td><td><code>read</code>, <code>write</code>, <code>confirm</code></td><td>Payout batch management</td></tr>
+<tr><td><code>api_keys</code></td><td><code>manage</code></td><td>Create, list, revoke API keys</td></tr>
+</tbody></table>
+
+<h3>Actor Types → Authorization</h3>
+<p>Maps every actor (Product Spec §4) to its credential, its Keto subject form, and how it is authorized. Participants and Invitees are deliberately absent — they hold no credential and are never Keto subjects.</p>
+<table>
+<thead><tr><th>Actor (Product Spec §4)</th><th>Credential</th><th>Keto subject</th><th>Authorization</th></tr></thead>
+<tbody>
+<tr><td><strong>Owner</strong> (= Owner)</td><td>OAuth2 JWT (Kratos)</td><td><code>user:&#123;id&#125;</code> via <code>role:owner</code></td><td>All namespaces incl. billing and API keys; <code>perms</code> snapshot + live Keto on money/keys</td></tr>
+<tr><td><strong>Campaign Manager</strong></td><td>OAuth2 JWT</td><td><code>user:&#123;id&#125;</code> via <code>role:operator</code></td><td>Campaign/variant/segment/referrer R-W, reward approve/reject (live Keto)</td></tr>
+<tr><td><strong>Analyst</strong></td><td>OAuth2 JWT</td><td><code>user:&#123;id&#125;</code> via <code>role:viewer</code></td><td>Read-only namespaces from <code>perms</code> (analytics, export)</td></tr>
+<tr><td><strong>Support Agent</strong></td><td>OAuth2 JWT</td><td><code>user:&#123;id&#125;</code> via <code>role:support</code></td><td>Read on referrers/referrals/rewards; limited write — <code>rewards:adjust</code>, <code>rewards:resend_email</code>, <code>referrers:note</code> — all live Keto + audit trail</td></tr>
+<tr><td><strong>Client backend</strong> (system)</td><td>Secret API key <code>rai_live_</code></td><td>not a Keto subject</td><td>Key-gated to ingestion only; no Keto, no config access</td></tr>
+<tr><td><strong>JS SDK / browser</strong> (system)</td><td>Publishable key <code>rai_pub_</code> + client-signed user JWT</td><td>not a Keto subject</td><td>Key-gated to SDK + touch ingestion only</td></tr>
+<tr><td><strong>Partner / integration</strong> (system)</td><td>OAuth2 client-credentials or connector token</td><td><code>service:&#123;name&#125;</code></td><td>Narrow service relations (e.g. <code>payouts:confirm@service:payout-worker</code>), live Keto</td></tr>
+<tr><td><strong>Internal worker</strong> (cron, Temporal)</td><td>Client credentials (mesh)</td><td><code>service:&#123;name&#125;</code></td><td>Machine-to-machine; live Keto on money transitions</td></tr>
+<tr><td><strong>Participant / Participant</strong></td><td><em>none</em></td><td><em>never a subject</em></td><td>No platform access — widget + emails/links only</td></tr>
+<tr><td><strong>Invitee</strong></td><td><em>none</em></td><td><em>never a subject</em></td><td>No platform access — interacts with client's product only</td></tr>
+</tbody></table>
+
+<h3>Relation Tuple Examples</h3>
+<pre><code># User "nizar" can write campaigns in tenant "acme"
+campaigns:tenant_acme#write@user_nizar
+
+# Role "operator" can read and write campaigns (role-based)
+campaigns:tenant_acme#write@role:operator#member
+
+# User "alice" (viewer role) can only read analytics
+analytics:tenant_acme#read@user_alice
+
+# Service "payout-worker" can confirm payouts (machine-to-machine)
+payouts:tenant_acme#confirm@service:payout-worker</code></pre>
+
+<h3>Permission Check Flow</h3>
+<figure><figcaption>Authorization Flow</figcaption>
+<div class="waterfall">
+<div class="wf">Request arrives with JWT → extract <code>user_id</code>, <code>tenant_id</code>, <code>perms[]</code></div>
+<div class="wf">Auth Guard determines required permission from route: e.g., <code>campaigns:write</code></div>
+<div class="wf-branch">
+<span class="wf-r wf-ok"><strong>Coarse perm in <code>perms[]</code></strong> → authorize from JWT (no Keto call)</span>
+<span class="wf-r wf-warn"><strong>High-risk / object-scoped</strong> → live <code>keto.check()</code></span>
+</div>
+<div class="wf-branch">
+<span class="wf-r wf-ok"><strong>Allowed</strong> → forward to service</span>
+<span class="wf-r wf-err"><strong>Denied</strong> → 403 authorization_error</span>
+</div></div></figure>
+
+<h3>Role → Permission Mapping</h3>
+<p>Roles are defined in Ory Keto as group memberships. Typical tenant roles:</p>
+<table>
+<thead><tr><th>Role</th><th>Permissions</th></tr></thead>
+<tbody>
+<tr><td><strong>owner</strong> (Owner)</td><td>All namespaces: all relations. Billing, API key management, DSR responses.</td></tr>
+<tr><td><strong>operator</strong> (Campaign Manager)</td><td><code>campaigns:read/write/activate/pause/complete</code>, <code>variants:read/write</code>, <code>segments:read/write</code>, <code>referrers:read/write</code>, <code>referrals:read/reject</code>, <code>rewards:read/approve/reject</code>, <code>analytics:read</code></td></tr>
+<tr><td><strong>viewer</strong> (Analyst)</td><td><code>programs:read</code>, <code>campaigns:read</code>, <code>variants:read</code>, <code>referrals:read</code>, <code>rewards:read</code>, <code>analytics:read</code></td></tr>
+<tr><td><strong>support</strong> (Support Agent)</td><td><code>referrers:read/note</code>, <code>referrals:read</code>, <code>rewards:read/adjust/resend_email</code>, <code>analytics:read</code> — adjust and resend are live-Keto, reason-mandatory, audit-logged</td></tr>
+</tbody></table>
+<blockquote><p><strong>Why hybrid (perms in JWT + Keto as source of truth)?</strong> A pure per-request Keto check adds a network hop to every call; pure static JWT scopes go stale and can't express object-level rules. The hybrid keeps Keto authoritative while caching the <em>resolved</em> permissions in a short-lived JWT so the hot path (reads, list, ordinary writes) needs no Keto round-trip. The cost is bounded staleness — capped by the token TTL — which is why money- and key-touching actions still re-check Keto live and object-scoped rules ("user X can manage only Campaign Y") are never cached. This matches the application architecture (§13.1): a uniform internal token carries resolved permissions, and live Keto guards sit on the money/config endpoints.</p></blockquote>
+
+<h2 id="tenant-isolation">Tenant Isolation</h2>
+<p>Every authentication mechanism resolves to a <code>tenant_id</code>. All queries are implicitly scoped. Accessing a resource from a different tenant returns <code>404</code>, not <code>403</code> — the resource is treated as nonexistent to prevent enumeration.</p>
+
+<h2 id="auth-summary">Authentication Summary by Endpoint Group</h2>
+<table>
+<thead><tr><th>Endpoint Group</th><th>API Key (secret)</th><th>API Key (pub)</th><th>OAuth2 JWT</th><th>Keto Permission</th></tr></thead>
+<tbody>
+<tr><td><code>POST /v1/events</code></td><td>✅ All types</td><td>✅ Touch only</td><td>❌</td><td><em>N/A (key-gated)</em></td></tr>
+<tr><td><code>POST /v1/events/batch</code></td><td>✅</td><td>❌</td><td>❌</td><td><em>N/A (key-gated)</em></td></tr>
+<tr><td><code>/v1/sdk/*</code></td><td>❌</td><td>✅</td><td>❌</td><td><em>N/A (key-gated)</em></td></tr>
+<tr><td>Programs</td><td>❌</td><td>❌</td><td>✅</td><td><code>programs:read/write</code></td></tr>
+<tr><td>Campaigns, Variants</td><td>❌</td><td>❌</td><td>✅</td><td><code>campaigns:read/write/activate…</code></td></tr>
+<tr><td>Participants, Referrals</td><td>❌</td><td>❌</td><td>✅</td><td><code>referrers:read/write</code>, <code>referrals:read</code></td></tr>
+<tr><td>Rewards</td><td>❌</td><td>❌</td><td>✅</td><td><code>rewards:read/approve/reject/clawback/adjust</code></td></tr>
+<tr><td>Analytics, Attribution</td><td>❌</td><td>❌</td><td>✅</td><td><code>analytics:read</code></td></tr>
+<tr><td>Payouts</td><td>❌</td><td>❌</td><td>✅</td><td><code>payouts:read/write/confirm</code></td></tr>
+<tr><td>Webhooks, Segments</td><td>❌</td><td>❌</td><td>✅</td><td><code>webhooks:*</code>, <code>segments:*</code></td></tr>
+<tr><td>API Key management</td><td>❌</td><td>❌</td><td>✅</td><td><code>api_keys:manage</code></td></tr>
+</tbody></table>
+<hr>
+
+<h1 id="3-core-resources">3. Core Resources & Endpoints</h1>
+<p><strong>Most</strong> endpoints in this section are configuration/runtime/analytics and require <strong>OAuth2 JWT</strong>: downstream guards authorize from the JWT <code>perms</code> snapshot and re-check Ory Keto live for high-risk actions (§2). The exceptions are <strong>event ingestion</strong> (§3.7, §5 — authenticated by <em>API key</em>, not JWT) and the <strong>SDK endpoints</strong> (§4 — <em>publishable key</em>). Each resource table states its auth where it differs from the JWT default.</p>
+
+<h2 id="program">3.1 Program</h2>
+<p>Top-level organizational container. One per client (typically). Groups Campaigns, carries default attribution model. Branding is an <strong>account-level</strong> concern — not on the Program resource.</p>
+<p><strong>Lifecycle:</strong> No state machine. Soft-delete only (<code>archived_at</code>). Cascades to all child Campaigns.</p>
+<div class="swg">
+<div class="op"><span class="m m-post">POST</span><span class="op-path"><code>/v1/programs</code></span><span class="op-sum">Create a new Program</span><span class="op-tag"><code>programs:write</code></span></div>
+<div class="op"><span class="m m-get">GET</span><span class="op-path"><code>/v1/programs</code></span><span class="op-sum">List all Programs</span><span class="op-tag"><code>programs:read</code></span></div>
+<div class="op"><span class="m m-get">GET</span><span class="op-path"><code>/v1/programs/&#123;id&#125;</code></span><span class="op-sum">Retrieve a Program</span><span class="op-tag"><code>programs:read</code></span></div>
+<div class="op"><span class="m m-patch">PATCH</span><span class="op-path"><code>/v1/programs/&#123;id&#125;</code></span><span class="op-sum">Update Program config</span><span class="op-tag"><code>programs:write</code></span></div>
+<div class="op"><span class="m m-post">POST</span><span class="op-path"><code>/v1/programs/&#123;id&#125;/archive</code></span><span class="op-sum">Soft-delete + cascade</span><span class="op-tag"><code>programs:archive</code></span></div>
+<div class="op"><span class="m m-get">GET</span><span class="op-path"><code>/v1/programs/&#123;id&#125;/health</code></span><span class="op-sum">Health Score (0–100)</span><span class="op-tag"><code>analytics:read</code></span></div>
+</div>
+<p><strong>Request body (<code>POST /v1/programs</code>):</strong></p>
+<pre><code>&#123;
+  "name": "Acme Referral Program",          // required
+  "description": "Customer referral program",
+  "default_attribution_model": "first_touch", // MVP: first_touch | last_touch · V2: linear | time_decay | position_based | ai_weighted
+  "default_attribution_window_days": 90,       // click→conversion default (Product Spec §10); a Pulse may narrow it
+  "metadata": &#123; "team": "growth" &#125;
+&#125;</code></pre>
+<p><strong>Response:</strong> <code>id</code>, <code>created_at</code>, <code>updated_at</code>, <code>archived_at</code> (null), <code>health_score</code> (null until computed).</p>
+
+<h2 id="campaign">3.2 Campaign</h2>
+<p>Time-bound execution unit. Selects a Pulse (immutable workflow type), defines enrollment strategy, manages shared budget, and transitions through a state machine.</p>
+
+<h3>Key Design Decisions</h3>
+<ol>
+<li><strong>Selective enrollment only.</strong> Participants must be enrolled by the client before they can refer; there is no open/self-enrollment. The widget renders only for enrolled users (otherwise <code>hidden</code>).</li>
+<li><strong>Default Variant</strong> auto-created on Campaign creation. Acts as catch-all fallback.</li>
+<li><strong>Variant resolution at enrollment time</strong>, not invitee click. Participant knows their reward when sharing.</li>
+<li><strong>Budget</strong> is shared across all variants. Campaign auto-pauses at 100%.</li>
+</ol>
+
+<h3>State Machine</h3>
+<figure><figcaption>Campaign States &amp; Transitions</figcaption>
+<svg viewBox="0 0 720 240" xmlns="http://www.w3.org/2000/svg" style="width:100%;height:auto;font-family:Geist,system-ui,sans-serif" role="img" aria-label="Campaign state machine">
+<defs><marker id="cm-a" markerWidth="9" markerHeight="9" refX="7.5" refY="3" orient="auto"><path d="M0,0 L7.5,3 L0,6 Z" fill="#78716c"/></marker></defs>
+<style>.st&#123;rx:7;stroke-width:1.2&#125;.lbl&#123;font-size:9.5px;fill:#57534e&#125;.sn&#123;font-size:11px;font-weight:600;fill:#1c1917&#125;</style>
+<!-- nodes -->
+<rect class="st" x="14" y="40" width="96" height="34" fill="#f5f5f4" stroke="#a8a29e"/><text class="sn" x="62" y="61" text-anchor="middle">Draft</text>
+<rect class="st" x="158" y="40" width="100" height="34" fill="#e0e7ff" stroke="#6366f1"/><text class="sn" x="208" y="61" text-anchor="middle">Scheduled</text>
+<rect class="st" x="306" y="40" width="90" height="34" fill="#dbeafe" stroke="#1e40af"/><text class="sn" x="351" y="61" text-anchor="middle">Active</text>
+<rect class="st" x="306" y="150" width="90" height="34" fill="#fef3c7" stroke="#b45309"/><text class="sn" x="351" y="171" text-anchor="middle">Paused</text>
+<rect class="st" x="452" y="40" width="100" height="34" fill="#d1fae5" stroke="#047857"/><text class="sn" x="502" y="61" text-anchor="middle">Ended</text>
+<rect class="st" x="600" y="40" width="100" height="34" fill="#ece9e6" stroke="#78716c"/><text class="sn" x="650" y="61" text-anchor="middle">Archived</text>
+<!-- transitions -->
+<line x1="110" y1="57" x2="156" y2="57" stroke="#78716c" stroke-width="1.4" marker-end="url(#cm-a)"/><text class="lbl" x="133" y="51" text-anchor="middle">schedule</text>
+<line x1="258" y1="57" x2="304" y2="57" stroke="#78716c" stroke-width="1.4" marker-end="url(#cm-a)"/><text class="lbl" x="281" y="51" text-anchor="middle">starts_at</text>
+<path d="M62,40 C62,12 351,12 351,38" fill="none" stroke="#78716c" stroke-width="1.4" marker-end="url(#cm-a)"/><text class="lbl" x="206" y="18" text-anchor="middle">activate (immediate)</text>
+<line x1="351" y1="74" x2="351" y2="148" stroke="#b45309" stroke-width="1.4" marker-end="url(#cm-a)"/><text class="lbl" x="357" y="115" text-anchor="start">pause / budget_threshold</text>
+<path d="M396,160 C440,160 440,74 398,62" fill="none" stroke="#047857" stroke-width="1.4" marker-end="url(#cm-a)"/><text class="lbl" x="447" y="120" text-anchor="start">resume</text>
+<line x1="396" y1="57" x2="450" y2="57" stroke="#78716c" stroke-width="1.4" marker-end="url(#cm-a)"/><text class="lbl" x="423" y="51" text-anchor="middle">complete / ends_at</text>
+<path d="M396,167 C470,167 480,74 478,74" fill="none" stroke="#78716c" stroke-width="1.2" marker-end="url(#cm-a)"/><text class="lbl" x="500" y="150" text-anchor="middle">complete</text>
+<line x1="552" y1="57" x2="598" y2="57" stroke="#78716c" stroke-width="1.4" marker-end="url(#cm-a)"/><text class="lbl" x="575" y="51" text-anchor="middle">archive</text>
+<path d="M62,74 C62,210 650,210 650,76" fill="none" stroke="#a8a29e" stroke-width="1.1" stroke-dasharray="4 3" marker-end="url(#cm-a)"/><text class="lbl" x="356" y="224" text-anchor="middle">archive (from Draft / Paused — soft-delete)</text>
+</svg>
+<p class="note">Terminal states: <code>Ended</code> and <code>Archived</code>. <code>Active ⇄ Paused</code> is the only reversible loop; <code>budget_threshold</code> at 100% auto-transitions Active → Paused. <strong>Internal/public split (per DB R-note):</strong> the state value is <code>ended</code>; the public lifecycle event surfaced to clients is <code>campaign.completed</code> (§6.1). The <code>/complete</code> action verb drives the campaign to <code>ended</code>.</p>
+</figure>
+
+<div class="swg">
+<div class="op"><span class="m m-post">POST</span><span class="op-path"><code>/v1/programs/&#123;program_id&#125;/campaigns</code></span><span class="op-sum">Create Campaign (draft)</span><span class="op-tag"><code>campaigns:write</code></span></div>
+<div class="op"><span class="m m-get">GET</span><span class="op-path"><code>/v1/programs/&#123;program_id&#125;/campaigns</code></span><span class="op-sum">List Campaigns</span><span class="op-tag"><code>campaigns:read</code></span></div>
+<div class="op"><span class="m m-get">GET</span><span class="op-path"><code>/v1/campaigns/&#123;id&#125;</code></span><span class="op-sum">Retrieve Campaign</span><span class="op-tag"><code>campaigns:read</code></span></div>
+<div class="op"><span class="m m-patch">PATCH</span><span class="op-path"><code>/v1/campaigns/&#123;id&#125;</code></span><span class="op-sum">Update (draft/paused only)</span><span class="op-tag"><code>campaigns:write</code></span></div>
+<div class="op"><span class="m m-post">POST</span><span class="op-path"><code>/v1/campaigns/&#123;id&#125;/schedule</code></span><span class="op-sum">Schedule activation</span><span class="op-tag"><code>campaigns:activate</code></span></div>
+<div class="op"><span class="m m-post">POST</span><span class="op-path"><code>/v1/campaigns/&#123;id&#125;/activate</code></span><span class="op-sum">Activate immediately</span><span class="op-tag"><code>campaigns:activate</code></span></div>
+<div class="op"><span class="m m-post">POST</span><span class="op-path"><code>/v1/campaigns/&#123;id&#125;/pause</code></span><span class="op-sum">Pause active</span><span class="op-tag"><code>campaigns:pause</code></span></div>
+<div class="op"><span class="m m-post">POST</span><span class="op-path"><code>/v1/campaigns/&#123;id&#125;/resume</code></span><span class="op-sum">Resume paused</span><span class="op-tag"><code>campaigns:activate</code></span></div>
+<div class="op"><span class="m m-post">POST</span><span class="op-path"><code>/v1/campaigns/&#123;id&#125;/complete</code></span><span class="op-sum">End the campaign → internal state <code>ended</code>, emits <code>campaign.completed</code></span><span class="op-tag"><code>campaigns:complete</code></span></div>
+<div class="op"><span class="m m-post">POST</span><span class="op-path"><code>/v1/campaigns/&#123;id&#125;/archive</code></span><span class="op-sum">Archive</span><span class="op-tag"><code>campaigns:write</code></span></div>
+<div class="op"><span class="m m-get">GET</span><span class="op-path"><code>/v1/campaigns/&#123;id&#125;/stats</code></span><span class="op-sum">Campaign KPIs</span><span class="op-tag"><code>analytics:read</code></span></div>
+</div>
+<p><strong>Request body (<code>POST /v1/programs/&#123;program_id&#125;/campaigns</code>):</strong></p>
+<pre><code>&#123;
+  "name": "Q3 Conversion Pulse",            // required
+  "pulse": "conversion",                    // required, immutable — signup | conversion | reactivation | cross_sell | renewal | feedback | newsletter | switch_up | product_education
+  "enrollment_trigger": "signup",           // optional — defaults to the Pulse's default; must be in the Pulse's allowed set (Product Spec §6)
+  "budget": &#123; "total_amount": 1000000, "currency": "EUR" &#125;,  // minor units
+  "starts_at": "2026-07-01T00:00:00Z",
+  "ends_at": "2026-09-30T23:59:59Z",
+  "attribution_window_days": 90,
+  "metadata": &#123; "region": "EU" &#125;
+&#125;</code></pre>
+<p>Campaigns are <strong>selective-enrollment only</strong> — there is no <code>enrollment_model</code> field. A Default Variant is auto-created.</p>
+<p><strong>Budget auto-pause:</strong> When <code>spent_amount</code> ≥ <code>total_amount</code>, the Campaign auto-transitions Active → Paused (<code>campaign.budget_threshold</code>). Pipeline referrals still process; new clicks are blocked.</p>
+
+<h2 id="variant">3.3 Campaign Variant</h2>
+<p>Core configuration unit: binds a Segment (who), Reward Config (what incentive), messaging (what they see), and allocation weight (traffic proportion).</p>
+
+<h3>Variant ↔ Segment</h3>
+<figure><figcaption>Variant references Segment</figcaption>
+<div class="duo">
+<div class="duo-col"><div class="duo-h dh-l">Segment (WHO)</div><div class="duo-b step-list">
+<div>Standalone, reusable definition</div>
+<div>Evaluates to true/false for any actor</div>
+<div>Shared across variants and campaigns</div>
+<div>No knowledge of rewards or campaigns</div>
+</div></div>
+<div class="duo-col"><div class="duo-h dh-r">Variant (WHAT)</div><div class="duo-b step-list">
+<div>References exactly one Segment</div>
+<div>Adds: reward config + messaging + weight</div>
+<div>Bound to one Campaign</div>
+<div>Many variants can share a Segment</div>
+</div></div>
+</div></figure>
+
+<h3>Variant Resolution at Enrollment</h3>
+<figure><figcaption>Resolution Fallback Chain</figcaption>
+<div class="waterfall">
+<div class="wf">Participant enrolled with attributes</div>
+<div class="wf">Evaluate against each variant's segment (priority order)</div>
+<div class="wf-branch">
+<span class="wf-r wf-ok">One match → assign</span>
+<span class="wf-r wf-ok">Multiple → highest priority wins</span>
+<span class="wf-r wf-warn">No match → default variant</span>
+<span class="wf-r wf-err">No default → ineligible</span>
+</div></div></figure>
+
+<div class="swg">
+<div class="op"><span class="m m-post">POST</span><span class="op-path"><code>/v1/campaigns/&#123;campaign_id&#125;/variants</code></span><span class="op-sum">Create Variant</span><span class="op-tag"><code>variants:write</code></span></div>
+<div class="op"><span class="m m-get">GET</span><span class="op-path"><code>/v1/campaigns/&#123;campaign_id&#125;/variants</code></span><span class="op-sum">List Variants</span><span class="op-tag"><code>variants:read</code></span></div>
+<div class="op"><span class="m m-get">GET</span><span class="op-path"><code>/v1/variants/&#123;id&#125;</code></span><span class="op-sum">Retrieve Variant</span><span class="op-tag"><code>variants:read</code></span></div>
+<div class="op"><span class="m m-patch">PATCH</span><span class="op-path"><code>/v1/variants/&#123;id&#125;</code></span><span class="op-sum">Update config</span><span class="op-tag"><code>variants:write</code></span></div>
+<div class="op"><span class="m m-post">POST</span><span class="op-path"><code>/v1/variants/&#123;id&#125;/enable</code></span><span class="op-sum">Enable (receives traffic)</span><span class="op-tag"><code>variants:write</code></span></div>
+<div class="op"><span class="m m-post">POST</span><span class="op-path"><code>/v1/variants/&#123;id&#125;/disable</code></span><span class="op-sum">Disable</span><span class="op-tag"><code>variants:write</code></span></div>
+<div class="op"><span class="m m-get">GET</span><span class="op-path"><code>/v1/variants/&#123;id&#125;/stats</code></span><span class="op-sum">Variant KPIs + significance</span><span class="op-tag"><code>analytics:read</code></span></div>
+</div>
+<p><strong>Request body (<code>POST /v1/campaigns/&#123;campaign_id&#125;/variants</code>):</strong></p>
+<pre><code>&#123;
+  "name": "Enterprise tier",
+  "is_default": false,
+  "priority": 10,                           // higher wins on multi-match
+  "allocation_weight": 50,                  // traffic share — only meaningful between variants bound to random segments of one mutual_exclusion_group
+  "segment": &#123; "segment_id": "seg_01J9..." &#125;,  // by ref, or inline definition
+  "reward_config": &#123;
+    "participant": &#123; "reward_type": "cash", "reward_structure": "fixed", "amount": 5000, "currency": "EUR" &#125;,
+    "invitee":  &#123; "reward_type": "discount_code", "reward_structure": "percentage", "value": 20 &#125;
+  &#125;,
+  "messaging": &#123; "headline": "Give 20%, get €50" &#125;,
+  "eligibility_rules": &#123; "min_plan": "pro" &#125;,
+  "enabled": true,
+  "metadata": &#123;&#125;
+&#125;</code></pre>
+<p><code>reward_config</code> uses the <strong>two-axis</strong> model from Product Spec §8 / DB Model: <code>reward_type</code> ∈ &#123;<code>cash</code>, <code>gift_card</code>, <code>account_credit</code>, <code>feature_unlock</code>, <code>extended_trial</code>, <code>discount_code</code>, <code>custom</code>&#125; × <code>reward_structure</code> ∈ &#123;<code>fixed</code>, <code>percentage</code>, <code>tiered</code>, <code>recurring</code>, <code>milestone</code>, <code>capped</code>&#125;. Type and structure are independent (e.g. a percentage discount = <code>discount_code</code> × <code>percentage</code>); there is no single conflated reward enum.</p>
+
+<h2 id="segment">3.4 Segment</h2>
+<p>Reusable audience definition. Segmentation is the <strong>sole allocation mechanism</strong> — no separate experimentation framework.</p>
+<table>
+<thead><tr><th>Type</th><th>Description</th><th>Evaluation</th></tr></thead>
+<tbody>
+<tr><td><code>rule_based</code></td><td>Manual attribute rules</td><td>Real-time</td></tr>
+<tr><td><code>behavioral</code></td><td>Action-history based</td><td>Batch / real-time</td></tr>
+<tr><td><code>temporal</code></td><td>Time-attribute based</td><td>Real-time</td></tr>
+<tr><td><code>composite</code></td><td>AND/OR combinations</td><td>Real-time</td></tr>
+<tr><td><code>random</code></td><td>Hash-based deterministic allocation</td><td>Real-time</td></tr>
+<tr><td><code>ai_generated</code></td><td>ML-detected patterns (read-only)</td><td>Batch (daily)</td></tr>
+</tbody></table>
+<p>Every segment carries <code>on_missing_attribute: "default" | "block"</code> (default <code>default</code>): a rule over an attribute the participant does not have evaluates as <em>no match</em> and falls through to the Default Variant, unless the segment is a compliance gate (<code>block</code>) — Product Spec §5 Targeting vs Gating. Only <code>segments:write</code> may set <code>block</code>.</p>
+<div class="swg">
+<div class="op"><span class="m m-post">POST</span><span class="op-path"><code>/v1/segments</code></span><span class="op-sum">Create Segment</span><span class="op-tag"><code>segments:write</code></span></div>
+<div class="op"><span class="m m-get">GET</span><span class="op-path"><code>/v1/segments</code></span><span class="op-sum">List Segments</span><span class="op-tag"><code>segments:read</code></span></div>
+<div class="op"><span class="m m-get">GET</span><span class="op-path"><code>/v1/segments/&#123;id&#125;</code></span><span class="op-sum">Retrieve</span><span class="op-tag"><code>segments:read</code></span></div>
+<div class="op"><span class="m m-patch">PATCH</span><span class="op-path"><code>/v1/segments/&#123;id&#125;</code></span><span class="op-sum">Update</span><span class="op-tag"><code>segments:write</code></span></div>
+<div class="op"><span class="m m-delete">DELETE</span><span class="op-path"><code>/v1/segments/&#123;id&#125;</code></span><span class="op-sum">Delete (if not in use)</span><span class="op-tag"><code>segments:delete</code></span></div>
+<div class="op"><span class="m m-get">GET</span><span class="op-path"><code>/v1/segments/&#123;id&#125;/estimate</code></span><span class="op-sum">Audience size estimate</span><span class="op-tag"><code>segments:read</code></span></div>
+</div>
+
+<h2 id="participant">3.5 Participant</h2>
+<p>External actor. <strong>No platform account, no dashboard, no login, no platform-hosted page of any kind.</strong> Interacts only via the embedded widget (inside the client's product) and via emails/links. Per the Product Spec, payout method is collected <strong>in the widget</strong> or on the <strong>payout provider's hosted page</strong> (linked from email) — never on a platform-hosted page; the platform stores only a provider reference, never raw bank data.</p>
+<h3>Enrollment Methods</h3>
+<p>All enrollment is <strong>selective</strong> — initiated by the client, never by the participant. The most common path is a client enrolling one of its own end-users as a participant, including a <strong>customer who originally arrived as a invitee</strong> (was referred, signed up, and is now invited to refer others).</p>
+<table>
+<thead><tr><th>Method</th><th>Endpoint</th><th>Phase</th></tr></thead>
+<tbody>
+<tr><td>API Single</td><td><code>POST /v1/referrers</code></td><td>MVP</td></tr>
+<tr><td>Invitee → Participant</td><td><code>POST /v1/referrers</code> — client enrolls a converted invitee (now a customer) as a participant</td><td>MVP</td></tr>
+<tr><td>API Bulk</td><td><code>POST /v1/referrers/batch</code> (up to 1000)</td><td>MVP</td></tr>
+<tr><td>CSV Import</td><td>Dashboard upload</td><td>Lot 1</td></tr>
+<tr><td>CRM Connector</td><td>HubSpot / Salesforce</td><td>Lot 1</td></tr>
+</tbody></table>
+<h3>Operational State &amp; Trust Level</h3>
+<p>Per Product Spec §2 these are <strong>two independent axes</strong> and must not be collapsed. <strong>Operational state</strong> (owned by the Participant domain) answers "can they act right now?"; <strong>trust level</strong> (owned by the Trust model, Lot 1) answers "how much financial exposure do we allow?". A third axis — journey stage (Anonymous→…→Advocate) — is an analytics projection (§3.13), not a stored participant field.</p>
+<figure><figcaption>Operational State Machine</figcaption>
+<svg viewBox="0 0 720 250" xmlns="http://www.w3.org/2000/svg" style="width:100%;height:auto;font-family:Geist,system-ui,sans-serif" role="img" aria-label="Participant operational state machine">
+<defs><marker id="os-a" markerWidth="9" markerHeight="9" refX="7.5" refY="3" orient="auto"><path d="M0,0 L7.5,3 L0,6 Z" fill="#78716c"/></marker></defs>
+<style>.os&#123;rx:7;stroke-width:1.2&#125;.ol&#123;font-size:9px;fill:#57534e&#125;.on&#123;font-size:10.5px;font-weight:600;fill:#1c1917&#125;</style>
+<rect class="os" x="40" y="100" width="96" height="34" fill="#ece9e6" stroke="#a8a29e"/><text class="on" x="88" y="121" text-anchor="middle">Dormant</text>
+<rect class="os" x="250" y="100" width="92" height="34" fill="#dbeafe" stroke="#1e40af"/><text class="on" x="296" y="121" text-anchor="middle">Active</text>
+<rect class="os" x="440" y="100" width="92" height="34" fill="#fef3c7" stroke="#b45309"/><text class="on" x="486" y="121" text-anchor="middle">Flagged</text>
+<rect class="os" x="585" y="182" width="110" height="34" fill="#fee2e2" stroke="#dc2626"/><text class="on" x="640" y="203" text-anchor="middle">Suspended</text>
+<rect class="os" x="590" y="20" width="100" height="34" fill="#1c1917" stroke="#1c1917"/><text class="on" x="640" y="41" text-anchor="middle" fill="#fff">Banned</text>
+<line x1="296" y1="70" x2="296" y2="98" stroke="#78716c" stroke-width="1.4" marker-end="url(#os-a)"/><text class="ol" x="296" y="64" text-anchor="middle">enrolled</text>
+<line x1="248" y1="111" x2="138" y2="111" stroke="#78716c" stroke-width="1.3" marker-end="url(#os-a)"/><text class="ol" x="193" y="105" text-anchor="middle">90d idle</text>
+<line x1="138" y1="124" x2="248" y2="124" stroke="#78716c" stroke-width="1.3" marker-end="url(#os-a)"/><text class="ol" x="193" y="138" text-anchor="middle">new activity</text>
+<line x1="342" y1="111" x2="438" y2="111" stroke="#b45309" stroke-width="1.3" marker-end="url(#os-a)"/><text class="ol" x="390" y="105" text-anchor="middle">fraud 0.3–0.7</text>
+<line x1="438" y1="124" x2="342" y2="124" stroke="#047857" stroke-width="1.2" stroke-dasharray="4 3" marker-end="url(#os-a)"/><text class="ol" x="390" y="138" text-anchor="middle">cleared</text>
+<line x1="500" y1="134" x2="600" y2="180" stroke="#dc2626" stroke-width="1.3" marker-end="url(#os-a)"/><text class="ol" x="522" y="168" text-anchor="middle">confirmed</text>
+<line x1="498" y1="100" x2="612" y2="56" stroke="#1c1917" stroke-width="1.2" marker-end="url(#os-a)"/><text class="ol" x="578" y="84" text-anchor="middle">serious fraud</text>
+<line x1="652" y1="182" x2="652" y2="56" stroke="#1c1917" stroke-width="1.2" marker-end="url(#os-a)"/><text class="ol" x="672" y="120" text-anchor="start">repeat</text>
+<path d="M585,205 C400,250 300,245 296,136" fill="none" stroke="#047857" stroke-width="1.2" stroke-dasharray="4 3" marker-end="url(#os-a)"/><text class="ol" x="380" y="243" text-anchor="middle">appeal / reinstate</text>
+</svg>
+<p class="note">Suspended is reversible (appeal); <strong>Banned is terminal</strong> (rewards forfeited). Suspended/Banned drive the comms changes in §8.2.1. Dormant can still refer and earn.</p>
+</figure>
+<table>
+<thead><tr><th>Operational state</th><th>Can refer?</th><th>Can earn?</th><th>Comms effect</th></tr></thead>
+<tbody>
+<tr><td><strong>Active</strong></td><td>Yes</td><td>Yes</td><td>Normal widget &amp; links</td></tr>
+<tr><td><strong>Dormant</strong></td><td>Yes</td><td>Yes</td><td>Normal; re-engagement nudge eligible (90d+ idle)</td></tr>
+<tr><td><strong>Flagged</strong></td><td>Yes</td><td>Held</td><td>Rewards forced to <code>Held</code>, manual approval; links still active</td></tr>
+<tr><td><strong>Suspended</strong></td><td>No</td><td>Held</td><td>Links → <code>410</code>, widget <code>hidden</code>, payouts held (§8.2.1)</td></tr>
+<tr><td><strong>Banned</strong></td><td>No</td><td>Forfeited</td><td>Same as Suspended; terminal, not reversible</td></tr>
+</tbody></table>
+<p class="note"><strong>On state breadth:</strong> the operational axis is exactly these <strong>five</strong>. <code>candidate</code> is a client-side journey stage, never a platform state (Product Spec Appendix A), and <code>reactivated</code> is the Dormant→Active <em>transition</em>, not a distinct state. Event Model §5.3 (<code>participant.state_changed.new_state</code>) and the DB Model (<code>participants.lifecycle_state</code>) enumerate the same five.</p>
+<p><strong>Trust level</strong> (score 0–100, scoped per participant × program, tenant-isolated) scales financial exposure — it never blocks an individual event:</p>
+<table>
+<thead><tr><th>Trust level</th><th>Score</th><th>Monthly payout cap</th><th>Hold</th><th>Approval mode</th></tr></thead>
+<tbody>
+<tr><td><strong>New</strong></td><td>0–25</td><td>€100</td><td>14d</td><td>Manual review</td></tr>
+<tr><td><strong>Established</strong></td><td>26–50</td><td>€500</td><td>7d</td><td>Auto &lt; €50</td></tr>
+<tr><td><strong>Trusted</strong></td><td>51–75</td><td>€2,000</td><td>3d</td><td>Auto &lt; €200</td></tr>
+<tr><td><strong>Advocate</strong></td><td>76–100</td><td>€10,000</td><td>Instant</td><td>Auto-approve all</td></tr>
+</tbody></table>
+<p class="note">MVP override (Product Spec §7): trust scoring is bypassed — all rewards manual review, 7-day hold, €1,000/mo cap for everyone.</p>
+<div class="swg">
+<div class="op"><span class="m m-post">POST</span><span class="op-path"><code>/v1/referrers</code></span><span class="op-sum">Register single participant</span><span class="op-tag"><code>referrers:write</code></span></div>
+<div class="op"><span class="m m-post">POST</span><span class="op-path"><code>/v1/referrers/batch</code></span><span class="op-sum">Register up to 1000</span><span class="op-tag"><code>referrers:write</code></span></div>
+<div class="op"><span class="m m-get">GET</span><span class="op-path"><code>/v1/referrers</code></span><span class="op-sum">List participants</span><span class="op-tag"><code>referrers:read</code></span></div>
+<div class="op"><span class="m m-get">GET</span><span class="op-path"><code>/v1/referrers/&#123;id&#125;</code></span><span class="op-sum">Retrieve participant</span><span class="op-tag"><code>referrers:read</code></span></div>
+<div class="op"><span class="m m-patch">PATCH</span><span class="op-path"><code>/v1/referrers/&#123;id&#125;</code></span><span class="op-sum">Update metadata, tags</span><span class="op-tag"><code>referrers:write</code></span></div>
+<div class="op"><span class="m m-post">POST</span><span class="op-path"><code>/v1/referrers/&#123;id&#125;/block</code></span><span class="op-sum">Block (disables all links)</span><span class="op-tag"><code>referrers:block</code></span></div>
+<div class="op"><span class="m m-post">POST</span><span class="op-path"><code>/v1/referrers/&#123;id&#125;/unblock</code></span><span class="op-sum">Unblock</span><span class="op-tag"><code>referrers:block</code></span></div>
+<div class="op"><span class="m m-post">POST</span><span class="op-path"><code>/v1/referrers/&#123;id&#125;/notes</code></span><span class="op-sum">Add support note (audit-logged)</span><span class="op-tag"><code>referrers:note</code></span></div>
+<div class="op"><span class="m m-post">POST</span><span class="op-path"><code>/v1/referrers/&#123;id&#125;/links</code></span><span class="op-sum">Generate referral link</span><span class="op-tag"><code>referrers:write</code></span></div>
+<div class="op"><span class="m m-get">GET</span><span class="op-path"><code>/v1/referrers/&#123;id&#125;/links</code></span><span class="op-sum">List active links</span><span class="op-tag"><code>referrers:read</code></span></div>
+<div class="op"><span class="m m-get">GET</span><span class="op-path"><code>/v1/referrers/&#123;id&#125;/stats</code></span><span class="op-sum">Participant KPIs</span><span class="op-tag"><code>analytics:read</code></span></div>
+<div class="op"><span class="m m-get">GET</span><span class="op-path"><code>/v1/referrers/&#123;id&#125;/rewards</code></span><span class="op-sum">List earned rewards</span><span class="op-tag"><code>rewards:read</code></span></div>
+</div>
+<p><strong>Request body (<code>POST /v1/referrers</code>):</strong></p>
+<pre><code>&#123;
+  "email": "alice@example.com",             // required
+  "name": "Alice Martin",
+  "external_id": "user_8842",               // client's own user id
+  "campaign_id": "camp_01J9...",            // enroll into campaign + resolve variant + generate link
+  "tags": ["beta", "eu"],
+  "attributes": &#123; "plan": "enterprise", "country": "DE" &#125;,  // for segment evaluation
+  "metadata": &#123;&#125;
+&#125;</code></pre>
+<p>Idempotent by <code>email</code> / <code>external_id</code> per tenant. Returns the participant plus the generated referral link for the named campaign.</p>
+
+<h2 id="referral">3.6 Referral</h2>
+<p>Runtime workflow instance (Temporal). Created on touch event or explicitly via API.</p>
+<figure><figcaption>Referral State Machine</figcaption>
+<div class="step-list compact">
+<div><code>PENDING</code> → referral created (touch recorded or API)</div>
+<div class="hl"><code>QUALIFIED</code> → eligibility passed</div>
+<div><code>CONVERTED</code> → qualifying action completed</div>
+<div class="hl"><code>REWARDED</code> → reward issued</div>
+</div>
+<div class="cols mt-sm"><div class="leaf lf-c"><code>REJECTED</code><br>Fraud or eligibility failure</div><div class="leaf lf-c"><code>EXPIRED</code><br>Attribution window passed</div></div>
+<p class="note">Per Product Spec §2 and Event Model §5.1, the referral has <strong>no <code>clawed_back</code> state</strong>. A refund / chargeback / fraud reversal is modelled at the <strong>reward</strong> level as <code>reward.reversed</code> (§3.8), not as a referral transition. States: <code>Pending → Qualified → Converted → Rewarded | Expired | Rejected</code>.</p>
+</figure>
+<div class="swg">
+<div class="op"><span class="m m-post">POST</span><span class="op-path"><code>/v1/referrals</code></span><span class="op-sum">Create explicitly (server-side)</span><span class="op-tag"><code>referrers:write</code></span></div>
+<div class="op"><span class="m m-get">GET</span><span class="op-path"><code>/v1/referrals</code></span><span class="op-sum">List referrals</span><span class="op-tag"><code>referrals:read</code></span></div>
+<div class="op"><span class="m m-get">GET</span><span class="op-path"><code>/v1/referrals/&#123;id&#125;</code></span><span class="op-sum">Retrieve with workflow state</span><span class="op-tag"><code>referrals:read</code></span></div>
+<div class="op"><span class="m m-post">POST</span><span class="op-path"><code>/v1/referrals/&#123;id&#125;/reject</code></span><span class="op-sum">Manually reject</span><span class="op-tag"><code>referrals:reject</code></span></div>
+<div class="op"><span class="m m-get">GET</span><span class="op-path"><code>/v1/referrals/&#123;id&#125;/touches</code></span><span class="op-sum">List touch events</span><span class="op-tag"><code>referrals:read</code></span></div>
+<div class="op"><span class="m m-get">GET</span><span class="op-path"><code>/v1/referrals/&#123;id&#125;/attribution</code></span><span class="op-sum">Attribution computation</span><span class="op-tag"><code>analytics:read</code></span></div>
+<div class="op"><span class="m m-get">GET</span><span class="op-path"><code>/v1/referrals/&#123;id&#125;/rewards</code></span><span class="op-sum">Associated rewards</span><span class="op-tag"><code>rewards:read</code></span></div>
+</div>
+
+<h2 id="event">3.7 Event</h2>
+<p>Immutable, timestamped records. Ingestion via API key (Section 5). Read via OAuth2 JWT.</p>
+<div class="swg">
+<div class="op"><span class="m m-post">POST</span><span class="op-path"><code>/v1/events</code></span><span class="op-sum"></span><span class="op-tag">API Key</span><span class="op-tag"><em>Key-gated</em></span></div>
+<div class="op"><span class="m m-post">POST</span><span class="op-path"><code>/v1/events/batch</code></span><span class="op-sum"></span><span class="op-tag">API Key (secret)</span><span class="op-tag"><em>Key-gated</em></span></div>
+<div class="op"><span class="m m-get">GET</span><span class="op-path"><code>/v1/events</code></span><span class="op-sum"></span><span class="op-tag">OAuth2 JWT</span><span class="op-tag"><code>analytics:read</code></span></div>
+<div class="op"><span class="m m-get">GET</span><span class="op-path"><code>/v1/events/&#123;id&#125;</code></span><span class="op-sum"></span><span class="op-tag">OAuth2 JWT</span><span class="op-tag"><code>analytics:read</code></span></div>
+</div>
+
+<h2 id="reward">3.8 Reward</h2>
+<p>Runtime instance. Canonical lifecycle (Product Spec §8): <code>Pending → Held → Approved → Processing → Paid</code>. Terminal off-ramps: <code>Rejected</code> (fraud/ineligible) and <code>Reversed</code> (refund, chargeback, or fraud after payout). <code>Held</code> fires when the fraud score is in the review band or the amount exceeds the trust ceiling.</p>
+<figure><figcaption>Reward States &amp; Transitions</figcaption>
+<svg viewBox="0 0 720 200" xmlns="http://www.w3.org/2000/svg" style="width:100%;height:auto;font-family:Geist,system-ui,sans-serif" role="img" aria-label="Reward state machine">
+<defs><marker id="rw-a" markerWidth="9" markerHeight="9" refX="7.5" refY="3" orient="auto"><path d="M0,0 L7.5,3 L0,6 Z" fill="#78716c"/></marker></defs>
+<style>.rs&#123;rx:7;stroke-width:1.2&#125;.rl&#123;font-size:9px;fill:#57534e&#125;.rn&#123;font-size:10px;font-weight:600;fill:#1c1917&#125;</style>
+<rect class="rs" x="10" y="70" width="80" height="32" fill="#f5f5f4" stroke="#a8a29e"/><text class="rn" x="50" y="90" text-anchor="middle">Pending</text>
+<rect class="rs" x="138" y="70" width="80" height="32" fill="#fef3c7" stroke="#b45309"/><text class="rn" x="178" y="90" text-anchor="middle">Held</text>
+<rect class="rs" x="266" y="70" width="90" height="32" fill="#dbeafe" stroke="#1e40af"/><text class="rn" x="311" y="90" text-anchor="middle">Approved</text>
+<rect class="rs" x="404" y="70" width="96" height="32" fill="#e0e7ff" stroke="#6366f1"/><text class="rn" x="452" y="90" text-anchor="middle">Processing</text>
+<rect class="rs" x="548" y="70" width="80" height="32" fill="#d1fae5" stroke="#047857"/><text class="rn" x="588" y="90" text-anchor="middle">Paid</text>
+<rect class="rs" x="266" y="158" width="90" height="32" fill="#fee2e2" stroke="#dc2626"/><text class="rn" x="311" y="178" text-anchor="middle">Rejected</text>
+<rect class="rs" x="548" y="158" width="90" height="32" fill="#fee2e2" stroke="#dc2626"/><text class="rn" x="593" y="178" text-anchor="middle">Reversed</text>
+<line x1="90" y1="86" x2="136" y2="86" stroke="#78716c" stroke-width="1.4" marker-end="url(#rw-a)"/><text class="rl" x="113" y="80" text-anchor="middle">fraud band</text>
+<path d="M50,70 C50,40 311,40 311,68" fill="none" stroke="#78716c" stroke-width="1.3" marker-end="url(#rw-a)"/><text class="rl" x="180" y="46" text-anchor="middle">clean → auto-approve</text>
+<line x1="218" y1="86" x2="264" y2="86" stroke="#78716c" stroke-width="1.4" marker-end="url(#rw-a)"/><text class="rl" x="241" y="80" text-anchor="middle">approve</text>
+<line x1="356" y1="86" x2="402" y2="86" stroke="#78716c" stroke-width="1.4" marker-end="url(#rw-a)"/><text class="rl" x="379" y="80" text-anchor="middle">batch</text>
+<line x1="500" y1="86" x2="546" y2="86" stroke="#047857" stroke-width="1.4" marker-end="url(#rw-a)"/><text class="rl" x="523" y="80" text-anchor="middle">payout.sent</text>
+<line x1="178" y1="102" x2="300" y2="156" stroke="#dc2626" stroke-width="1.2" marker-end="url(#rw-a)"/><text class="rl" x="205" y="135" text-anchor="middle">reject</text>
+<line x1="588" y1="102" x2="595" y2="156" stroke="#dc2626" stroke-width="1.2" marker-end="url(#rw-a)"/><text class="rl" x="618" y="132" text-anchor="middle">refund/chargeback</text>
+</svg>
+<p class="note"><code>approve</code>/<code>reject</code> are Keto-gated (<code>rewards:approve</code>/<code>rewards:reject</code>, live check). Hold windows by trust tier (§3.5) exist so a reversal can land before <code>Processing</code> releases funds.</p>
+</figure>
+<div class="swg">
+<div class="op"><span class="m m-get">GET</span><span class="op-path"><code>/v1/rewards</code></span><span class="op-sum">List rewards</span><span class="op-tag"><code>rewards:read</code></span></div>
+<div class="op"><span class="m m-get">GET</span><span class="op-path"><code>/v1/rewards/&#123;id&#125;</code></span><span class="op-sum">Retrieve reward</span><span class="op-tag"><code>rewards:read</code></span></div>
+<div class="op"><span class="m m-post">POST</span><span class="op-path"><code>/v1/rewards/&#123;id&#125;/approve</code></span><span class="op-sum">Approve pending</span><span class="op-tag"><code>rewards:approve</code></span></div>
+<div class="op"><span class="m m-post">POST</span><span class="op-path"><code>/v1/rewards/&#123;id&#125;/reject</code></span><span class="op-sum">Reject pending</span><span class="op-tag"><code>rewards:reject</code></span></div>
+<div class="op"><span class="m m-post">POST</span><span class="op-path"><code>/v1/rewards/&#123;id&#125;/clawback</code></span><span class="op-sum">Reverse paid</span><span class="op-tag"><code>rewards:clawback</code></span></div>
+<div class="op"><span class="m m-post">POST</span><span class="op-path"><code>/v1/rewards/&#123;id&#125;/adjust</code></span><span class="op-sum">Support manual adjustment (Pending/Held only; live Keto)</span><span class="op-tag"><code>rewards:adjust</code></span></div>
+<div class="op"><span class="m m-post">POST</span><span class="op-path"><code>/v1/rewards/&#123;id&#125;/resend-email</code></span><span class="op-sum">Resend the reward email (rate-limited)</span><span class="op-tag"><code>rewards:resend_email</code></span></div>
+</div>
+<p><strong>Request body (<code>POST /v1/rewards/&#123;id&#125;/clawback</code>):</strong></p>
+<pre><code>&#123;
+  "reason": "chargeback_received",          // required (audit trail)
+  "amount": 2500                            // optional — minor units, for partial clawback
+&#125;</code></pre>
+<p><strong>Request body (<code>POST /v1/rewards/&#123;id&#125;/adjust</code>):</strong> <code>&#123; "amount": 4000, "reason": "duplicate invitee merged" &#125;</code> — sets the amount of a reward still in <em>Pending</em> or <em>Held</em>; <code>reason</code> required; the adjustment is an immutable audit row and the reward re-enters the approval decision function. Rewards already <em>Approved</em> or later are adjusted only through clawback.</p>
+
+<h2 id="attribution">3.9 Attribution (Read-Only)</h2>
+<div class="swg">
+<div class="op"><span class="m m-get">GET</span><span class="op-path"><code>/v1/attributions</code></span><span class="op-sum"></span><span class="op-tag"><code>analytics:read</code></span></div>
+<div class="op"><span class="m m-get">GET</span><span class="op-path"><code>/v1/attributions/&#123;id&#125;</code></span><span class="op-sum"></span><span class="op-tag"><code>analytics:read</code></span></div>
+</div>
+<p>Fields: <code>model_used</code>, <code>touches</code> (with <code>credit_weight</code>), <code>total_attributed_revenue</code>, <code>confidence</code> (AI-weighted only).</p>
+
+<h2 id="payout">3.10 Payout</h2>
+<p>Batched disbursements with a deliberate two-step (create then confirm) so money never moves on a single call.</p>
+<figure><figcaption>Payout Batch States &amp; Transitions</figcaption>
+<svg viewBox="0 0 720 180" xmlns="http://www.w3.org/2000/svg" style="width:100%;height:auto;font-family:Geist,system-ui,sans-serif" role="img" aria-label="Payout batch state machine">
+<defs><marker id="po-a" markerWidth="9" markerHeight="9" refX="7.5" refY="3" orient="auto"><path d="M0,0 L7.5,3 L0,6 Z" fill="#78716c"/></marker></defs>
+<style>.ps&#123;rx:7;stroke-width:1.2&#125;.pl&#123;font-size:9px;fill:#57534e&#125;.pn&#123;font-size:10px;font-weight:600;fill:#1c1917&#125;</style>
+<rect class="ps" x="12" y="60" width="92" height="32" fill="#f5f5f4" stroke="#a8a29e"/><text class="pn" x="58" y="80" text-anchor="middle">Pending</text>
+<rect class="ps" x="186" y="60" width="104" height="32" fill="#e0e7ff" stroke="#6366f1"/><text class="pn" x="238" y="80" text-anchor="middle">Processing</text>
+<rect class="ps" x="372" y="20" width="96" height="32" fill="#d1fae5" stroke="#047857"/><text class="pn" x="420" y="40" text-anchor="middle">Completed</text>
+<rect class="ps" x="372" y="100" width="96" height="32" fill="#fee2e2" stroke="#dc2626"/><text class="pn" x="420" y="120" text-anchor="middle">Failed</text>
+<rect class="ps" x="372" y="140" width="96" height="32" fill="#ece9e6" stroke="#78716c"/><text class="pn" x="420" y="160" text-anchor="middle">Cancelled</text>
+<rect class="ps" x="548" y="100" width="150" height="32" fill="#fef3c7" stroke="#b45309"/><text class="pn" x="623" y="120" text-anchor="middle">Partially Completed</text>
+<line x1="104" y1="76" x2="184" y2="76" stroke="#78716c" stroke-width="1.4" marker-end="url(#po-a)"/><text class="pl" x="144" y="70" text-anchor="middle">confirm</text>
+<path d="M58,60 C58,150 360,158 370,156" fill="none" stroke="#78716c" stroke-width="1.1" stroke-dasharray="4 3" marker-end="url(#po-a)"/><text class="pl" x="150" y="150" text-anchor="middle">cancel (pending only)</text>
+<line x1="290" y1="70" x2="370" y2="42" stroke="#047857" stroke-width="1.4" marker-end="url(#po-a)"/><text class="pl" x="330" y="48" text-anchor="middle">all items sent</text>
+<line x1="290" y1="82" x2="370" y2="112" stroke="#dc2626" stroke-width="1.4" marker-end="url(#po-a)"/><text class="pl" x="330" y="104" text-anchor="middle">provider error</text>
+<line x1="290" y1="78" x2="546" y2="114" stroke="#b45309" stroke-width="1.2" marker-end="url(#po-a)"/><text class="pl" x="470" y="92" text-anchor="middle">some items failed</text>
+</svg>
+<p class="note">Provider callbacks (§6.5) drive Processing → Completed/Failed per item; <code>payout.sent</code>/<code>payout.failed</code> webhooks fire accordingly. Confirm requires <code>payouts:confirm</code> (live Keto).</p>
+</figure>
+<div class="swg">
+<div class="op"><span class="m m-get">GET</span><span class="op-path"><code>/v1/payouts</code></span><span class="op-sum">List batches</span><span class="op-tag"><code>payouts:read</code></span></div>
+<div class="op"><span class="m m-get">GET</span><span class="op-path"><code>/v1/payouts/&#123;id&#125;</code></span><span class="op-sum">Retrieve batch</span><span class="op-tag"><code>payouts:read</code></span></div>
+<div class="op"><span class="m m-post">POST</span><span class="op-path"><code>/v1/payouts</code></span><span class="op-sum">Create batch</span><span class="op-tag"><code>payouts:write</code></span></div>
+<div class="op"><span class="m m-post">POST</span><span class="op-path"><code>/v1/payouts/&#123;id&#125;/confirm</code></span><span class="op-sum">Confirm for processing</span><span class="op-tag"><code>payouts:confirm</code></span></div>
+<div class="op"><span class="m m-post">POST</span><span class="op-path"><code>/v1/payouts/&#123;id&#125;/cancel</code></span><span class="op-sum">Cancel pending</span><span class="op-tag"><code>payouts:write</code></span></div>
+<div class="op"><span class="m m-get">GET</span><span class="op-path"><code>/v1/payouts/&#123;id&#125;/items</code></span><span class="op-sum">List line items</span><span class="op-tag"><code>payouts:read</code></span></div>
+</div>
+
+<h2 id="playbook">3.11 Playbook</h2>
+<div class="swg">
+<div class="op"><span class="m m-get">GET</span><span class="op-path"><code>/v1/playbooks</code></span><span class="op-sum">List templates</span><span class="op-tag"><code>campaigns:read</code></span></div>
+<div class="op"><span class="m m-get">GET</span><span class="op-path"><code>/v1/playbooks/&#123;id&#125;</code></span><span class="op-sum">Retrieve full template</span><span class="op-tag"><code>campaigns:read</code></span></div>
+<div class="op"><span class="m m-post">POST</span><span class="op-path"><code>/v1/playbooks/&#123;id&#125;/instantiate</code></span><span class="op-sum">Create Campaign from template</span><span class="op-tag"><code>campaigns:write</code></span></div>
+</div>
+<p>Instantiate requires <code>program_id</code>. Returns a Campaign in <code>draft</code> with its Default Variant populated.</p>
+
+<h2 id="ai-recommendations">3.12 AI Recommendations</h2>
+<div class="swg">
+<div class="op"><span class="m m-get">GET</span><span class="op-path"><code>/v1/recommendations</code></span><span class="op-sum">List pending</span><span class="op-tag"><code>analytics:read</code></span></div>
+<div class="op"><span class="m m-get">GET</span><span class="op-path"><code>/v1/recommendations/&#123;id&#125;</code></span><span class="op-sum">Retrieve with explanation</span><span class="op-tag"><code>analytics:read</code></span></div>
+<div class="op"><span class="m m-post">POST</span><span class="op-path"><code>/v1/recommendations/&#123;id&#125;/accept</code></span><span class="op-sum">Accept + apply</span><span class="op-tag"><code>campaigns:write</code> or <code>rewards:approve</code></span></div>
+<div class="op"><span class="m m-post">POST</span><span class="op-path"><code>/v1/recommendations/&#123;id&#125;/dismiss</code></span><span class="op-sum">Dismiss (AI feedback)</span><span class="op-tag"><code>analytics:read</code></span></div>
+</div>
+<p>Recommendations are produced by AI-service agents (optimization, segmentation, and the Campaign Creation Assistant §3.14). <code>accept</code> is the single human-in-the-loop gate: it <strong>applies</strong> the recommendation by performing the underlying action through the owning service's public API under the operator's permissions — for a <code>campaign_config</code> recommendation that means materialising a Campaign (draft) + Variants + Segments + Reward configs via §3.2–§3.4. The AI service never writes those records itself. <code>accept</code>/<code>reject</code> outcomes and the producing prompt version are retained for audit.</p>
+
+<h2 id="analytics">3.13 Analytics</h2>
+<p>Two layers: <strong>fixed report endpoints</strong> (predictable, filterable) and an <strong>AI analytics layer</strong> (natural-language query + proactive insight surfacing). All require <code>analytics:read</code>.</p>
+<h3>Fixed Reports</h3>
+<div class="swg">
+<div class="op"><span class="m m-get">GET</span><span class="op-path"><code>/v1/analytics/kpis</code></span><span class="op-sum">Account-level KPIs</span></div>
+<div class="op"><span class="m m-get">GET</span><span class="op-path"><code>/v1/analytics/funnel</code></span><span class="op-sum">Touches → conversions → rewards</span></div>
+<div class="op"><span class="m m-get">GET</span><span class="op-path"><code>/v1/analytics/revenue</code></span><span class="op-sum">Attributed revenue over time</span></div>
+<div class="op"><span class="m m-get">GET</span><span class="op-path"><code>/v1/analytics/referrers/leaderboard</code></span><span class="op-sum">Top participants</span></div>
+</div>
+<p>Common filter params: <code>period</code>, <code>from</code>, <code>to</code>, <code>program_id</code>, <code>campaign_id</code>, <code>variant_id</code>, <code>channel</code> (UTM source/medium), <code>group_by</code>.</p>
+<h3>AI Analytics Layer</h3>
+<div class="swg">
+<div class="op"><span class="m m-post">POST</span><span class="op-path"><code>/v1/analytics/query</code></span><span class="op-sum">Natural-language question → AI generates SQL → returns results</span></div>
+<div class="op"><span class="m m-get">GET</span><span class="op-path"><code>/v1/analytics/insights</code></span><span class="op-sum">AI-surfaced top insights (proactive, ranked)</span></div>
+</div>
+<p><strong>NL query (<code>POST /v1/analytics/query</code>):</strong></p>
+<pre><code>&#123;
+  "question": "Which channel drove the most MRR last quarter?",
+  "filters": &#123; "program_id": "prog_01J9...", "from": "2026-01-01", "to": "2026-03-31" &#125;
+&#125;</code></pre>
+<p>The AI generates SQL constrained to the tenant's read schema (tenant scope is enforced server-side, never trusted from the model), executes it read-only, and returns <code>&#123; sql, columns, rows, explanation &#125;</code>. The generated <code>sql</code> is returned for transparency/audit. Generation never has write access and cannot cross tenant boundaries.</p>
+<p><strong>Insights (<code>GET /v1/analytics/insights</code>):</strong> the AI explores the tenant's metrics on a schedule and returns a ranked, capped set (a <strong>max number of insights</strong>, e.g. top 5) — each with a headline, supporting figures, and a plain-language explanation. Surfacing is capped so the dashboard shows the highest-signal findings rather than an unbounded list; lower-ranked insights are dropped, not paginated.</p>
+
+<h2 id="campaign-assistant">3.14 Campaign Creation Assistant (Chatbot)</h2>
+<p>Conversational agent that interviews an operator across four phases (goal/pulse/trigger → economics/reward → audience/saturation → measure/quality/budget) and proposes <strong>three</strong> candidate campaign configurations — Baseline / Balanced / Aggressive. Endpoint shapes are defined here; the agent's behaviour, prompts, and derivations live in the Creation Assistant specs (Interview Script v5.0 · Service Placement v5.0) and the AI service.</p>
+<blockquote><p><strong>Boundary — AI proposes, Campaign owns.</strong> This is an <code>ai-service</code> surface. The assistant <strong>holds no write tool over the Campaign domain</strong>: it reads analytics/propensity (to derive the CAC ceiling, saturation pacing, targeting, hold/clawback defaults) and emits proposals — it never creates, activates, or budgets a campaign. The three proposals are transient <code>Recommendation</code> records in <code>ai_db</code> (accept/reject outcome). A campaign is materialised <strong>only</strong> when the operator accepts one via <code>POST /v1/recommendations/&#123;id&#125;/accept</code> (§3.12), which applies it through the public Campaign/Variant/Segment APIs (§3.2–§3.4) under the operator's permissions, the campaign state machine, budget controls, and the Pulse×Reward compatibility gate.</p></blockquote>
+<p><strong>Conversation model — stateless, single-turn.</strong> Each message is an independent invocation; the assistant holds no memory across turns. Conversation state (gathered answers, current phase) is persisted in <code>ai_db</code> and replayed on every turn — the client only carries the <code>conversation_id</code>. Behaviour is <strong>model-agnostic</strong> (identical across primary / verification / fallback models). Precondition: the client's site is already scraped (vertical, pricing, value props known), so the assistant asks as little as possible.</p>
+<div class="swg">
+<div class="op"><span class="m m-post">POST</span><span class="op-path"><code>/v1/ai/campaign-assistant/conversations</code></span><span class="op-sum">Start a conversation → returns <code>conversation_id</code>, <code>phase</code>, first question</span><span class="op-tag"><code>campaigns:write</code></span></div>
+<div class="op"><span class="m m-post">POST</span><span class="op-path"><code>/v1/ai/campaign-assistant/conversations/&#123;id&#125;/messages</code></span><span class="op-sum">Submit operator answer → next question, or 3 proposals at the final phase</span><span class="op-tag"><code>campaigns:write</code></span></div>
+<div class="op"><span class="m m-get">GET</span><span class="op-path"><code>/v1/ai/campaign-assistant/conversations/&#123;id&#125;</code></span><span class="op-sum">Retrieve replayed phase, answers, and proposals</span><span class="op-tag"><code>campaigns:read</code></span></div>
+<div class="op"><span class="m m-post">POST</span><span class="op-path"><code>/v1/ai/campaign-assistant/conversations/&#123;id&#125;/regenerate</code></span><span class="op-sum">Re-run generation from current answers (proposals are disposable — zero blast radius)</span><span class="op-tag"><code>campaigns:write</code></span></div>
+</div>
+<p><strong>Turn response (<code>POST …/messages</code>)</strong> — one of two shapes:</p>
+<pre><code>// mid-interview
+&#123;
+  "conversation_id": "conv_01J9...",
+  "phase": "economics_reward",            // goal_pulse | economics_reward | audience_saturation | measure_quality_budget
+  "status": "in_progress",
+  "question": &#123; "id": "reward_ceiling", "text": "...", "kind": "infer_and_confirm", "inferred": &#123; "cac_payback_ceiling": 4200 &#125; &#125;
+&#125;
+
+// final phase — proposals emitted as Recommendation records
+&#123;
+  "conversation_id": "conv_01J9...",
+  "phase": "measure_quality_budget",
+  "status": "proposals_ready",
+  "proposals": [
+    &#123; "recommendation_id": "rec_...A", "profile": "baseline",   "summary": "...", "config_preview": &#123; ... &#125; &#125;,
+    &#123; "recommendation_id": "rec_...B", "profile": "balanced",   "summary": "...", "config_preview": &#123; ... &#125; &#125;,
+    &#123; "recommendation_id": "rec_...C", "profile": "aggressive", "summary": "...", "config_preview": &#123; ... &#125; &#125;
+  ]
+&#125;</code></pre>
+<p>Accepting a proposal (§3.12) creates the Campaign in <code>draft</code> with its Default Variant, referenced Segments, and Reward configs via the Campaign service; the chosen <code>Recommendation</code> is marked <code>accepted</code> and the other two <code>rejected</code>, retained for audit/explainability. The assistant has no path that bypasses this — regenerating or abandoning a conversation never touches a real campaign.</p>
+
+<h2 id="gdpr">3.15 GDPR Erasure</h2>
+<p>Consent is a field on touch events (captured from CMP by JS SDK), not a standalone resource.</p>
+<div class="swg">
+<div class="op"><span class="m m-post">POST</span><span class="op-path"><code>/v1/dsr</code></span><span class="op-sum">Submit a data-subject request (access · erasure · portability)</span><span class="op-tag"><code>referrers:write</code></span></div>
+<div class="op"><span class="m m-get">GET</span><span class="op-path"><code>/v1/dsr/&#123;id&#125;</code></span><span class="op-sum">Check status</span><span class="op-tag"><code>referrers:read</code></span></div>
+</div>
+<p>Processed within 30 days. Data anonymized in-place (PII → hashed tokens). Aggregate analytics preserved.</p>
+<hr>
+
+<h1 id="4-sdk-widget">4. SDK & Widget Endpoints</h1>
+<p>Called by the JS SDK in the client's website. Authenticated via <strong>publishable API key</strong> (<code>rai_pub_</code>). Latency-sensitive, high concurrency.</p>
+<blockquote><p><strong>Deployment note.</strong> These SDK endpoints (§4) and touch ingestion (§5) share the same trust boundary (publishable key, browser-origin, untrusted input), latency target, and stateless read profile, so they are served by the <strong>same publishable-key edge service</strong> — the Event Ingestion Service and its SDK endpoints, per application architecture §12.1/§13.1. That service is stateless (Redis-only): <code>widget-config</code> and <code>resolve-link</code> read campaign/enrollment state from Redis projections rather than an owned RDS. Secret-key server ingestion (conversion/revenue) terminates at the same service but on a separate key-gated path. Referral-link <em>generation</em> is not an SDK concern — it is a server-side, JWT-authenticated operation in the Referral Workflow domain (§3.5).</p></blockquote>
+
+<h2 id="widget-config">4.1 Widget Configuration</h2>
+<p><code>GET /v1/sdk/widget-config?campaign_id=xxx&amp;token=jwt</code></p>
+<p>Called on page load after <code>RefRev.init()</code>. The <code>token</code> is a server-generated JWT from the client's backend (signed with a shared secret). Our backend verifies the signature, extracts user identity, checks enrollment status, and returns widget behavior.</p>
+<figure><figcaption>Widget Response by Status</figcaption>
+<div class="duo">
+<div class="leaf lf-a"><strong>Enrolled participant</strong><br>mode: active_referrer<br>Shows: referral link, simple stats, share tools</div>
+<div class="leaf lf-c"><strong>Not enrolled / blocked</strong><br>mode: hidden<br>Widget not rendered (enrollment is selective — no self-enroll CTA)</div>
+</div></figure>
+<p>If token is not provided: widget does not render. Console warning logged. Integration health dashboard flags repeated loads without token.</p>
+
+<h2 id="link-resolution">4.2 Referral Link Resolution</h2>
+<p><code>GET /v1/sdk/resolve-link?referral_code=ALICE123</code></p>
+<p>Called when the SDK detects <code>?ref=</code> in the URL. Returns campaign context, cookie TTL, and invitee reward preview. Invalid/expired/revoked codes return <code>&#123; "valid": false, "reason": "..." &#125;</code>. This is the <strong>read</strong> side of a referral link; <strong>generation</strong> happens server-side at enrollment via <code>POST /v1/referrers/&#123;id&#125;/links</code> (§3.5, JWT + <code>referrers:write</code>).</p>
+
+<h2 id="attribution-retrieval">4.3 Attribution Retrieval</h2>
+<p><code>POST /v1/sdk/attribution</code></p>
+<p>Returns <code>ref_code</code>, <code>click_id</code>, <code>session_id</code>, <code>campaign_id</code> for the current session. Frontend passes this to client's backend, which includes it in server-side conversion events.</p>
+<hr>
+
+<h1 id="5-event-ingestion">5. Event Ingestion API</h1>
+<p>Highest-throughput endpoint. <strong>API key only.</strong> Latency SLA: &lt; 100ms.</p>
+
+<h2 id="event-schema">5.1 Event Schema</h2>
+<p>Every event carries the same envelope and declares one of three <code>type</code> values. The <code>type</code> sets the trust rules and which extras are required; <code>event_name</code> is the specific dot-notation label within that type.</p>
+<table>
+<thead><tr><th>Type</th><th>What it is</th><th>Examples (<code>event_name</code>)</th><th>Who may send</th></tr></thead>
+<tbody>
+<tr><td><code>touch</code></td><td>A pre-conversion interaction in the referral journey — anything that signals engagement before the qualifying action</td><td><code>referral.link.clicked</code>, <code>referral.page.viewed</code>, <code>referral.link.shared</code>, <code>referral.email.opened</code>, <code>referral.email.clicked</code></td><td>Publishable key (browser) or secret key</td></tr>
+<tr><td><code>conversion</code></td><td>The qualifying/monetizable action that closes a referral — carries identity + revenue</td><td><code>signup.completed</code>, <code>payment.completed</code>, <code>subscription.renewed</code>, <code>feedback.submitted</code></td><td>Secret key only (server-side)</td></tr>
+<tr><td><code>custom</code></td><td>Client-defined events used for segmentation and AI features, not part of the core funnel — all ride the <code>custom.recorded</code> schema</td><td><code>custom.recorded</code> (client-defined name, e.g. <code>plan.upgraded</code>)</td><td>Secret key only</td></tr>
+</tbody></table>
+<table>
+<thead><tr><th>Field</th><th>Type</th><th>Required</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td><code>external_id</code></td><td>string</td><td>Yes</td><td>Caller-supplied dedup key (see §5.3). Max 256 chars.</td></tr>
+<tr><td><code>type</code></td><td>enum</td><td>Yes</td><td><code>touch</code>, <code>conversion</code>, <code>custom</code></td></tr>
+<tr><td><code>event_name</code></td><td>string</td><td>Yes</td><td>Dot-notation within the type (e.g., <code>payment.completed</code>)</td></tr>
+<tr><td><code>occurred_at</code></td><td>ISO 8601</td><td>Yes</td><td>Not future (5min). Not older than 7d (touch) / 30d (conversion).</td></tr>
+<tr><td><code>properties</code></td><td>object</td><td>No</td><td>Max 50 keys, 10KB.</td></tr>
+</tbody></table>
+<p><strong>Touch extras:</strong> <code>referral_code</code> (required), <code>consent_status</code> (required: <code>granted</code>/<code>denied</code>/<code>pending</code>), <code>click_id</code>, <code>session_id</code>, <code>channel</code>, and <strong>UTM fields</strong> (<code>utm_source</code>, <code>utm_medium</code>, <code>utm_campaign</code>, <code>utm_content</code>, <code>utm_term</code>). IP/user-agent are <strong>server-derived</strong>, never trusted from the body.</p>
+<p class="note"><strong>Consent field mapping:</strong> <code>consent_status</code> is the <em>raw inbound</em> field on the request body. On normalization it is stored in the event envelope as <code>consent.tracking_consent</code> (Event Model §2.4) — same value, raw-vs-normalized naming.</p>
+<p><strong>Conversion extras</strong> — flat fields per Event Model v5.0 / <code>_defs#/revenue</code>; <strong>there is no nested <code>revenue</code> object</strong>, and conversion schemas are closed (<code>unevaluatedProperties: false</code>), so unknown keys like <code>product</code> are rejected. Identity: <code>invitee_email</code> or <code>invitee_external_id</code> (one required). Correlation: <code>referral_code</code> or <code>click_id</code>. Revenue: <code>revenue_amount</code> (integer, minor units, required), <code>revenue_currency</code> (ISO 4217, required), <code>revenue_type</code> (<code>one_time</code> | <code>recurring</code>, required), <code>revenue_mrr</code> (required when <code>recurring</code>), <code>revenue_arr</code>, <code>revenue_ltv_estimate</code>. Plus event-specific props (e.g. <code>payment_provider</code>, <code>plan_id</code>, <code>billing_interval</code>, <code>is_first_payment</code>, and the Pulse discriminators <code>product_id</code> / <code>is_reactivation</code> / <code>switched_from</code> — Product Spec §6 trigger binding).</p>
+
+<h2 id="utm-handling">5.2 UTM Handling</h2>
+<p>UTMs are <strong>first-class citizens</strong>, not free-form properties. They are parsed from the landing URL by the SDK (touch) and/or echoed by the backend (conversion), then normalized and persisted in dedicated, indexed columns — separate from the <code>properties</code> blob.</p>
+<table>
+<thead><tr><th>Field</th><th>Normalization</th><th>Notes</th></tr></thead>
+<tbody>
+<tr><td><code>utm_source</code></td><td>lower-cased, trimmed, max 100 chars</td><td>e.g. <code>linkedin</code></td></tr>
+<tr><td><code>utm_medium</code></td><td>lower-cased, trimmed</td><td>e.g. <code>referral</code>, <code>email</code>, <code>social</code></td></tr>
+<tr><td><code>utm_campaign</code></td><td>lower-cased, trimmed</td><td>typically the campaign slug</td></tr>
+<tr><td><code>utm_content</code></td><td>trimmed (case preserved)</td><td>e.g. email <code>template_id</code></td></tr>
+<tr><td><code>utm_term</code></td><td>trimmed (case preserved)</td><td>optional keyword/segment marker</td></tr>
+</tbody></table>
+<p>Unknown <code>utm_*</code> keys are dropped (not stored). Values exceeding limits are truncated, not rejected — UTM quality never blocks ingestion. Normalized UTMs feed four consumers:</p>
+<div class="trio">
+<div class="leaf lf-a"><strong>Channel analytics</strong><br>per source / medium / campaign rollups</div>
+<div class="leaf lf-a"><strong>Attribution</strong><br>channel becomes an attribution dimension on each touch</div>
+<div class="leaf lf-b"><strong>AI features</strong><br>channel-level incentive optimization, ROI-per-channel</div>
+<div class="leaf lf-c"><strong>Fraud features</strong><br>suspicious concentration of low-quality traffic by source</div>
+</div>
+
+<h2 id="deduplication">5.3 Deduplication</h2>
+<p><strong>Where <code>external_id</code> comes from.</strong> It is always <em>caller-supplied</em>, never generated by the platform on receipt — that is what makes a retry idempotent. The source depends on who sends the event:</p>
+<table>
+<thead><tr><th>Sender</th><th><code>external_id</code> source</th><th>Property</th></tr></thead>
+<tbody>
+<tr><td>Backend (conversion / custom)</td><td><strong>Deterministic</strong>, derived from a domain fact — e.g. <code>payment_&#123;stripe_charge_id&#125;</code>, <code>signup_&#123;user_id&#125;</code></td><td>A retry reproduces the same id → deduplicates instead of double-counting</td></tr>
+<tr><td>Inbound provider webhook</td><td>The provider's native event id (e.g. Stripe <code>evt_…</code>), mapped to <code>external_id</code></td><td>Provider re-delivery is idempotent</td></tr>
+<tr><td>SDK (touch)</td><td>SDK-generated id from the tracked link / click — typically the <code>click_id</code> minted at link resolution</td><td>Best-effort; browser conditions can make it imperfect</td></tr>
+</tbody></table>
+<p><strong>When there is no natural <code>external_id</code></strong> — email opens, link clicks, social shares, invitations — the id is minted by whoever owns the touchpoint, so it still exists:</p>
+<table>
+<thead><tr><th>Touch</th><th>Id strategy</th></tr></thead>
+<tbody>
+<tr><td><strong>Email open / email link click</strong></td><td>The platform embeds a unique tracking token per recipient-send when it generates the email (one token per message); the open/click pixel or redirect carries it back as <code>external_id</code></td></tr>
+<tr><td><strong>Link click (referral link)</strong></td><td>Link resolution mints a <code>click_id</code>; the subsequent touch uses it as <code>external_id</code></td></tr>
+<tr><td><strong>Share action</strong></td><td>SDK mints a client-side id (<code>session_id</code> + target + timestamp)</td></tr>
+<tr><td><strong>Invitation sent</strong></td><td>The platform assigns an invitation id at send time; that id is the dedup key</td></tr>
+</tbody></table>
+<p><strong>Primary dedup:</strong> <code>external_id</code> per tenant, 90-day window. <strong>Secondary (SDK safety net):</strong> for touches where the browser-supplied id may be unreliable, <code>referral_code + session_id + 5min_bucket</code> collapses click-storms even if <code>external_id</code> varies. On a duplicate, ingestion returns <code>202</code> with the original event's id — duplicates are absorbed, never errored.</p>
+
+<h2 id="trust-boundaries">5.4 Trust Boundaries</h2>
+<figure><figcaption>Trust Zones</figcaption>
+<div class="duo">
+<div class="duo-col"><div class="duo-h dh-l">Secret Key (rai_live_)</div><div class="duo-b step-list">
+<div>All event types</div><div>Revenue data trusted</div><div>Context fields trusted</div><div>Consent status trusted</div>
+</div></div>
+<div class="duo-col"><div class="duo-h dh-r3">Publishable Key (rai_pub_)</div><div class="duo-b step-list">
+<div>Touch events only</div><div>No conversion, no revenue</div><div>IP/UA derived server-side</div><div>Consent from CMP accepted</div>
+</div></div>
+</div></figure>
+
+<h2 id="business-rules-guard">5.5 Ingestion Event Rules Guard</h2>
+<p>A synchronous guard that runs <strong>at ingestion</strong>, after dedup and before the event is emitted to the bus — it is not part of the async Temporal workflow. It rejects or buffers events that violate campaign/link state, so poisoned or out-of-window events never enter the pipeline:</p>
+<table>
+<thead><tr><th>Check</th><th>Invalid State</th><th>Response</th></tr></thead>
+<tbody>
+<tr><td>Campaign exists?</td><td>No</td><td><code>422: "Unknown campaign"</code></td></tr>
+<tr><td>Campaign archived?</td><td>Yes</td><td><code>410: "Campaign archived"</code></td></tr>
+<tr><td>Campaign completed?</td><td>Yes</td><td><code>410: "Campaign completed"</code></td></tr>
+<tr><td>Campaign paused?</td><td>Touch events</td><td><code>202 Accepted</code> (buffered for resume)</td></tr>
+<tr><td></td><td>Conversions for existing referrals</td><td><code>202 Accepted</code></td></tr>
+<tr><td></td><td>New referral creation</td><td>Blocked</td></tr>
+<tr><td>Before <code>starts_at</code>?</td><td>Yes</td><td><code>422: "Campaign not yet active"</code></td></tr>
+<tr><td>After <code>ends_at</code>?</td><td>Yes</td><td><code>410: "Campaign ended"</code></td></tr>
+<tr><td>Link expired/revoked?</td><td>Yes</td><td><code>410</code> / <code>403</code></td></tr>
+</tbody></table>
+
+<h2 id="batching">5.6 Batching &amp; Throughput</h2>
+<p><strong>When to use it.</strong> Batch is a <strong>server-side, secret-key</strong> facility for high-volume producers — historical backfill/migration, replaying a queue after an outage, nightly export of conversions/custom events, or CRM/warehouse syncs that emit many events at once. It is <em>not</em> for the browser SDK, which sends single touches in real time (publishable key, single <code>POST /v1/events</code>). Use single-event ingestion for live traffic; use batch to amortize HTTP overhead on bulk server workloads.</p>
+<p><code>POST /v1/events/batch</code> accepts up to <strong>500 events</strong> per request (secret key only). Each event is validated and deduped independently.</p>
+<table>
+<thead><tr><th>Concern</th><th>Behavior</th></tr></thead>
+<tbody>
+<tr><td><strong>Response code</strong></td><td><code>207 Multi-Status</code> when results are mixed; <code>202 Accepted</code> when all accepted</td></tr>
+<tr><td><strong>Partial failure</strong></td><td>Per-item <code>results[]</code> array: <code>&#123; external_id, status: "accepted"|"duplicate"|"rejected", error? &#125;</code>. Accepted items are <strong>not</strong> rolled back on a sibling's failure.</td></tr>
+<tr><td><strong>Ordering</strong></td><td>No ordering guarantee within a batch — events are routed to the bus independently. Consumers tolerate out-of-order arrival.</td></tr>
+<tr><td><strong>Latency target</strong></td><td>Single <code>POST /v1/events</code>: p99 &lt; 100ms to <code>202</code>. Batch: p99 &lt; 400ms.</td></tr>
+<tr><td><strong>Payload cap</strong></td><td>2 MB per request; oversized → <code>413</code>.</td></tr>
+</tbody></table>
+
+<h2 id="processing-pipeline">5.7 Processing Pipeline</h2>
+<figure><figcaption>Event Flow</figcaption>
+<div class="waterfall">
+<div class="wf wf-ok2"><strong>Sync (&lt; 100ms)</strong> — Validate → Dedup → Business Guard → Enrich → Emit to SNS/SQS → Return <code>202 Accepted</code></div>
+<div class="wf"><strong>Async (Temporal)</strong> — Route to workflow → Variant resolution → Eligibility → Fraud → Conversion → Reward evaluation → Fulfillment</div>
+</div></figure>
+<hr>
+
+<h1 id="6-webhooks">6. Webhooks (Outbound &amp; Inbound)</h1>
+<p>Outbound webhooks are the platform's primary push channel to client backends. Inbound webhooks (§6.5) are receivers for third-party providers. All webhook <em>configuration</em> endpoints require OAuth2 JWT + <code>webhooks:read/write/delete</code> Keto permissions.</p>
+
+<h2 id="webhook-events">6.1 Outbound Event Types</h2>
+<table>
+<thead><tr><th>Event Type</th><th>Trigger</th></tr></thead>
+<tbody>
+<tr><td><code>referral.created</code></td><td>New referral workflow created</td></tr>
+<tr><td><code>referral.qualified</code></td><td>Passed eligibility checks</td></tr>
+<tr><td><code>conversion.recorded</code></td><td>Conversion completed</td></tr>
+<tr><td><code>referral.rejected</code></td><td>Fraud or eligibility failure</td></tr>
+<tr><td><code>referral.expired</code></td><td>Attribution window passed</td></tr>
+<tr><td><code>reward.earned</code></td><td>Reward created (pre-approval)</td></tr>
+<tr><td><code>reward.held</code></td><td>Held for review (fraud band or over trust ceiling)</td></tr>
+<tr><td><code>reward.approved</code></td><td>Passed approval</td></tr>
+<tr><td><code>reward.paid</code></td><td>Payout sent</td></tr>
+<tr><td><code>reward.reversed</code></td><td>Refund / chargeback / fraud reversal</td></tr>
+<tr><td><code>campaign.activated</code></td><td>Campaign went live</td></tr>
+<tr><td><code>campaign.paused</code></td><td>Campaign paused</td></tr>
+<tr><td><code>campaign.completed</code></td><td>Campaign finished</td></tr>
+<tr><td><code>campaign.budget_threshold</code></td><td>Spend reached budget; campaign auto-paused</td></tr>
+<tr><td><code>payout.sent</code></td><td>Payout dispatched to provider</td></tr>
+<tr><td><code>payout.failed</code></td><td>Payout failed at provider</td></tr>
+<tr><td><code>fraud.flagged</code></td><td>Fraud signal detected</td></tr>
+<tr><td><code>participant.suspended</code></td><td>Participant blocked</td></tr>
+<tr><td><code>participant.trust_changed</code></td><td>Trust tier moved up or down</td></tr>
+<tr><td><code>recommendation.created</code></td><td>New AI recommendation available (optional subscription)</td></tr>
+</tbody></table>
+<p>Wildcards by aggregate: <code>referral.*</code>, <code>conversion.*</code>, <code>reward.*</code>, <code>payout.*</code>, <code>participant.*</code>, <code>campaign.*</code>, <code>fraud.*</code>, <code>*</code>.</p>
+
+<h2 id="webhook-envelope">6.2 Payload Envelope</h2>
+<p>Every outbound delivery shares a common envelope. The <code>data</code> object carries opaque resource references (IDs), never inlined PII; receivers fetch full objects over the API if needed.</p>
+<pre><code>&#123;
+  "id": "evt_01J9Z...",              // unique delivery id — dedup on this
+  "type": "reward.earned",
+  "created_at": "2026-06-02T14:30:00.000Z",
+  "tenant_id": "tenant_acme",
+  "api_version": "2026-06-01",       // pinned per subscription (§6.4)
+  "data": &#123;
+    "program_id": "prog_...",
+    "campaign_id": "camp_...",
+    "variant_id":  "var_...",
+    "participant_id": "part_...",   // the Product Spec calls participants Participants
+    "referral_id": "rfl_...",
+    "reward_id":   "rwd_...",
+    "amount": 5000,                 // minor units (§ Timestamps & Currency)
+    "currency": "EUR"
+  &#125;
+&#125;</code></pre>
+<p>Only the reference fields relevant to the event type are present. Deliveries are <strong>not</strong> ordered; consumers must not assume <code>reward.earned</code> arrives before <code>reward.approved</code>.</p>
+
+<h2 id="webhook-delivery">6.3 Delivery &amp; Retry</h2>
+<p><strong>At-least-once</strong>, out-of-order possible. Deduplicate on <code>id</code>. Retry: 1min → 5min → 30min → 2h → 12h → 24h (7 total). 50 consecutive failures → auto-disable + notify.</p>
+
+<h2 id="webhook-signing">6.4 Signing &amp; Verification</h2>
+<p>Header: <code>X-ReferralAI-Signature: t=&#123;timestamp&#125;,v1=&#123;hmac_hex&#125;</code></p>
+<p>Signed payload: <code>&#123;timestamp&#125;.&#123;raw_body&#125;</code>, HMAC-SHA256 with the webhook secret. Receivers must verify the signature <strong>and</strong> reject if the timestamp is &gt; 5 minutes stale (replay defense).</p>
+<p><strong>Versioning:</strong> webhook payloads are versioned <strong>independently</strong> of the <code>/v1</code> path. A subscription pins an <code>api_version</code> that locks its payload schema; existing subscriptions are unaffected by later schema additions.</p>
+
+<h2 id="inbound-webhooks">6.5 Inbound Receivers (Provider Callbacks)</h2><p><strong>Revision 2026-10-12.</strong> Receivers are hosted by the Event Ingestion service (not the notification service) at <code>POST /inbound/{provider}/{connection_id}</code> — <code>provider ∈ stripe, paddle, chargebee, paypal, wise, tremendous</code> — authenticated solely by the provider\'s signature scheme verified against the connection secret (<code>POST /v1/connections</code>, Owner, <code>api_keys:manage</code>); no API key, no gateway token. The same service hosts the email-tracking endpoints <code>GET /t/o/{token}</code> (pixel → <code>referral.email.opened</code>) and <code>GET /t/c/{token}</code> (redirect → <code>referral.email.clicked</code>, mints <code>click_id</code>, 302 to the landing URL with <code>?rr_click</code>); the token is signed by the notification service at send time. Idempotency: the provider\'s event id (<code>evt_…</code>) or the token + timestamp bucket is the dedup key, 90-day window. Credential-per-ingress table: Product Spec §9 R-SDK-07.</p>
+<p>The platform exposes dedicated receiver endpoints for third-party providers. These are <strong>not</strong> the public ingestion API — each is provider-specific, verifies the <em>provider's</em> signature scheme, and translates the callback into an internal <code>conversion.recorded</code> (or payout state). Inbound callbacks are <strong>data, never commands</strong>: a provider payload can move a referral/payout forward but can never alter configuration. Correlation uses the Product Spec's <strong>events from billing provider</strong> — the client attaches <code>refrev_ref_code</code> to the provider object (e.g. Stripe <code>customer.metadata</code>), so the receiver maps the payment back to a referral without a separate conversion call. Receiver paths below are <strong>contract-proposed</strong> (the Product Spec names the mechanism, not the path) — confirm against the Integrations domain before build.</p>
+<table>
+<thead><tr><th>Source</th><th>Provider events (Product Spec §9)</th><th>Translates to</th><th>Verification</th></tr></thead>
+<tbody>
+<tr><td><strong>Stripe</strong></td><td><code>invoice.payment_succeeded</code>, <code>checkout.session.completed</code></td><td><code>conversion.recorded</code> + revenue (reads <code>customer.metadata</code>)</td><td>Stripe-Signature (HMAC)</td></tr>
+<tr><td><strong>Paddle</strong></td><td><code>subscription.created</code>, <code>transaction.completed</code></td><td><code>conversion.recorded</code> + MRR (reads <code>custom_data</code>)</td><td>Paddle signature header</td></tr>
+<tr><td><strong>Chargebee</strong></td><td><code>payment_succeeded</code>, <code>subscription_created</code></td><td><code>conversion.recorded</code>; refund → <code>reward.reversed</code> path (reads <code>meta_data</code>)</td><td>Basic auth + IP allowlist</td></tr>
+<tr><td><strong>PayPal / Wise</strong></td><td>provider payout status callbacks</td><td><code>payout.sent</code> / <code>payout.failed</code> state</td><td>Provider webhook signature</td></tr>
+<tr><td><strong>Gift-card (Tremendous/Tango)</strong></td><td>code-delivery confirmation</td><td><code>reward.paid</code></td><td>Shared secret HMAC</td></tr>
+<tr><td><strong>CRM (HubSpot/Salesforce)</strong></td><td>contact sync</td><td><code>participant.enrolled</code> import (Lot 1)</td><td>OAuth-scoped connector token</td></tr>
+</tbody></table>
+<p><strong>Guarantees:</strong> idempotent by the provider's native event id (mapped to <code>external_id</code>); signature failure → <code>401</code> and the payload is dropped (not queued); a callback referencing an unknown tenant/connection → <code>404</code>. Refund/chargeback callbacks that arrive after payout enter the <strong>reversal</strong> path (negative ledger entry + trust penalty, per Product Spec §6 saga) rather than reversing inline.</p>
+<hr>
+
+<h1 id="7-emails-links">7. Emails, Links &amp; UTM Tracking</h1>
+<p>Email and tracked links are part of the communication contract: they are how referrer-visible information flows without a platform-hosted dashboard. Every outbound link carries UTMs that close the loop back into ingestion (§5.2).</p>
+
+<h2 id="triggered-emails">7.1 Platform-Triggered Emails</h2>
+<p>Sent server-side, tied to <strong>participant</strong> consent (first-party), distinct from invitee browser-cookie consent. Clients may suppress any class and send their own instead, using link/data from API responses.</p>
+<table>
+<thead><tr><th>Email</th><th>Trigger</th><th>Primary link target</th></tr></thead>
+<tbody>
+<tr><td><strong>Enrollment</strong></td><td><code>participant.enrolled</code></td><td>Referral link</td></tr>
+<tr><td><strong>Reward earned</strong></td><td><code>reward.earned</code> / <code>reward.approved</code></td><td>Client app context ("€50 earned")</td></tr>
+<tr><td><strong>Payout sent</strong></td><td><code>payout.sent</code></td><td>Provider-hosted payout setup, or client app</td></tr>
+<tr><td><strong>Nudge / re-engagement</strong></td><td>Dormancy rule (Lot 1)</td><td>Referral link</td></tr>
+</tbody></table>
+<p>Emails <strong>never</strong> link to any platform-hosted page — there is no participant dashboard and no tokenized portal. They link only to the referral destination (for invitees), to the client's own app (where the client may surface a participant view from API data), or to the payout provider's hosted setup flow. Participants never reach a surface we host.</p>
+
+<h2 id="link-types">7.2 Link Types</h2>
+<table>
+<thead><tr><th>Type</th><th>Shape</th><th>Who clicks</th></tr></thead>
+<tbody>
+<tr><td><strong>Referral link</strong></td><td><code>https://ref.client.com/r/&#123;referral_code&#125;?utm_source=email&amp;utm_medium=referral&amp;utm_campaign=&#123;campaign_slug&#125;&amp;utm_content=&#123;template_id&#125;</code></td><td>Invitee (prospect)</td></tr>
+<tr><td><strong>Link back to client app</strong></td><td><code>https://app.client.com/referrals?utm_source=referralai&amp;utm_medium=email&amp;utm_campaign=&#123;campaign_slug&#125;</code></td><td>Participant</td></tr>
+</tbody></table>
+<p>The referral link's host (<code>ref.client.com</code>) is a client-branded redirector that resolves <code>referral_code</code> → destination, dropping cookies via the SDK on landing. A <strong>blocked</strong> participant's links resolve to <code>410 Gone</code> and set no cookie (§8.2).</p>
+
+<h2 id="tracking-loop">7.3 Tracking Loop</h2>
+<figure><figcaption>How a click becomes attributable revenue</figcaption>
+<div class="waterfall numbered">
+<div class="wf">Invitee clicks a referral link; lands on client site with <code>?ref=</code> + <code>utm_*</code> in the URL.</div>
+<div class="wf">SDK calls <code>GET /v1/sdk/resolve-link</code>, drops attribution cookies (consent-gated), and emits a <code>touch</code> event (publishable key) carrying the parsed, normalized UTMs.</div>
+<div class="wf">Invitee converts. Client backend reads <code>RefRev.getAttribution()</code> and sends a <strong>server-side</strong> <code>conversion</code> event (secret key) with the same <code>referral_code</code>/<code>click_id</code> + revenue.</div>
+<div class="wf-ok2">Attribution joins touch→conversion; UTMs become channel dimensions on the attribution record and feed ROI-per-channel analytics and AI.</div>
+</div></figure>
+<p>Email-open and link-click touches generated by platform-sent emails are first-party/server-side and tied to participant consent — they are not subject to the invitee's browser-cookie consent gate.</p>
+<hr>
+
+<h1 id="8-security">8. Security & Abuse</h1>
+
+<h2 id="rate-limiting">8.1 Rate Limiting</h2>
+<table>
+<thead><tr><th>Auth Type</th><th>Endpoint</th><th>Rate Limit</th></tr></thead>
+<tbody>
+<tr><td>API Key (secret)</td><td>Event ingestion</td><td>5,000 req/min</td></tr>
+<tr><td>API Key (secret)</td><td>Batch events</td><td>100 req/min</td></tr>
+<tr><td>API Key (publishable)</td><td>Touch events</td><td>10,000 req/min</td></tr>
+<tr><td>API Key (publishable)</td><td>SDK endpoints</td><td>500 req/min</td></tr>
+<tr><td>OAuth2 JWT</td><td>Standard CRUD</td><td>1,000 req/min</td></tr>
+<tr><td>OAuth2 JWT</td><td>Analytics</td><td>200 req/min</td></tr>
+</tbody></table>
+<p><strong>Business-level:</strong> per referral code (100 touches/hour), per IP (50 touches/min per IP hash), per tenant (plan-based). Sliding window with 2x burst tolerance.</p>
+
+<h2 id="privilege-separation">8.2 Privilege Separation</h2>
+<table>
+<thead><tr><th>Concern</th><th>Enforcement</th></tr></thead>
+<tbody>
+<tr><td>Conversion events from browsers</td><td>Publishable keys blocked from <code>type: "conversion"</code></td></tr>
+<tr><td>Configuration changes</td><td>OAuth2 JWT + Keto permission required</td></tr>
+<tr><td>Enrollment</td><td>Selective only — client-initiated via JWT + <code>referrers:write</code>; no self-enroll path exists</td></tr>
+<tr><td>Reward approval</td><td>Keto <code>rewards:approve</code> + variant <code>approval_mode</code> config</td></tr>
+<tr><td>Clawbacks</td><td>Keto <code>rewards:clawback</code> + <code>reason</code> required + audit trail</td></tr>
+<tr><td>Payouts</td><td>Two-step: create (<code>payouts:write</code>) + confirm (<code>payouts:confirm</code>)</td></tr>
+<tr><td>API key management</td><td>Keto <code>api_keys:manage</code>, dashboard session only</td></tr>
+<tr><td>Participant surfaces</td><td>No credential, no platform-hosted page; widget + emails/links only. Payout setup via provider-hosted flow</td></tr>
+<tr><td>Blocked participant comms</td><td>Links → <code>410</code>, widget hidden, rewards/payouts held (§8.2.1)</td></tr>
+</tbody></table>
+
+<h3>8.2.1 Fraud &amp; Trust Effects on Communication</h3>
+<p id="blocked-comms">Certain states change communication behavior across every surface. When a participant is <code>blocked</code> (or fraud score crosses the auto-block threshold):</p>
+<table>
+<thead><tr><th>Surface</th><th>Behavior change</th></tr></thead>
+<tbody>
+<tr><td>Referral links</td><td>Resolve to <code>410 Gone</code>; no cookie set; touch events for that code rejected at the guard</td></tr>
+<tr><td>SDK widget</td><td><code>widget-config</code> returns <code>mode: "hidden"</code></td></tr>
+<tr><td>Rewards / payouts</td><td>Held; pending payout items excluded from new batches</td></tr>
+<tr><td>Webhooks</td><td><code>participant.suspended</code> + <code>fraud.flagged</code> emitted; reward/payout webhooks suppressed while held</td></tr>
+</tbody></table>
+
+<h2 id="data-residency">8.3 Data Residency & Retention</h2>
+<p>EU-only: <code>eu-central-1</code> primary, <code>eu-west-1</code> failover. Event data: 24 months (configurable 6–36). PII: GDPR erasure anonymizes in-place. API keys: last 4 chars only in logs. Audit trail: tenant lifetime + 12 months, dashboard only.</p>
+<hr>
+
+<h1 id="9-flows">9. End-to-End Communication Flows</h1>
+<p>Three narratives tying the contract together. Focus is on <strong>which credential, which endpoint, which guarantee</strong> — not implementation.</p>
+
+<h2 id="flow-linkedin">9.1 Share → Convert → Reward</h2>
+<p><em>Participant shares a link on LinkedIn; invitee signs up and pays; participant is rewarded.</em></p>
+<div class="waterfall numbered">
+<div class="wf">Participant's link (built at enrollment) is posted to LinkedIn with <code>utm_source=linkedin&amp;utm_medium=social</code>.</div>
+<div class="wf">Invitee clicks; lands on client site. SDK (<strong>publishable key</strong>) calls <code>GET /v1/sdk/resolve-link</code>, sets cookies (consent-gated), emits a <code>touch</code> with the normalized UTMs. → <code>202</code>.</div>
+<div class="wf">Invitee signs up, then pays. Client backend (<strong>secret key</strong>) sends a <code>conversion</code> event (<code>payment.completed</code>) to <code>POST /v1/events</code> with <code>referral_code</code>/<code>click_id</code> + flat revenue fields <code>revenue_amount</code>, <code>revenue_currency</code>, <code>revenue_type:"recurring"</code>, <code>revenue_mrr</code>. → <code>202</code>.</div>
+<div class="wf">Temporal resolves attribution (touch→conversion), runs fraud + eligibility, creates the reward. Outbound webhooks fire: <code>conversion.recorded</code>, then <code>reward.earned</code> (signed, dedup on <code>id</code>).</div>
+<div class="wf-ok2">Reward approved (auto or human-in-the-loop per trust tier). <code>reward.approved</code> webhook + reward-earned email link the participant to the client's app. <code>linkedin/social</code> is now an attributable channel in ROI analytics.</div>
+</div>
+
+<h2 id="flow-pulse">9.2 Conversion Pulse Campaign</h2>
+<p><em>Client runs a Conversion Pulse; revenue events arrive from Stripe; rewards are created, webhooks sent, reward emails go out.</em></p>
+<div class="waterfall numbered">
+<div class="wf">Campaign activated (OAuth2 JWT + <code>campaigns:activate</code>); <code>campaign.activated</code> webhook emitted.</div>
+<div class="wf">Stripe posts <code>invoice.payment_succeeded</code> to the inbound receiver. Platform verifies the Stripe signature, idempotent on Stripe's event id, reads <code>customer.metadata.refrev_ref_code</code>, and records an internal <code>conversion.recorded</code> + revenue (MRR for subscriptions).</div>
+<div class="wf">Attribution matches the conversion to the originating touch/referral. Reward computed against the resolved variant's <code>reward_config</code>; budget checked.</div>
+<div class="wf-branch">
+<span class="wf-r wf-ok"><code>reward.earned</code> → <code>reward.approved</code> webhooks; reward email sent</span>
+<span class="wf-r wf-warn">Budget hits 100% → <code>campaign.budget_threshold</code>; campaign auto-pauses; in-pipeline referrals still honored</span>
+</div>
+<div class="wf">Operator batches payouts (two-step <code>payouts:write</code> → <code>payouts:confirm</code>). Provider confirms via inbound payout receiver → <code>payout.sent</code> webhook + payout confirmation email (status only; setup via provider-hosted flow).</div>
+</div>
+
+<h2 id="flow-fraud">9.3 Fraud Detected → Participant Blocked</h2>
+<p><em>A fraud pattern is detected; the participant is blocked; subsequent ingestion and webhooks behave differently.</em></p>
+<div class="waterfall numbered">
+<div class="wf">Velocity + device-fingerprint signals cross the auto-block threshold during async fraud checks. <code>fraud.flagged</code> webhook emitted; participant moves to <code>blocked</code>; <code>participant.suspended</code> + <code>participant.trust_changed</code> emitted.</div>
+<div class="wf-d">New <code>touch</code> events for that participant's code are now <strong>rejected at the business-rules guard</strong> (link revoked → <code>410</code>); the SDK widget returns <code>mode: "hidden"</code>.</div>
+<div class="wf-d">Pending rewards are held; the participant's items are excluded from new payout batches; reward/payout webhooks are suppressed while held.</div>
+<div class="wf">A late Stripe refund for an earlier converted referral arrives at the inbound receiver → enters the <strong>clawback</strong> path → <code>reward.reversed</code> webhook (not an inline reversal).</div>
+<div class="wf-ok2">If a human review later clears the participant, an unblock restores link resolution and widget visibility; held rewards resume their normal lifecycle.</div>
+</div>
+<hr>
+
+<blockquote>
+<p><strong>Version:</strong> 5.0 · <strong>Date:</strong> October 2026 · <strong>Status:</strong> Living document · <em>entries below use the pre-alignment numbering</em><br>
+<strong>Changes from v1.2:</strong> UTM fields as first-class touch citizens + UTM Handling (§5.2); batch semantics &amp; throughput targets (§5.6); outbound webhook payload envelope + resource references (§6.2); inbound provider receivers (§6.5); Emails, Links &amp; UTM Tracking (§7); fraud/trust effects on communication (§8.2.1); end-to-end flows (§9).<br>
+<strong>v4 alignment pass:</strong> outbound webhook names mapped to the Event Model / Product Spec v4 (<code>conversion.recorded</code>, <code>reward.earned/held/approved/paid/reversed</code>, <code>payout.sent/failed</code>, <code>fraud.flagged</code>, <code>participant.trust_changed</code>, <code>participant.suspended</code>, <code>recommendation.created</code>); payload fields reverted to <code>amount</code>/<code>mrr_value</code>/<code>participant_id</code>; consent enum → <code>granted/denied/pending</code>; reward lifecycle → <code>Pending→Held→Approved→Processing→Paid|Rejected|Reversed</code> (v4 §8); inbound receivers use v4 events from billing provider provider events + <code>refrev_ref_code</code> metadata; companion ref → Product &amp; Domain Spec v4.<br>
+<strong>Auth &amp; portal revision:</strong> hybrid authorization — Keto remains source of truth but resolved <code>perms</code> are cached in short-lived JWTs at issuance, downstream enforces coarse checks from the JWT and re-checks Keto live only for money/config/object-scoped actions (aligns with architecture §13.1); added Actor Types → Authorization mapping (§2); removed the Magic Link Micro-Portal entirely — participants never access any platform-hosted page, payout-method setup moves to provider-hosted flows; surfaced enrollment model + no-referrer-access in Key Constraints; documented that SDK endpoints (§4) and touch ingestion (§5) share one publishable-key edge service.<br>
+<strong>Enrollment, schema &amp; diagram pass:</strong> <strong>selective enrollment only</strong> — removed open/self-enrollment, <code>/v1/sdk/enroll</code>, §4.2 Self-Enrollment, Auto-Enrollment, and the <code>enrollment_model</code> field; added the invitee→participant enrollment path; POST examples reformatted as JSON bodies (Program, Campaign, Variant, Participant, clawback); fixed §3 chapter intro so ingestion (API key) and SDK (publishable key) auth aren't mislabeled as JWT; added transition diagrams for Campaign, Trust tiers, Reward, and Payout, plus a Trust-tier description table; explained the event type taxonomy (touch/conversion/custom) in §5.1; expanded §5.3 with <code>external_id</code> sourcing and no-natural-id cases (email/link/share/invitation); renamed the guard to "Ingestion Event Rules Guard"; added batch use-cases (§5.6); added the AI analytics layer (NL-query → SQL, capped insights) to §3.13; clarified link generation (§3.5, server-side) vs resolution (§4.2, SDK).<br>
+<strong>v4 coherence &amp; Swagger pass:</strong> corrected the participant model to v4 §2's <strong>two independent axes</strong> — Operational State (Active/Dormant/Flagged/Suspended/Banned, with v4 transitions) and Trust Level (New/Established/Trusted/Advocate with score ranges, caps, holds, approval modes); removed the invented "Ambassador" tier and the conflated single diagram; aligned payout-method collection wording to v4 (widget or partner-hosted page); all REST endpoint tables (15) re-rendered as Swagger-style operation lists with colored method badges, monospace paths, summaries, and auth/permission tags.<br>
+<strong>Chatbot API &amp; self-enroll sweep:</strong> added <strong>§3.14 Campaign Creation Assistant (Chatbot)</strong> — stateless single-turn conversational endpoints (<code>/v1/ai/campaign-assistant/conversations…</code>) aligned to the Creation Assistant Interview Script v2 &amp; Service Placement v2; AI proposes three profiles as transient <code>Recommendation</code> records, the operator accepts one via §3.12, and the Campaign is materialised only through the public Campaign API (AI holds no Campaign write tool); model-agnostic; tied §3.12 accept to the apply-via-owning-service path; GDPR bumped to §3.15; verified no self-enrollment endpoint or open-enrollment path remains anywhere in the doc.<br>
+<strong>Ground-truth field alignment:</strong> flattened conversion <code>revenue</code> to match Event Model v3.0 / <code>_defs#/revenue</code> and the conversion JSON Schemas — <code>revenue_amount</code> / <code>revenue_currency</code> / <code>revenue_type</code> (<code>one_time</code>|<code>recurring</code>) / <code>revenue_mrr</code> / <code>revenue_arr</code> / <code>revenue_ltv_estimate</code> (§5.1, §9.1); removed the nested object, the non-schema <code>product</code> field, and the invalid <code>type:"payment"</code>; corrected event-name examples to real schemas (dropped <code>invite.sent</code>, <code>plan.upgraded</code>); removed <code>clawed_back</code> from the §3.6 referral state machine (states now <code>Pending→Qualified→Converted→Rewarded | Expired | Rejected</code> per Product Spec §2), with reversal modelled at the reward level as <code>reward.reversed</code> per Event Model §5.1.<br>
+<strong>Taxonomy, naming &amp; cross-ref pass:</strong> reward config now uses the two-axis <code>reward_type</code> × <code>reward_structure</code> model (Product Spec §8 / DB) — dropped the non-enum <code>discount_pct</code> (§3.3); attribution model name <code>multi_touch_linear</code> → <code>linear</code> (§3.1, Product Spec §10); Campaign terminal state shown as <code>Ended</code> with an explicit internal(<code>ended</code>)/public(<code>campaign.completed</code>) mapping note (§3.2); resolved the §1↔§5.3 idempotency contradiction (duplicate ingest = <code>202</code> everywhere); event-name examples corrected (added <code>feedback.submitted</code>, custom rides <code>custom.recorded</code> e.g. <code>plan.upgraded</code>); documented raw <code>consent_status</code> → envelope <code>consent.tracking_consent</code> mapping (§5.1); noted the canonical five operational states (<code>candidate</code>/<code>reactivated</code> are not states, §3.5); fixed stale Product-Spec cross-refs (Actors §14→§4, Rewards §18→§8).<br>
+<strong>Coherence pass (2026-10-05):</strong> <code>feedback.submitted</code> moved from the touch examples to the conversion row in §5.1 (it carries the invitee identity anchor and is secret-key only — Event Model §4.9, closed schema); §3.5 note on the operational axis updated now that Event Model §5.3 and the DB Model both enumerate the canonical five states; §2 JWT comment aligned with architecture §13.1 (<code>perms</code> claim).<br>
+<strong>Arbitration pass (2026-10-06):</strong> role model aligned to Product Spec §4 — <code>owner</code> / <code>operator</code> / <code>viewer</code> / <code>support</code> (the invented Admin tier dropped, Support Agent given <code>rewards:adjust</code>, <code>rewards:resend_email</code>, <code>referrers:note</code> with endpoints in §3.5/§3.8); program defaults set to <code>first_touch</code> / 90 days and the six attribution models listed with their phase (§3.1); <code>pulse</code> values aligned to the DB enum and <code>enrollment_trigger</code> added to the campaign body (§3.2); <code>allocation_weight</code> scoped to random segments (§3.3); <code>on_missing_attribute</code> documented on segments (§3.4); Pulse discriminators on <code>payment.completed</code> (§5.1).</p>
+</blockquote>
+
+</main>
+<script>
+const o=new IntersectionObserver(e=>{e.forEach(e=>{if(e.isIntersecting){document.querySelectorAll('.sd a').forEach(a=>a.classList.remove('active'));const l=document.querySelector(`.sd a[href="#${e.target.id}"]`);l&&l.classList.add('active')}})},{rootMargin:'-20% 0px -75% 0px'});
+document.querySelectorAll('h1[id],h2[id]').forEach(h=>o.observe(h));
+</script></body></html>

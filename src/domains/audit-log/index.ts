@@ -18,7 +18,7 @@ export interface AuditLogProps {
     occurredAt: Date;
 }
 
-/** `GET /v1/audit-log` filters, on top of the cursor (API Contract v1.3 §1). */
+/** `GET /v1/audit-log` filters, on top of the cursor (API Contract §1). */
 export class AuditLogQueryDto extends ListQueryDto {
     @ApiPropertyOptional({ example: 'api_key.revoked' })
     @IsOptional()
