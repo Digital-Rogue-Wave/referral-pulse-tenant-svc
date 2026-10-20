@@ -27,6 +27,16 @@ export const PERMISSION_CATALOG = {
     webhooks: ['read', 'write', 'delete'],
     payouts: ['read', 'write', 'confirm'],
     api_keys: ['manage'],
+    /**
+     * Added 2026-10-20. `POST /v1/connections` was gated on `api_keys:manage` and `POST /v1/dsr` on
+     * `programs:write` (§6.5, §618) — both resolve to Owner-only in practice, but neither permission
+     * is about the thing it guards, and a data-subject request gated on a *programs* permission reads
+     * as a copy-paste. Both are granted to Owner below, so effective access is unchanged; the point is
+     * that a compliance officer can later be given DSR access without program write, and doing it
+     * before staging avoids back-filling Keto tuples for live tenants.
+     */
+    dsr: ['manage'],
+    connections: ['manage'],
     tenants: ['read', 'write', 'delete'],
     users: ['read', 'write'],
     billing: ['read', 'write'],

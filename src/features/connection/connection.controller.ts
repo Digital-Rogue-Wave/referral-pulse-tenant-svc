@@ -11,12 +11,14 @@ import { ConnectionResponse, CreateConnectionDto } from '@domains/connection';
 import { ConnectionService } from './connection.service';
 
 /**
- * Provider connections (API Contract §6.5: `POST /v1/connections`, Owner, `api_keys:manage`). The
- * connection's secret is what Event Ingestion verifies provider callbacks against; the callbacks
- * themselves are received by that service, never here.
+ * Provider connections (API Contract §6.5: `POST /v1/connections`, Owner). The connection's secret is
+ * what Event Ingestion verifies provider callbacks against; the callbacks themselves are received by
+ * that service, never here.
  *
- * `api_keys:manage` rather than a `connections:*` relation because §6.5 names it, and it is the
- * existing relation for "credentials that let something talk to the platform".
+ * Gated on `connections:manage`, not the `api_keys:manage` §6.5 names. Both resolve to Owner-only, so
+ * effective access is identical — but a provider connection is not an API key, and keeping them
+ * separate is what later lets an operator manage connections without being handed the power to mint
+ * platform credentials. Ratified 2026-10-20; §6.5 is being corrected to match.
  */
 @ApiTags('Connections')
 @ApiBearerAuth()
@@ -26,7 +28,7 @@ export class ConnectionController {
 
     @ApiBody({ type: CreateConnectionDto })
     @ApiCreatedResponse({ description: 'Connection created; post provider callbacks to `receiver_url`', type: ConnectionResponse })
-    @RequirePermission('api_keys:manage')
+    @RequirePermission('connections:manage')
     @HttpCode(HttpStatus.CREATED)
     @Post()
     async create(@Body() dto: CreateConnectionDto, @CurrentUser() user: IAuthenticatedUser): Promise<ConnectionResponse> {
@@ -34,7 +36,7 @@ export class ConnectionController {
     }
 
     @ApiOkResponse({ description: 'A page of connections, newest first', type: CursorPage })
-    @RequirePermission('api_keys:manage')
+    @RequirePermission('connections:manage')
     @HttpCode(HttpStatus.OK)
     @Get()
     async findAll(@Query() query: ListQueryDto): Promise<CursorPage<ConnectionResponse>> {
@@ -42,7 +44,7 @@ export class ConnectionController {
     }
 
     @ApiOkResponse({ description: 'Connection revoked; its callbacks are refused from now on' })
-    @RequirePermission('api_keys:manage')
+    @RequirePermission('connections:manage')
     @HttpCode(HttpStatus.NO_CONTENT)
     @Delete(':id')
     async revoke(@Param('id') id: string, @CurrentUser() user: IAuthenticatedUser): Promise<void> {
