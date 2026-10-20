@@ -38,7 +38,20 @@ export enum ServiceCapability {
      * Event Ingestion verifies them, so both hold this capability — separate from
      * `provider_connection.read` so neither service gets the other's secrets by holding one grant.
      */
-    TRACKING_TOKEN_READ = 'tracking_token.read'
+    TRACKING_TOKEN_READ = 'tracking_token.read',
+    /**
+     * Exchanging an inbound credential for an internal JWT — `GET /internal/validate-token`.
+     *
+     * Architecture §13.1 names "the ALB + Traefik + NestJS Auth Guard" as the caller and §12.1 lists
+     * "the Tenant token call" among Event Ingestion's own integration adapters, so a service calls this
+     * as well as the gateway. The gateway proves itself with `X-Gateway-Secret`; a service proves itself
+     * with its own token and this capability, so the gateway's shared secret stays in the gateway and
+     * each service caller is individually revocable.
+     *
+     * Held only by `ingestion-svc`: it is the one service that receives API keys (Product Spec
+     * R-SDK-07), and this endpoint can mint an internal JWT for any credential presented to it.
+     */
+    TOKEN_EXCHANGE_CALL = 'token_exchange.call'
 }
 
 export const userSubject = (userId: string): string => `user:${userId}`;
