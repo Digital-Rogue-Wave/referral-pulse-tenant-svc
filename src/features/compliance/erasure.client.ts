@@ -12,12 +12,33 @@ import type { AllConfigType } from '@config/config.type';
 
 import { ErasureTarget, REMOTE_ERASURE_PATH } from './dsr-targets';
 
-/** What this service asks of a target. The shape of its own `POST /internal/erasures/operators`. */
-export interface SubjectErasureRequest {
+/**
+ * The subject, as this service knows them, before it is narrowed to what a target accepts.
+ *
+ * `externalId` is carried here and deliberately not sent: no implemented handler has a field for it
+ * (see `ErasureClient.toWire`).
+ */
+export interface ErasureSubject {
     dsrId: string;
-    subjectEmailHash?: string;
-    subjectExternalId?: string;
-    subjectId?: string;
+    tenantId: string;
+    emailHash: string | null;
+    participantId: string | null;
+    externalId: string | null;
+}
+
+/**
+ * What a target's erasure handler accepts, in its wire spelling.
+ *
+ * snake_case because every service in the fleet runs the global wire transform: analytics-service's
+ * `ServiceScopeGuard` reads `tenant_id` off the raw body precisely because "the wire is snake_case and
+ * `WireCaseInterceptor` has not camel-cased anything yet". Sending camelCase would reach the DTO as
+ * unknown properties and `forbidNonWhitelisted` would answer 400.
+ */
+interface SubjectErasureWire {
+    dsr_id: string;
+    tenant_id: string;
+    participant_id?: string;
+    subject_email_hash?: string;
 }
 
 /** A target's answer, as this service records it. */
@@ -27,7 +48,7 @@ export interface TargetReceipt {
     retainedUnderObligation: boolean;
 }
 
-/** The receipt body a target returns, in the shape this service's own handler returns it. */
+/** The receipt body a target returns. `retained` and `status` spell the same in both cases. */
 interface RemoteReceiptBody {
     status?: string;
     retained?: unknown;
@@ -53,10 +74,14 @@ export class ErasureClient {
      * `pending` receipt carrying why, so the fan-out can be retried and resume at exactly the targets
      * that still owe an answer.
      */
-    async erase(target: ErasureTarget, request: SubjectErasureRequest): Promise<TargetReceipt> {
+    async erase(target: ErasureTarget, subject: ErasureSubject): Promise<TargetReceipt> {
+        const wire = this.toWire(subject);
+        if (!wire) {
+            return this.unidentifiable(target, subject);
+        }
         const url = `${this.baseUrlOf(target)}${REMOTE_ERASURE_PATH}`;
         try {
-            const response = await this.http.post<RemoteReceiptBody>(url, request, {
+            const response = await this.http.post<RemoteReceiptBody>(url, wire, {
                 headers: { Authorization: await this.tokens.authorization() },
                 // One attempt per fan-out run. A target that is down is a pending receipt the next run
                 // picks up, which is a longer and cheaper retry than hammering it inside one job.
@@ -66,6 +91,28 @@ export class ErasureClient {
         } catch (error) {
             return this.unanswered(target, error);
         }
+    }
+
+    /**
+     * Narrows the subject to the fields the handler contract has, which is the one analytics-service
+     * and notification-service both already implement: `dsr_id` and `tenant_id` required, then at
+     * least one of `participant_id`, `user_id` or `subject_email_hash`.
+     *
+     * `user_id` is never sent: it names an *operator*, which is Identity's own share and runs
+     * in-process. A subject carrying neither a participant id nor an email hash cannot be addressed
+     * at all — no handler has a field for the client's own `subject_external_id` — so the call is not
+     * made rather than sent to be refused. Spec defect 15 in NOTE.md.
+     */
+    private toWire(subject: ErasureSubject): SubjectErasureWire | null {
+        if (!subject.emailHash && !subject.participantId) {
+            return null;
+        }
+        return {
+            dsr_id: subject.dsrId,
+            tenant_id: subject.tenantId,
+            ...(subject.participantId ? { participant_id: subject.participantId } : {}),
+            ...(subject.emailHash ? { subject_email_hash: subject.emailHash } : {})
+        };
     }
 
     private baseUrlOf(target: ErasureTarget): string {
@@ -81,6 +128,24 @@ export class ErasureClient {
         // reporting it has answered, but not finished, so it needs a human rather than a retry.
         const status = body.status === BLOCKED ? DsrReceiptStatus.FAILED : DsrReceiptStatus.COMPLETED;
         return { status, receipt: { ...body, share: target.share }, retainedUnderObligation: retained.length > 0 };
+    }
+
+    /** Pending, not failed: it resolves the day the handler contract gains an external-id field. */
+    private unidentifiable(target: ErasureTarget, subject: ErasureSubject): TargetReceipt {
+        this.logger.warn('An erasure subject carries no identifier the handler contract accepts', {
+            service: target.serviceName,
+            dsrId: subject.dsrId,
+            hasExternalId: Boolean(subject.externalId)
+        });
+        return {
+            status: DsrReceiptStatus.PENDING,
+            receipt: {
+                service: target.serviceName,
+                share: target.share,
+                unanswered: 'subject carries no participant id and no email hash; the handler contract accepts no external id'
+            },
+            retainedUnderObligation: false
+        };
     }
 
     private unanswered(target: ErasureTarget, error: unknown): TargetReceipt {

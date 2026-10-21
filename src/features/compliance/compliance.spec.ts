@@ -23,7 +23,7 @@ import { ConsentService } from './consent.service';
 import { DsrFanOutService } from './dsr-fanout.service';
 import { DsrService } from './dsr.service';
 import { ERASURE_TARGETS, REMOTE_ERASURE_PATH } from './dsr-targets';
-import { ErasureClient } from './erasure.client';
+import { ErasureClient, type ErasureSubject } from './erasure.client';
 
 const TENANT = 't1';
 const EMAIL = 'ada@acme.io';
@@ -127,6 +127,14 @@ describe('DsrService — POST /v1/dsr and GET /v1/dsr/{id}', () => {
 
 describe('ErasureClient — asking one service to erase its share', () => {
     const target = ERASURE_TARGETS.find((candidate) => candidate.serviceName === 'reward-service')!;
+    const subject = (overrides: Partial<ErasureSubject> = {}): ErasureSubject => ({
+        dsrId: 'dsr1',
+        tenantId: TENANT,
+        emailHash: HASH,
+        participantId: null,
+        externalId: null,
+        ...overrides
+    });
     let http: MockProxy<HttpClientService>;
     let client: ErasureClient;
 
@@ -139,16 +147,30 @@ describe('ErasureClient — asking one service to erase its share', () => {
         client = new ErasureClient(http, tokens, configService as never, logger());
     });
 
-    it('calls the target’s erasure handler with this service’s own token', async () => {
+    /**
+     * The contract analytics-service and notification-service both already implement: snake_case on
+     * the wire, `dsr_id` and `tenant_id` required. camelCase would reach their DTOs as unknown
+     * properties and `forbidNonWhitelisted` would answer 400.
+     */
+    it('sends the handler contract in its wire spelling, with the tenant it is acting for', async () => {
         http.post.mockResolvedValue({ data: { status: 'completed', retained: [] }, status: 200, headers: {}, duration: 1 });
 
-        await client.erase(target, { dsrId: 'dsr1', subjectEmailHash: HASH });
+        await client.erase(target, subject({ participantId: 'p'.repeat(26) }));
 
         expect(http.post).toHaveBeenCalledWith(
             `http://rewards.local${REMOTE_ERASURE_PATH}`,
-            { dsrId: 'dsr1', subjectEmailHash: HASH },
+            { dsr_id: 'dsr1', tenant_id: TENANT, participant_id: 'p'.repeat(26), subject_email_hash: HASH },
             expect.objectContaining({ headers: { Authorization: 'Bearer svc.jwt' } })
         );
+    });
+
+    /** No handler has a field for the client's own identifier, so the call is not made at all. */
+    it('does not call a target for a subject it cannot name, and says so in the receipt', async () => {
+        await expect(client.erase(target, subject({ emailHash: null, externalId: 'cust-9' }))).resolves.toMatchObject({
+            status: DsrReceiptStatus.PENDING,
+            receipt: expect.objectContaining({ unanswered: expect.stringContaining('no external id') })
+        });
+        expect(http.post).not.toHaveBeenCalled();
     });
 
     it('flags a target that kept rows under legal obligation, which is what the subject has to be told', async () => {
@@ -159,17 +181,24 @@ describe('ErasureClient — asking one service to erase its share', () => {
             duration: 1
         });
 
-        await expect(client.erase(target, { dsrId: 'dsr1' })).resolves.toMatchObject({
+        await expect(client.erase(target, subject())).resolves.toMatchObject({
             status: DsrReceiptStatus.COMPLETED,
             retainedUnderObligation: true
         });
+    });
+
+    /** `not_found` is a complete answer: there was nothing of the subject's to erase. */
+    it('treats not_found as answered', async () => {
+        http.post.mockResolvedValue({ data: { status: 'not_found' }, status: 200, headers: {}, duration: 1 });
+
+        await expect(client.erase(target, subject())).resolves.toMatchObject({ status: DsrReceiptStatus.COMPLETED });
     });
 
     /** `blocked` means the target answered and did not erase — a retry will not change that. */
     it('records a blocked answer as failed', async () => {
         http.post.mockResolvedValue({ data: { status: 'blocked' }, status: 200, headers: {}, duration: 1 });
 
-        await expect(client.erase(target, { dsrId: 'dsr1' })).resolves.toMatchObject({ status: DsrReceiptStatus.FAILED });
+        await expect(client.erase(target, subject())).resolves.toMatchObject({ status: DsrReceiptStatus.FAILED });
     });
 
     it.each([
@@ -178,7 +207,7 @@ describe('ErasureClient — asking one service to erase its share', () => {
     ])('leaves %s as a pending receipt, so the next sweep asks again', async (_case, status) => {
         http.post.mockRejectedValue(new AxiosError('boom', undefined, undefined, undefined, { status } as never));
 
-        await expect(client.erase(target, { dsrId: 'dsr1' })).resolves.toMatchObject({
+        await expect(client.erase(target, subject())).resolves.toMatchObject({
             status: DsrReceiptStatus.PENDING,
             receipt: expect.objectContaining({ unanswered: `HTTP ${status}` })
         });
@@ -187,14 +216,14 @@ describe('ErasureClient — asking one service to erase its share', () => {
     it('never throws when the target is unreachable', async () => {
         http.post.mockRejectedValue(new Error('ECONNREFUSED'));
 
-        await expect(client.erase(target, { dsrId: 'dsr1' })).resolves.toMatchObject({ status: DsrReceiptStatus.PENDING });
+        await expect(client.erase(target, subject())).resolves.toMatchObject({ status: DsrReceiptStatus.PENDING });
     });
 
     /** A 403 is this service's grant being wrong, not a transient failure — an operator has to act. */
     it('records a refusal as failed rather than pending', async () => {
         http.post.mockRejectedValue(new AxiosError('nope', undefined, undefined, undefined, { status: 403 } as never));
 
-        await expect(client.erase(target, { dsrId: 'dsr1' })).resolves.toMatchObject({ status: DsrReceiptStatus.FAILED });
+        await expect(client.erase(target, subject())).resolves.toMatchObject({ status: DsrReceiptStatus.FAILED });
     });
 });
 
@@ -263,6 +292,13 @@ describe('DsrFanOutService — the erasure fan-out', () => {
 
         expect(operators.erase).toHaveBeenCalledWith({ dsrId: 'dsr1', subjectEmailHash: HASH });
         expect(erasure.erase).toHaveBeenCalledTimes(ERASURE_TARGETS.length - 1);
+        expect(erasure.erase.mock.calls[0]![1]).toEqual({
+            dsrId: 'dsr1',
+            tenantId: TENANT,
+            emailHash: HASH,
+            participantId: null,
+            externalId: null
+        });
     });
 
     /**

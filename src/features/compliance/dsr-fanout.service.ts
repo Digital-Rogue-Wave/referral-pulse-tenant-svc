@@ -16,7 +16,7 @@ import {
 import { OperatorErasureService } from '@app/features/users/operator-erasure.service';
 
 import { ERASURE_TARGETS, ErasureTarget } from './dsr-targets';
-import { ErasureClient, SubjectErasureRequest, TargetReceipt } from './erasure.client';
+import { ErasureClient, ErasureSubject, TargetReceipt } from './erasure.client';
 
 /** A receipt in one of these states is an answer; the rest are re-asked on the next run. */
 const ANSWERED = [DsrReceiptStatus.COMPLETED, DsrReceiptStatus.PARTIAL] as string[];
@@ -102,7 +102,7 @@ export class DsrFanOutService {
     /** Identity's share is this service's own handler, called in-process; the other five over HTTP. */
     private async ask(target: ErasureTarget, request: DsrRequestProps): Promise<TargetReceipt> {
         if (target.configKey) {
-            return this.erasure.erase(target, toErasureRequest(request));
+            return this.erasure.erase(target, toErasureSubject(request));
         }
         if (!request.subjectEmailHash) {
             // An operator record is only ever matched by email hash: `subject_id` and
@@ -173,11 +173,13 @@ export class DsrFanOutService {
     }
 }
 
-function toErasureRequest(request: DsrRequestProps): SubjectErasureRequest {
+/** `subject_id` is a participant id, which is what the handler contract calls `participant_id`. */
+function toErasureSubject(request: DsrRequestProps): ErasureSubject {
     return {
         dsrId: request.id,
-        ...(request.subjectEmailHash ? { subjectEmailHash: request.subjectEmailHash } : {}),
-        ...(request.subjectExternalId ? { subjectExternalId: request.subjectExternalId } : {}),
-        ...(request.subjectId ? { subjectId: request.subjectId } : {})
+        tenantId: request.tenantId,
+        emailHash: request.subjectEmailHash,
+        participantId: request.subjectId,
+        externalId: request.subjectExternalId
     };
 }

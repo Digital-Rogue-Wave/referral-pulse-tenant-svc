@@ -255,6 +255,9 @@ envVars:
   SERVICE_AUTH_TOKEN_URL: "http://hydra-public.ory.svc.cluster.local:4444/oauth2/token"
   SERVICE_AUTH_CLIENT_ID: "tenant-svc"
   SERVICE_AUTH_AUDIENCE: "referralai-internal"
+  # analytics-service authorizes its erasure handler on the token scope rather than on a Keto
+  # tuple like the rest of the fleet, so the token has to carry this as well as the grant.
+  SERVICE_AUTH_SCOPE: "dsr.erase"
   SERVICE_NOTIFICATIONS_URL: "http://referral-pulse-notification-svc.default.svc.cluster.local:5005"
 
 # -------- Secret (sensitive env) --------

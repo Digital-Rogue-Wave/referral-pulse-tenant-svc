@@ -1384,6 +1384,106 @@ subscription, the SQS consumer and the 404-to-pending path have no live run behi
     lists what each one erases, but no path, no request body and no receipt shape appear anywhere.
     The orchestrator is the only place it can be stated, so §V5.16 D5-10 states it as a proposal.
 
+## V5.17 The erasure handler contract was not a guess after all — and the fan-out did not match it
+
+§V5.16 D5-10 recorded `POST /api/v1/internal/erasures/subjects` as this service's proposal, "because no
+v5 document specifies that contract". The path is right. Two of the five remote targets already
+implement it, and reading them showed the fan-out would have failed against both.
+
+| service | handler | authorizes on |
+|---|---|---|
+| analytics-service | `POST /api/v1/internal/erasures/subjects` | the token's **`dsr.erase` scope** (`ServiceScopeGuard`) |
+| notification-service | the same path | the **Keto tuple** `services:dsr.erase#call` (`AllowServices`) |
+| tenant-service (this one) | `…/erasures/operators` | the Keto tuple |
+
+Their request and receipt shapes agree with each other, so the contract is real and already settled by
+two implementations — it just was not the one §V5.16 shipped.
+
+### Three defects in the fan-out, found by reading the two live handlers
+
+**1. `tenant_id` was not sent, and it is required.** Both DTOs declare it `@IsString()` non-optional,
+and analytics' guard refuses a service token that does not name a tenant at all: "A service token must
+name the tenant it is acting for" — it has no tenant claim of its own, so the tenant comes from the
+call. Every fan-out call would have been a 400, which `ErasureClient` classifies as *refused* and
+records `failed`: the DSR would have shown two permanently failed targets with nothing to fix.
+
+**2. The body was camelCase.** Every service in the fleet runs the global snake_case wire transform —
+analytics' guard reads `tenant_id` off the raw body precisely because "the wire is snake_case and
+`WireCaseInterceptor` has not camel-cased anything yet". With `forbidNonWhitelisted: true` in the
+ValidationPipe, `dsrId` and `subjectEmailHash` would have arrived as unknown properties and been
+refused. Same class of defect as the `ConnectionWire` one in event-svc §11.15 — and the same cause:
+this service's own transform makes it easy to forget the wire is not the TypeScript shape.
+
+**3. `subject_external_id` and `subject_id` are not fields the contract has.** `subject_id` maps to
+`participant_id`, which both DTOs do have. `subject_external_id` has no counterpart anywhere, and
+sending it would itself have been a `forbidNonWhitelisted` 400.
+
+Fixed in `erasure.client.ts`: `SubjectErasureWire` is explicitly snake_case, `tenant_id` travels,
+`subject_id → participant_id`, and `user_id` is deliberately never sent — it names an *operator*, which
+is Identity's own share and runs in-process.
+
+### Decisions taken, with what was rejected
+
+**D5-15 — request the `dsr.erase` scope as well as holding the Keto tuple.** The fleet's own rule
+(`scripts/service-clients.sh`) is "scope is deliberately not used for authorization: a scope is
+self-asserted by the caller at token time, whereas a Keto tuple is granted by the platform". analytics
+checks the scope anyway. So tenant-service's Hydra client is now registered with `scope: "dsr.erase"`
+and `ServiceTokenProvider` requests it (`SERVICE_AUTH_SCOPE`). Hydra refuses a token request for a
+scope the client is not registered for, so the scope is constrained by registration — the header's
+objection is weaker than it reads.
+
+*Rejected:* changing analytics to authorize on Keto. It is the right end state and it is one service's
+guard, but it is a change to a service that is working, for a caller that did not exist until now, and
+it would have to ship before the fan-out could. Doing it the other way round means the fan-out works
+today and analytics converges later. Recorded as open item 6.
+
+**D5-16 — a subject with neither a participant id nor an email hash is not called at all.** The
+contract has no field for the client's own identifier, so a DSR naming the subject only by
+`subject_external_id` can be addressed nowhere. `ErasureClient` records a `pending` receipt saying so
+instead of making five calls that would each be refused — and the sweep re-asking costs nothing,
+because no HTTP call is made until the contract grows the field. Spec defect 15.
+
+*Rejected:* recording it `failed`. It is not a failure of the target; it is a hole in the contract, and
+`failed` is the state an operator is supposed to act on.
+
+### Verified
+
+| claim | how |
+|---|---|
+| the wire body matches what both live DTOs accept | `compliance.spec.ts` asserts the exact snake_case body |
+| `not_found` counts as answered, `blocked` does not | two cases in the same suite |
+| an unnameable subject makes no HTTP call | `http.post` not called; receipt says why |
+| unit suite | **574 passed / 55 suites** |
+| typecheck | **27 errors**, unchanged baseline |
+
+Still not run live: Docker is down, so the scope registration, the token request and the two real
+handlers have no end-to-end run behind them. This is the first thing to do when the stack is back up —
+`POST /v1/dsr` with an erasure should now come back with analytics' and notification's receipts
+`completed` and the other three `pending`.
+
+### Added to §V5.16's open list
+
+6. **analytics-service authorizes the erasure handler on the token scope, not on Keto.** It is the
+   only service in the fleet that does. Converging it on `AllowServices` would let
+   `SERVICE_AUTH_SCOPE` and the client's registered scope go away.
+7. **`dsr_receipts.service_name` is this service's naming, and the receipts say their own.** Analytics
+   returns `service: "analytics-service"`, notification `"notification-service"` — both match
+   `ERASURE_TARGETS`. The three unimplemented ones are unconfirmed.
+
+## V5.14 Spec defects — additions (continued)
+
+15. **The erasure handler contract has no field for the client's own subject identifier.** `POST /v1/dsr`
+    can name a subject by email, by the platform's participant id, or by `subject_external_id` — and
+    the two implemented handlers accept only the first two. A DSR submitted with just an external id
+    is therefore unexecutable, which is a gap in R-CPL-02 rather than in any one service: the identity
+    the Owner has is not always the identity the services hold. Recorded as §V5.17 D5-16; the fix is
+    one optional field on the handler contract.
+16. **R-CPL-01's "every other service implements its own erasure handler" is implemented three
+    different ways.** Two services authorize it on a Keto capability, one on an OAuth2 scope, and the
+    paths differ for the subject type (`/erasures/subjects` vs `/erasures/operators`). The suite names
+    neither the path nor the authorization mechanism, so each service chose. Worth stating once in
+    the Architecture document, since the orchestrator has to satisfy all of them at the same time.
+
 ---
 
 > **Cross-service decision list.** The consolidated list of everything still open across all four

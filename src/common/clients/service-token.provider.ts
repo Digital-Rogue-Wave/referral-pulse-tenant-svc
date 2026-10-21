@@ -45,7 +45,7 @@ export class ServiceTokenProvider {
     }
 
     private async fetch(): Promise<string> {
-        const { tokenUrl, clientId, clientSecret, audience } = this.configService.getOrThrow('services', { infer: true }).auth;
+        const { tokenUrl, clientId, clientSecret, audience, scope } = this.configService.getOrThrow('services', { infer: true }).auth;
         // Checked here rather than at boot: this service had no outbound service calls before the DSR
         // fan-out, so a deployment without a registered client must still start — and must fail loudly
         // the first time it actually needs a token.
@@ -55,7 +55,13 @@ export class ServiceTokenProvider {
         const credentials = Buffer.from(`${encodeURIComponent(clientId)}:${encodeURIComponent(clientSecret)}`).toString('base64');
         // `audience` is requested, not merely allowed: Hydra issues `"aud": []` when the token request
         // omits it, and every service rejects that token as "jwt audience invalid".
-        const form = new URLSearchParams({ grant_type: 'client_credentials', ...(audience ? { audience } : {}) });
+        // `scope` is for analytics-service, which authorizes its erasure handler on the token's scope
+        // rather than on a Keto tuple like the rest of the fleet (NOTE.md §V5.17).
+        const form = new URLSearchParams({
+            grant_type: 'client_credentials',
+            ...(audience ? { audience } : {}),
+            ...(scope ? { scope } : {})
+        });
         const response = await this.http.post<TokenResponse>(tokenUrl, form.toString(), {
             headers: { 'Content-Type': 'application/x-www-form-urlencoded', Authorization: `Basic ${credentials}` }
         });

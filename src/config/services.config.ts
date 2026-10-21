@@ -16,7 +16,14 @@ const serviceAuthSchema = z.object({
     tokenUrl: z.string().url().optional(),
     clientId: z.string().min(1).optional(),
     clientSecret: z.string().min(1).optional(),
-    audience: z.string().min(1).optional()
+    audience: z.string().min(1).optional(),
+    /**
+     * Space-separated OAuth2 scopes to request. The fleet authorizes service calls through Keto, not
+     * scope — but analytics-service's `ServiceScopeGuard` checks the token's scope instead, so a token
+     * for its erasure handler needs `dsr.erase` in it as well as the Keto tuple. Hydra only issues
+     * scopes the client is registered for, so this is not self-assertion.
+     */
+    scope: z.string().min(1).optional()
 });
 
 const schema = z.object({
@@ -49,7 +56,8 @@ export default registerAs('services', (): ServicesConfig => {
             tokenUrl: process.env.SERVICE_AUTH_TOKEN_URL,
             clientId: process.env.SERVICE_AUTH_CLIENT_ID,
             clientSecret: process.env.SERVICE_AUTH_CLIENT_SECRET,
-            audience: process.env.SERVICE_AUTH_AUDIENCE
+            audience: process.env.SERVICE_AUTH_AUDIENCE,
+            scope: process.env.SERVICE_AUTH_SCOPE
         },
         tenants: {
             url: process.env.SERVICE_TENANTS_URL || 'http://localhost:5001',
