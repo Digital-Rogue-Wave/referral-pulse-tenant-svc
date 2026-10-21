@@ -1484,6 +1484,76 @@ handlers have no end-to-end run behind them. This is the first thing to do when 
     neither the path nor the authorization mechanism, so each service chose. Worth stating once in
     the Architecture document, since the orchestrator has to satisfy all of them at the same time.
 
+## V5.18 The live pass that is still owed, and how to run it
+
+Everything in §V5.16 and §V5.17 is verified at unit level (574 tests) and compiles for production
+(`nest build` clean — which is the stronger signal, because the 27 `tsc --noEmit` errors are all in
+spec files the build excludes). **Nothing ran against live infrastructure**: Docker was not running on
+this machine for the whole pass, and starting the stack and bringing up ten containers while nobody
+was at the keyboard was not a call to make unasked.
+
+This is the recipe, in order, with what each step proves. Steps 1–3 are prerequisites that changed in
+this pass, so a stack started from an older state will not exercise the new paths.
+
+### 1 · Infrastructure — two scripts must be re-run, not just the stack started
+
+```
+cd D:\Projects\Work\REFERRAL\v2-infra\referral-pulse-infrastucture\local
+docker compose up -d
+./scripts/service-clients.sh
+```
+
+- `service-clients.sh` **must** re-run: `upsert_client` now registers tenant-service's Hydra client
+  with `scope: "dsr.erase"`. Without it, Hydra refuses the token request as an unregistered scope and
+  the fan-out cannot call analytics-service at all (§V5.17 D5-15).
+- LocalStack runs `01-queues-and-topics.sh` on container start, so a fresh `up` picks up the new
+  `ingestion-events.fifo → tenant-svc.fifo` subscription. On an already-running container:
+  `docker exec rp-localstack bash /etc/localstack/init/ready.d/01-queues-and-topics.sh`.
+
+### 2 · The migration — an approval gate, so it is deliberately not applied
+
+```
+cd D:\Projects\Work\REFERRAL\referral-scope-ahmed\referral-pulse-tenant-svc
+npx prisma migrate deploy
+```
+
+One `CREATE INDEX` (`20261021120000_consent_external_id_index`). Without it the consent registry still
+works, but the lookup for a subject named only by `invitee_external_id` is a sequential scan on every
+touch event carrying a consent block — see §V5.16 open item 1 for why that read is hot.
+
+### 3 · One env flag
+
+`SQS_POLLING_ENABLED` is still `false` in `.env.development`. It was false because the queues did not
+exist; they do now. The consent consumer receives nothing until it is `true`.
+
+### 4 · What to run, and what each check proves
+
+| check | how | proves |
+|---|---|---|
+| the consent registry reads the bus | send a touch with a `consent` block through ingestion's `POST /v1/events`, then `select * from consents` | §V5.16 D5-7 — the SNS subscription, the consumer, and the hash-not-address rule |
+| an unchanged signal is dropped | send the same touch twice | the table grows with decisions, not traffic |
+| the fan-out reaches the two live targets | `POST /v1/dsr` with `{"request_type":"erasure","subject_email":"…"}`, then `GET /v1/dsr/{id}` | §V5.17 — the snake_case body, `tenant_id`, and the `dsr.erase` scope all at once |
+| the other three are pending, not failed | the same `GET` | §V5.16 D5-10 — a 404 is a pending receipt with its reason |
+| the request completes on its own | wait for the `:35` sweep, or re-enqueue | the resume path: only unanswered targets are re-asked |
+| `erasure.completed` and `audit.logged` reach the bus | `select * from event_outbox where event_type like 'erasure%' or event_type = 'audit.logged'` | the four compliance events and their flat payloads |
+
+**Expected result for the fan-out today:** `tenant-service` completed, `analytics-service` completed,
+`notification-service` completed, and `referral-workflow-service`, `reward-service`, `ai-service`
+pending with `"unanswered": "ECONNREFUSED"` — those three are not in this working set and are not
+running. The request therefore stays `in_progress`, which is the designed behaviour, not a failure.
+
+**Getting an Owner token.** `POST /v1/dsr` is gated on `dsr:manage`, which lives in the internal JWT's
+`perms`, and locally there is no gateway to mint one. Use the same approach as §11.16's live run in
+event-svc: sign an internal JWT with this service's `INTERNAL_JWT_PRIVATE_KEY` and the Owner's claims
+— `test/bdd/support/jwt.helper.ts` is the reference for the exact issuer, audience and claim set.
+
+### 5 · Not covered by any of this
+
+The `/t/o` + `/t/c` round trip. Notification-service signs the tokens now and ingestion verifies them,
+but no route carries an `invitation_id` yet, so there is no mail to click. See
+`referral-pulse-notification-svc/NOTE.md` §N5.8 and
+`my-docs/cross-service-requirements.md` §3.10.
+
 ---
 
 > **Cross-service decision list.** The consolidated list of everything still open across all four
