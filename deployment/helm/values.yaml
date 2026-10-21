@@ -243,6 +243,20 @@ envVars:
   CH_USERNAME: "sa"
   CH_DATABASE: "analytics"
 
+  # The erasure fan-out (Product Spec R-CPL-02) calls five other services' internal erasure handlers
+  # with a client-credentials token. Without SERVICE_AUTH_*, this service still boots and still serves
+  # every other route; the fan-out fails loudly the first time it needs a token, which is the
+  # behaviour ServiceTokenProvider is written for.
+  #
+  # Only the URL the fan-out needs is listed. The rest of the SERVICE_*_URL family that
+  # src/config/services.config.ts reads (tenants, campaigns, rewards, analytics, tracking, referrals,
+  # sdkConfig, contentAi, clientIdentity, workflowOrchestration) has never been in this file and falls
+  # back to localhost defaults — pre-existing, and not this change's to fix.
+  SERVICE_AUTH_TOKEN_URL: "http://hydra-public.ory.svc.cluster.local:4444/oauth2/token"
+  SERVICE_AUTH_CLIENT_ID: "tenant-svc"
+  SERVICE_AUTH_AUDIENCE: "referralai-internal"
+  SERVICE_NOTIFICATIONS_URL: "http://referral-pulse-notification-svc.default.svc.cluster.local:5005"
+
 # -------- Secret (sensitive env) --------
 secretVars:
   # Stripe credentials. The price IDs below are public identifiers and live in envVars; these two
@@ -257,6 +271,9 @@ secretVars:
   # it, ingestion verifies with it, and both read it from this service — so it is one value per
   # environment, and changing it invalidates the tokens in mail already sent.
   TRACKING_TOKEN_KEY: ""
+  # This service's own Hydra client secret, for the erasure fan-out's outbound calls. Its client id and
+  # token URL are in envVars; this half is not.
+  SERVICE_AUTH_CLIENT_SECRET: ""
   CH_PASSWORD: "sa"
   REDIS_USERNAME: "appuser"
   REDIS_PASSWORD: "super-secret"
