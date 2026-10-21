@@ -41,9 +41,12 @@ model Consent {
 
   tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
-  /// Latest-row-per-subject reads, by both identifiers a subject may be known under.
+  /// Latest-row-per-subject reads, by each of the three identifiers a subject may be known under.
+  /// `ConsentService` runs this read on every touch event carrying a consent block, so all three are
+  /// hot paths and none of them may fall back to a scan.
   @@index([tenantId, subjectId, recordedAt(sort: Desc)], map: "idx_consent_subject")
   @@index([tenantId, subjectEmailHash, recordedAt(sort: Desc)], map: "idx_consent_email")
+  @@index([tenantId, subjectExternalId, recordedAt(sort: Desc)], map: "idx_consent_external_id")
   @@map("consents")
 }
 

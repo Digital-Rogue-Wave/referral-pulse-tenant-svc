@@ -17,6 +17,8 @@ import { AuditLogService } from './audit-log/audit-log.service';
 import { BillingController } from './billing/billing.controller';
 import { BillingService } from './billing/billing.service';
 import { InternalTenantStatusController } from './billing/internal-tenant-status.controller';
+import { DsrController } from './compliance/dsr.controller';
+import { DsrService } from './compliance/dsr.service';
 import { PlanAdminController } from './billing/plan-admin.controller';
 import { PlanLimitService } from './billing/plan-limit.service';
 import { PlanPublicController } from './billing/plan-public.controller';
@@ -132,6 +134,15 @@ describe('Controllers delegate to their services', () => {
             [() => admin.unsuspend('t2'), service.unsuspend],
             [() => admin.lock('t2', { reason: 'r', lockUntil: '2026-10-01T00:00:00Z' }, USER), service.lockAsAdmin],
             [() => admin.unlock('t2', USER), service.unlockAsAdmin]
+        ]);
+    });
+
+    it('data-subject requests', () => {
+        const service = mock<DsrService>();
+        const controller = new DsrController(service);
+        expectDelegation([
+            [() => controller.submit({ requestType: 'erasure' } as never, USER), service.create],
+            [() => controller.findOne('dsr1'), service.findOne]
         ]);
     });
 

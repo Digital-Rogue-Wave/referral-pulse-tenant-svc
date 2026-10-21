@@ -7,7 +7,20 @@ const serviceSchema = z.object({
     timeout: z.coerce.number().int().positive().default(5000)
 });
 
+/**
+ * This service's own Hydra client-credentials identity, for calls to another service's internal API
+ * (API Contract §2). Optional so a deployment without a registered client still boots;
+ * `ServiceTokenProvider` fails loudly the first time it actually needs a token.
+ */
+const serviceAuthSchema = z.object({
+    tokenUrl: z.string().url().optional(),
+    clientId: z.string().min(1).optional(),
+    clientSecret: z.string().min(1).optional(),
+    audience: z.string().min(1).optional()
+});
+
 const schema = z.object({
+    auth: serviceAuthSchema,
     tenants: serviceSchema,
     campaigns: serviceSchema,
     rewards: serviceSchema,
@@ -17,7 +30,13 @@ const schema = z.object({
     sdkConfig: serviceSchema,
     contentAi: serviceSchema,
     clientIdentity: serviceSchema,
-    workflowOrchestration: serviceSchema
+    workflowOrchestration: serviceSchema,
+    /**
+     * notification-service, one of the six erasure targets Product Spec R-CPL-02 names. The default
+     * port is the one notification-service actually runs on locally, which `tracking` above also
+     * claims — that older default looks wrong, but it is not this change's to move.
+     */
+    notifications: serviceSchema
 });
 
 export type ServicesConfig = z.infer<typeof schema>;
@@ -26,6 +45,12 @@ export default registerAs('services', (): ServicesConfig => {
     const defaultTimeout = process.env.INTRA_HTTP_TIMEOUT_MS ? parseInt(process.env.INTRA_HTTP_TIMEOUT_MS, 10) : 5000;
 
     const result = schema.safeParse({
+        auth: {
+            tokenUrl: process.env.SERVICE_AUTH_TOKEN_URL,
+            clientId: process.env.SERVICE_AUTH_CLIENT_ID,
+            clientSecret: process.env.SERVICE_AUTH_CLIENT_SECRET,
+            audience: process.env.SERVICE_AUTH_AUDIENCE
+        },
         tenants: {
             url: process.env.SERVICE_TENANTS_URL || 'http://localhost:5001',
             timeout: defaultTimeout
@@ -64,6 +89,10 @@ export default registerAs('services', (): ServicesConfig => {
         },
         workflowOrchestration: {
             url: process.env.SERVICE_WORKFLOW_ORCHESTRATION_URL || 'http://localhost:5010',
+            timeout: defaultTimeout
+        },
+        notifications: {
+            url: process.env.SERVICE_NOTIFICATIONS_URL || 'http://localhost:5005',
             timeout: defaultTimeout
         }
     });

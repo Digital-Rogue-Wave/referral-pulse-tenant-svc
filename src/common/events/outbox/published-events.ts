@@ -1,5 +1,6 @@
 import type { BaseDomainEvent } from '@domains/common/events';
 import type { ApiKeyCreatedEvent, ApiKeyDeletedEvent, ApiKeyRotatedEvent } from '@domains/api-key';
+import type { ComplianceAuditLoggedEvent, ConsentRecordedEvent, DsrRequestedEvent, ErasureCompletedEvent } from '@domains/compliance';
 import type { ConnectionCreatedEvent, ConnectionRevokedEvent } from '@domains/connection';
 import type {
     SubscriptionCancelledEvent,
@@ -39,7 +40,7 @@ import type {
 } from '@domains/user';
 
 /** Event Model §2.3 `object.object_type`, extended with tenant-service's aggregates (additive enum values). */
-export type PublishedObjectType = 'tenant' | 'user' | 'api_key' | 'subscription' | 'invitation' | 'connection';
+export type PublishedObjectType = 'tenant' | 'user' | 'api_key' | 'subscription' | 'invitation' | 'connection' | 'consent' | 'dsr_request';
 
 /** Flat properties (Event Model §2.5): primitive values only, snake_case keys. */
 export type FlatProperties = Record<string, string | number | boolean | null>;
@@ -397,6 +398,77 @@ const MAPPERS: Record<string, Mapper<never>> = {
             externalId: `usage.monthly_summary:${e.tenantId}:${e.metric}:${e.month}`,
             object: tenantObject(e),
             properties: { tenant_id: e.tenantId, metric: e.metric, month: e.month, usage: e.usage, limit: e.limit }
+        }
+    ],
+
+    // ── Compliance (Product Spec R-CPL-01's "Event Model compliance family") ──
+    // The four names are R-CPL-01's and R-CPL-02's; the payloads are not, because the Event Model
+    // defines none of them. Derived from what R-CPL-02 says each has to carry, and sent back as a spec
+    // patch — see NOTE.md §V5.16.
+    'consent.recorded': (e: ConsentRecordedEvent) => [
+        {
+            eventType: 'consent.recorded',
+            externalId: `consent.recorded:${e.aggregateId}`,
+            object: { type: 'consent', id: e.aggregateId },
+            properties: {
+                tenant_id: e.tenantId,
+                subject_email_hash: e.payload.subjectEmailHash,
+                subject_external_id: e.payload.subjectExternalId,
+                tracking_consent: e.payload.trackingConsent,
+                marketing_consent: e.payload.marketingConsent,
+                consent_source: e.payload.consentSource,
+                consent_recorded_at: iso(e.payload.recordedAt)
+            }
+        }
+    ],
+    'dsr.requested': (e: DsrRequestedEvent) => [
+        {
+            eventType: 'dsr.requested',
+            externalId: `dsr.requested:${e.aggregateId}`,
+            object: { type: 'dsr_request', id: e.aggregateId },
+            properties: {
+                tenant_id: e.tenantId,
+                dsr_id: e.aggregateId,
+                request_type: e.payload.requestType,
+                subject_email_hash: e.payload.subjectEmailHash,
+                subject_external_id: e.payload.subjectExternalId,
+                subject_id: e.payload.subjectId,
+                due_at: iso(e.payload.dueAt)
+            }
+        }
+    ],
+    'erasure.completed': (e: ErasureCompletedEvent) => [
+        {
+            eventType: 'erasure.completed',
+            externalId: `erasure.completed:${e.aggregateId}`,
+            object: { type: 'dsr_request', id: e.aggregateId },
+            properties: {
+                tenant_id: e.tenantId,
+                dsr_id: e.aggregateId,
+                subject_email_hash: e.payload.subjectEmailHash,
+                subject_external_id: e.payload.subjectExternalId,
+                completed_at: iso(e.payload.completedAt),
+                receipt_count: e.payload.receipts.length,
+                // R-CPL-02 says this event "carries all receipts"; Event Model §2.5 says properties are
+                // flat. Both hold here: every receipt travels, as one JSON string, and the per-service
+                // detail stays readable at `GET /v1/dsr/{id}`.
+                receipts: JSON.stringify(e.payload.receipts),
+                retained_under_obligation: e.payload.receipts.some((receipt) => receipt.retained_under_obligation)
+            }
+        }
+    ],
+    'audit.logged': (e: ComplianceAuditLoggedEvent) => [
+        {
+            eventType: 'audit.logged',
+            externalId: `audit.logged:${e.payload.action}:${e.aggregateId}`,
+            object: { type: 'dsr_request', id: e.aggregateId },
+            properties: {
+                tenant_id: e.tenantId,
+                action: e.payload.action,
+                subject_email_hash: e.payload.subjectEmailHash,
+                receipt_count: e.payload.receiptCount,
+                record_url: e.payload.recordUrl
+            }
         }
     ]
 };

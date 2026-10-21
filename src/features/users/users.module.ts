@@ -18,6 +18,6 @@ import { UsersController } from './users.controller';
     imports: [PlanLimitModule],
     controllers: [UsersController, OperatorErasureController, OperatorContactController],
     providers: [UsersService, OperatorErasureService, KetoReconcilerWorker],
-    exports: [UsersService]
+    exports: [UsersService, OperatorErasureService]
 })
 export class UsersModule {}

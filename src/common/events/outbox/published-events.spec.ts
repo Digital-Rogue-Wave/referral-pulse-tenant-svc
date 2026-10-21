@@ -14,6 +14,7 @@ import {
     UsageMonthlySummaryEvent,
     UsageThresholdCrossedEvent
 } from '@domains/billing';
+import { ComplianceAuditLoggedEvent, ConsentRecordedEvent, DsrRequestedEvent, ErasureCompletedEvent } from '@domains/compliance';
 import type { BaseDomainEvent } from '@domains/common/events';
 import { ConnectionCreatedEvent, ConnectionRevokedEvent } from '@domains/connection';
 import {
@@ -38,6 +39,8 @@ import { isPublishedEvent, PUBLISHED_EVENT_TYPES, toPublishedEvents } from './pu
 const T = 't1';
 const NOW = new Date('2026-09-22T00:00:00Z');
 const ISO = NOW.toISOString();
+/** A subject is only ever named by hash on the bus, which the "never puts an email address" test pins. */
+const HASH = 'a'.repeat(64);
 
 /** One representative of every published in-process event. */
 const EVENTS: BaseDomainEvent[] = [
@@ -87,7 +90,31 @@ const EVENTS: BaseDomainEvent[] = [
     new UsageThresholdCrossedEvent(T, T, 'email_sends', 80, 80, 100, 80, '2026-09', ISO),
     new UsageMonthlySummaryEvent(T, T, 'email_sends', '2026-08', 90, 100, '2026-08-31', ISO),
     new ConnectionCreatedEvent('c1', T, { connectionId: 'c1', provider: 'stripe', connectionType: 'billing', createdBy: 'u1' }, 'u1'),
-    new ConnectionRevokedEvent('c1', T, { connectionId: 'c1', provider: 'stripe', revokedBy: 'u1' }, 'u1')
+    new ConnectionRevokedEvent('c1', T, { connectionId: 'c1', provider: 'stripe', revokedBy: 'u1' }, 'u1'),
+    new ConsentRecordedEvent('cs1', T, {
+        subjectEmailHash: HASH,
+        subjectExternalId: 'cust-9',
+        trackingConsent: 'granted',
+        marketingConsent: 'denied',
+        consentSource: 'cmp_banner',
+        recordedAt: NOW
+    }),
+    new DsrRequestedEvent('dsr1', T, { requestType: 'erasure', subjectEmailHash: HASH, subjectExternalId: null, subjectId: null, dueAt: NOW }, 'u1'),
+    new ErasureCompletedEvent('dsr1', T, {
+        subjectEmailHash: HASH,
+        subjectExternalId: null,
+        completedAt: NOW,
+        receipts: [
+            { service: 'tenant-service', status: 'completed', retained_under_obligation: true },
+            { service: 'reward-service', status: 'completed', retained_under_obligation: true }
+        ]
+    }),
+    new ComplianceAuditLoggedEvent('dsr1', T, {
+        action: 'erasure.completed',
+        subjectEmailHash: HASH,
+        receiptCount: 6,
+        recordUrl: '/api/v1/dsr/dsr1'
+    })
 ];
 
 describe('Published events — the wire contract of every tenant-service event', () => {

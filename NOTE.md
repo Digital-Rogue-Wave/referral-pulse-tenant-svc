@@ -1234,6 +1234,156 @@ The value is one per environment (Helm `TRACKING_TOKEN_KEY`), and rotating it in
 in mail already sent — tracked in the Helm comment, because that is where someone will be when they
 consider rotating it.
 
+## V5.16 D5 step 2 — the DSR pipeline and the consent registry, built
+
+Product Spec R-CPL-01 makes this service compliance's one coordinating owner: "the Tenant service
+hosts the consent registry, the DSR endpoint and the DSR fan-out workflow and the audit sink; every
+other service implements its own erasure handler and returns a receipt." §V5.12 built the three
+tables. This builds what uses them.
+
+| what | where |
+|---|---|
+| `POST /v1/dsr`, `GET /v1/dsr/{id}` | `features/compliance/dsr.controller.ts` + `dsr.service.ts` |
+| erasure fan-out across the six targets | `dsr-fanout.service.ts` + `dsr-fanout.worker.ts` |
+| the remote erasure call | `erasure.client.ts`, `dsr-targets.ts` |
+| consent registry, written off the bus | `consent.consumer.ts` + `consent.service.ts` |
+| the four compliance events | `common/events/outbox/published-events.ts` |
+| this service's first outbound service token | `common/clients/service-token.provider.ts` |
+
+### Decisions taken, with what was rejected
+
+**D5-6 — BullMQ with the state in Postgres, not Temporal.** R-CPL-02 says "Erasure fans out as a
+Temporal workflow". This service has no Temporal client, no worker and no `temporal` entry in
+`package.json`; the three `temporal_*` columns §V5.12 added are written from an inbound DTO in
+`tenant.service.ts`, never by a workflow here. What a fan-out actually needs from a workflow engine is
+resumability, and the unique `(dsr_request_id, service_name)` on `dsr_receipts` gives that directly: a
+run asks only the targets that have not answered, so a crash, a BullMQ retry and the hourly sweep all
+converge on the same six receipts. Nine BullMQ workers already run here.
+
+*Rejected:* standing up Temporal for one workflow. It would make the platform's compliance path depend
+on a component this service does not otherwise use, for a guarantee the unique constraint already
+gives. The columns stay — they are the handle a later migration to Temporal would write into, and
+dropping them would be a second migration for nothing.
+
+**D5-7 — the consent registry is built by consuming touch events.** API Contract §3.15 is explicit:
+"Consent is a field on touch events (captured from CMP by JS SDK), **not a standalone resource**."
+There is no endpoint to write consent to, and R-CPL-01 still makes this service the registry's owner.
+The only reconciliation is to read the bus, so this service now consumes `tenant-svc.fifo`, subscribed
+to ingestion's `ingestion-events` topic.
+
+*Rejected:* a `POST /v1/consent` of our own (§3.15 forbids it, and the SDK would have no reason to call
+it), and having ingestion write the registry (it owns no RDS, and R-CPL-01 assigns the registry here).
+
+Append-only, per DB Model §0.4: a change of mind is a new row. A signal that repeats what is already on
+file is dropped, so the table grows with decisions rather than with traffic — which matters, because
+this read runs on every touch event that carries a consent block. A row recording a denial after a
+grant carries `withdrawn_at` itself; no earlier row is ever edited.
+
+**D5-8 — erasure runs end to end; access and portability are accepted and dated.** R-CPL-02 specifies
+a fan-out for erasure only. For access and portability it gives no collect contract, no response
+format and no per-service shape, so the request is recorded with its deadline, answerable at
+`GET /v1/dsr/{id}`, and resting at `accepted`.
+
+*Rejected:* inventing six "collect my share" contracts. Five of the six services do not exist in this
+working set; a guessed contract implemented on one side is worse than a recorded gap, because it reads
+as done.
+
+**D5-9 — Identity's share runs in-process.** The fan-out calls `OperatorErasureService.erase()`
+directly rather than `POST`ing to its own `/internal/erasures/operators`. Same handler either way, and
+a self-call would need this service to mint and verify a token for its own endpoint.
+
+The guard that came with it: an operator record is only ever matched by email hash, because
+`subject_id` and `subject_external_id` name a participant or invitee — a different id space. A DSR
+naming the subject only by external id gets a `completed` Identity receipt saying so, rather than a
+call that would have matched `emailHash: undefined`, which in Prisma is no filter at all.
+
+**D5-10 — a target that cannot answer is a `pending` receipt, not a failure.** No v5 document
+specifies the erasure handler contract the other five services implement, so
+`POST {base}/api/v1/internal/erasures/subjects` is this service's proposal, mirroring its own handler.
+Today all five answer 404. That leaves a `pending` receipt carrying the reason, and the hourly sweep
+asks again — so the request shows exactly who still owes an answer instead of failing wholesale, and
+starts completing on its own as each endpoint ships. A 4xx that is not 404 is recorded `failed`
+instead: the target answered and refused, which is a grant to fix, not a retry.
+
+**D5-11 — `dsr:manage`, over both permissions §3.15 names.** §3.15's table says `referrers:write` /
+`referrers:read`; its own revision line says "Owner-only — permission to update to `programs:write`".
+The contract disagrees with itself and neither candidate is about data-subject requests. All three
+resolve to Owner-only today, so effective access is identical; a separate permission is what later
+lets a compliance officer answer DSRs without also being able to edit participants or programs.
+Ratified 2026-10-20 with the catalog addition.
+
+**D5-12 — 30 days, from the two statements of one deadline.** API §3.15 says "Processed within 30
+days"; R-CPL-02 says "within the client's legal deadline (one month)". Same deadline, and 30 days is
+the one with a number, so that is what `due_at` is stamped with at submission — which is also what
+makes an overdue request a query on `idx_dsr_tenant_status`.
+
+**D5-13 — `erasure.completed` carries its receipts as one JSON string.** R-CPL-02: the event "carries
+all receipts". Event Model §2.5: properties are flat, primitives only. Both hold if every receipt
+travels as one string property, with `receipt_count` and `retained_under_obligation` alongside for
+consumers that only need the summary, and the per-service detail readable at `GET /v1/dsr/{id}`.
+
+**D5-14 — `audit.logged` is published for the compliance record only.** `AuditLogWriter` already turns
+every published event into an `audit_log` row, so an event per row would be a firehose and would audit
+itself. `audit.logged` is therefore emitted once per completed erasure, announcing that the record
+exists and where to read it, and is excluded from the trail (`NOT_OPERATOR_ACTIONS`).
+`erasure.completed` was added to `AUDITED_WHEN_SYSTEM` so the erasure itself is audited even though no
+operator performed it — DB Model §0.5's rule. `consent.recorded` is excluded too: it is the subject's
+own choice arriving off the bus, not an operator action.
+
+### Verified, not assumed
+
+| claim | how |
+|---|---|
+| the four compliance mappers produce valid Event Model drafts | `published-events.spec.ts` — its "covers every mapper" test now holds 41 events |
+| no subject's address reaches the bus | the same suite's "never puts an email address or a raw token on the bus" |
+| a re-run asks only the unanswered targets | `compliance.spec.ts` — two already-answered targets, four calls |
+| a pending target blocks completion | the request stays `in_progress`, no event emitted |
+| Identity is never asked to erase a subject it cannot match | `operators.erase` not called; receipt says why |
+| the sweep survives one request failing | three swept, one failed, two accounted for |
+| unit suite | **572 passed / 55 suites** (was 530 / 51) |
+| typecheck | **27 errors**, unchanged — all pre-existing (see §11.16 in event-svc's NOTE) |
+
+Not verified: nothing ran against live infrastructure. Docker was down for this pass, so the SNS
+subscription, the SQS consumer and the 404-to-pending path have no live run behind them.
+
+### Still open
+
+1. **The migration is written but not applied.** `20261021120000_consent_external_id_index` adds
+   `idx_consent_external_id`. `ConsentService` reads the registry on every touch event carrying a
+   consent block, and a subject named only by `invitee_external_id` had no index to read —
+   `idx_consent_email` covers the hashed address and `idx_consent_subject` the platform id. One
+   `CREATE INDEX`, needs the usual approval before it is applied.
+2. **The erasure handler contract needs ratifying by the other five services.** `dsr-targets.ts` and
+   `REMOTE_ERASURE_PATH` are the proposal; nothing confirms it.
+3. **The four compliance event payloads are this service's.** See spec defect 11 below.
+4. **`SQS_POLLING_ENABLED` is still `false` in tenant-service's `.env.development`.** It was false
+   because the queues did not exist; they do now, and the consent consumer needs it true to receive
+   anything. Flipping it is a live-behaviour change, so it waits for a run with Docker up.
+5. **`services.tracking` defaults to port 5005**, which is the port notification-service actually
+   runs on and which the new `services.notifications` entry therefore also claims. The older default
+   looks wrong; not this change's to move.
+
+## V5.14 Spec defects — additions (continued)
+
+11. **The compliance event family has no payload anywhere in the Event Model.** R-CPL-01 names
+    `consent.recorded`, `dsr.requested`, `erasure.completed` and `audit.logged` as "Event Model
+    compliance family". All four appear only in the Product Spec — two, three, four and three
+    mentions respectively — and nowhere in the Event Model: no payload, no `object_type`, no schema
+    version. `erasure.completed` is the one R-CPL-02 constrains at all ("carries all receipts"), and
+    that constraint contradicts §2.5's flat-properties rule. Implemented as §V5.16 D5-13/D5-14 and
+    going back as a patch.
+12. **Architecture §2.1 says tenant-service "Consumes: None" while R-CPL-01 gives it the consent
+    registry.** API Contract §3.15 puts consent on touch events and says it is "not a standalone
+    resource", so there is no endpoint through which the registry could be written. Holding it
+    requires reading the bus. §2.1 needs correcting; implemented as §V5.16 D5-7.
+13. **R-CPL-02 specifies a fan-out for erasure only.** `access` and `portability` are named as DSR
+    types in the same sentence and then never given a collect contract, a response format or a
+    per-service shape. Implemented as §V5.16 D5-8 — recorded, dated, and resting at `accepted`.
+14. **No v5 document specifies the erasure handler every service is required to implement.** R-CPL-01
+    says "every other service implements its own erasure handler and returns a receipt" and R-CPL-02
+    lists what each one erases, but no path, no request body and no receipt shape appear anywhere.
+    The orchestrator is the only place it can be stated, so §V5.16 D5-10 states it as a proposal.
+
 ---
 
 > **Cross-service decision list.** The consolidated list of everything still open across all four

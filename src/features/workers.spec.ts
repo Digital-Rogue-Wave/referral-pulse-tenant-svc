@@ -16,6 +16,8 @@ import { PlanStripeSyncService } from './billing/plan-stripe-sync.service';
 import { BillingUsageProcessor } from './billing/processors/billing-usage.processor';
 import { TrialLifecycleService } from './billing/trial-lifecycle.service';
 import { TenantDeletionSweeperWorker } from './tenant-deletion/tenant-deletion-sweeper.worker';
+import { DsrFanOutService } from './compliance/dsr-fanout.service';
+import { DsrFanOutWorker } from './compliance/dsr-fanout.worker';
 import { TenantDeletionService } from './tenant-deletion/tenant-deletion.service';
 import { TenantUnlockProcessor } from './tenant/processors/tenant-unlock.processor';
 import { TenantService } from './tenant/tenant.service';
@@ -25,8 +27,11 @@ import { KetoReconcilerWorker } from './users/keto-reconciler.worker';
 function workerOf<W extends object>(type: abstract new (...args: never[]) => W, deps: Record<string, unknown>) {
     const worker = Object.create(type.prototype) as W;
     Object.assign(worker, { logger: mock<AppLoggerService>(), ...deps });
-    return (name = 'run') =>
-        (worker as unknown as { processJob: (job: Partial<Job>) => Promise<{ success: boolean; data?: unknown }> }).processJob({ name });
+    return (name = 'run', data?: Record<string, unknown>) =>
+        (worker as unknown as { processJob: (job: Partial<Job>) => Promise<{ success: boolean; data?: unknown }> }).processJob({
+            name,
+            data
+        } as Partial<Job>);
 }
 
 describe('Scheduled workers', () => {
@@ -80,6 +85,56 @@ describe('Scheduled workers', () => {
         expect(keto.assignRole).toHaveBeenCalledWith('t1', 'u1', 'OWNER');
         expect(keto.removeMember).toHaveBeenCalledWith('t1', 'u2');
         expect(keto.revokeTenant).toHaveBeenCalledWith('t-gone');
+    });
+
+    describe('the DSR fan-out worker', () => {
+        const fanOut = () => {
+            const service = mock<DsrFanOutService>();
+            return { service, run: workerOf(DsrFanOutWorker, { fanOut: service }) };
+        };
+
+        it('runs the fan-out for the request the job names', async () => {
+            const { service, run } = fanOut();
+            service.run.mockResolvedValue({ dsrId: 'dsr1', answered: 6, outstanding: [] });
+
+            await expect(run('dsr-fan-out', { tenantId: 't1', dsrId: 'dsr1' })).resolves.toEqual({
+                success: true,
+                data: { dsrId: 'dsr1', answered: 6, outstanding: [] }
+            });
+            expect(service.run).toHaveBeenCalledWith('dsr1', 't1');
+        });
+
+        /** A run that left a target unanswered is not a success, so BullMQ retries it. */
+        it('reports a run with an outstanding target as unsuccessful', async () => {
+            const { service, run } = fanOut();
+            service.run.mockResolvedValue({ dsrId: 'dsr1', answered: 5, outstanding: ['ai-service'] });
+
+            await expect(run('dsr-fan-out', { tenantId: 't1', dsrId: 'dsr1' })).resolves.toMatchObject({ success: false });
+        });
+
+        it('refuses a job with no request to act on, in terms the base worker treats as unrecoverable', async () => {
+            const { run } = fanOut();
+
+            await expect(run('dsr-fan-out', { tenantId: 't1' })).rejects.toThrow(/invalid data/);
+        });
+
+        it('sweeps the unfinished erasures and keeps going past one that fails', async () => {
+            const { service, run } = fanOut();
+            service.findUnfinished.mockResolvedValue([
+                { id: 'dsr1', tenantId: 't1' },
+                { id: 'dsr2', tenantId: 't2' },
+                { id: 'dsr3', tenantId: 't3' }
+            ]);
+            service.run
+                .mockResolvedValueOnce({ dsrId: 'dsr1', answered: 6, outstanding: [] })
+                .mockRejectedValueOnce(new Error('postgres down'))
+                .mockResolvedValueOnce({ dsrId: 'dsr3', answered: 2, outstanding: ['ai-service'] });
+
+            await expect(run('dsr-sweep', { tenantId: 'system' })).resolves.toEqual({
+                success: false,
+                data: { swept: 3, stillWaiting: ['dsr3'], failed: ['dsr2'] }
+            });
+        });
     });
 
     it('the billing processor dispatches each scheduled billing job', async () => {
