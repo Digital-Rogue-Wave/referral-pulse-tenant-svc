@@ -1758,6 +1758,101 @@ this working set.
   `billing`, `audit` — all carry endpoints §13 assigns to Identity & Access that §4's table simply
   does not cover. Worth ratifying rather than changing.
 
+## V5.21 `admin` is gone — T-1 reversed, with the migration T-1 was missing (2026-10-22)
+
+R-ACT-01: *"There are exactly five internal roles: Owner, Campaign Manager, Analyst, Support Agent
+(tenant-side, Keto roles `owner` / `operator` / `viewer` / `support`) and Super Admin (platform-side).
+**No other role exists**; 'Program Admin', 'Account Owner', 'Marketer/Operator' and 'Viewer' are
+retired names for the same four tenant roles."*
+
+`ADMIN` was the retired Program Admin. **Decision T-1 kept it** as a custom role, and its stated
+reason was sound at the time: *"removing a role that may be assigned to live users would orphan them
+mid-session"*, and v5's own `roles.name` CHECK permits `custom`. Reversed now, because the objection
+was never to the removal — it was to removing it **without moving its holders**. That is a migration,
+and T-1 did not write one.
+
+### What it took
+
+| | |
+|---|---|
+| enum | `RoleEnum` is four values; `CUSTOM_ROLES` deleted with nothing left to hold |
+| grants | the `ADMIN` row of `ROLE_GRANTS` and its rank 4 are gone, and `withoutNamespaces()` with them — it existed only to build that one grant |
+| ownership transfer | the outgoing Owner becomes an **`OPERATOR`**, the highest standard role below Owner. T-1's second reason for keeping `ADMIN` was exactly this path |
+| `PRIVILEGED_ROLES` | `[OWNER]`. `remove()` refuses an Owner two lines earlier, so the last-privileged-member check there was dead and is gone; `updateRole()` keeps it for a demotion |
+| migration | `20261022080000_retire_admin_role` |
+| seed | the catalog description |
+| DTO | `ContactDto.role`'s documented enum said `owner, admin, operator, viewer` — wrong in two ways, since it also omitted `support` |
+
+### The migration remaps **down**, never up
+
+`ADMIN` granted every namespace except billing, with tenant deletion reserved to the Owner. Holders
+become `OPERATOR` (Campaign Manager), the highest standard role below Owner — not Owner, which would
+hand a former admin billing and tenant deletion. **A migration must never escalate a privilege.**
+Anyone who should hold more can be promoted deliberately afterwards, by a person, with an audit entry.
+
+It also moves `invitations` still offering the role, repoints the `user_roles` display projection
+(dropping rather than repointing a row that would collide on `(user_id, role_id)` because the member
+already holds `OPERATOR`), and then **refuses to continue** if anything still references the role.
+That last step matters: `user_roles.role_id` cascades on delete, so a missing `OPERATOR` catalog row
+would have turned the final `DELETE FROM roles` into a silent deletion of live assignments instead of
+a move. Forward-only, with no down migration — re-creating the role would not restore who held it.
+
+**Not applied.** Docker was down by the time this was written (`P1001` on `localhost:5432`), so the
+SQL has not run anywhere. It needs `npx prisma migrate dev` against the local stack before anyone
+trusts it, and the guard block is the part to watch.
+
+### A side effect: the `roles.tenant_id` gap closes itself
+
+§V5.5's schema list, item 2, wanted `roles.tenant_id` — null for the four standard roles, set for
+custom ones — because "decision T-1 keeps `ADMIN` as a custom role, and v5 scopes custom roles to a
+tenant; without the column `ADMIN` is a global row, which is the one part of T-1 the schema cannot
+yet express." There are no custom roles now, so the column has nothing left to express. Item 2 should
+be struck rather than built.
+
+### The Owner-only re-check in `tenant.service.ts` is gone
+
+`assertOwner()` existed for one reason, which its own comment stated: `tenants:write`, the relation
+gating `PATCH /v1/tenants/me`, *"is also held by the custom `admin` role v5 does not define"*. R-PRT-02
+makes the invitation channel Owner-only, so the guard alone was not enough. With `admin` retired,
+`tenants:write` belongs to the Owner and nobody else — the guard **is** the enforcement.
+
+**The residual risk, stated plainly:** the gate is now a property of `ROLE_GRANTS`, not of the
+endpoint. If any future role is given `tenants:write`, it silently gains the ability to set a
+jurisdiction flag whose misuse creates liability under German competition law. The authz parity spec
+asserts the four grants against §4, which is what would catch it — but it would catch it as a spec
+mismatch, not as "someone can now change the invitation channel". Worth a line in whatever review
+adds a fifth role.
+
+### Verified
+
+| claim | how |
+|---|---|
+| four roles, nothing else | `authz.spec.ts` asserts `Object.keys(ROLE_GRANTS)` is exactly the four |
+| transfer leaves the outgoing Owner an Operator | `users.service.spec.ts`, on both the row and the event |
+| the Owner still cannot be removed | `users.service.spec.ts`, from both directions — see below |
+| unit suite | **589 passed / 56 suites**, the same count as before |
+| typecheck | 27 errors, unchanged baseline |
+| lint | `npx eslint src test` — **0 errors** (117 warnings, all pre-existing `any`s) |
+
+The removal test changed shape. It used to seed an `ADMIN`, stub the privileged count at 1 and expect
+`409`. The surviving invariant is enforced one layer up: `RoleGrantPolicy` refuses an Owner acting on
+their own membership, and refuses anyone else from managing a peer or superior — so the Owner is
+unreachable from both directions with `403`, and `remove()`'s `state_conflict` branch is defensive
+code that predates this change. The test now asserts the reachable behaviour and says so.
+
+### Two things found while here, not fixed
+
+- **The BDD suite does not compile**, and did not before this change:
+  `src/features/webhook/webhook.controller.ts(88,46): Property 'rawBody' does not exist on type 'Request'`.
+  `tsc --noEmit` does not report it, so the Cucumber runner is resolving a different `tsconfig` — one
+  without whatever augments Express's `Request`. Nothing in this change touches that file.
+- **Three files from earlier in this session had no trailing newline** and one had a double blank
+  line, all four committed, all four failing `prettier/prettier` — so `pnpm lint:check` was red on
+  `main` for `contact.dto.ts`, `tenant.service.ts`, `operator-contact.controller.ts` and
+  `tenant.types.ts`. Fixed in this commit. Cause: `Path.write_text` on Windows, which also silently
+  rewrote those files CRLF; git's `core.autocrlf=input` normalized the blobs, so neither the diffs
+  nor the test suite ever showed it. Lint was the only thing that did.
+
 ---
 
 > **Cross-service decision list.** The consolidated list of everything still open across all four
