@@ -1860,6 +1860,11 @@ code that predates this change. The test now asserts the reachable behaviour and
 
 ### Two things found while here, not fixed
 
+- **`pnpm test:e2e` matches nothing.** `test/jest-e2e.json`'s `testRegex` is `.e2e-spec.ts$` and this
+  service has no such file — its end-to-end layer is the Cucumber suite below. The script exits 1 on
+  "No tests found", so anything running it in CI fails for a reason that has nothing to do with the
+  code. Either point it at the Cucumber run or drop it. `pnpm test:integration` is real and green
+  (5 tests, live Postgres).
 - **The BDD suite does not compile**, and did not before this change:
   `src/features/webhook/webhook.controller.ts(88,46): Property 'rawBody' does not exist on type 'Request'`.
   `tsc --noEmit` does not report it, so the Cucumber runner is resolving a different `tsconfig` — one
