@@ -22,7 +22,7 @@ export class OperatorContactResponse {
     @ApiPropertyOptional({ nullable: true, type: String })
     name!: string | null;
 
-    @ApiProperty({ enum: ['owner', 'admin', 'operator', 'viewer'] })
+    @ApiProperty({ enum: ['owner', 'operator', 'viewer', 'support'] })
     role!: string;
 }
 

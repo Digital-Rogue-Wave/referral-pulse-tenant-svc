@@ -41,8 +41,6 @@ import {
     VerificationType
 } from '@domains/tenant';
 
-import { ALL_PERMISSIONS } from '@common/auth/authz/permission-catalog';
-
 import {
     TenantCreatedEvent,
     TenantUpdatedEvent,
@@ -317,24 +315,6 @@ export class TenantService {
     /**
      * Update current tenant's settings (aware context).
      */
-    /**
-     * R-PRT-02 makes the invitation channel Owner-only, and `tenants:write` — the relation gating
-     * this endpoint — is also held by the custom `admin` role v5 does not define (R-ACT-01 says
-     * there are exactly five roles). A jurisdiction gate whose misuse creates liability under German
-     * competition law is worth the belt as well as the braces.
-     *
-     * "Is the Owner" is not a field on the principal: §4's model is relations, and the Owner is the
-     * role granted all of them. Comparing against the catalog says exactly that, costs nothing, and
-     * stays correct as the catalog grows — where naming two sample relations would quietly stop
-     * meaning "Owner" the moment another role gained them.
-     */
-    private assertOwner(user: IAuthenticatedUser, field: string): void {
-        const perms = new Set(user.perms ?? []);
-        if (!ALL_PERMISSIONS.every((permission) => perms.has(permission))) {
-            throw new BaseException('authorization_error', `Only the Owner may change ${field}`, HttpStatus.FORBIDDEN);
-        }
-    }
-
     async update(dto: UpdateTenantDto, user: IAuthenticatedUser, file?: Express.Multer.File | Express.MulterS3.File): Promise<TenantResponse> {
         const tenantId = this.tenantContext.getTenantId()!;
         const tenant = await this.findOneOrFail(tenantId);
@@ -368,8 +348,11 @@ export class TenantService {
             }
         }
 
+        // R-PRT-02 makes the invitation channel Owner-only. `tenants:write`, the relation gating this
+        // endpoint, is now held by the Owner alone — the `admin` role that also held it is retired
+        // (R-ACT-01), so the guard is the enforcement and the in-service re-check that used to back
+        // it up is gone (NOTE.md §V5.21).
         if (dto.invitationChannel !== undefined && dto.invitationChannel !== tenant.invitationChannel) {
-            this.assertOwner(user, 'invitationChannel');
             updateData.invitationChannel = dto.invitationChannel;
             changes.invitationChannel = { from: tenant.invitationChannel, to: dto.invitationChannel };
         }

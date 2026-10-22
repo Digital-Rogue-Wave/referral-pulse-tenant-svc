@@ -52,19 +52,15 @@ export const ALL_PERMISSIONS: readonly Permission[] = (Object.keys(PERMISSION_CA
     PERMISSION_CATALOG[namespace].map((relation) => `${namespace}:${relation}` as Permission)
 );
 
-const withoutNamespaces = (...excluded: PermissionNamespace[]): Permission[] =>
-    ALL_PERMISSIONS.filter((permission) => !excluded.includes(permission.split(':')[0] as PermissionNamespace));
-
 /**
  * Role → permission grants (API Contract §2 "Role → Permission Mapping").
  *
  * Operator and Viewer additionally read their own tenant profile, which the dashboard needs on every
- * page; Admin is the custom role v5 does not define, kept at "all namespaces except billing" with
- * tenant deletion reserved to the Owner (irreversible, and it cancels the subscription).
+ * page. Four roles, no more: R-ACT-01 retired the `admin` grant that used to sit between Owner and
+ * Operator at "all namespaces except billing" (NOTE.md §V5.21).
  */
 export const ROLE_GRANTS: Readonly<Record<RoleEnum, readonly Permission[]>> = {
     [RoleEnum.OWNER]: ALL_PERMISSIONS,
-    [RoleEnum.ADMIN]: withoutNamespaces('billing').filter((permission) => permission !== 'tenants:delete'),
     [RoleEnum.OPERATOR]: [
         // Product Spec §4's Campaign Manager row: `programs | read`. They run campaigns inside the
         // program, so they read it and never write it.
@@ -136,7 +132,6 @@ export const LIVE_CHECK_PERMISSIONS: ReadonlySet<Permission> = new Set<Permissio
 /** Role hierarchy used to stop a principal granting a role above their own. */
 export const ROLE_RANK: Readonly<Record<RoleEnum, number>> = {
     [RoleEnum.OWNER]: 5,
-    [RoleEnum.ADMIN]: 4,
     [RoleEnum.OPERATOR]: 3,
     // Above Viewer because Support can adjust a reward and resend its email, which Viewer cannot;
     // below Operator because it cannot approve one. Only the ordering is used, never the numbers.

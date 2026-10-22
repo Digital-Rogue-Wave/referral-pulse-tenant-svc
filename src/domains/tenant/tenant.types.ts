@@ -63,15 +63,10 @@ const FORBIDDEN_BY_DEFAULT_COUNTRIES: readonly string[] = ['DE'];
  * chosen" stays distinguishable from "chosen allowed".
  */
 export const defaultInvitationChannel = (billingCountry: string | null | undefined): InvitationChannel =>
-    billingCountry && FORBIDDEN_BY_DEFAULT_COUNTRIES.includes(billingCountry.toUpperCase())
-        ? InvitationChannel.FORBIDDEN
-        : InvitationChannel.ALLOWED;
+    billingCountry && FORBIDDEN_BY_DEFAULT_COUNTRIES.includes(billingCountry.toUpperCase()) ? InvitationChannel.FORBIDDEN : InvitationChannel.ALLOWED;
 
 /** The value every other service must honour: the Owner's choice, or the platform default. */
-export const effectiveInvitationChannel = (tenant: {
-    invitationChannel?: string | null;
-    billingCountry?: string | null;
-}): InvitationChannel =>
+export const effectiveInvitationChannel = (tenant: { invitationChannel?: string | null; billingCountry?: string | null }): InvitationChannel =>
     tenant.invitationChannel === InvitationChannel.ALLOWED || tenant.invitationChannel === InvitationChannel.FORBIDDEN
         ? tenant.invitationChannel
         : defaultInvitationChannel(tenant.billingCountry);

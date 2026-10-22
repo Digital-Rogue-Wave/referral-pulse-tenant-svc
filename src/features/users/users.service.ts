@@ -44,7 +44,11 @@ export interface MemberIdentity {
     name?: string | null;
 }
 
-const PRIVILEGED_ROLES: RoleEnum[] = [RoleEnum.OWNER, RoleEnum.ADMIN];
+/**
+ * Roles whose last holder a tenant cannot be left without. Only the Owner, since R-ACT-01 retired
+ * `ADMIN` — `remove()` refuses an Owner outright, so this now bites only on a demotion.
+ */
+const PRIVILEGED_ROLES: RoleEnum[] = [RoleEnum.OWNER];
 
 /**
  * Tenant membership: who belongs to which tenant, with which role.
@@ -144,11 +148,10 @@ export class UsersService {
         const actorRole = await this.roleOf(actor);
         const target = await this.findMember(id);
         RoleGrantPolicy.assertCanManage(actorRole, actor.userId, { id: target.id, role: target.role as RoleEnum });
+        // Owner is the only privileged role since R-ACT-01, so this refusal subsumes the
+        // last-privileged-member check that used to follow it.
         if (target.role === RoleEnum.OWNER) {
             throw new BaseException('state_conflict', 'Transfer ownership before removing the Owner', HttpStatus.CONFLICT);
-        }
-        if (PRIVILEGED_ROLES.includes(target.role as RoleEnum)) {
-            await this.assertNotLastPrivilegedUser(target.tenantId);
         }
 
         await this.prisma.$transaction(async (tx) => {
@@ -168,7 +171,11 @@ export class UsersService {
 
     /**
      * The Owner hands the tenant to another member. The new Owner is promoted and the previous Owner
-     * becomes an Admin, atomically — a tenant always has exactly one Owner.
+     * becomes a Campaign Manager, atomically — a tenant always has exactly one Owner.
+     *
+     * The outgoing Owner used to become an `ADMIN`; R-ACT-01 retired that role, and `OPERATOR` is the
+     * highest standard role below Owner. It is a demotion either way — the alternative, leaving them
+     * an Owner until someone else acts, is the one shape this method exists to prevent.
      */
     async transferOwnership(actor: IAuthenticatedUser, newOwnerId: string): Promise<void> {
         if ((await this.roleOf(actor)) !== RoleEnum.OWNER) {
@@ -181,16 +188,16 @@ export class UsersService {
 
         await this.prisma.$transaction(async (tx) => {
             const promoted = (await tx.user.update({ where: { id: target.id }, data: { role: RoleEnum.OWNER } })) as UserProps;
-            const demoted = (await tx.user.update({ where: { id: actor.userId }, data: { role: RoleEnum.ADMIN } })) as UserProps;
+            const demoted = (await tx.user.update({ where: { id: actor.userId }, data: { role: RoleEnum.OPERATOR } })) as UserProps;
             await this.replaceRoleProjection(tx, promoted, RoleEnum.OWNER, actor.userId);
-            await this.replaceRoleProjection(tx, demoted, RoleEnum.ADMIN, actor.userId);
+            await this.replaceRoleProjection(tx, demoted, RoleEnum.OPERATOR, actor.userId);
             this.txEventEmitter.emitAfterCommit(
                 'user.role_changed',
                 new UserRoleChangedEvent(promoted.id, promoted.tenantId, target.role, RoleEnum.OWNER, actor.userId)
             );
             this.txEventEmitter.emitAfterCommit(
                 'user.role_changed',
-                new UserRoleChangedEvent(demoted.id, demoted.tenantId, RoleEnum.OWNER, RoleEnum.ADMIN, actor.userId)
+                new UserRoleChangedEvent(demoted.id, demoted.tenantId, RoleEnum.OWNER, RoleEnum.OPERATOR, actor.userId)
             );
             this.txEventEmitter.emitAfterCommit(
                 TenantEvents.OWNERSHIP_TRANSFERRED,
@@ -280,7 +287,7 @@ export class UsersService {
     private async assertNotLastPrivilegedUser(tenantId: string): Promise<void> {
         const privilegedCount = await this.prisma.user.count({ where: { tenantId, role: { in: PRIVILEGED_ROLES }, deletedAt: null } });
         if (privilegedCount <= 1) {
-            throw new BaseException('state_conflict', 'Cannot remove or downgrade the last Owner/Admin in the tenant', HttpStatus.CONFLICT);
+            throw new BaseException('state_conflict', 'Cannot downgrade the last Owner in the tenant', HttpStatus.CONFLICT);
         }
     }
 
