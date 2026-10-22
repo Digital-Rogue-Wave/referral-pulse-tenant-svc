@@ -82,7 +82,10 @@ export class DsrService {
     /** The subject's proof of what happened: the request, its deadline, and every receipt so far. */
     async findOne(id: string): Promise<DsrRequestResponse> {
         const row = (await this.prisma.dsrRequest.findFirst({
-            where: this.tenantAware.withTenantFilter({ id }),
+            // `includeSoftDeleted` because `dsr_requests` has no `deletedAt`: a data-subject request is
+            // the proof that the request was answered, so it is never soft-deleted. Without this the
+            // filter adds `deletedAt: null` and Prisma rejects the query as an unknown argument.
+            where: this.tenantAware.withTenantFilter({ id }, { includeSoftDeleted: true }),
             include: { receipts: { orderBy: { serviceName: 'asc' } } }
         })) as DsrRequestProps | null;
         if (!row) {

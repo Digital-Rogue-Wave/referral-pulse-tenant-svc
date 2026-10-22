@@ -99,7 +99,10 @@ describe('HTTP layer', () => {
             await client.patch('http://kratos:4434/x', { a: 1 });
             await client.delete('http://kratos:4434/x', { headers: { 'X-Extra': '1' } });
 
-            expect(breakers.execute).toHaveBeenCalledWith('kratos', expect.any(Function));
+            // host *and* port: keyed on the hostname alone, every service behind one host shares a
+            // breaker — which locally is all of them, so one dead service opens the breaker for the
+            // rest (NOTE.md §V5.19).
+            expect(breakers.execute).toHaveBeenCalledWith('kratos:4434', expect.any(Function));
             const config = http.request.mock.calls[4]![0];
             expect(config).toMatchObject({
                 method: 'DELETE',
@@ -150,7 +153,7 @@ describe('HTTP layer', () => {
         const config = (url: string, headers: Record<string, string> = {}) =>
             ({ url, method: 'get', headers }) as unknown as InternalAxiosRequestConfig;
 
-        it('forwards the caller’s token only to internal services, and strips credentials for external ones', () => {
+        it('forwards the caller’s token only to internal services', () => {
             const internal = request(config('http://campaign.svc.cluster.local/v1/x'));
             expect(internal.headers).toMatchObject({
                 Authorization: 'Bearer internal',
@@ -159,12 +162,24 @@ describe('HTTP layer', () => {
                 'x-user-id': 'u1'
             });
 
-            const external = request(config('https://api.stripe.com/v1/x', { Authorization: 'Bearer leak', Cookie: 'c' }));
-            expect(external.headers['Authorization']).toBeUndefined();
-            expect(external.headers['Cookie']).toBeUndefined();
-
             const relative = request({ ...config('/v1/x'), baseURL: 'http://kratos:4434' } as InternalAxiosRequestConfig);
             expect(relative.headers['x-tenant-id']).toBe('t1');
+        });
+
+        /**
+         * The property worth keeping is "a user's JWT never reaches a third party" — not "no
+         * Authorization header ever leaves". Deleting it unconditionally also deleted the HTTP Basic
+         * credentials `ServiceTokenProvider` attaches to Hydra's token endpoint, which is external by
+         * this classification, so this service could never obtain a service token at all
+         * (NOTE.md §V5.19).
+         */
+        it('strips a forwarded token from an external call, and keeps a credential the caller set', () => {
+            const forwarded = request(config('https://api.stripe.com/v1/x', { Authorization: 'Bearer internal', Cookie: 'c' }));
+            expect(forwarded.headers['Authorization']).toBeUndefined();
+            expect(forwarded.headers['Cookie']).toBeUndefined();
+
+            const deliberate = request(config('https://hydra.example/oauth2/token', { Authorization: 'Basic dGVuYW50LXN2Yzpz' }));
+            expect(deliberate.headers['Authorization']).toBe('Basic dGVuYW50LXN2Yzpz');
         });
 
         it('records the outcome of every call', async () => {

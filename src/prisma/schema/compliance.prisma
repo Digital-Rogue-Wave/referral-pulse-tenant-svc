@@ -99,7 +99,9 @@ model DsrReceipt {
 
   /// The service that answered, e.g. `workflow-service`, `reward-service`.
   serviceName String @map("service_name") @db.VarChar(60)
-  /// `completed` | `partial` | `failed`.
+  /// `pending` | `completed` | `partial` | `failed`. `pending` is a target that has not answered
+  /// yet, which is what lets a re-run resume at exactly the targets that still owe one
+  /// (NOTE.md §V5.16 D5-10). The CHECK gained it in 20261022060000.
   status String @db.VarChar(20)
   /// What the service erased or exported. Evidence of the erasure, which GDPR requires logging.
   receipt Json?

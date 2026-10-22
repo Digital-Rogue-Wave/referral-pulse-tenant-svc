@@ -52,7 +52,11 @@ describe('DsrService — POST /v1/dsr and GET /v1/dsr/{id}', () => {
         bullJobs = mock<BullJobsService>();
         tenantAware = mock<TenantAwareService>();
         tenantAware.getRequiredTenantId.mockReturnValue(TENANT);
-        tenantAware.withTenantFilter.mockImplementation((where) => ({ ...where, tenantId: TENANT }) as never);
+        // Mirrors the real implementation, including the `deletedAt: null` it adds unless asked not
+        // to — a mock that skipped that hid a live 500 on a table with no `deletedAt` column.
+        tenantAware.withTenantFilter.mockImplementation(
+            (where, options) => ({ ...where, tenantId: TENANT, ...(options?.includeSoftDeleted ? {} : { deletedAt: null }) }) as never
+        );
         service = new DsrService(prisma, tenantAware, txEvents, bullJobs, logger());
     });
 
@@ -110,6 +114,7 @@ describe('DsrService — POST /v1/dsr and GET /v1/dsr/{id}', () => {
 
         const response = await service.findOne('dsr1');
 
+        // No `deletedAt`: the table has no such column, and a DSR is never soft-deleted.
         expect((prisma.dsrRequest.findFirst as jest.Mock).mock.calls[0]![0].where).toEqual({ id: 'dsr1', tenantId: TENANT });
         expect(response.receipts).toEqual([
             { serviceName: 'reward-service', status: 'completed', receipt: {}, retainedUnderObligation: true, receivedAt: NOW }
@@ -194,6 +199,30 @@ describe('ErasureClient — asking one service to erase its share', () => {
         await expect(client.erase(target, subject())).resolves.toMatchObject({ status: DsrReceiptStatus.COMPLETED });
     });
 
+    /**
+     * The two live handlers disagree on the shape: notification-service answers with a list of bases,
+     * analytics-service with one sentence. Reading the sentence as an empty list would record
+     * "nothing retained" for a service that just said it keeps the aggregates.
+     */
+    it.each([
+        ['a list of bases', ['reward_ledger: tax law']],
+        ['one sentence', 'Aggregate counts are kept, with every id replaced by a random token.']
+    ])('reads retained given %s', async (_case, retained) => {
+        http.post.mockResolvedValue({ data: { status: 'completed', retained }, status: 200, headers: {}, duration: 1 });
+
+        await expect(client.erase(target, subject())).resolves.toMatchObject({ retainedUnderObligation: true });
+    });
+
+    it.each([
+        ['an empty list', []],
+        ['an empty sentence', '   '],
+        ['nothing at all', undefined]
+    ])('records nothing retained given %s', async (_case, retained) => {
+        http.post.mockResolvedValue({ data: { status: 'completed', retained }, status: 200, headers: {}, duration: 1 });
+
+        await expect(client.erase(target, subject())).resolves.toMatchObject({ retainedUnderObligation: false });
+    });
+
     /** `blocked` means the target answered and did not erase — a retry will not change that. */
     it('records a blocked answer as failed', async () => {
         http.post.mockResolvedValue({ data: { status: 'blocked' }, status: 200, headers: {}, duration: 1 });
@@ -217,6 +246,17 @@ describe('ErasureClient — asking one service to erase its share', () => {
         http.post.mockRejectedValue(new Error('ECONNREFUSED'));
 
         await expect(client.erase(target, subject())).resolves.toMatchObject({ status: DsrReceiptStatus.PENDING });
+    });
+
+    /** A refused connection carries its reason in `code`, not `message`, and `message` is empty. */
+    it('records the reason for a refused connection, which has no message', async () => {
+        const refused = new AxiosError('', 'ECONNREFUSED');
+        http.post.mockRejectedValue(refused);
+
+        await expect(client.erase(target, subject())).resolves.toMatchObject({
+            status: DsrReceiptStatus.PENDING,
+            receipt: expect.objectContaining({ unanswered: 'ECONNREFUSED' })
+        });
     });
 
     /** A 403 is this service's grant being wrong, not a transient failure — an operator has to act. */

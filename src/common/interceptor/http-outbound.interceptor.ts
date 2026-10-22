@@ -101,8 +101,22 @@ export class HttpOutboundInterceptor implements OnModuleInit {
                 });
             }
         } else {
-            // External service: strip JWT token for security
-            delete config.headers['Authorization'];
+            // Not an internal service, so a *forwarded* user JWT must not travel. This used to delete
+            // `Authorization` unconditionally, which also deleted credentials the caller set on
+            // purpose: Ory Hydra's token endpoint is not in `internalServiceDomains`, so the HTTP
+            // Basic header `ServiceTokenProvider` had just attached was stripped and Hydra answered
+            // 400 with no client authentication. This service could therefore never obtain a service
+            // token, and so could never call another service at all — invisible until the DSR
+            // fan-out made it an outbound caller for the first time.
+            //
+            // The property worth keeping is "a user's JWT never reaches a third party". A header the
+            // caller passed deliberately is not that, and the only thing that ever sets Authorization
+            // implicitly is the forwarding branch above — so comparing against it strips exactly the
+            // leak and nothing else. Same fix as event-svc's NOTE.md §11.15; this copy was missed.
+            const forwardedAuthHeader = this.tenantContext.getMetadata<string>('authHeader');
+            if (forwardedAuthHeader && config.headers['Authorization'] === forwardedAuthHeader) {
+                delete config.headers['Authorization'];
+            }
             delete config.headers['Cookie'];
             this.logger.debug(`External service call (JWT stripped): ${serviceName}`, {
                 url,

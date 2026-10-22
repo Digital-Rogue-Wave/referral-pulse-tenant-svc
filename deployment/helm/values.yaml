@@ -243,6 +243,28 @@ envVars:
   CH_USERNAME: "sa"
   CH_DATABASE: "analytics"
 
+  # Token verification. Every one of these is required by src/config/auth.config.ts with no default,
+  # so a pod without them dies at boot with "Auth config validation failed" - they were missing from
+  # this file entirely (NOTE.md V5.19).
+  #
+  # Two issuers are trusted, for two kinds of principal: the internal JWT this service mints at
+  # /internal/validate-token (dashboard users and API keys, after the gateway - Architecture 13.1),
+  # and Ory Hydra for client-credentials tokens on the mesh.
+  AUTH_JWKS_URI: "http://hydra-public.ory.svc.cluster.local:4444/.well-known/jwks.json"
+  # Must match Hydra's own urls.self.issuer exactly, including the trailing slash.
+  AUTH_ISSUER: "http://hydra-public.ory.svc.cluster.local:4444/"
+  AUTH_AUDIENCE: "frontend-tenant"
+  # This service's own JWKS, served at /.well-known/jwks.json outside the API prefix.
+  AUTH_INTERNAL_JWKS_URI: "http://referral-pulse-tenant-svc.default.svc.cluster.local:8080/.well-known/jwks.json"
+  AUTH_INTERNAL_ISSUER: "referralai-tenant-svc"
+  AUTH_INTERNAL_AUDIENCE: "referralai-internal"
+  # ES256 is the internal JWT (InternalTokenService signs ES256 and the published JWKS says so);
+  # RS256 is Hydra's. Dropping either one makes that whole class of principal unauthenticatable.
+  AUTH_ALGORITHMS: "RS256,ES256"
+  AUTH_CLOCK_TOLERANCE: "30"
+  AUTH_CACHE_ENABLED: "true"
+  AUTH_CACHE_TTL: "600"
+
   # The erasure fan-out (Product Spec R-CPL-02) calls five other services' internal erasure handlers
   # with a client-credentials token. Without SERVICE_AUTH_*, this service still boots and still serves
   # every other route; the fan-out fails loudly the first time it needs a token, which is the

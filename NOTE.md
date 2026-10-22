@@ -1554,6 +1554,127 @@ but no route carries an `invitation_id` yet, so there is no mail to click. See
 `referral-pulse-notification-svc/NOTE.md` §N5.8 and
 `my-docs/cross-service-requirements.md` §3.10.
 
+## V5.19 The live pass — six defects, and the DSR path working end to end (2026-10-22)
+
+§V5.18 listed the live run as owed. It ran. **Every one of the six things it found was invisible to 574
+passing unit tests**, and five of the six would have made the fan-out fail in production.
+
+### It works now
+
+```
+POST /api/v1/dsr  →  201
+GET  /api/v1/dsr/{id}  →  200
+   tenant-service              completed   (in-process)
+   analytics-service           completed   retained
+   notification-service        completed   retained
+   referral-workflow-service   pending     ECONNREFUSED
+   reward-service              pending     ECONNREFUSED
+   ai-service                  pending     ECONNREFUSED
+   status: in_progress
+```
+
+The three pending ones are the services not in this working set and not running — exactly the designed
+behaviour (D5-10), not a failure. `dsr.requested` and `consent.recorded` both reached SNS through the
+outbox relay; a touch event published to `ingestion-events.fifo` produced a `consents` row whose
+`subject_email_hash` is the SHA-256 of the address, with `recorded_at` taken from the event's own
+`occurred_at` and `marketing_consent` / `consent_source` read from the envelope.
+
+### The six defects
+
+**1 · `AUTH_ALGORITHMS=RS256` — this service could not verify its own internal JWT.**
+`InternalTokenService` signs **ES256** and the published JWKS says so, but `.env.development` listed
+RS256 only, so every dashboard request answered 401 "invalid algorithm". `.env.test` already had
+`RS256,ES256`, which is why the BDD suite — where every request carries an internal JWT — never saw it.
+**Worse:** the whole `AUTH_*` family (ten keys, every one required with no Zod default) was **missing
+from `deployment/helm/values.yaml`**, so a pod from this chart dies at boot with "Auth config
+validation failed". Both fixed; the Helm block carries the ES256/RS256 reasoning inline.
+
+**2 · The outbound interceptor deleted the credentials it was given.**
+`HttpOutboundInterceptor`'s external branch did `delete config.headers['Authorization']`
+unconditionally. Hydra's token endpoint is not in `internalServiceDomains`, so the HTTP Basic header
+`ServiceTokenProvider` had just attached was stripped and Hydra answered **400, no client
+authentication**. This service could therefore never obtain a service token, and never call another
+service at all. Because the token fetch sits inside `erase()`'s try block, the single 400 was recorded
+as *every* target's answer — five receipts reading "HTTP 400", none of which had been contacted.
+
+This is the **same defect, in the same file, as event-svc §11.15** — fixed there a day earlier and
+never ported. It stayed invisible here because tenant-service had no outbound service call until the
+DSR fan-out.
+
+**3 · `pending` was not in the `dsr_receipts` status CHECK.**
+The most consequential one. §V5.12 wrote `CHECK (status IN ('completed','partial','failed'))` from the
+schema comment, before the fan-out existed; D5-10 then made "cannot answer yet" a `pending` receipt —
+which is the *normal* case today. Every pending write violated the constraint, failed the BullMQ job,
+and left the fan-out stalled at the first unreachable target with no receipt for it, retrying three
+times and giving up. Migration `20261022060000_dsr_receipt_pending_status` adds it.
+
+The unit tests could not catch this: they mock Prisma, and a mock has no CHECK constraints.
+
+**4 · The circuit breaker was keyed on hostname, so one dead service shut out the healthy ones.**
+`new URL(url).hostname` meant every service on one host shared a breaker. Locally that is all of them,
+so three dead targets opened the breaker and the fan-out recorded a **running** notification-service as
+`"unanswered": "Breaker is open"` — a wrong answer about a healthy service. Now keyed on `host`, so the
+port is part of the identity. In a cluster the hostnames already differ, so this is mostly a local
+artifact — but a local artifact that silently corrupts a compliance record is worth one word.
+
+**5 · `GET /v1/dsr/{id}` was a 500 on every call.**
+`withTenantFilter` adds `deletedAt: null` unless told not to, and `dsr_requests` has no `deletedAt`
+column — a DSR is the proof the request was answered, so it is never soft-deleted. Prisma rejected the
+query as an unknown argument. The unit test passed because its mock of `withTenantFilter` returned
+`{...where, tenantId}` and skipped the part that breaks. **The mock now mirrors the real
+implementation**, including the `deletedAt` it adds, which is the only reason the test is worth having.
+
+**6 · `retained` has two shapes, and a refused connection had no reason.**
+notification-service answers with a list of legal bases, analytics-service with one sentence.
+`Array.isArray(...) ? ... : []` read the sentence as "nothing retained" — the opposite of what it says
+— so analytics' receipt lost the flag the subject has to be told about. And a refused connection
+arrives with an empty `message` and the reason only in `code`, which wrote `"unanswered": ""` into the
+one field whose job is to say why. Both read both ways now.
+
+### What this says about the test suite
+
+Four of the six were *hidden by a mock that was kinder than reality*: a Prisma mock with no
+constraints, a `withTenantFilter` mock that skipped its own behaviour, a receipt fixture with only one
+of the two live shapes, and an error fixture with a `message`. The two that were not — the algorithm
+list and the interceptor — were config and a file no test in this repo exercises end to end.
+
+The lesson is the same one §11.17 drew for the wire format: **a unit test written against the same
+assumption as the code cannot find the assumption wrong.** For anything crossing a process boundary,
+the cheap check is to call it.
+
+### Verified
+
+| claim | how |
+|---|---|
+| `POST /v1/dsr` → 201, hash not address, deadline +30 days | live, twice, with a ULID tenant |
+| `GET /v1/dsr/{id}` → 200 with all six receipts | live |
+| the two live handlers answer `completed` with `retained` | live, through the fan-out *and* probed directly |
+| unreachable targets become `pending` with their reason | live, three of them |
+| `dsr.requested` and `consent.recorded` reach SNS | `event_outbox` rows, both `published` |
+| the consent registry hashes the address and keeps the event's own time | live row, hash checked against `sha256(address)` |
+| the fan-out resumes rather than restarts | successive attempts re-asked only the unanswered target |
+| unit suite | **581 passed / 55 suites** (was 574) |
+| typecheck | 27 errors, unchanged baseline; `nest build` clean |
+
+Two pre-existing tests in `http-layer.spec.ts` asserted the old behaviour of defects 2 and 4 and now
+assert the new: a forwarded token is stripped from an external call, a credential the caller set
+deliberately is not.
+
+### Still open
+
+1. **`erasure.completed` and `audit.logged` have not fired**, because they need all six targets to
+   answer and three of the six are services that do not exist here. The path is covered by unit tests;
+   it will fire on its own the first time the other three run.
+2. **The `:35` sweep has not been observed resuming a request on its schedule** — only the
+   resume-on-retry path, which is the same code.
+3. **Idempotency.** `POST /v1/dsr` requires an `Idempotency-Key` header (API §1, the global
+   interceptor). Worth noting because it is not in §3.15's description of the endpoint, and a caller
+   reading only the contract will get a 400.
+4. **Dev seed tenants are not ULIDs.** `default-tenant` and `AZP-772-OMEGA` are 14 and 13 characters;
+   notification-service's erasure DTO requires `@Length(26, 26)` on `tenant_id`, correctly, so a DSR
+   for either of them is refused with a 400 that looks like a contract bug and is not. A ULID tenant
+   was created for this run.
+
 ---
 
 > **Cross-service decision list.** The consolidated list of everything still open across all four

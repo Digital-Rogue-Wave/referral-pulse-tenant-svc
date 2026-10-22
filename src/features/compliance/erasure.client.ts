@@ -51,6 +51,12 @@ export interface TargetReceipt {
 /** The receipt body a target returns. `retained` and `status` spell the same in both cases. */
 interface RemoteReceiptBody {
     status?: string;
+    /**
+     * What the target kept, and on what basis. A list in notification-service's and this service's
+     * receipts, a single sentence in analytics-service's — read both ways rather than reading the
+     * sentence as "nothing retained", which is the opposite of what it says. The shape is worth
+     * settling in the contract (NOTE.md §V5.19).
+     */
     retained?: unknown;
     [key: string]: unknown;
 }
@@ -123,11 +129,10 @@ export class ErasureClient {
     }
 
     private fromBody(target: ErasureTarget, body: RemoteReceiptBody): TargetReceipt {
-        const retained = Array.isArray(body.retained) ? body.retained : [];
         // `blocked` is this service's own vocabulary for "there is a reason I did not erase" — a target
         // reporting it has answered, but not finished, so it needs a human rather than a retry.
         const status = body.status === BLOCKED ? DsrReceiptStatus.FAILED : DsrReceiptStatus.COMPLETED;
-        return { status, receipt: { ...body, share: target.share }, retainedUnderObligation: retained.length > 0 };
+        return { status, receipt: { ...body, share: target.share }, retainedUnderObligation: hasRetained(body.retained) };
     }
 
     /** Pending, not failed: it resolves the day the handler contract gains an external-id field. */
@@ -163,6 +168,21 @@ export class ErasureClient {
     }
 }
 
+/**
+ * A connection refusal arrives with an empty `message` and the reason only in `code`, which wrote
+ * `"unanswered": ""` into the receipt — the one field whose whole job is to say why.
+ */
 function errorMessage(error: unknown): string {
-    return error instanceof Error ? error.message : 'unknown error';
+    if (error instanceof AxiosError) {
+        return error.code ?? error.message ?? 'unknown error';
+    }
+    return error instanceof Error && error.message ? error.message : 'unknown error';
+}
+
+/** True when the target said it kept something, whichever of the two shapes it said it in. */
+function hasRetained(retained: unknown): boolean {
+    if (Array.isArray(retained)) {
+        return retained.length > 0;
+    }
+    return typeof retained === 'string' && retained.trim().length > 0;
 }
