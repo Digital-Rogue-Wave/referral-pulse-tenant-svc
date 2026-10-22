@@ -21,11 +21,11 @@ the suite requires and no document defines, so it is deliberately recorded rathe
 |---|---|
 | Product Spec | 7 |
 | API Contract | 7 |
-| Event Model | 8 |
+| Event Model | 9 |
 | DB Model | 8 |
 | Architecture | 6 |
 | Per-Pulse Event Flows | 1 |
-| **Total** | **37** |
+| **Total** | **38** |
 
 Service NOTE.md files hold the full reasoning: `referral-pulse-event-svc/NOTE.md` §11,
 `referral-pulse-tenant-svc/NOTE.md` §V5, `referral-pulse-analytics-svc/NOTE.md` §A5,
@@ -198,18 +198,26 @@ cross-service decision list.
   What is missing is one route-table entry.
 - **Fix** Author either, with `invitation_id` and `referral_code` on the event.
 
-### D-36 · `referral.completed` is emitted but is not a public webhook event
+### D-36 · `referral.completed` is specified in three places and catalogued in none
 
-- **Says** The per-Pulse event flows emit `referral.completed` on five drawings — every recurring
-  Pulse × `subscription.cancelled`, and Renewal cap-reached — and the Notifications row of each says
-  "`referral.completed` webhook **(to be added to API §6.1)**".
-- **Against** §6.1's public event list does not contain it, so the suite names an event it also says
-  is not deliverable.
-- **Built** Nothing, faithfully: notification-service's public vocabulary is built from §6.1, so a
-  `referral.completed` reaching it is dropped and no subscriber learns the referral closed — including
-  subscribers to `referral.*`. The gap is notification NOTE.md §N5.9.
-- **Fix** Add `referral.completed` to §6.1 with its payload (`reason` at minimum —
-  `cancelled` / `cap_reached` are both drawn). The implementation is then one mapping line.
+- **Says** Product Spec **R-INT-01**: "Events added by this revision and to be catalogued there:
+  `referral.completed{reason}`, `reward.earned` (replacing the `reward.calculated` webhook name) and
+  `invitation.sent|bounced`." **R-RWD-03** defines the state and its reasons: the referral "enters
+  Completed (`completion_reason` ∈ `cap_reached` | `cancelled`)". The per-Pulse flows emit it on five
+  drawings, each noting "webhook **(to be added to API §6.1)**".
+- **Against** API §6.1's public event list does not contain it. Worse, the **Event Model** does not
+  define the internal event either: §4's referral family is `created` · `qualified` · `converted` ·
+  `rejected` · `expired`, and its state machine reads "created → qualified → converted → rewarded,
+  with branches to rejected and expired" — **no Completed state at all**, although R-RWD-03 names it
+  and says non-recurring structures are the ones that never enter it.
+- **Built** The webhook, in notification-service — on exactly the evidence above, which is enough:
+  R-INT-01 gives the public name and field, R-RWD-03 gives the internal field and both values, and
+  `reward.earned` was already implemented from that same R-INT-01 sentence without waiting for §6.1.
+  `completion_reason` → `reason` follows `referral.rejected`'s existing `rejection_reason` → `reason`.
+  notification NOTE.md §N5.10.
+- **Fix** Two edits, not one: add `referral.completed` to API §6.1, **and** add the event and the
+  `Completed` state to the Event Model's referral family. The state machine there is the one a reader
+  implementing workflow-service would follow, and it cannot reach the state R-RWD-03 requires.
 
 ---
 
@@ -284,6 +292,26 @@ belong.
 - **Built** tenant-service consumes touch events off the bus and records a row only when the signal
   changes (§V5.16 D5-7). This is also why Architecture §2.1's "Consumes: None" is now wrong (D-30).
 - **Fix** Say how the registry is fed. Reading the bus is the only mechanism the suite leaves open.
+
+### D-38 · Only `reward.earned` says whose reward it is
+
+- **Says** §4's `reward.earned` requires `recipient_type` (`participant` | `invitee`) and
+  `recipient_id`. `reward.approved`, `reward.rejected` and `reward.paid` carry neither — only
+  `reward_id`, `referral_id` and the approval or payment facts.
+- **Against** R-RWD-02: "A variant may define an invitee-side reward... The invitee reward is created
+  on the same conversion, follows the same approval gates, and is fulfilled through the client's
+  system (account credit, discount, trial) **via the `reward.approved` webhook** — the platform never
+  pays an invitee cash." So `reward.approved` fires for invitee rewards by design, and no consumer of
+  it can tell that is what it is.
+- **Built** The defect, unavoidably. notification-service's `reward.earned` route guards on the field
+  (`applies: recipient_type === 'participant'`, "an invitee reward is the client's to announce"); its
+  `reward.approved` route has nothing to guard on, so it resolves the recipient as the envelope's
+  participant and mails them. **On an invitee-side reward the participant is emailed "your reward was
+  approved" for a reward that is not theirs.** notification NOTE.md §N5.10 N5-13.
+- **Fix** Carry `recipient_type` and `recipient_id` on every `reward.*` event, not only on creation.
+  The alternative — each consumer remembering `reward_id → recipient_type` from the earlier
+  `reward.earned` — makes every consumer hold reward facts it does not own, to recover a field the
+  producer already had.
 
 ---
 
