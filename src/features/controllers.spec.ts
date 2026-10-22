@@ -248,12 +248,16 @@ describe('Internal endpoints', () => {
                     id: 't1',
                     name: 'Acme',
                     status: 'active',
+                    billingCountry: 'FR',
+                    invitationChannel: null,
                     setting: { general: { locale: 'de-DE', appUrl: 'https://app.acme.io/referrals', supportEmail: 'help@acme.io' } }
                 })
                 .mockResolvedValueOnce({
                     id: 't1',
                     name: 'Acme',
                     status: 'active',
+                    billingCountry: 'DE',
+                    invitationChannel: null,
                     setting: { general: { locale: 'klingon!', appUrl: 'http://app.acme.io' } }
                 })
                 .mockResolvedValueOnce(null);
@@ -264,9 +268,17 @@ describe('Internal endpoints', () => {
                 status: 'active',
                 locale: 'de-DE',
                 appUrl: 'https://app.acme.io/referrals',
-                replyTo: 'help@acme.io'
+                replyTo: 'help@acme.io',
+                invitationChannel: 'allowed'
             });
-            await expect(controller.profileOf('t1')).resolves.toMatchObject({ locale: null, appUrl: null, replyTo: null });
+            // The same read carries R-PRT-02's effective value, so a consumer never re-derives the
+            // jurisdiction rule: this tenant bills in Germany and made no choice.
+            await expect(controller.profileOf('t1')).resolves.toMatchObject({
+                locale: null,
+                appUrl: null,
+                replyTo: null,
+                invitationChannel: 'forbidden'
+            });
             await expect(controller.profileOf('gone')).rejects.toBeInstanceOf(NotFoundException);
         });
     });

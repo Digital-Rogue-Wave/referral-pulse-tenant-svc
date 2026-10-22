@@ -1675,6 +1675,89 @@ deliberately is not.
    for either of them is refused with a 400 that looks like a contract bug and is not. A ULID tenant
    was created for this run.
 
+## V5.20 Product-spec pass — the invitation channel, and two grants that were missing (2026-10-22)
+
+A full read of Product Spec v5 (87 rule cards) against this service turned up three concrete gaps.
+Two were one-liners; the third was a responsibility with no home.
+
+### A5-16 · R-PRT-02's invitation channel did not exist here
+
+R-PRT-02 governs platform-sent invitations at two levels: the **tenant** setting
+`invitation_channel ∈ allowed | forbidden` is the *legal envelope*, Owner-only, platform default
+`forbidden` for tenants whose billing country is Germany; the **campaign** setting
+`invitations_enabled` is the product choice and "can never enable what the tenant forbids".
+
+The tenant half was absent — and so was its input: **no column anywhere in this service held a
+country**. So the rule could not even be computed, let alone enforced.
+
+Two columns, one migration (`20261022070000_tenant_invitation_channel`, applied):
+
+| column | why |
+|---|---|
+| `billing_country char(2)` | the jurisdiction input the rule names, which nothing held |
+| `invitation_channel varchar(20)` nullable, CHECK `('allowed','forbidden')` | the Owner's choice |
+
+**Null means "the Owner has not chosen"** and resolves through `effectiveInvitationChannel()` to the
+platform default. Storing the derived value instead would freeze a jurisdiction answer at
+provisioning and lose the distinction between *not chosen* and *chosen `allowed`* — and R-PRT-02's
+own example turns on that distinction ("If Globex's Owner later sets the tenant to forbidden, every
+campaign drops to mailto: at its next widget-config fetch").
+
+*Rejected:* putting it in `tenant_settings.general`, which is a Json blob holding branding and
+locale. A legal gate that another service must read on every widget-config fetch deserves a column
+with a CHECK constraint, not a key in free-form JSON.
+
+*Rejected:* defaulting to `forbidden` when the country is unknown. The country is not known at
+provisioning, so that would switch the feature off platform-wide until every tenant was corrected.
+R-PRT-02 names Germany, not "unknown".
+
+**Owner-only, enforced twice.** The endpoint is gated on `tenants:write`, which the custom `admin`
+role also holds — the role R-ACT-01 says does not exist (§V5.21 open item 2). A jurisdiction gate
+whose misuse creates liability under German competition law gets the belt as well as the braces, so
+`TenantService.assertOwner` additionally requires the principal to hold **every** relation in the
+catalog. "Is the Owner" is not a field on `IAuthenticatedUser` — §4's model is relations and the
+Owner is the role granted all of them — and comparing against `ALL_PERMISSIONS` says exactly that
+while staying correct as the catalog grows. Naming two sample Owner-only relations instead would
+quietly stop meaning "Owner" the moment another role gained them.
+
+**Who reads it.** `GET /v1/internal/tenants/{id}/profile` now carries the *effective* value, resolved
+here so no consumer re-derives the jurisdiction rule. Referral Workflow checks it before creating an
+Invitation; widget-config uses it to decide whether `invite_email` is among the share tools
+(R-SDK-03). Written up as a cross-service requirement, since both callers are other services.
+
+### A5-17 · Two relations missing from the Campaign Manager
+
+§4's permission table gives the Campaign Manager `programs | read` and
+`referrers | read · write · block`; `ROLE_GRANTS[OPERATOR]` had neither `programs:read` nor
+`referrers:block`. The second is the one that mattered: a fraudulent participant was only blockable
+by the Owner, when the person watching the campaign is exactly who should be able to stop them.
+The parity spec that holds `ROLE_GRANTS` against §4 did not catch it because its expected array was
+written from the same reading as the code.
+
+### Verified
+
+| claim | how |
+|---|---|
+| DE defaults to forbidden, FR/ES/NL to allowed, unknown to allowed | `invitation-channel.spec.ts`, both casings |
+| an explicit choice beats the default in both directions | same suite |
+| a stored value outside the enum falls back to the default | same suite |
+| the internal profile carries the effective value | `controllers.spec.ts` — a DE tenant with no choice reads `forbidden` |
+| the two grants match §4 | the authz parity spec's Operator row |
+| unit suite | **589 passed / 56 suites** (was 581) |
+| typecheck | 27 errors, unchanged baseline; `nest build` clean |
+
+Not verified live: no caller reads the invitation channel yet, because Referral Workflow is not in
+this working set.
+
+### Left alone, deliberately
+
+- **`POST /v1/dsr` stays on `dsr:manage`.** §4's table routes it to `programs:write` (Owner only) and
+  §3.15's to `referrers:write`; neither is about data-subject requests, and §V5.16 D5-11 already
+  ratified the separate relation. The spec's own disagreement is CHANGELOG D-09.
+- **17 namespaces against §4's "eleven".** The extras — `dsr`, `connections`, `tenants`, `users`,
+  `billing`, `audit` — all carry endpoints §13 assigns to Identity & Access that §4's table simply
+  does not cover. Worth ratifying rather than changing.
+
 ---
 
 > **Cross-service decision list.** The consolidated list of everything still open across all four

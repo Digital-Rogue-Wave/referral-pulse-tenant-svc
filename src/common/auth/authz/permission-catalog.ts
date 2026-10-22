@@ -66,6 +66,9 @@ export const ROLE_GRANTS: Readonly<Record<RoleEnum, readonly Permission[]>> = {
     [RoleEnum.OWNER]: ALL_PERMISSIONS,
     [RoleEnum.ADMIN]: withoutNamespaces('billing').filter((permission) => permission !== 'tenants:delete'),
     [RoleEnum.OPERATOR]: [
+        // Product Spec §4's Campaign Manager row: `programs | read`. They run campaigns inside the
+        // program, so they read it and never write it.
+        'programs:read',
         'campaigns:read',
         'campaigns:write',
         'campaigns:activate',
@@ -77,6 +80,10 @@ export const ROLE_GRANTS: Readonly<Record<RoleEnum, readonly Permission[]>> = {
         'segments:write',
         'referrers:read',
         'referrers:write',
+        // §4: `referrers | read · write · block` for the Campaign Manager, and the role row says
+        // "reject referrals" and blocking is theirs too — a fraudulent participant has to be
+        // stoppable by the person watching the campaign, not only by the Owner.
+        'referrers:block',
         'referrals:read',
         'referrals:reject',
         'rewards:read',

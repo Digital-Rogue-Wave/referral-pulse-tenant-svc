@@ -3,6 +3,8 @@ import { IsEnum, IsOptional } from 'class-validator';
 
 import { RoleEnum } from '@common/enums/role.enum';
 
+import { InvitationChannel } from '@domains/tenant/tenant.types';
+
 /**
  * An operator's delivery address, for notification-service to resolve at send time (events never carry
  * addresses). Only live operators are returned: a removed or erased operator is not found.
@@ -55,4 +57,12 @@ export class TenantCommunicationProfileResponse {
 
     @ApiPropertyOptional({ nullable: true, type: String })
     replyTo!: string | null;
+
+    /**
+     * R-PRT-02's effective legal envelope for platform-sent invitations: the Owner's explicit choice
+     * or, where they made none, the platform default derived from the billing country. Resolved here
+     * so no consumer re-derives the jurisdiction rule.
+     */
+    @ApiProperty({ enum: InvitationChannel, description: 'Whether the platform may send invitations for this tenant' })
+    invitationChannel!: InvitationChannel;
 }
