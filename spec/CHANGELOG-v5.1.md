@@ -12,18 +12,20 @@ edited by this file. This is the patch list to apply to them.
 *Against* is the statement it contradicts. *Built* is what the code does, and where the reasoning is
 recorded. *Fix* is the proposed edit.
 
-**Status of each.** Nothing here is blocked on a decision: every one was resolved in code, under a
-recorded decision with its rejected alternative. The edits are so the next reader of the spec reaches
-the same answer without re-deriving it.
+**Status of each.** Almost nothing here is blocked on a decision: all but one were resolved in code,
+under a recorded decision with its rejected alternative, and the edits are so the next reader of the
+spec reaches the same answer without re-deriving it. **D-35 is the exception** — it names a credential
+the suite requires and no document defines, so it is deliberately recorded rather than built.
 
 | Scope | Count |
 |---|---|
-| Product Spec | 6 |
-| API Contract | 6 |
+| Product Spec | 7 |
+| API Contract | 7 |
 | Event Model | 8 |
 | DB Model | 8 |
 | Architecture | 6 |
-| **Total** | **34** |
+| Per-Pulse Event Flows | 1 |
+| **Total** | **37** |
 
 Service NOTE.md files hold the full reasoning: `referral-pulse-event-svc/NOTE.md` §11,
 `referral-pulse-tenant-svc/NOTE.md` §V5, `referral-pulse-analytics-svc/NOTE.md` §A5,
@@ -107,6 +109,26 @@ cross-service decision list.
 - **Fix** One column on the §13 table — "exceptions under this prefix" — or a separate routing table.
   Without it a gateway configured from §13 alone breaks nine working endpoints.
 
+### D-35 · §2's two credential tables disagree about the participant JWT, and R-SDK-07 rules out the pair
+
+- **Says** §2's **ingress table** gives `referral.link.shared` / `referral.widget.viewed` the
+  credential "publishable key + participant JWT", with "participant id from the JWT". §2's **class
+  table**, four paragraphs earlier, gives the same two events "SDK (publishable key)" and nothing
+  else. R-SDK-07 says "every ingress to Event Ingestion has exactly one credential, and that
+  credential sets the trust level".
+- **Against** Three statements, two of them in one section, and no two of them agree. A reader
+  implementing the ingress table needs a second credential; a reader implementing the class table or
+  R-SDK-07 must not have one.
+- **Built** The weaker reading, because it is the only one the suite defines well enough to build:
+  the publishable key alone, with the participant taken from `actor_external_id` in the request body.
+  **This is a live exposure and is recorded as one** (ingestion NOTE.md §11.20): a publishable key is
+  in the client's page source by design, so anyone holding it can post engagement touches naming any
+  participant. R-CON-03 keeps it away from attribution and money, but it reaches funnel analytics, AI
+  propensity, segment membership and the participant Dormant→Active transition.
+- **Fix** Decide which table is right. If it is the ingress table, the suite needs the participant
+  JWT specified — issuer, claims, lifetime, which service mints it, and how R-SDK-07's "exactly one
+  credential" is meant to read when an ingress has two. Nothing mints such a token today.
+
 ---
 
 ## API Contract
@@ -175,6 +197,19 @@ cross-service decision list.
   sharing one verbatim-copied payload contract (notification `NOTE.md` §N5.8, ingestion §11.12).
   What is missing is one route-table entry.
 - **Fix** Author either, with `invitation_id` and `referral_code` on the event.
+
+### D-36 · `referral.completed` is emitted but is not a public webhook event
+
+- **Says** The per-Pulse event flows emit `referral.completed` on five drawings — every recurring
+  Pulse × `subscription.cancelled`, and Renewal cap-reached — and the Notifications row of each says
+  "`referral.completed` webhook **(to be added to API §6.1)**".
+- **Against** §6.1's public event list does not contain it, so the suite names an event it also says
+  is not deliverable.
+- **Built** Nothing, faithfully: notification-service's public vocabulary is built from §6.1, so a
+  `referral.completed` reaching it is dropped and no subscriber learns the referral closed — including
+  subscribers to `referral.*`. The gap is notification NOTE.md §N5.9.
+- **Fix** Add `referral.completed` to §6.1 with its payload (`reason` at minimum —
+  `cancelled` / `cap_reached` are both drawn). The implementation is then one mapping line.
 
 ---
 
@@ -409,6 +444,25 @@ belong.
   (notification §N5.8 N5-9, ingestion §11.12).
 - **Fix** Publish the payload shape in the API Contract or the Event Model, so a third implementer
   does not have to read two repos to find it.
+
+---
+
+## Per-Pulse Event Flows
+
+### D-37 · "ClickHouse 5 s batch insert" describes a design analytics abandoned for durability
+
+- **Says** All 34 flow tables give Analytics the same row: "append to ClickHouse (5 s batch insert)".
+- **Against** A 5-second batch is only free if the writer does not wait for it. Analytics does wait,
+  deliberately: `wait_for_async_insert=1`, because fire-and-forget lost every event still in
+  ClickHouse's async buffer when a node restarted, and the warehouse is meant to be lossless. With
+  the wait, the batch window *is* the latency of every consumed message — a 5-second window would
+  make each SQS message take at least five seconds to ack, and the consumer would never catch up.
+- **Built** `async_insert=1` with `wait_for_async_insert=1` and no `async_insert_busy_timeout_ms`
+  anywhere, in the service or the infrastructure — so the cadence is the server default and is durable
+  per insert, not batched over five seconds. Analytics NOTE.md §A5.10.
+- **Fix** Drop the "5 s" from the flow tables, or state the actual contract: durable on ack, visible
+  to a query in well under a second. Other services are reading "5 s" as the freshness they can
+  promise a dashboard, and it is neither the floor nor the ceiling.
 
 ---
 
