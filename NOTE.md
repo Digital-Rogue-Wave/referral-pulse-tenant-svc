@@ -1797,9 +1797,27 @@ That last step matters: `user_roles.role_id` cascades on delete, so a missing `O
 would have turned the final `DELETE FROM roles` into a silent deletion of live assignments instead of
 a move. Forward-only, with no down migration — re-creating the role would not restore who held it.
 
-**Not applied.** Docker was down by the time this was written (`P1001` on `localhost:5432`), so the
-SQL has not run anywhere. It needs `npx prisma migrate dev` against the local stack before anyone
-trusts it, and the guard block is the part to watch.
+**Applied and verified live, 2026-10-22.** The dev database held no `ADMIN` at all, so applying it
+as-is would have proved only that the SQL parses. Both cases the migration exists for were seeded
+first — a plain holder, and a member holding **both** `ADMIN` and `OPERATOR`, which is the
+`(user_id, role_id)` collision — and then:
+
+| | before | after |
+|---|---|---|
+| `users.role = 'ADMIN'` | 2 | 0, both `OPERATOR` |
+| the plain holder's `user_roles` row | → `ADMIN` | → `OPERATOR` |
+| the double holder's `user_roles` rows | `ADMIN` + `OPERATOR` | one `OPERATOR` — the colliding row dropped, not duplicated, no PK violation |
+| `invitations.role = 'ADMIN'` | 1 | 0, `OPERATOR` |
+| the `roles` catalog | ADMIN · OPERATOR · OWNER · VIEWER | OPERATOR · OWNER · VIEWER |
+
+The guard block passed with zero remaining references, so the `DELETE FROM roles` ran as a delete and
+not as a cascade. Fixtures were prefixed `01JMIGTEST` and removed afterwards; the database is back to
+its one real Owner.
+
+**Noticed while in there, not fixed:** the `roles` catalog has no `SUPPORT` row, although `seed.ts`
+upserts all four standard roles. The seed has not been re-run since `SUPPORT` was added, so a tenant
+assigning a Support Agent today would hit `replaceRoleProjection`'s "Role catalog is missing SUPPORT —
+run the seed". One `pnpm prisma:seed`, but it is a data fix rather than a code one.
 
 ### A side effect: the `roles.tenant_id` gap closes itself
 
