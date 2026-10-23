@@ -20,13 +20,13 @@ the suite requires and no document defines, so it is deliberately recorded rathe
 | Scope | Count |
 |---|---|
 | Product Spec | 7 |
-| API Contract | 7 |
+| API Contract | 8 |
 | Event Model | 9 |
 | DB Model | 8 |
 | Architecture | 6 |
 | Per-Pulse Event Flows | 1 |
 | Failure & Observability | 2 |
-| **Total** | **40** |
+| **Total** | **41** |
 
 Service NOTE.md files hold the full reasoning: `referral-pulse-event-svc/NOTE.md` §11,
 `referral-pulse-tenant-svc/NOTE.md` §V5, `referral-pulse-analytics-svc/NOTE.md` §A5,
@@ -492,6 +492,29 @@ belong.
 - **Fix** Drop the "5 s" from the flow tables, or state the actual contract: durable on ack, visible
   to a query in well under a second. Other services are reading "5 s" as the freshness they can
   promise a dashboard, and it is neither the floor nor the ceiling.
+
+### D-41 · The widget token is specified, but nothing says where its secret lives
+
+- **Says** API Contract §4.1: the widget token is "a server-generated JWT from the client's backend
+  (**signed with a shared secret**). Our backend verifies the signature, extracts user identity".
+  R-ACT-06 and Responsibility Contract §2.3 agree on the token; §2.3 adds that v5 replaced the raw
+  `user_id` precisely so "the widget will not render on a browser-asserted identity".
+- **Against** A shared secret has two holders, and the suite describes neither side's storage. No
+  document says which tenant field holds it, which endpoint serves it to ingestion, who rotates it,
+  or what the client's backend is told to sign with. Everything else about the token is specified:
+  the parameter name, the algorithm family, the claim to extract, and the behaviour when it is
+  missing.
+- **Built** The verification, because the gap is only the key's address: HS256 allowlisted (an
+  attacker must not choose `alg`), identity from `sub` or `user_id`, and `null` for every failure so
+  the endpoint cannot be used to tell "expired" from "forged" from "unknown tenant". The secret is
+  read from a proposed tenant-service endpoint —
+  `GET /internal/tenants/{tenant_id}/widget-token-secret` — modelled on the email-tracking key this
+  service already fetches and caches the same way. Per tenant, not platform-wide: one client's token
+  must not render another's widget. Fail-closed, so until tenant-service serves it no widget renders,
+  which is what §4.1 requires of an unverifiable token anyway. ingestion NOTE.md §11.22,
+  `my-docs/cross-service-requirements.md` §1.11.
+- **Fix** Name the secret's home in the API Contract or Architecture, and say what the client's
+  backend signs. The endpoint above is a proposal for the lead to ratify or replace.
 
 ---
 
