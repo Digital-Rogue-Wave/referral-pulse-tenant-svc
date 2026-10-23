@@ -62,7 +62,7 @@ ingress:
   annotations:
     alb.ingress.kubernetes.io/scheme: internet-facing        # or "internal"
     alb.ingress.kubernetes.io/target-type: ip
-    alb.ingress.kubernetes.io/healthcheck-path: /health
+    alb.ingress.kubernetes.io/healthcheck-path: /health/live
     alb.ingress.kubernetes.io/healthcheck-port: traffic-port
     alb.ingress.kubernetes.io/listen-ports: '[{"HTTP": 80},{"HTTPS":443}]'
     alb.ingress.kubernetes.io/ssl-redirect: "443"
@@ -119,6 +119,29 @@ networkPolicy:
         app.kubernetes.io/name: otel-collector
     # If you need general outbound (e.g., S3/SQS/SNS), keep this true
     allowInternet: true
+
+# Kubernetes probes. `/health/live` is the cheap one (heap only) and `/health/ready` checks the
+# dependencies — the split `nestjs-best-practices.md` requires. Liveness must not check a
+# dependency: restarting this pod because Redis blipped would be a cascade, not a fix.
+livenessProbe:
+    httpGet:
+        path: /health/live
+        port: http
+    initialDelaySeconds: 30
+    periodSeconds: 10
+    timeoutSeconds: 5
+    failureThreshold: 3
+    successThreshold: 1
+
+readinessProbe:
+    httpGet:
+        path: /health/ready
+        port: http
+    initialDelaySeconds: 10
+    periodSeconds: 10
+    timeoutSeconds: 3
+    failureThreshold: 3
+    successThreshold: 1
 
 resources:
   limits:
