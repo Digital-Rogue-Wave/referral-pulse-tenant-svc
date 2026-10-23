@@ -20,13 +20,13 @@ the suite requires and no document defines, so it is deliberately recorded rathe
 | Scope | Count |
 |---|---|
 | Product Spec | 7 |
-| API Contract | 8 |
+| API Contract | 10 |
 | Event Model | 10 |
 | DB Model | 8 |
 | Architecture | 6 |
 | Per-Pulse Event Flows | 1 |
 | Failure & Observability | 2 |
-| **Total** | **42** |
+| **Total** | **44** |
 
 Service NOTE.md files hold the full reasoning: `referral-pulse-event-svc/NOTE.md` §11,
 `referral-pulse-tenant-svc/NOTE.md` §V5, `referral-pulse-analytics-svc/NOTE.md` §A5,
@@ -219,6 +219,39 @@ cross-service decision list.
 - **Fix** Two edits, not one: add `referral.completed` to API §6.1, **and** add the event and the
   `Completed` state to the Event Model's referral family. The state machine there is the one a reader
   implementing workflow-service would follow, and it cannot reach the state R-RWD-03 requires.
+
+### D-43 · §7.1 names a payout email trigger that is not the event the reward reaches
+
+- **Says** §7.1's platform-triggered email table gives the "Payout sent" email the trigger
+  `payout.sent`, with "provider-hosted payout setup, or client app" as its link target.
+- **Against** R-RWD-04 makes `Paid` a **reward** state — "Reward states are Pending → Held → Approved
+  → Processing → Paid" — and `reward.paid` is the public webhook event for reaching it. `payout.sent`
+  is the payout batch leaving the platform. They are adjacent (a reward reaches Paid because a payout
+  was sent) but they are different events with different payloads, and only one of them tells the
+  participant what they care about.
+- **Built** The email hangs off `reward.paid`, which carries the reward, its amount and its fulfilment
+  method. Not switched to `payout.sent`: either is defensible, mailing on both would double-send, and
+  which event triggers a participant-facing email is a product decision rather than an alignment fix
+  (notification NOTE.md §N5.11 N5-17).
+- **Fix** Say which event is the trigger and why. If it is `payout.sent`, §7.1 should also say what
+  that event carries for the mail to render — a payout id and a provider is not an amount.
+
+### D-44 · Nothing checks that a chart satisfies a service's required config
+
+- **Says** Nothing — which is the defect. Each service validates its environment with Zod at boot and
+  the suite is silent on how a deployment is held to that.
+- **Against** Three services have now shipped charts that cannot boot them: tenant-service's whole
+  `AUTH_*` family (its NOTE.md §V5.19), analytics' `AUTH_INTERNAL_*` (§A5.9), and notification's
+  `NOTIFICATION_PUBLIC_BASE_URL`, `NOTIFICATION_UNSUBSCRIBE_SECRET` and
+  `WEBHOOK_SECRET_ENCRYPTION_KEY` (§N5.11). Every one was required with no default and absent from the
+  values files; every one would have failed Zod validation at startup, and two of the last three were
+  signing keys missing from the **secret** block rather than the config block.
+- **Built** The keys, in all three charts, each time after the fact.
+- **Fix** More an engineering-practice gap than a spec one, and the cheap fix is a test: diff the
+  `process.env.*` references in `src/config/` against the chart's `envVars` + `secretVars`, fail on a
+  required key neither supplies, and fail on a credential-shaped name appearing in `envVars`. It
+  exists in none of the four services. Worth a line in the Architecture document's deployment section
+  so it is a platform expectation rather than four separate habits.
 
 ---
 
