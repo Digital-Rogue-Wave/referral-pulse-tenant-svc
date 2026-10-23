@@ -370,5 +370,14 @@ class TenantResponseMapper extends BaseResponseMapper<TenantProps, TenantRespons
 
 export const tenantResponseMapper = new TenantResponseMapper();
 
+/**
+ * API Contract §4.1's "shared secret" for widget identity tokens. Returned only to a service holding
+ * `widget_secret.read`; see `internal-widget-secret.controller.ts`.
+ */
+export class WidgetTokenSecretDto {
+    @ApiProperty({ description: '32 bytes as 64 hex characters' })
+    secret!: string;
+}
+
 // Re-export events for convenience
 export * from './events/tenant.events';

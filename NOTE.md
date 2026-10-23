@@ -1758,6 +1758,78 @@ this working set.
   `billing`, `audit` — all carry endpoints §13 assigns to Identity & Access that §4's table simply
   does not cover. Worth ratifying rather than changing.
 
+## V5.22 This service now serves the widget-token secret (2026-10-23)
+
+Ingestion's §11.22 found `GET /v1/sdk/widget-config` rendering a widget from a `user_id` in the query
+string — anyone with the tenant's publishable key, which is in the page source by design, could read
+any participant's referral code, link and earnings. It now verifies a backend-signed token instead,
+and the one thing the v5 suite does not say is where that token's secret lives (CHANGELOG **D-41**).
+This is the other half, ratified and built.
+
+### The shape
+
+| | |
+|---|---|
+| column | `tenants.widget_token_secret CHAR(64)` — 32 random bytes as hex, HMAC-SHA256's block size |
+| migration | `20261023090000_tenant_widget_token_secret`, backfilling every existing tenant |
+| at creation | `tenant.service.ts` mints one in the create transaction |
+| endpoint | `GET /v1/internal/tenants/{tenantId}/widget-token-secret` → `{ secret }` |
+| capability | `widget_secret.read`, its own — granted to `ingestion-svc` only |
+
+**Per tenant, not platform-wide**, unlike the email-tracking key beside it: a token minted by one
+client's backend must not render another client's widget.
+
+**Its own capability, separate from `tracking_token.read`.** Both are signing keys ingestion reads
+from here, but this one signs *identities* — notification-service holds the tracking grant and must
+not acquire tenant identity secrets by holding it. The same reasoning the tracking key's own comment
+gives for not folding it into `provider_connection.read`.
+
+**No dashboard route.** An operator session that could read another tenant's secret could mint widget
+tokens for their participants. Handing the secret to the tenant who must *sign* with it is a separate
+problem with an established shape — API-key-like, shown once, rotatable — and is **not built here**.
+Worth flagging: until that exists, a client cannot actually produce a token, so the widget works in
+the sense that the verification path is correct and fail-closed, not in the sense that a customer can
+use it yet.
+
+**Backfilled rather than left null.** Ingestion fails closed — no secret, no widget — so a null would
+be a tenant whose widget silently never renders, which is the opposite of the point.
+`gen_random_bytes` is pgcrypto, already required by this database for API-key hashing.
+
+503 rather than 404 when a tenant exists without a secret: the caller's correct response is to fail
+and retry, never to treat "no secret" as a secret and accept unverified tokens. Same reasoning as the
+tracking-key endpoint's.
+
+### Verified live
+
+With Docker up, tenant-service booted, and a real Hydra client-credentials token:
+
+| claim | result |
+|---|---|
+| every existing tenant was backfilled | 3 of 3, all 64 characters |
+| the secrets are **distinct per tenant** | `count(*) = 3`, `count(DISTINCT …) = 3` — `gen_random_bytes` evaluated per row, not once |
+| ingestion's token reads one | `200` with the 64-hex secret |
+| the value matches the column | byte-identical to the `psql` read |
+| an unknown tenant | `404` |
+| no token | `401` |
+| **notification-svc's token** — it has no `widget_secret.read` grant | **`403`** |
+
+That last row is the one that matters: the capability separation is enforced by Keto, not just
+asserted in a comment. The tuple is `services:widget_secret.read#call@service:ingestion-svc`, granted
+by `scripts/service-clients.sh` in the infra repo and confirmed present in Keto.
+
+| | |
+|---|---|
+| unit suite | **589 passed / 56 suites**, unchanged |
+| typecheck | 27 errors, unchanged baseline |
+| lint | clean on every touched file |
+
+### Still open
+
+**Rotation.** The secret can be replaced by an `UPDATE`, and ingestion's cache bounds the staleness to
+ten minutes — but there is no rotation endpoint, no audit entry, and no way for a tenant to learn the
+new value. That belongs with the "show it to the tenant once" problem above, and both are
+`my-docs/cross-service-requirements.md` §1.11 rather than this commit.
+
 ## V5.21 `admin` is gone — T-1 reversed, with the migration T-1 was missing (2026-10-22)
 
 R-ACT-01: *"There are exactly five internal roles: Owner, Campaign Manager, Analyst, Support Agent

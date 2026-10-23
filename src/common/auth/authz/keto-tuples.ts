@@ -40,6 +40,12 @@ export enum ServiceCapability {
      */
     TRACKING_TOKEN_READ = 'tracking_token.read',
     /**
+     * A tenant's widget-token secret. Event Ingestion verifies the backend-signed widget token with
+     * it (API Contract §4.1), and only ingestion needs it — separate from `tracking_token.read` so
+     * notification-service does not acquire tenant signing secrets by holding the tracking grant.
+     */
+    WIDGET_SECRET_READ = 'widget_secret.read',
+    /**
      * Exchanging an inbound credential for an internal JWT — `GET /internal/validate-token`.
      *
      * Architecture §13.1 names "the ALB + Traefik + NestJS Auth Guard" as the caller and §12.1 lists
