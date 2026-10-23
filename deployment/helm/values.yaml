@@ -62,7 +62,7 @@ ingress:
   annotations:
     alb.ingress.kubernetes.io/scheme: internet-facing        # or "internal"
     alb.ingress.kubernetes.io/target-type: ip
-    alb.ingress.kubernetes.io/healthcheck-path: /health
+    alb.ingress.kubernetes.io/healthcheck-path: /health/live
     alb.ingress.kubernetes.io/healthcheck-port: traffic-port
     alb.ingress.kubernetes.io/listen-ports: '[{"HTTP": 80},{"HTTPS":443}]'
     alb.ingress.kubernetes.io/ssl-redirect: "443"
@@ -119,6 +119,29 @@ networkPolicy:
         app.kubernetes.io/name: otel-collector
     # If you need general outbound (e.g., S3/SQS/SNS), keep this true
     allowInternet: true
+
+# Kubernetes probes. `/health/live` is the cheap one (heap only) and `/health/ready` checks the
+# dependencies — the split `nestjs-best-practices.md` requires. Liveness must not check a
+# dependency: restarting this pod because Redis blipped would be a cascade, not a fix.
+livenessProbe:
+    httpGet:
+        path: /health/live
+        port: http
+    initialDelaySeconds: 30
+    periodSeconds: 10
+    timeoutSeconds: 5
+    failureThreshold: 3
+    successThreshold: 1
+
+readinessProbe:
+    httpGet:
+        path: /health/ready
+        port: http
+    initialDelaySeconds: 10
+    periodSeconds: 10
+    timeoutSeconds: 3
+    failureThreshold: 3
+    successThreshold: 1
 
 resources:
   limits:
@@ -243,6 +266,45 @@ envVars:
   CH_USERNAME: "sa"
   CH_DATABASE: "analytics"
 
+  # Token verification. Every one of these is required by src/config/auth.config.ts with no default,
+  # so a pod without them dies at boot with "Auth config validation failed" - they were missing from
+  # this file entirely (NOTE.md V5.19).
+  #
+  # Two issuers are trusted, for two kinds of principal: the internal JWT this service mints at
+  # /internal/validate-token (dashboard users and API keys, after the gateway - Architecture 13.1),
+  # and Ory Hydra for client-credentials tokens on the mesh.
+  AUTH_JWKS_URI: "http://hydra-public.ory.svc.cluster.local:4444/.well-known/jwks.json"
+  # Must match Hydra's own urls.self.issuer exactly, including the trailing slash.
+  AUTH_ISSUER: "http://hydra-public.ory.svc.cluster.local:4444/"
+  AUTH_AUDIENCE: "frontend-tenant"
+  # This service's own JWKS, served at /.well-known/jwks.json outside the API prefix.
+  AUTH_INTERNAL_JWKS_URI: "http://referral-pulse-tenant-svc.default.svc.cluster.local:8080/.well-known/jwks.json"
+  AUTH_INTERNAL_ISSUER: "referralai-tenant-svc"
+  AUTH_INTERNAL_AUDIENCE: "referralai-internal"
+  # ES256 is the internal JWT (InternalTokenService signs ES256 and the published JWKS says so);
+  # RS256 is Hydra's. Dropping either one makes that whole class of principal unauthenticatable.
+  AUTH_ALGORITHMS: "RS256,ES256"
+  AUTH_CLOCK_TOLERANCE: "30"
+  AUTH_CACHE_ENABLED: "true"
+  AUTH_CACHE_TTL: "600"
+
+  # The erasure fan-out (Product Spec R-CPL-02) calls five other services' internal erasure handlers
+  # with a client-credentials token. Without SERVICE_AUTH_*, this service still boots and still serves
+  # every other route; the fan-out fails loudly the first time it needs a token, which is the
+  # behaviour ServiceTokenProvider is written for.
+  #
+  # Only the URL the fan-out needs is listed. The rest of the SERVICE_*_URL family that
+  # src/config/services.config.ts reads (tenants, campaigns, rewards, analytics, tracking, referrals,
+  # sdkConfig, contentAi, clientIdentity, workflowOrchestration) has never been in this file and falls
+  # back to localhost defaults — pre-existing, and not this change's to fix.
+  SERVICE_AUTH_TOKEN_URL: "http://hydra-public.ory.svc.cluster.local:4444/oauth2/token"
+  SERVICE_AUTH_CLIENT_ID: "tenant-svc"
+  SERVICE_AUTH_AUDIENCE: "referralai-internal"
+  # analytics-service authorizes its erasure handler on the token scope rather than on a Keto
+  # tuple like the rest of the fleet, so the token has to carry this as well as the grant.
+  SERVICE_AUTH_SCOPE: "dsr.erase"
+  SERVICE_NOTIFICATIONS_URL: "http://referral-pulse-notification-svc.default.svc.cluster.local:5005"
+
 # -------- Secret (sensitive env) --------
 secretVars:
   # Stripe credentials. The price IDs below are public identifiers and live in envVars; these two
@@ -257,6 +319,9 @@ secretVars:
   # it, ingestion verifies with it, and both read it from this service — so it is one value per
   # environment, and changing it invalidates the tokens in mail already sent.
   TRACKING_TOKEN_KEY: ""
+  # This service's own Hydra client secret, for the erasure fan-out's outbound calls. Its client id and
+  # token URL are in envVars; this half is not.
+  SERVICE_AUTH_CLIENT_SECRET: ""
   CH_PASSWORD: "sa"
   REDIS_USERNAME: "appuser"
   REDIS_PASSWORD: "super-secret"

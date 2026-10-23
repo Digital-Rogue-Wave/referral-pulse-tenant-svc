@@ -53,8 +53,8 @@ describe('Audited actions', () => {
     });
 
     it('names the operator, and records the system only for erasure', () => {
-        expect(auditActor(new UserRoleChangedEvent('u2', 't1', 'viewer', 'admin', 'u1'))).toBe('u1');
-        expect(auditActor(new UserRoleChangedEvent('u2', 't1', 'viewer', 'admin'))).toBeNull();
+        expect(auditActor(new UserRoleChangedEvent('u2', 't1', 'viewer', 'operator', 'u1'))).toBe('u1');
+        expect(auditActor(new UserRoleChangedEvent('u2', 't1', 'viewer', 'operator'))).toBeNull();
         expect(auditActor(new TenantDeletedEvent('t1', 't1', 'Acme', 'acme'))).toBe('system');
     });
 });

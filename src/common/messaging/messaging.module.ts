@@ -3,7 +3,7 @@ import { ConfigService, ConfigModule } from '@nestjs/config';
 
 import { SqsModule } from '@ssut/nestjs-sqs';
 
-import { Environment } from '@app/types';
+import { Environment, TENANT_SVC_FIFO } from '@app/types';
 
 import type { AllConfigType } from '@config/config.type';
 
@@ -49,8 +49,29 @@ export class MessagingModule {
                             ...(credentials && { credentials })
                         }));
 
-                        // Producer only: tenant-service consumes no queue (Architecture §2.1).
-                        return { consumers: [], producers };
+                        const sqs = configService.getOrThrow('aws.sqs', { infer: true });
+                        // One inbound queue, for the consent registry. Architecture §2.1 says this
+                        // service "Consumes: None", which Product Spec R-CPL-01 contradicts by making
+                        // it the owner of the consent registry while API Contract §3.15 puts consent on
+                        // touch events and nowhere else — so the only way to hold the registry is to
+                        // read the bus. Recorded in NOTE.md §V5.16; §2.1 is being corrected.
+                        const inbound = queues.filter((queue) => queue.name === TENANT_SVC_FIFO);
+                        const consumers =
+                            sqs.pollingEnabled && inbound.length > 0
+                                ? inbound.map((queue) => ({
+                                      name: queue.name,
+                                      queueUrl: queue.url,
+                                      region,
+                                      batchSize: sqs.defaultBatchSize,
+                                      visibilityTimeout: sqs.defaultVisibilityTimeout,
+                                      waitTimeSeconds: sqs.defaultWaitTimeSeconds,
+                                      terminateVisibilityTimeout: true,
+                                      ...(endpoint && { endpoint }),
+                                      ...(credentials && { credentials })
+                                  }))
+                                : [];
+
+                        return { consumers, producers };
                     }
                 })
             ],

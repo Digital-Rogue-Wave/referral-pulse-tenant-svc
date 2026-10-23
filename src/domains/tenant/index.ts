@@ -7,8 +7,9 @@ import { BaseResponseMapper } from '@common/helper';
 // Enums (canonical definition lives in tenant.types.ts)
 // ============================================================
 
-import { TenantStatus, VerificationRecordStatus, VerificationStatus, VerificationType } from './tenant.types';
-export { TenantStatus, VerificationRecordStatus, VerificationStatus, VerificationType };
+import { InvitationChannel, TenantStatus, VerificationRecordStatus, VerificationStatus, VerificationType } from './tenant.types';
+export { InvitationChannel, TenantStatus, VerificationRecordStatus, VerificationStatus, VerificationType };
+export { defaultInvitationChannel, effectiveInvitationChannel } from './tenant.types';
 
 // ============================================================
 // Props (shape of the Prisma model)
@@ -73,6 +74,21 @@ export class UpdateTenantDto {
     @Min(6)
     @Max(36)
     retentionMonths?: number;
+
+    @ApiPropertyOptional({ description: 'ISO 3166-1 alpha-2 billing country — the input to the invitation-channel default' })
+    @IsOptional()
+    @IsString()
+    @Length(2, 2)
+    billingCountry?: string;
+
+    /**
+     * R-PRT-02's legal envelope. Owner-only: the service refuses it from any other role, because a
+     * custom role flipping a jurisdiction gate is exactly what the rule exists to prevent.
+     */
+    @ApiPropertyOptional({ enum: InvitationChannel, description: 'Platform-sent invitations: allowed | forbidden (Owner only)' })
+    @IsOptional()
+    @IsEnum(InvitationChannel)
+    invitationChannel?: InvitationChannel;
 }
 
 export class TransferOwnershipDto {
@@ -353,6 +369,15 @@ class TenantResponseMapper extends BaseResponseMapper<TenantProps, TenantRespons
 }
 
 export const tenantResponseMapper = new TenantResponseMapper();
+
+/**
+ * API Contract §4.1's "shared secret" for widget identity tokens. Returned only to a service holding
+ * `widget_secret.read`; see `internal-widget-secret.controller.ts`.
+ */
+export class WidgetTokenSecretDto {
+    @ApiProperty({ description: '32 bytes as 64 hex characters' })
+    secret!: string;
+}
 
 // Re-export events for convenience
 export * from './events/tenant.events';

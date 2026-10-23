@@ -15,6 +15,7 @@ import { HealthModule } from '@app/health/health.module';
 import { ApiKeyModule } from '@app/features/api-key/api-key.module';
 import { AuditLogModule } from '@app/features/audit-log/audit-log.module';
 import { BillingModule } from '@app/features/billing/billing.module';
+import { ComplianceModule } from '@app/features/compliance/compliance.module';
 
 import { ConnectionModule } from '@app/features/connection/connection.module';
 import { DnsModule } from '@app/features/dns/dns.module';
@@ -61,6 +62,7 @@ import { WireCaseInterceptor } from '@common/http-contract/wire-case.interceptor
         ApiKeyModule,
         AuditLogModule,
         BillingModule,
+        ComplianceModule,
         ConnectionModule,
         DnsModule,
         FilesModule,

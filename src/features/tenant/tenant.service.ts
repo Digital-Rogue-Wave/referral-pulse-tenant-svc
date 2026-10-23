@@ -1,3 +1,5 @@
+import { randomBytes } from 'crypto';
+
 import { BadRequestException, HttpStatus, Injectable, NotFoundException } from '@nestjs/common';
 import { ulid } from 'ulid';
 import { ConfigService } from '@nestjs/config';
@@ -59,6 +61,9 @@ import {
 } from '@domains/tenant/events/tenant.events';
 
 /** Default trial period in days */
+/** HMAC-SHA256's block size; hex-encoded to the column's 64 characters. */
+const WIDGET_TOKEN_SECRET_BYTES = 32;
+
 const TRIAL_PERIOD_DAYS = 14;
 
 /** Default days until deletion after scheduling */
@@ -201,7 +206,13 @@ export class TenantService {
                     verificationStatus: VerificationStatus.PENDING,
                     paymentStatus: 'active',
                     trialStartedAt,
-                    trialEndsAt
+                    trialEndsAt,
+                    // The secret the tenant's backend signs widget identity tokens with and Event
+                    // Ingestion verifies them with (API Contract §4.1). Set here rather than as a
+                    // column default so rotation has one home in application code, and set at
+                    // creation because ingestion fails closed: a tenant without one has a widget
+                    // that silently never renders (NOTE.md §V5.22).
+                    widgetTokenSecret: randomBytes(WIDGET_TOKEN_SECRET_BYTES).toString('hex')
                 }
             });
             // Company verification at signup: the workflow service runs the account_verification workflow.
@@ -338,6 +349,23 @@ export class TenantService {
         if (dto.retentionMonths !== undefined && dto.retentionMonths !== tenant.retentionMonths) {
             updateData.retentionMonths = dto.retentionMonths;
             changes.retentionMonths = { from: tenant.retentionMonths, to: dto.retentionMonths };
+        }
+
+        if (dto.billingCountry !== undefined) {
+            const country = dto.billingCountry.toUpperCase();
+            if (country !== tenant.billingCountry) {
+                updateData.billingCountry = country;
+                changes.billingCountry = { from: tenant.billingCountry, to: country };
+            }
+        }
+
+        // R-PRT-02 makes the invitation channel Owner-only. `tenants:write`, the relation gating this
+        // endpoint, is now held by the Owner alone — the `admin` role that also held it is retired
+        // (R-ACT-01), so the guard is the enforcement and the in-service re-check that used to back
+        // it up is gone (NOTE.md §V5.21).
+        if (dto.invitationChannel !== undefined && dto.invitationChannel !== tenant.invitationChannel) {
+            updateData.invitationChannel = dto.invitationChannel;
+            changes.invitationChannel = { from: tenant.invitationChannel, to: dto.invitationChannel };
         }
 
         if (file) {

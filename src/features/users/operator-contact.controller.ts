@@ -6,6 +6,7 @@ import { ServiceCapability } from '@common/auth/authz/keto-tuples';
 import { AllowServices } from '@common/auth/require-permission.decorator';
 import { DatabaseService } from '@app/database/database.service';
 import { ContactQueryDto, OperatorContactResponse, TenantCommunicationProfileResponse } from '@domains/user/contact.dto';
+import { effectiveInvitationChannel } from '@domains/tenant/tenant.types';
 
 type ContactRow = { id: string; tenantId: string; email: string; name: string | null; role: string };
 
@@ -58,7 +59,14 @@ export class OperatorContactController {
     async profileOf(@Param('tenantId') tenantId: string): Promise<TenantCommunicationProfileResponse> {
         const tenant = await this.prisma.tenant.findFirst({
             where: { id: tenantId, deletedAt: null },
-            select: { id: true, name: true, status: true, setting: { select: { general: true } } }
+            select: {
+                id: true,
+                name: true,
+                status: true,
+                invitationChannel: true,
+                billingCountry: true,
+                setting: { select: { general: true } }
+            }
         });
         if (!tenant) {
             throw new NotFoundException(`Tenant not found: ${tenantId}`);
@@ -70,7 +78,11 @@ export class OperatorContactController {
             status: tenant.status,
             locale: canonicalLocale(general.locale),
             appUrl: httpsUrl(general.appUrl),
-            replyTo: typeof general.supportEmail === 'string' && isEmail(general.supportEmail) ? general.supportEmail : null
+            replyTo: typeof general.supportEmail === 'string' && isEmail(general.supportEmail) ? general.supportEmail : null,
+            // R-PRT-02's effective value, resolved here so no caller re-derives the jurisdiction
+            // default. Referral Workflow checks it before creating an Invitation, and widget-config
+            // uses it to decide whether "invite by email" is among the share tools (R-SDK-03).
+            invitationChannel: effectiveInvitationChannel(tenant)
         };
     }
 }

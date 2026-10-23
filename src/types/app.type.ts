@@ -47,7 +47,11 @@ export type EventCategory =
     | 'trial'
     | 'usage'
     | 'payment'
-    | 'connection';
+    | 'connection'
+    // Compliance (Product Spec R-CPL-01 names these four as the Event Model's compliance family)
+    | 'consent'
+    | 'dsr'
+    | 'erasure';
 
 /**
  * Event actions (what happened)
@@ -110,7 +114,11 @@ export type EventAction =
     | 'disputed'
     | 'refunded'
     | 'verification_requested'
-    | 'verification_status_changed';
+    | 'verification_status_changed'
+    // Compliance
+    | 'recorded'
+    | 'requested'
+    | 'logged';
 
 /**
  * Valid base event type combining category and action
@@ -548,6 +556,8 @@ export const BILLING_USAGE_QUEUE = 'billing-usage-queue';
 export const TENANT_DELETION_QUEUE = 'tenant-deletion-queue';
 export const TENANT_UNLOCK_QUEUE = 'tenant-unlock-queue';
 export const INVITATION_QUEUE = 'invitation-queue';
+/** The data-subject-request erasure fan-out (Product Spec R-CPL-02). */
+export const DSR_FANOUT_QUEUE = 'dsr-fanout-queue';
 
 /**
  * BullMQ job names for billing jobs
@@ -558,6 +568,8 @@ export const PAYMENT_STATUS_ESCALATION_JOB = 'payment-status-escalation';
 export const TRIAL_LIFECYCLE_JOB = 'trial-lifecycle';
 export const PLAN_STRIPE_SYNC_JOB = 'plan-stripe-sync';
 export const INVITATION_EXPIRY_JOB = 'invitation-expiry-job';
+export const DSR_FANOUT_JOB = 'dsr-fan-out';
+export const DSR_SWEEP_JOB = 'dsr-sweep';
 
 // ============================================================================
 // ERROR MESSAGES
@@ -568,7 +580,12 @@ export const NO_STRIPE_CUSTOMER_ERROR = 'No Stripe customer configured for this 
 /**
  * All BullMQ queue names
  */
-export type BullMQQueueName = typeof BILLING_USAGE_QUEUE | typeof TENANT_DELETION_QUEUE | typeof TENANT_UNLOCK_QUEUE | typeof INVITATION_QUEUE;
+export type BullMQQueueName =
+    | typeof BILLING_USAGE_QUEUE
+    | typeof TENANT_DELETION_QUEUE
+    | typeof TENANT_UNLOCK_QUEUE
+    | typeof INVITATION_QUEUE
+    | typeof DSR_FANOUT_QUEUE;
 
 // ============================================================================
 // BULLMQ JOB DATA TYPES

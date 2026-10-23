@@ -21,6 +21,20 @@ model Tenant {
   domainVerificationStatus String    @default("unverified") @map("domain_verification_status") @db.VarChar(50)
   domainVerificationToken  String?   @map("domain_verification_token") @db.VarChar(255)
   // DB Model §3: EU-first residency and the tenant's own raw-data retention window (API §8.3, 6–36 months).
+  /// ISO 3166-1 alpha-2 of the tenant's billing country. The input to R-PRT-02's platform default:
+  /// platform-sent invitations are forbidden by default for German tenants (BGH 2013,
+  /// Empfehlungs-E-Mail) and allowed elsewhere. Nullable because the country is not known at
+  /// provisioning; until it is, the default resolves to `allowed`.
+  billingCountry           String?   @map("billing_country") @db.Char(2)
+  /// R-PRT-02's legal envelope: `allowed` | `forbidden`, Owner-only. **Null means "no explicit
+  /// choice"** and resolves to the platform default from `billingCountry` — which is what lets a
+  /// later correction of the billing country re-derive the right answer, and what distinguishes it
+  /// from an Owner who deliberately chose `allowed`.
+  invitationChannel        String?   @map("invitation_channel") @db.VarChar(20)
+  /// The shared secret the tenant's backend signs widget identity tokens with, and Event Ingestion
+  /// verifies them with (API Contract §4.1). 32 random bytes as hex. Never returned to a dashboard
+  /// session — only to a service holding `widget_secret.read`.
+  widgetTokenSecret        String?   @map("widget_token_secret") @db.Char(64)
   dataRegion               String    @default("eu-central-1") @map("data_region") @db.VarChar(32)
   retentionMonths          Int       @default(24) @map("retention_months") @db.SmallInt
   metadata                 Json?

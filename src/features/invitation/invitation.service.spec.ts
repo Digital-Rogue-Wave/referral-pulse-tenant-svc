@@ -57,7 +57,7 @@ describe('InvitationService', () => {
         tenantAware.withTenantFilter.mockImplementation((w) => ({ ...w, tenantId }) as never);
         prisma.invitation = { findUnique: jest.fn(), update: jest.fn() } as never;
         (prisma as unknown as { $transaction: jest.Mock }).$transaction = jest.fn(async (fn: (client: unknown) => Promise<unknown>) => fn(tx));
-        usersService.roleOf.mockResolvedValue(RoleEnum.ADMIN);
+        usersService.roleOf.mockResolvedValue(RoleEnum.OWNER);
 
         const module: TestingModule = await Test.createTestingModule({
             providers: [
@@ -74,7 +74,7 @@ describe('InvitationService', () => {
         service = module.get(InvitationService);
     });
 
-    describe('when an Admin invites someone', () => {
+    describe('when the Owner invites someone', () => {
         it('then the invitation is refused once every seat of the plan is taken (a pending invitation holds a seat)', async () => {
             delegate.findFirst.mockResolvedValue(null);
             planLimits.assertSeatAvailable.mockRejectedValue(new LimitExceededException({ metric: 'seats', currentUsage: 2, limit: 2 }));
@@ -105,8 +105,8 @@ describe('InvitationService', () => {
         });
 
         it('then inviting at a rank above the inviter is refused', async () => {
-            usersService.roleOf.mockResolvedValue(RoleEnum.OPERATOR);
-            await expect(service.create(admin, { email: 'x@acme.com', role: RoleEnum.ADMIN })).rejects.toBeInstanceOf(BaseException);
+            usersService.roleOf.mockResolvedValue(RoleEnum.VIEWER);
+            await expect(service.create(admin, { email: 'x@acme.com', role: RoleEnum.OPERATOR })).rejects.toBeInstanceOf(BaseException);
             expect(delegate.create).not.toHaveBeenCalled();
         });
 

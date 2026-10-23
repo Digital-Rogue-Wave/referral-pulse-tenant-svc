@@ -11,6 +11,7 @@ import { AwareTenantController } from './aware/aware-tenant.controller';
 import { AgnosticTenantController } from './agnostic/agnostic-tenant.controller';
 import { AdminTenantController } from './agnostic/admin-tenant.controller';
 import { InternalTenantVerificationController } from './internal-tenant-verification.controller';
+import { InternalWidgetSecretController } from './internal-widget-secret.controller';
 
 // Services
 import { TenantService } from './tenant.service';
@@ -34,7 +35,13 @@ import { TenantUnlockProcessor } from './processors/tenant-unlock.processor';
 
         // BullJobsModule is @Global() - no need to import
     ],
-    controllers: [AwareTenantController, AgnosticTenantController, AdminTenantController, InternalTenantVerificationController],
+    controllers: [
+        AwareTenantController,
+        AgnosticTenantController,
+        AdminTenantController,
+        InternalTenantVerificationController,
+        InternalWidgetSecretController
+    ],
     providers: [
         // Core Services
         TenantService,

@@ -99,7 +99,7 @@ describe('EventOutboxWriter', () => {
 
     it('writes publishable events with the transaction client, inside the transaction, as canonical v3 envelopes', async () => {
         const txCreateMany = jest.fn();
-        const event = new UserRegisteredEvent('u1', 't1', 'ADMIN', 'actor-1');
+        const event = new UserRegisteredEvent('u1', 't1', 'OPERATOR', 'actor-1');
 
         await hook({ eventOutbox: { createMany: txCreateMany } } as unknown as Prisma.TransactionClient, [
             { event: 'user.registered', payload: event },
@@ -126,13 +126,13 @@ describe('EventOutboxWriter', () => {
             tenant: { tenant_id: 't1' },
             actor: { actor_type: 'operator', actor_id: 'actor-1' },
             object: { object_type: 'user', object_id: 'u1' },
-            properties: { user_id: 'u1', tenant_id: 't1', role: 'admin' },
+            properties: { user_id: 'u1', tenant_id: 't1', role: 'operator' },
             metadata: { correlation_id: 'corr-1', request_id: 'req_1' }
         });
     });
 
     it('does not write the same event again when it is emitted after commit', async () => {
-        const event = new UserRegisteredEvent('u1', 't1', 'ADMIN');
+        const event = new UserRegisteredEvent('u1', 't1', 'OPERATOR');
         await hook({ eventOutbox: { createMany: jest.fn() } } as unknown as Prisma.TransactionClient, [{ event: 'user.registered', payload: event }]);
 
         await writer.onEmitted(event);

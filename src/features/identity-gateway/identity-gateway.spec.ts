@@ -1,13 +1,15 @@
 import { HttpStatus } from '@nestjs/common';
+import type { ExecutionContext } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { mock, MockProxy } from 'jest-mock-extended';
 
 import { createPublicKey, generateKeyPairSync } from 'crypto';
 import * as jwt from 'jsonwebtoken';
 
-import type { IInternalTokenClaims } from '@app/types';
+import type { IAuthenticatedUser, IInternalTokenClaims } from '@app/types';
 
 import { AuthorizationService } from '@common/auth/authz/authorization.service';
+import { ServiceCapability } from '@common/auth/authz/keto-tuples';
 import { BaseException } from '@common/exceptions/base.exceptions';
 import { RedisService } from '@common/redis/redis.service';
 import { DatabaseService } from '@app/database/database.service';
@@ -18,6 +20,7 @@ import { TenantStatus } from '@domains/tenant/tenant.types';
 import { CredentialResolverService } from './credential-resolver.service';
 import { IdentityGatewayController } from './identity-gateway.controller';
 import { InternalTokenService } from './internal-token.service';
+import { TokenExchangeCallerGuard, type TokenExchangeCaller } from './token-exchange-caller.guard';
 
 const ecKey = generateKeyPairSync('ec', {
     namedCurve: 'P-256',
@@ -25,6 +28,8 @@ const ecKey = generateKeyPairSync('ec', {
     publicKeyEncoding: { type: 'spki', format: 'pem' }
 });
 const GATEWAY_SECRET = 'g'.repeat(40);
+
+const loggerStub = () => ({ setContext: jest.fn(), warn: jest.fn(), log: jest.fn(), error: jest.fn(), debug: jest.fn() });
 
 const configWith = (overrides: Record<string, unknown> = {}): ConfigService =>
     ({
@@ -215,31 +220,153 @@ describe('CredentialResolverService', () => {
 
 describe('IdentityGatewayController', () => {
     const credentials = mock<CredentialResolverService>();
-    const controller = new IdentityGatewayController(configWith(), credentials, new InternalTokenService(configWith()));
+    const controller = new IdentityGatewayController(credentials, new InternalTokenService(configWith()));
     const response = { setHeader: jest.fn() };
 
-    it('refuses callers that are not the gateway', async () => {
-        for (const secret of [undefined, 'wrong', `${GATEWAY_SECRET}x`]) {
-            const error = await controller
-                .validateToken({ 'x-gateway-secret': secret, 'x-api-key': 'rai_live_abc' }, response as never)
-                .catch((e: BaseException) => e);
+    const call = (headers: Record<string, string | undefined>, caller: TokenExchangeCaller | undefined) =>
+        controller.validateToken(headers, { tokenExchangeCaller: caller } as never, response as never);
+
+    beforeEach(() => {
+        credentials.resolve.mockReset();
+        response.setHeader.mockReset();
+    });
+
+    describe('given the gateway exchanged a credential', () => {
+        it('then it reads the credential from the forwarded Authorization header', async () => {
+            credentials.resolve.mockResolvedValue({ token: 'internal.jwt', expiresAt: new Date(), claims: claims() });
+
+            const body = await call({ authorization: 'Bearer hydra.jwt' }, 'gateway');
+
+            expect(credentials.resolve).toHaveBeenCalledWith('hydra.jwt');
+            expect(body.token).toBe('internal.jwt');
+        });
+
+        it('then it returns the internal JWT in the Authorization header for Traefik forwardAuth', async () => {
+            credentials.resolve.mockResolvedValue({ token: 'internal.jwt', expiresAt: new Date(), claims: claims() });
+
+            await call({ authorization: 'Bearer hydra.jwt' }, 'gateway');
+
+            expect(response.setHeader).toHaveBeenCalledWith('Authorization', 'Bearer internal.jwt');
+        });
+
+        it('then a call carrying no credential at all is refused', async () => {
+            const error = await call({}, 'gateway').catch((e: BaseException) => e);
+
             expect((error as BaseException).getStatus()).toBe(HttpStatus.UNAUTHORIZED);
+            expect(credentials.resolve).not.toHaveBeenCalled();
+        });
+    });
+
+    describe('given a service exchanged a credential', () => {
+        it('then it reads the credential from X-Api-Key', async () => {
+            credentials.resolve.mockResolvedValue({ token: 'internal.jwt', expiresAt: new Date(), claims: claims() });
+
+            await call({ 'x-api-key': 'rai_live_abc', authorization: 'Bearer the.service.token' }, 'service');
+
+            expect(credentials.resolve).toHaveBeenCalledWith('rai_live_abc');
+        });
+
+        /**
+         * The reason the bearer fallback is not shared between the two paths. A service caller's
+         * `Authorization` is its *own* token; falling back to it would exchange the service's identity
+         * as though it were a tenant's credential.
+         */
+        it('then it never falls back to the bearer, which is the service own token', async () => {
+            const error = await call({ authorization: 'Bearer the.service.token' }, 'service').catch((e: BaseException) => e);
+
+            expect((error as BaseException).getStatus()).toBe(HttpStatus.UNAUTHORIZED);
+            expect(credentials.resolve).not.toHaveBeenCalled();
+        });
+    });
+});
+
+/**
+ * Who may exchange a credential. Two callers with two different proofs, because the endpoint has two
+ * legitimate ones: Traefik's forwardAuth and Event Ingestion, which Architecture §12.1 lists "the
+ * Tenant token call" against and which is the one service that receives API keys (R-SDK-07).
+ */
+describe('TokenExchangeCallerGuard', () => {
+    const authorization = mock<AuthorizationService>();
+
+    /** Stubs out passport, so the capability decision is what these tests measure. */
+    class TestableGuard extends TokenExchangeCallerGuard {
+        constructor(private readonly principal: Partial<IAuthenticatedUser> | undefined) {
+            super(configWith() as never, authorization, loggerStub() as never);
         }
-        expect(credentials.resolve).not.toHaveBeenCalled();
+
+        protected override authenticate(context: ExecutionContext): Promise<void> {
+            if (!this.principal) {
+                return Promise.reject(new BaseException('authentication_error', 'Unauthorized', HttpStatus.UNAUTHORIZED));
+            }
+            context.switchToHttp().getRequest<{ user?: unknown }>().user = this.principal;
+            return Promise.resolve();
+        }
+    }
+
+    const contextFor = (headers: Record<string, string | undefined>) => {
+        const request: Record<string, unknown> = { headers };
+        return {
+            switchToHttp: () => ({ getRequest: () => request }),
+            getHandler: () => undefined,
+            getClass: () => undefined
+        } as unknown as ExecutionContext & { __request: Record<string, unknown> };
+    };
+
+    beforeEach(() => authorization.serviceHas.mockReset());
+
+    describe('given the gateway secret', () => {
+        it('then the call is allowed and marked as the gateway', async () => {
+            const context = contextFor({ 'x-gateway-secret': GATEWAY_SECRET });
+
+            await expect(new TestableGuard(undefined).canActivate(context)).resolves.toBe(true);
+            expect(context.switchToHttp().getRequest<{ tokenExchangeCaller?: string }>().tokenExchangeCaller).toBe('gateway');
+        });
+
+        it('then a wrong or truncated secret is refused without consulting Keto', async () => {
+            for (const secret of ['wrong', `${GATEWAY_SECRET}x`, '']) {
+                const error = await new TestableGuard(undefined)
+                    .canActivate(contextFor({ 'x-gateway-secret': secret }))
+                    .catch((e: BaseException) => e);
+                expect((error as BaseException).getStatus()).toBe(HttpStatus.UNAUTHORIZED);
+            }
+            expect(authorization.serviceHas).not.toHaveBeenCalled();
+        });
     });
 
-    it('returns the internal JWT in the Authorization header for Traefik forwardAuth', async () => {
-        credentials.resolve.mockResolvedValue({ token: 'internal.jwt', expiresAt: new Date(), claims: claims() });
+    describe('given a service token instead', () => {
+        it('then a service holding token_exchange.call is allowed and marked as a service', async () => {
+            authorization.serviceHas.mockResolvedValue(true);
+            const context = contextFor({ authorization: 'Bearer svc.jwt' });
 
-        const body = await controller.validateToken({ 'x-gateway-secret': GATEWAY_SECRET, authorization: 'Bearer hydra.jwt' }, response as never);
+            await expect(new TestableGuard({ isServiceToken: true, clientId: 'ingestion-svc' }).canActivate(context)).resolves.toBe(true);
+            expect(authorization.serviceHas).toHaveBeenCalledWith('ingestion-svc', ServiceCapability.TOKEN_EXCHANGE_CALL);
+            expect(context.switchToHttp().getRequest<{ tokenExchangeCaller?: string }>().tokenExchangeCaller).toBe('service');
+        });
 
-        expect(credentials.resolve).toHaveBeenCalledWith('hydra.jwt');
-        expect(response.setHeader).toHaveBeenCalledWith('Authorization', 'Bearer internal.jwt');
-        expect(body.token).toBe('internal.jwt');
-    });
+        /** Deny-by-default: holding a valid service token is not the same as being allowed to mint JWTs. */
+        it('then a service without the capability is refused with 403', async () => {
+            authorization.serviceHas.mockResolvedValue(false);
 
-    it('rejects a gateway call that carries no credential', async () => {
-        const error = await controller.validateToken({ 'x-gateway-secret': GATEWAY_SECRET }, response as never).catch((e: BaseException) => e);
-        expect((error as BaseException).getStatus()).toBe(HttpStatus.UNAUTHORIZED);
+            const error = await new TestableGuard({ isServiceToken: true, clientId: 'analytics-svc' })
+                .canActivate(contextFor({ authorization: 'Bearer svc.jwt' }))
+                .catch((e: BaseException) => e);
+
+            expect((error as BaseException).getStatus()).toBe(HttpStatus.FORBIDDEN);
+        });
+
+        it('then a human token is refused, however well authenticated', async () => {
+            const error = await new TestableGuard({ isServiceToken: false, userId: 'user-1' })
+                .canActivate(contextFor({ authorization: 'Bearer human.jwt' }))
+                .catch((e: BaseException) => e);
+
+            expect((error as BaseException).getStatus()).toBe(HttpStatus.UNAUTHORIZED);
+            expect(authorization.serviceHas).not.toHaveBeenCalled();
+        });
+
+        it('then no credential of any kind is refused', async () => {
+            const error = await new TestableGuard(undefined).canActivate(contextFor({})).catch((e: BaseException) => e);
+
+            expect((error as BaseException).getStatus()).toBe(HttpStatus.UNAUTHORIZED);
+        });
     });
 });

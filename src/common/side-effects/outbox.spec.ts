@@ -37,7 +37,7 @@ describe('Outbox worker', () => {
             id: 'se-1',
             status: 'pending',
             effectType: 'keto',
-            payload: { operation: 'assign_role', tenantId: 't1', userId: 'u1', role: RoleEnum.ADMIN },
+            payload: { operation: 'assign_role', tenantId: 't1', userId: 'u1', role: RoleEnum.OPERATOR },
             retryCount: 0,
             maxRetries: 10
         };
@@ -57,7 +57,7 @@ describe('Outbox worker', () => {
         await process();
 
         expect(updateMany).toHaveBeenCalledWith({ where: { id: 'se-1', status: 'pending' }, data: { status: 'processing' } });
-        expect(keto.assignRole).toHaveBeenCalledWith('t1', 'u1', RoleEnum.ADMIN);
+        expect(keto.assignRole).toHaveBeenCalledWith('t1', 'u1', RoleEnum.OPERATOR);
         expect(row!.status).toBe('completed');
     });
 
@@ -146,11 +146,11 @@ describe('KetoSyncListener', () => {
 
     it('queues the member’s role on registration and on every role change, and removal on removal', async () => {
         await listener.onUserRegistered(new UserRegisteredEvent('u1', 't1', RoleEnum.OWNER));
-        await listener.onUserRoleChanged(new UserRoleChangedEvent('u1', 't1', RoleEnum.OWNER, RoleEnum.ADMIN));
-        await listener.onUserRemoved(new UserRemovedEvent('u1', 't1', RoleEnum.ADMIN));
+        await listener.onUserRoleChanged(new UserRoleChangedEvent('u1', 't1', RoleEnum.OWNER, RoleEnum.OPERATOR));
+        await listener.onUserRemoved(new UserRemovedEvent('u1', 't1', RoleEnum.OPERATOR));
         expect(sideEffects.createKetoSideEffect.mock.calls.map(([payload]) => payload)).toEqual([
             { operation: 'assign_role', tenantId: 't1', userId: 'u1', role: RoleEnum.OWNER },
-            { operation: 'assign_role', tenantId: 't1', userId: 'u1', role: RoleEnum.ADMIN },
+            { operation: 'assign_role', tenantId: 't1', userId: 'u1', role: RoleEnum.OPERATOR },
             { operation: 'remove_member', tenantId: 't1', userId: 'u1' }
         ]);
     });

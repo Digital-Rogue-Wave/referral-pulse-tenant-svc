@@ -27,6 +27,16 @@ export const PERMISSION_CATALOG = {
     webhooks: ['read', 'write', 'delete'],
     payouts: ['read', 'write', 'confirm'],
     api_keys: ['manage'],
+    /**
+     * Added 2026-10-20. `POST /v1/connections` was gated on `api_keys:manage` and `POST /v1/dsr` on
+     * `programs:write` (§6.5, §618) — both resolve to Owner-only in practice, but neither permission
+     * is about the thing it guards, and a data-subject request gated on a *programs* permission reads
+     * as a copy-paste. Both are granted to Owner below, so effective access is unchanged; the point is
+     * that a compliance officer can later be given DSR access without program write, and doing it
+     * before staging avoids back-filling Keto tuples for live tenants.
+     */
+    dsr: ['manage'],
+    connections: ['manage'],
     tenants: ['read', 'write', 'delete'],
     users: ['read', 'write'],
     billing: ['read', 'write'],
@@ -42,20 +52,19 @@ export const ALL_PERMISSIONS: readonly Permission[] = (Object.keys(PERMISSION_CA
     PERMISSION_CATALOG[namespace].map((relation) => `${namespace}:${relation}` as Permission)
 );
 
-const withoutNamespaces = (...excluded: PermissionNamespace[]): Permission[] =>
-    ALL_PERMISSIONS.filter((permission) => !excluded.includes(permission.split(':')[0] as PermissionNamespace));
-
 /**
  * Role → permission grants (API Contract §2 "Role → Permission Mapping").
  *
  * Operator and Viewer additionally read their own tenant profile, which the dashboard needs on every
- * page; Admin is the custom role v5 does not define, kept at "all namespaces except billing" with
- * tenant deletion reserved to the Owner (irreversible, and it cancels the subscription).
+ * page. Four roles, no more: R-ACT-01 retired the `admin` grant that used to sit between Owner and
+ * Operator at "all namespaces except billing" (NOTE.md §V5.21).
  */
 export const ROLE_GRANTS: Readonly<Record<RoleEnum, readonly Permission[]>> = {
     [RoleEnum.OWNER]: ALL_PERMISSIONS,
-    [RoleEnum.ADMIN]: withoutNamespaces('billing').filter((permission) => permission !== 'tenants:delete'),
     [RoleEnum.OPERATOR]: [
+        // Product Spec §4's Campaign Manager row: `programs | read`. They run campaigns inside the
+        // program, so they read it and never write it.
+        'programs:read',
         'campaigns:read',
         'campaigns:write',
         'campaigns:activate',
@@ -67,6 +76,10 @@ export const ROLE_GRANTS: Readonly<Record<RoleEnum, readonly Permission[]>> = {
         'segments:write',
         'referrers:read',
         'referrers:write',
+        // §4: `referrers | read · write · block` for the Campaign Manager, and the role row says
+        // "reject referrals" and blocking is theirs too — a fraudulent participant has to be
+        // stoppable by the person watching the campaign, not only by the Owner.
+        'referrers:block',
         'referrals:read',
         'referrals:reject',
         'rewards:read',
@@ -119,7 +132,6 @@ export const LIVE_CHECK_PERMISSIONS: ReadonlySet<Permission> = new Set<Permissio
 /** Role hierarchy used to stop a principal granting a role above their own. */
 export const ROLE_RANK: Readonly<Record<RoleEnum, number>> = {
     [RoleEnum.OWNER]: 5,
-    [RoleEnum.ADMIN]: 4,
     [RoleEnum.OPERATOR]: 3,
     // Above Viewer because Support can adjust a reward and resend its email, which Viewer cannot;
     // below Operator because it cannot approve one. Only the ordering is used, never the numbers.

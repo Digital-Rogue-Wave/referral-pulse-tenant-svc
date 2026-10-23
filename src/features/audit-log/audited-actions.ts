@@ -17,11 +17,25 @@ type Change = { from: unknown; to: unknown };
 type Changes = Record<string, Change>;
 type EventWithPayload = BaseDomainEvent & { payload?: Record<string, unknown>; changes?: unknown };
 
-/** Published events that are not operator actions: sign-ins, meters and trial clocks. */
-const NOT_OPERATOR_ACTIONS = new Set(['user.logged_in', 'usage.threshold_crossed', 'usage.monthly_summary', 'trial.reminder', 'trial.expired']);
+/**
+ * Published events that are not operator actions: sign-ins, meters and trial clocks.
+ *
+ * `consent.recorded` is the data subject's own choice, arriving off the bus rather than from anyone in
+ * the dashboard. `audit.logged` would audit the audit: every published event already becomes a row
+ * here, so the event announcing that one exists must not produce a second one.
+ */
+const NOT_OPERATOR_ACTIONS = new Set([
+    'user.logged_in',
+    'usage.threshold_crossed',
+    'usage.monthly_summary',
+    'trial.reminder',
+    'trial.expired',
+    'consent.recorded',
+    'audit.logged'
+]);
 
 /** Recorded even when the system performs them (DB Model §0.5: erasure is always audited). */
-const AUDITED_WHEN_SYSTEM = new Set(['tenant.deleted', 'user.anonymised']);
+const AUDITED_WHEN_SYSTEM = new Set(['tenant.deleted', 'user.anonymised', 'erasure.completed']);
 
 /** Operator actions that are not published on the bus, keyed by in-process event type. */
 const INTERNAL_ACTIONS: Record<string, (event: EventWithPayload) => Pick<AuditEntry, 'action' | 'targetType' | 'targetId'>> = {

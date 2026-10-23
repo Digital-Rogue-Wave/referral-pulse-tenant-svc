@@ -24,11 +24,9 @@ describe('Permission catalog (API Contract §2)', () => {
         expect(ROLE_GRANTS[RoleEnum.OWNER]).toEqual(ALL_PERMISSIONS);
     });
 
-    it('gives the Admin everything except billing and tenant deletion', () => {
-        const admin = ROLE_GRANTS[RoleEnum.ADMIN];
-        expect(admin.some((p) => p.startsWith('billing:'))).toBe(false);
-        expect(admin).not.toContain('tenants:delete');
-        expect(admin).toEqual(expect.arrayContaining(['api_keys:manage', 'users:write', 'payouts:confirm']));
+    /** R-ACT-01: exactly four tenant roles. The retired `admin` grant must not come back. */
+    it('grants nothing to any role outside the four', () => {
+        expect(Object.keys(ROLE_GRANTS).sort()).toEqual(['OPERATOR', 'OWNER', 'SUPPORT', 'VIEWER']);
     });
 
     it('matches the spec Operator row (plus reading their own tenant)', () => {
@@ -39,8 +37,10 @@ describe('Permission catalog (API Contract §2)', () => {
             'campaigns:pause',
             'campaigns:read',
             'campaigns:write',
+            'programs:read',
             'referrals:read',
             'referrals:reject',
+            'referrers:block',
             'referrers:read',
             'referrers:write',
             'rewards:approve',
@@ -127,9 +127,9 @@ describe('Permission catalog (API Contract §2)', () => {
 describe('Keto tuples', () => {
     it('scopes role objects to the tenant, so a role in one tenant grants nothing in another', () => {
         expect(roleObject('t1', RoleEnum.OPERATOR)).toBe('t1:operator');
-        expect(membershipTuple('t1', RoleEnum.ADMIN, 'u1')).toEqual({
+        expect(membershipTuple('t1', RoleEnum.OPERATOR, 'u1')).toEqual({
             namespace: 'role',
-            object: 't1:admin',
+            object: 't1:operator',
             relation: 'member',
             subject_id: 'user:u1'
         });
@@ -211,11 +211,11 @@ describe('KetoProvisioningService', () => {
     });
 
     it('makes a role the member’s only role, in one atomic patch', async () => {
-        await provisioning.assignRole('t1', 'u1', RoleEnum.ADMIN);
+        await provisioning.assignRole('t1', 'u1', RoleEnum.OPERATOR);
 
         const patches = keto.patchTuples.mock.calls[0]![0] as KetoTuplePatch[];
         expect(patches.filter((p) => p.action === 'insert')).toEqual([
-            { action: 'insert', relation_tuple: membershipTuple('t1', RoleEnum.ADMIN, 'u1') }
+            { action: 'insert', relation_tuple: membershipTuple('t1', RoleEnum.OPERATOR, 'u1') }
         ]);
         // Every other role is deleted, whatever the role set currently is — derived rather than
         // hardcoded so adding a role (v5 added `support`) does not need this number edited.

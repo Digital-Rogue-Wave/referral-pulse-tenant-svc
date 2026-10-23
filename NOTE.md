@@ -1234,6 +1234,720 @@ The value is one per environment (Helm `TRACKING_TOKEN_KEY`), and rotating it in
 in mail already sent — tracked in the Helm comment, because that is where someone will be when they
 consider rotating it.
 
+## V5.16 D5 step 2 — the DSR pipeline and the consent registry, built
+
+Product Spec R-CPL-01 makes this service compliance's one coordinating owner: "the Tenant service
+hosts the consent registry, the DSR endpoint and the DSR fan-out workflow and the audit sink; every
+other service implements its own erasure handler and returns a receipt." §V5.12 built the three
+tables. This builds what uses them.
+
+| what | where |
+|---|---|
+| `POST /v1/dsr`, `GET /v1/dsr/{id}` | `features/compliance/dsr.controller.ts` + `dsr.service.ts` |
+| erasure fan-out across the six targets | `dsr-fanout.service.ts` + `dsr-fanout.worker.ts` |
+| the remote erasure call | `erasure.client.ts`, `dsr-targets.ts` |
+| consent registry, written off the bus | `consent.consumer.ts` + `consent.service.ts` |
+| the four compliance events | `common/events/outbox/published-events.ts` |
+| this service's first outbound service token | `common/clients/service-token.provider.ts` |
+
+### Decisions taken, with what was rejected
+
+**D5-6 — BullMQ with the state in Postgres, not Temporal.** R-CPL-02 says "Erasure fans out as a
+Temporal workflow". This service has no Temporal client, no worker and no `temporal` entry in
+`package.json`; the three `temporal_*` columns §V5.12 added are written from an inbound DTO in
+`tenant.service.ts`, never by a workflow here. What a fan-out actually needs from a workflow engine is
+resumability, and the unique `(dsr_request_id, service_name)` on `dsr_receipts` gives that directly: a
+run asks only the targets that have not answered, so a crash, a BullMQ retry and the hourly sweep all
+converge on the same six receipts. Nine BullMQ workers already run here.
+
+*Rejected:* standing up Temporal for one workflow. It would make the platform's compliance path depend
+on a component this service does not otherwise use, for a guarantee the unique constraint already
+gives. The columns stay — they are the handle a later migration to Temporal would write into, and
+dropping them would be a second migration for nothing.
+
+**D5-7 — the consent registry is built by consuming touch events.** API Contract §3.15 is explicit:
+"Consent is a field on touch events (captured from CMP by JS SDK), **not a standalone resource**."
+There is no endpoint to write consent to, and R-CPL-01 still makes this service the registry's owner.
+The only reconciliation is to read the bus, so this service now consumes `tenant-svc.fifo`, subscribed
+to ingestion's `ingestion-events` topic.
+
+*Rejected:* a `POST /v1/consent` of our own (§3.15 forbids it, and the SDK would have no reason to call
+it), and having ingestion write the registry (it owns no RDS, and R-CPL-01 assigns the registry here).
+
+Append-only, per DB Model §0.4: a change of mind is a new row. A signal that repeats what is already on
+file is dropped, so the table grows with decisions rather than with traffic — which matters, because
+this read runs on every touch event that carries a consent block. A row recording a denial after a
+grant carries `withdrawn_at` itself; no earlier row is ever edited.
+
+**D5-8 — erasure runs end to end; access and portability are accepted and dated.** R-CPL-02 specifies
+a fan-out for erasure only. For access and portability it gives no collect contract, no response
+format and no per-service shape, so the request is recorded with its deadline, answerable at
+`GET /v1/dsr/{id}`, and resting at `accepted`.
+
+*Rejected:* inventing six "collect my share" contracts. Five of the six services do not exist in this
+working set; a guessed contract implemented on one side is worse than a recorded gap, because it reads
+as done.
+
+**D5-9 — Identity's share runs in-process.** The fan-out calls `OperatorErasureService.erase()`
+directly rather than `POST`ing to its own `/internal/erasures/operators`. Same handler either way, and
+a self-call would need this service to mint and verify a token for its own endpoint.
+
+The guard that came with it: an operator record is only ever matched by email hash, because
+`subject_id` and `subject_external_id` name a participant or invitee — a different id space. A DSR
+naming the subject only by external id gets a `completed` Identity receipt saying so, rather than a
+call that would have matched `emailHash: undefined`, which in Prisma is no filter at all.
+
+**D5-10 — a target that cannot answer is a `pending` receipt, not a failure.** No v5 document
+specifies the erasure handler contract the other five services implement, so
+`POST {base}/api/v1/internal/erasures/subjects` is this service's proposal, mirroring its own handler.
+Today all five answer 404. That leaves a `pending` receipt carrying the reason, and the hourly sweep
+asks again — so the request shows exactly who still owes an answer instead of failing wholesale, and
+starts completing on its own as each endpoint ships. A 4xx that is not 404 is recorded `failed`
+instead: the target answered and refused, which is a grant to fix, not a retry.
+
+**D5-11 — `dsr:manage`, over both permissions §3.15 names.** §3.15's table says `referrers:write` /
+`referrers:read`; its own revision line says "Owner-only — permission to update to `programs:write`".
+The contract disagrees with itself and neither candidate is about data-subject requests. All three
+resolve to Owner-only today, so effective access is identical; a separate permission is what later
+lets a compliance officer answer DSRs without also being able to edit participants or programs.
+Ratified 2026-10-20 with the catalog addition.
+
+**D5-12 — 30 days, from the two statements of one deadline.** API §3.15 says "Processed within 30
+days"; R-CPL-02 says "within the client's legal deadline (one month)". Same deadline, and 30 days is
+the one with a number, so that is what `due_at` is stamped with at submission — which is also what
+makes an overdue request a query on `idx_dsr_tenant_status`.
+
+**D5-13 — `erasure.completed` carries its receipts as one JSON string.** R-CPL-02: the event "carries
+all receipts". Event Model §2.5: properties are flat, primitives only. Both hold if every receipt
+travels as one string property, with `receipt_count` and `retained_under_obligation` alongside for
+consumers that only need the summary, and the per-service detail readable at `GET /v1/dsr/{id}`.
+
+**D5-14 — `audit.logged` is published for the compliance record only.** `AuditLogWriter` already turns
+every published event into an `audit_log` row, so an event per row would be a firehose and would audit
+itself. `audit.logged` is therefore emitted once per completed erasure, announcing that the record
+exists and where to read it, and is excluded from the trail (`NOT_OPERATOR_ACTIONS`).
+`erasure.completed` was added to `AUDITED_WHEN_SYSTEM` so the erasure itself is audited even though no
+operator performed it — DB Model §0.5's rule. `consent.recorded` is excluded too: it is the subject's
+own choice arriving off the bus, not an operator action.
+
+### Verified, not assumed
+
+| claim | how |
+|---|---|
+| the four compliance mappers produce valid Event Model drafts | `published-events.spec.ts` — its "covers every mapper" test now holds 41 events |
+| no subject's address reaches the bus | the same suite's "never puts an email address or a raw token on the bus" |
+| a re-run asks only the unanswered targets | `compliance.spec.ts` — two already-answered targets, four calls |
+| a pending target blocks completion | the request stays `in_progress`, no event emitted |
+| Identity is never asked to erase a subject it cannot match | `operators.erase` not called; receipt says why |
+| the sweep survives one request failing | three swept, one failed, two accounted for |
+| unit suite | **572 passed / 55 suites** (was 530 / 51) |
+| typecheck | **27 errors**, unchanged — all pre-existing (see §11.16 in event-svc's NOTE) |
+
+Not verified: nothing ran against live infrastructure. Docker was down for this pass, so the SNS
+subscription, the SQS consumer and the 404-to-pending path have no live run behind them.
+
+### Still open
+
+1. **The migration is written but not applied.** `20261021120000_consent_external_id_index` adds
+   `idx_consent_external_id`. `ConsentService` reads the registry on every touch event carrying a
+   consent block, and a subject named only by `invitee_external_id` had no index to read —
+   `idx_consent_email` covers the hashed address and `idx_consent_subject` the platform id. One
+   `CREATE INDEX`, needs the usual approval before it is applied.
+2. **The erasure handler contract needs ratifying by the other five services.** `dsr-targets.ts` and
+   `REMOTE_ERASURE_PATH` are the proposal; nothing confirms it.
+3. **The four compliance event payloads are this service's.** See spec defect 11 below.
+4. **`SQS_POLLING_ENABLED` is still `false` in tenant-service's `.env.development`.** It was false
+   because the queues did not exist; they do now, and the consent consumer needs it true to receive
+   anything. Flipping it is a live-behaviour change, so it waits for a run with Docker up.
+5. **`services.tracking` defaults to port 5005**, which is the port notification-service actually
+   runs on and which the new `services.notifications` entry therefore also claims. The older default
+   looks wrong; not this change's to move.
+
+## V5.14 Spec defects — additions (continued)
+
+11. **The compliance event family has no payload anywhere in the Event Model.** R-CPL-01 names
+    `consent.recorded`, `dsr.requested`, `erasure.completed` and `audit.logged` as "Event Model
+    compliance family". All four appear only in the Product Spec — two, three, four and three
+    mentions respectively — and nowhere in the Event Model: no payload, no `object_type`, no schema
+    version. `erasure.completed` is the one R-CPL-02 constrains at all ("carries all receipts"), and
+    that constraint contradicts §2.5's flat-properties rule. Implemented as §V5.16 D5-13/D5-14 and
+    going back as a patch.
+12. **Architecture §2.1 says tenant-service "Consumes: None" while R-CPL-01 gives it the consent
+    registry.** API Contract §3.15 puts consent on touch events and says it is "not a standalone
+    resource", so there is no endpoint through which the registry could be written. Holding it
+    requires reading the bus. §2.1 needs correcting; implemented as §V5.16 D5-7.
+13. **R-CPL-02 specifies a fan-out for erasure only.** `access` and `portability` are named as DSR
+    types in the same sentence and then never given a collect contract, a response format or a
+    per-service shape. Implemented as §V5.16 D5-8 — recorded, dated, and resting at `accepted`.
+14. **No v5 document specifies the erasure handler every service is required to implement.** R-CPL-01
+    says "every other service implements its own erasure handler and returns a receipt" and R-CPL-02
+    lists what each one erases, but no path, no request body and no receipt shape appear anywhere.
+    The orchestrator is the only place it can be stated, so §V5.16 D5-10 states it as a proposal.
+
+## V5.17 The erasure handler contract was not a guess after all — and the fan-out did not match it
+
+§V5.16 D5-10 recorded `POST /api/v1/internal/erasures/subjects` as this service's proposal, "because no
+v5 document specifies that contract". The path is right. Two of the five remote targets already
+implement it, and reading them showed the fan-out would have failed against both.
+
+| service | handler | authorizes on |
+|---|---|---|
+| analytics-service | `POST /api/v1/internal/erasures/subjects` | the token's **`dsr.erase` scope** (`ServiceScopeGuard`) |
+| notification-service | the same path | the **Keto tuple** `services:dsr.erase#call` (`AllowServices`) |
+| tenant-service (this one) | `…/erasures/operators` | the Keto tuple |
+
+Their request and receipt shapes agree with each other, so the contract is real and already settled by
+two implementations — it just was not the one §V5.16 shipped.
+
+### Three defects in the fan-out, found by reading the two live handlers
+
+**1. `tenant_id` was not sent, and it is required.** Both DTOs declare it `@IsString()` non-optional,
+and analytics' guard refuses a service token that does not name a tenant at all: "A service token must
+name the tenant it is acting for" — it has no tenant claim of its own, so the tenant comes from the
+call. Every fan-out call would have been a 400, which `ErasureClient` classifies as *refused* and
+records `failed`: the DSR would have shown two permanently failed targets with nothing to fix.
+
+**2. The body was camelCase.** Every service in the fleet runs the global snake_case wire transform —
+analytics' guard reads `tenant_id` off the raw body precisely because "the wire is snake_case and
+`WireCaseInterceptor` has not camel-cased anything yet". With `forbidNonWhitelisted: true` in the
+ValidationPipe, `dsrId` and `subjectEmailHash` would have arrived as unknown properties and been
+refused. Same class of defect as the `ConnectionWire` one in event-svc §11.15 — and the same cause:
+this service's own transform makes it easy to forget the wire is not the TypeScript shape.
+
+**3. `subject_external_id` and `subject_id` are not fields the contract has.** `subject_id` maps to
+`participant_id`, which both DTOs do have. `subject_external_id` has no counterpart anywhere, and
+sending it would itself have been a `forbidNonWhitelisted` 400.
+
+Fixed in `erasure.client.ts`: `SubjectErasureWire` is explicitly snake_case, `tenant_id` travels,
+`subject_id → participant_id`, and `user_id` is deliberately never sent — it names an *operator*, which
+is Identity's own share and runs in-process.
+
+### Decisions taken, with what was rejected
+
+**D5-15 — request the `dsr.erase` scope as well as holding the Keto tuple.** The fleet's own rule
+(`scripts/service-clients.sh`) is "scope is deliberately not used for authorization: a scope is
+self-asserted by the caller at token time, whereas a Keto tuple is granted by the platform". analytics
+checks the scope anyway. So tenant-service's Hydra client is now registered with `scope: "dsr.erase"`
+and `ServiceTokenProvider` requests it (`SERVICE_AUTH_SCOPE`). Hydra refuses a token request for a
+scope the client is not registered for, so the scope is constrained by registration — the header's
+objection is weaker than it reads.
+
+*Rejected:* changing analytics to authorize on Keto. It is the right end state and it is one service's
+guard, but it is a change to a service that is working, for a caller that did not exist until now, and
+it would have to ship before the fan-out could. Doing it the other way round means the fan-out works
+today and analytics converges later. Recorded as open item 6.
+
+**D5-16 — a subject with neither a participant id nor an email hash is not called at all.** The
+contract has no field for the client's own identifier, so a DSR naming the subject only by
+`subject_external_id` can be addressed nowhere. `ErasureClient` records a `pending` receipt saying so
+instead of making five calls that would each be refused — and the sweep re-asking costs nothing,
+because no HTTP call is made until the contract grows the field. Spec defect 15.
+
+*Rejected:* recording it `failed`. It is not a failure of the target; it is a hole in the contract, and
+`failed` is the state an operator is supposed to act on.
+
+### Verified
+
+| claim | how |
+|---|---|
+| the wire body matches what both live DTOs accept | `compliance.spec.ts` asserts the exact snake_case body |
+| `not_found` counts as answered, `blocked` does not | two cases in the same suite |
+| an unnameable subject makes no HTTP call | `http.post` not called; receipt says why |
+| unit suite | **574 passed / 55 suites** |
+| typecheck | **27 errors**, unchanged baseline |
+
+Still not run live: Docker is down, so the scope registration, the token request and the two real
+handlers have no end-to-end run behind them. This is the first thing to do when the stack is back up —
+`POST /v1/dsr` with an erasure should now come back with analytics' and notification's receipts
+`completed` and the other three `pending`.
+
+### Added to §V5.16's open list
+
+6. **analytics-service authorizes the erasure handler on the token scope, not on Keto.** It is the
+   only service in the fleet that does. Converging it on `AllowServices` would let
+   `SERVICE_AUTH_SCOPE` and the client's registered scope go away.
+7. **`dsr_receipts.service_name` is this service's naming, and the receipts say their own.** Analytics
+   returns `service: "analytics-service"`, notification `"notification-service"` — both match
+   `ERASURE_TARGETS`. The three unimplemented ones are unconfirmed.
+
+## V5.14 Spec defects — additions (continued)
+
+15. **The erasure handler contract has no field for the client's own subject identifier.** `POST /v1/dsr`
+    can name a subject by email, by the platform's participant id, or by `subject_external_id` — and
+    the two implemented handlers accept only the first two. A DSR submitted with just an external id
+    is therefore unexecutable, which is a gap in R-CPL-02 rather than in any one service: the identity
+    the Owner has is not always the identity the services hold. Recorded as §V5.17 D5-16; the fix is
+    one optional field on the handler contract.
+16. **R-CPL-01's "every other service implements its own erasure handler" is implemented three
+    different ways.** Two services authorize it on a Keto capability, one on an OAuth2 scope, and the
+    paths differ for the subject type (`/erasures/subjects` vs `/erasures/operators`). The suite names
+    neither the path nor the authorization mechanism, so each service chose. Worth stating once in
+    the Architecture document, since the orchestrator has to satisfy all of them at the same time.
+
+## V5.18 The live pass that is still owed, and how to run it
+
+Everything in §V5.16 and §V5.17 is verified at unit level (574 tests) and compiles for production
+(`nest build` clean — which is the stronger signal, because the 27 `tsc --noEmit` errors are all in
+spec files the build excludes). **Nothing ran against live infrastructure**: Docker was not running on
+this machine for the whole pass, and starting the stack and bringing up ten containers while nobody
+was at the keyboard was not a call to make unasked.
+
+This is the recipe, in order, with what each step proves. Steps 1–3 are prerequisites that changed in
+this pass, so a stack started from an older state will not exercise the new paths.
+
+### 1 · Infrastructure — two scripts must be re-run, not just the stack started
+
+```
+cd D:\Projects\Work\REFERRAL\v2-infra\referral-pulse-infrastucture\local
+docker compose up -d
+./scripts/service-clients.sh
+```
+
+- `service-clients.sh` **must** re-run: `upsert_client` now registers tenant-service's Hydra client
+  with `scope: "dsr.erase"`. Without it, Hydra refuses the token request as an unregistered scope and
+  the fan-out cannot call analytics-service at all (§V5.17 D5-15).
+- LocalStack runs `01-queues-and-topics.sh` on container start, so a fresh `up` picks up the new
+  `ingestion-events.fifo → tenant-svc.fifo` subscription. On an already-running container:
+  `docker exec rp-localstack bash /etc/localstack/init/ready.d/01-queues-and-topics.sh`.
+
+### 2 · The migration — an approval gate, so it is deliberately not applied
+
+```
+cd D:\Projects\Work\REFERRAL\referral-scope-ahmed\referral-pulse-tenant-svc
+npx prisma migrate deploy
+```
+
+One `CREATE INDEX` (`20261021120000_consent_external_id_index`). Without it the consent registry still
+works, but the lookup for a subject named only by `invitee_external_id` is a sequential scan on every
+touch event carrying a consent block — see §V5.16 open item 1 for why that read is hot.
+
+### 3 · One env flag
+
+`SQS_POLLING_ENABLED` is still `false` in `.env.development`. It was false because the queues did not
+exist; they do now. The consent consumer receives nothing until it is `true`.
+
+### 4 · What to run, and what each check proves
+
+| check | how | proves |
+|---|---|---|
+| the consent registry reads the bus | send a touch with a `consent` block through ingestion's `POST /v1/events`, then `select * from consents` | §V5.16 D5-7 — the SNS subscription, the consumer, and the hash-not-address rule |
+| an unchanged signal is dropped | send the same touch twice | the table grows with decisions, not traffic |
+| the fan-out reaches the two live targets | `POST /v1/dsr` with `{"request_type":"erasure","subject_email":"…"}`, then `GET /v1/dsr/{id}` | §V5.17 — the snake_case body, `tenant_id`, and the `dsr.erase` scope all at once |
+| the other three are pending, not failed | the same `GET` | §V5.16 D5-10 — a 404 is a pending receipt with its reason |
+| the request completes on its own | wait for the `:35` sweep, or re-enqueue | the resume path: only unanswered targets are re-asked |
+| `erasure.completed` and `audit.logged` reach the bus | `select * from event_outbox where event_type like 'erasure%' or event_type = 'audit.logged'` | the four compliance events and their flat payloads |
+
+**Expected result for the fan-out today:** `tenant-service` completed, `analytics-service` completed,
+`notification-service` completed, and `referral-workflow-service`, `reward-service`, `ai-service`
+pending with `"unanswered": "ECONNREFUSED"` — those three are not in this working set and are not
+running. The request therefore stays `in_progress`, which is the designed behaviour, not a failure.
+
+**Getting an Owner token.** `POST /v1/dsr` is gated on `dsr:manage`, which lives in the internal JWT's
+`perms`, and locally there is no gateway to mint one. Use the same approach as §11.16's live run in
+event-svc: sign an internal JWT with this service's `INTERNAL_JWT_PRIVATE_KEY` and the Owner's claims
+— `test/bdd/support/jwt.helper.ts` is the reference for the exact issuer, audience and claim set.
+
+### 5 · Not covered by any of this
+
+The `/t/o` + `/t/c` round trip. Notification-service signs the tokens now and ingestion verifies them,
+but no route carries an `invitation_id` yet, so there is no mail to click. See
+`referral-pulse-notification-svc/NOTE.md` §N5.8 and
+`my-docs/cross-service-requirements.md` §3.10.
+
+## V5.19 The live pass — six defects, and the DSR path working end to end (2026-10-22)
+
+§V5.18 listed the live run as owed. It ran. **Every one of the six things it found was invisible to 574
+passing unit tests**, and five of the six would have made the fan-out fail in production.
+
+### It works now
+
+```
+POST /api/v1/dsr  →  201
+GET  /api/v1/dsr/{id}  →  200
+   tenant-service              completed   (in-process)
+   analytics-service           completed   retained
+   notification-service        completed   retained
+   referral-workflow-service   pending     ECONNREFUSED
+   reward-service              pending     ECONNREFUSED
+   ai-service                  pending     ECONNREFUSED
+   status: in_progress
+```
+
+The three pending ones are the services not in this working set and not running — exactly the designed
+behaviour (D5-10), not a failure. `dsr.requested` and `consent.recorded` both reached SNS through the
+outbox relay; a touch event published to `ingestion-events.fifo` produced a `consents` row whose
+`subject_email_hash` is the SHA-256 of the address, with `recorded_at` taken from the event's own
+`occurred_at` and `marketing_consent` / `consent_source` read from the envelope.
+
+### The six defects
+
+**1 · `AUTH_ALGORITHMS=RS256` — this service could not verify its own internal JWT.**
+`InternalTokenService` signs **ES256** and the published JWKS says so, but `.env.development` listed
+RS256 only, so every dashboard request answered 401 "invalid algorithm". `.env.test` already had
+`RS256,ES256`, which is why the BDD suite — where every request carries an internal JWT — never saw it.
+**Worse:** the whole `AUTH_*` family (ten keys, every one required with no Zod default) was **missing
+from `deployment/helm/values.yaml`**, so a pod from this chart dies at boot with "Auth config
+validation failed". Both fixed; the Helm block carries the ES256/RS256 reasoning inline.
+
+**2 · The outbound interceptor deleted the credentials it was given.**
+`HttpOutboundInterceptor`'s external branch did `delete config.headers['Authorization']`
+unconditionally. Hydra's token endpoint is not in `internalServiceDomains`, so the HTTP Basic header
+`ServiceTokenProvider` had just attached was stripped and Hydra answered **400, no client
+authentication**. This service could therefore never obtain a service token, and never call another
+service at all. Because the token fetch sits inside `erase()`'s try block, the single 400 was recorded
+as *every* target's answer — five receipts reading "HTTP 400", none of which had been contacted.
+
+This is the **same defect, in the same file, as event-svc §11.15** — fixed there a day earlier and
+never ported. It stayed invisible here because tenant-service had no outbound service call until the
+DSR fan-out.
+
+**3 · `pending` was not in the `dsr_receipts` status CHECK.**
+The most consequential one. §V5.12 wrote `CHECK (status IN ('completed','partial','failed'))` from the
+schema comment, before the fan-out existed; D5-10 then made "cannot answer yet" a `pending` receipt —
+which is the *normal* case today. Every pending write violated the constraint, failed the BullMQ job,
+and left the fan-out stalled at the first unreachable target with no receipt for it, retrying three
+times and giving up. Migration `20261022060000_dsr_receipt_pending_status` adds it.
+
+The unit tests could not catch this: they mock Prisma, and a mock has no CHECK constraints.
+
+**4 · The circuit breaker was keyed on hostname, so one dead service shut out the healthy ones.**
+`new URL(url).hostname` meant every service on one host shared a breaker. Locally that is all of them,
+so three dead targets opened the breaker and the fan-out recorded a **running** notification-service as
+`"unanswered": "Breaker is open"` — a wrong answer about a healthy service. Now keyed on `host`, so the
+port is part of the identity. In a cluster the hostnames already differ, so this is mostly a local
+artifact — but a local artifact that silently corrupts a compliance record is worth one word.
+
+**5 · `GET /v1/dsr/{id}` was a 500 on every call.**
+`withTenantFilter` adds `deletedAt: null` unless told not to, and `dsr_requests` has no `deletedAt`
+column — a DSR is the proof the request was answered, so it is never soft-deleted. Prisma rejected the
+query as an unknown argument. The unit test passed because its mock of `withTenantFilter` returned
+`{...where, tenantId}` and skipped the part that breaks. **The mock now mirrors the real
+implementation**, including the `deletedAt` it adds, which is the only reason the test is worth having.
+
+**6 · `retained` has two shapes, and a refused connection had no reason.**
+notification-service answers with a list of legal bases, analytics-service with one sentence.
+`Array.isArray(...) ? ... : []` read the sentence as "nothing retained" — the opposite of what it says
+— so analytics' receipt lost the flag the subject has to be told about. And a refused connection
+arrives with an empty `message` and the reason only in `code`, which wrote `"unanswered": ""` into the
+one field whose job is to say why. Both read both ways now.
+
+### What this says about the test suite
+
+Four of the six were *hidden by a mock that was kinder than reality*: a Prisma mock with no
+constraints, a `withTenantFilter` mock that skipped its own behaviour, a receipt fixture with only one
+of the two live shapes, and an error fixture with a `message`. The two that were not — the algorithm
+list and the interceptor — were config and a file no test in this repo exercises end to end.
+
+The lesson is the same one §11.17 drew for the wire format: **a unit test written against the same
+assumption as the code cannot find the assumption wrong.** For anything crossing a process boundary,
+the cheap check is to call it.
+
+### Verified
+
+| claim | how |
+|---|---|
+| `POST /v1/dsr` → 201, hash not address, deadline +30 days | live, twice, with a ULID tenant |
+| `GET /v1/dsr/{id}` → 200 with all six receipts | live |
+| the two live handlers answer `completed` with `retained` | live, through the fan-out *and* probed directly |
+| unreachable targets become `pending` with their reason | live, three of them |
+| `dsr.requested` and `consent.recorded` reach SNS | `event_outbox` rows, both `published` |
+| the consent registry hashes the address and keeps the event's own time | live row, hash checked against `sha256(address)` |
+| the fan-out resumes rather than restarts | successive attempts re-asked only the unanswered target |
+| unit suite | **581 passed / 55 suites** (was 574) |
+| typecheck | 27 errors, unchanged baseline; `nest build` clean |
+
+Two pre-existing tests in `http-layer.spec.ts` asserted the old behaviour of defects 2 and 4 and now
+assert the new: a forwarded token is stripped from an external call, a credential the caller set
+deliberately is not.
+
+### Still open
+
+1. **`erasure.completed` and `audit.logged` have not fired**, because they need all six targets to
+   answer and three of the six are services that do not exist here. The path is covered by unit tests;
+   it will fire on its own the first time the other three run.
+2. **The `:35` sweep has not been observed resuming a request on its schedule** — only the
+   resume-on-retry path, which is the same code.
+3. **Idempotency.** `POST /v1/dsr` requires an `Idempotency-Key` header (API §1, the global
+   interceptor). Worth noting because it is not in §3.15's description of the endpoint, and a caller
+   reading only the contract will get a 400.
+4. **Dev seed tenants are not ULIDs.** `default-tenant` and `AZP-772-OMEGA` are 14 and 13 characters;
+   notification-service's erasure DTO requires `@Length(26, 26)` on `tenant_id`, correctly, so a DSR
+   for either of them is refused with a 400 that looks like a contract bug and is not. A ULID tenant
+   was created for this run.
+
+## V5.20 Product-spec pass — the invitation channel, and two grants that were missing (2026-10-22)
+
+A full read of Product Spec v5 (87 rule cards) against this service turned up three concrete gaps.
+Two were one-liners; the third was a responsibility with no home.
+
+### A5-16 · R-PRT-02's invitation channel did not exist here
+
+R-PRT-02 governs platform-sent invitations at two levels: the **tenant** setting
+`invitation_channel ∈ allowed | forbidden` is the *legal envelope*, Owner-only, platform default
+`forbidden` for tenants whose billing country is Germany; the **campaign** setting
+`invitations_enabled` is the product choice and "can never enable what the tenant forbids".
+
+The tenant half was absent — and so was its input: **no column anywhere in this service held a
+country**. So the rule could not even be computed, let alone enforced.
+
+Two columns, one migration (`20261022070000_tenant_invitation_channel`, applied):
+
+| column | why |
+|---|---|
+| `billing_country char(2)` | the jurisdiction input the rule names, which nothing held |
+| `invitation_channel varchar(20)` nullable, CHECK `('allowed','forbidden')` | the Owner's choice |
+
+**Null means "the Owner has not chosen"** and resolves through `effectiveInvitationChannel()` to the
+platform default. Storing the derived value instead would freeze a jurisdiction answer at
+provisioning and lose the distinction between *not chosen* and *chosen `allowed`* — and R-PRT-02's
+own example turns on that distinction ("If Globex's Owner later sets the tenant to forbidden, every
+campaign drops to mailto: at its next widget-config fetch").
+
+*Rejected:* putting it in `tenant_settings.general`, which is a Json blob holding branding and
+locale. A legal gate that another service must read on every widget-config fetch deserves a column
+with a CHECK constraint, not a key in free-form JSON.
+
+*Rejected:* defaulting to `forbidden` when the country is unknown. The country is not known at
+provisioning, so that would switch the feature off platform-wide until every tenant was corrected.
+R-PRT-02 names Germany, not "unknown".
+
+**Owner-only, enforced twice.** The endpoint is gated on `tenants:write`, which the custom `admin`
+role also holds — the role R-ACT-01 says does not exist (§V5.21 open item 2). A jurisdiction gate
+whose misuse creates liability under German competition law gets the belt as well as the braces, so
+`TenantService.assertOwner` additionally requires the principal to hold **every** relation in the
+catalog. "Is the Owner" is not a field on `IAuthenticatedUser` — §4's model is relations and the
+Owner is the role granted all of them — and comparing against `ALL_PERMISSIONS` says exactly that
+while staying correct as the catalog grows. Naming two sample Owner-only relations instead would
+quietly stop meaning "Owner" the moment another role gained them.
+
+**Who reads it.** `GET /v1/internal/tenants/{id}/profile` now carries the *effective* value, resolved
+here so no consumer re-derives the jurisdiction rule. Referral Workflow checks it before creating an
+Invitation; widget-config uses it to decide whether `invite_email` is among the share tools
+(R-SDK-03). Written up as a cross-service requirement, since both callers are other services.
+
+### A5-17 · Two relations missing from the Campaign Manager
+
+§4's permission table gives the Campaign Manager `programs | read` and
+`referrers | read · write · block`; `ROLE_GRANTS[OPERATOR]` had neither `programs:read` nor
+`referrers:block`. The second is the one that mattered: a fraudulent participant was only blockable
+by the Owner, when the person watching the campaign is exactly who should be able to stop them.
+The parity spec that holds `ROLE_GRANTS` against §4 did not catch it because its expected array was
+written from the same reading as the code.
+
+### Verified
+
+| claim | how |
+|---|---|
+| DE defaults to forbidden, FR/ES/NL to allowed, unknown to allowed | `invitation-channel.spec.ts`, both casings |
+| an explicit choice beats the default in both directions | same suite |
+| a stored value outside the enum falls back to the default | same suite |
+| the internal profile carries the effective value | `controllers.spec.ts` — a DE tenant with no choice reads `forbidden` |
+| the two grants match §4 | the authz parity spec's Operator row |
+| unit suite | **589 passed / 56 suites** (was 581) |
+| typecheck | 27 errors, unchanged baseline; `nest build` clean |
+
+Not verified live: no caller reads the invitation channel yet, because Referral Workflow is not in
+this working set.
+
+### Left alone, deliberately
+
+- **`POST /v1/dsr` stays on `dsr:manage`.** §4's table routes it to `programs:write` (Owner only) and
+  §3.15's to `referrers:write`; neither is about data-subject requests, and §V5.16 D5-11 already
+  ratified the separate relation. The spec's own disagreement is CHANGELOG D-09.
+- **17 namespaces against §4's "eleven".** The extras — `dsr`, `connections`, `tenants`, `users`,
+  `billing`, `audit` — all carry endpoints §13 assigns to Identity & Access that §4's table simply
+  does not cover. Worth ratifying rather than changing.
+
+## V5.22 This service now serves the widget-token secret (2026-10-23)
+
+Ingestion's §11.22 found `GET /v1/sdk/widget-config` rendering a widget from a `user_id` in the query
+string — anyone with the tenant's publishable key, which is in the page source by design, could read
+any participant's referral code, link and earnings. It now verifies a backend-signed token instead,
+and the one thing the v5 suite does not say is where that token's secret lives (CHANGELOG **D-41**).
+This is the other half, ratified and built.
+
+### The shape
+
+| | |
+|---|---|
+| column | `tenants.widget_token_secret CHAR(64)` — 32 random bytes as hex, HMAC-SHA256's block size |
+| migration | `20261023090000_tenant_widget_token_secret`, backfilling every existing tenant |
+| at creation | `tenant.service.ts` mints one in the create transaction |
+| endpoint | `GET /v1/internal/tenants/{tenantId}/widget-token-secret` → `{ secret }` |
+| capability | `widget_secret.read`, its own — granted to `ingestion-svc` only |
+
+**Per tenant, not platform-wide**, unlike the email-tracking key beside it: a token minted by one
+client's backend must not render another client's widget.
+
+**Its own capability, separate from `tracking_token.read`.** Both are signing keys ingestion reads
+from here, but this one signs *identities* — notification-service holds the tracking grant and must
+not acquire tenant identity secrets by holding it. The same reasoning the tracking key's own comment
+gives for not folding it into `provider_connection.read`.
+
+**No dashboard route.** An operator session that could read another tenant's secret could mint widget
+tokens for their participants. Handing the secret to the tenant who must *sign* with it is a separate
+problem with an established shape — API-key-like, shown once, rotatable — and is **not built here**.
+Worth flagging: until that exists, a client cannot actually produce a token, so the widget works in
+the sense that the verification path is correct and fail-closed, not in the sense that a customer can
+use it yet.
+
+**Backfilled rather than left null.** Ingestion fails closed — no secret, no widget — so a null would
+be a tenant whose widget silently never renders, which is the opposite of the point.
+`gen_random_bytes` is pgcrypto, already required by this database for API-key hashing.
+
+503 rather than 404 when a tenant exists without a secret: the caller's correct response is to fail
+and retry, never to treat "no secret" as a secret and accept unverified tokens. Same reasoning as the
+tracking-key endpoint's.
+
+### Verified live
+
+With Docker up, tenant-service booted, and a real Hydra client-credentials token:
+
+| claim | result |
+|---|---|
+| every existing tenant was backfilled | 3 of 3, all 64 characters |
+| the secrets are **distinct per tenant** | `count(*) = 3`, `count(DISTINCT …) = 3` — `gen_random_bytes` evaluated per row, not once |
+| ingestion's token reads one | `200` with the 64-hex secret |
+| the value matches the column | byte-identical to the `psql` read |
+| an unknown tenant | `404` |
+| no token | `401` |
+| **notification-svc's token** — it has no `widget_secret.read` grant | **`403`** |
+
+That last row is the one that matters: the capability separation is enforced by Keto, not just
+asserted in a comment. The tuple is `services:widget_secret.read#call@service:ingestion-svc`, granted
+by `scripts/service-clients.sh` in the infra repo and confirmed present in Keto.
+
+| | |
+|---|---|
+| unit suite | **589 passed / 56 suites**, unchanged |
+| typecheck | 27 errors, unchanged baseline |
+| lint | clean on every touched file |
+
+### Still open
+
+**Rotation.** The secret can be replaced by an `UPDATE`, and ingestion's cache bounds the staleness to
+ten minutes — but there is no rotation endpoint, no audit entry, and no way for a tenant to learn the
+new value. That belongs with the "show it to the tenant once" problem above, and both are
+`my-docs/cross-service-requirements.md` §1.11 rather than this commit.
+
+## V5.21 `admin` is gone — T-1 reversed, with the migration T-1 was missing (2026-10-22)
+
+R-ACT-01: *"There are exactly five internal roles: Owner, Campaign Manager, Analyst, Support Agent
+(tenant-side, Keto roles `owner` / `operator` / `viewer` / `support`) and Super Admin (platform-side).
+**No other role exists**; 'Program Admin', 'Account Owner', 'Marketer/Operator' and 'Viewer' are
+retired names for the same four tenant roles."*
+
+`ADMIN` was the retired Program Admin. **Decision T-1 kept it** as a custom role, and its stated
+reason was sound at the time: *"removing a role that may be assigned to live users would orphan them
+mid-session"*, and v5's own `roles.name` CHECK permits `custom`. Reversed now, because the objection
+was never to the removal — it was to removing it **without moving its holders**. That is a migration,
+and T-1 did not write one.
+
+### What it took
+
+| | |
+|---|---|
+| enum | `RoleEnum` is four values; `CUSTOM_ROLES` deleted with nothing left to hold |
+| grants | the `ADMIN` row of `ROLE_GRANTS` and its rank 4 are gone, and `withoutNamespaces()` with them — it existed only to build that one grant |
+| ownership transfer | the outgoing Owner becomes an **`OPERATOR`**, the highest standard role below Owner. T-1's second reason for keeping `ADMIN` was exactly this path |
+| `PRIVILEGED_ROLES` | `[OWNER]`. `remove()` refuses an Owner two lines earlier, so the last-privileged-member check there was dead and is gone; `updateRole()` keeps it for a demotion |
+| migration | `20261022080000_retire_admin_role` |
+| seed | the catalog description |
+| DTO | `ContactDto.role`'s documented enum said `owner, admin, operator, viewer` — wrong in two ways, since it also omitted `support` |
+
+### The migration remaps **down**, never up
+
+`ADMIN` granted every namespace except billing, with tenant deletion reserved to the Owner. Holders
+become `OPERATOR` (Campaign Manager), the highest standard role below Owner — not Owner, which would
+hand a former admin billing and tenant deletion. **A migration must never escalate a privilege.**
+Anyone who should hold more can be promoted deliberately afterwards, by a person, with an audit entry.
+
+It also moves `invitations` still offering the role, repoints the `user_roles` display projection
+(dropping rather than repointing a row that would collide on `(user_id, role_id)` because the member
+already holds `OPERATOR`), and then **refuses to continue** if anything still references the role.
+That last step matters: `user_roles.role_id` cascades on delete, so a missing `OPERATOR` catalog row
+would have turned the final `DELETE FROM roles` into a silent deletion of live assignments instead of
+a move. Forward-only, with no down migration — re-creating the role would not restore who held it.
+
+**Applied and verified live, 2026-10-22.** The dev database held no `ADMIN` at all, so applying it
+as-is would have proved only that the SQL parses. Both cases the migration exists for were seeded
+first — a plain holder, and a member holding **both** `ADMIN` and `OPERATOR`, which is the
+`(user_id, role_id)` collision — and then:
+
+| | before | after |
+|---|---|---|
+| `users.role = 'ADMIN'` | 2 | 0, both `OPERATOR` |
+| the plain holder's `user_roles` row | → `ADMIN` | → `OPERATOR` |
+| the double holder's `user_roles` rows | `ADMIN` + `OPERATOR` | one `OPERATOR` — the colliding row dropped, not duplicated, no PK violation |
+| `invitations.role = 'ADMIN'` | 1 | 0, `OPERATOR` |
+| the `roles` catalog | ADMIN · OPERATOR · OWNER · VIEWER | OPERATOR · OWNER · VIEWER |
+
+The guard block passed with zero remaining references, so the `DELETE FROM roles` ran as a delete and
+not as a cascade. Fixtures were prefixed `01JMIGTEST` and removed afterwards; the database is back to
+its one real Owner.
+
+**Noticed while in there, not fixed:** the `roles` catalog has no `SUPPORT` row, although `seed.ts`
+upserts all four standard roles. The seed has not been re-run since `SUPPORT` was added, so a tenant
+assigning a Support Agent today would hit `replaceRoleProjection`'s "Role catalog is missing SUPPORT —
+run the seed". One `pnpm prisma:seed`, but it is a data fix rather than a code one.
+
+### A side effect: the `roles.tenant_id` gap closes itself
+
+§V5.5's schema list, item 2, wanted `roles.tenant_id` — null for the four standard roles, set for
+custom ones — because "decision T-1 keeps `ADMIN` as a custom role, and v5 scopes custom roles to a
+tenant; without the column `ADMIN` is a global row, which is the one part of T-1 the schema cannot
+yet express." There are no custom roles now, so the column has nothing left to express. Item 2 should
+be struck rather than built.
+
+### The Owner-only re-check in `tenant.service.ts` is gone
+
+`assertOwner()` existed for one reason, which its own comment stated: `tenants:write`, the relation
+gating `PATCH /v1/tenants/me`, *"is also held by the custom `admin` role v5 does not define"*. R-PRT-02
+makes the invitation channel Owner-only, so the guard alone was not enough. With `admin` retired,
+`tenants:write` belongs to the Owner and nobody else — the guard **is** the enforcement.
+
+**The residual risk, stated plainly:** the gate is now a property of `ROLE_GRANTS`, not of the
+endpoint. If any future role is given `tenants:write`, it silently gains the ability to set a
+jurisdiction flag whose misuse creates liability under German competition law. The authz parity spec
+asserts the four grants against §4, which is what would catch it — but it would catch it as a spec
+mismatch, not as "someone can now change the invitation channel". Worth a line in whatever review
+adds a fifth role.
+
+### Verified
+
+| claim | how |
+|---|---|
+| four roles, nothing else | `authz.spec.ts` asserts `Object.keys(ROLE_GRANTS)` is exactly the four |
+| transfer leaves the outgoing Owner an Operator | `users.service.spec.ts`, on both the row and the event |
+| the Owner still cannot be removed | `users.service.spec.ts`, from both directions — see below |
+| unit suite | **589 passed / 56 suites**, the same count as before |
+| typecheck | 27 errors, unchanged baseline |
+| lint | `npx eslint src test` — **0 errors** (117 warnings, all pre-existing `any`s) |
+
+The removal test changed shape. It used to seed an `ADMIN`, stub the privileged count at 1 and expect
+`409`. The surviving invariant is enforced one layer up: `RoleGrantPolicy` refuses an Owner acting on
+their own membership, and refuses anyone else from managing a peer or superior — so the Owner is
+unreachable from both directions with `403`, and `remove()`'s `state_conflict` branch is defensive
+code that predates this change. The test now asserts the reachable behaviour and says so.
+
+### Two things found while here, not fixed
+
+- **`pnpm test:e2e` matches nothing.** `test/jest-e2e.json`'s `testRegex` is `.e2e-spec.ts$` and this
+  service has no such file — its end-to-end layer is the Cucumber suite below. The script exits 1 on
+  "No tests found", so anything running it in CI fails for a reason that has nothing to do with the
+  code. Either point it at the Cucumber run or drop it. `pnpm test:integration` is real and green
+  (5 tests, live Postgres).
+- **The BDD suite does not compile**, and did not before this change:
+  `src/features/webhook/webhook.controller.ts(88,46): Property 'rawBody' does not exist on type 'Request'`.
+  `tsc --noEmit` does not report it, so the Cucumber runner is resolving a different `tsconfig` — one
+  without whatever augments Express's `Request`. Nothing in this change touches that file.
+- **Three files from earlier in this session had no trailing newline** and one had a double blank
+  line, all four committed, all four failing `prettier/prettier` — so `pnpm lint:check` was red on
+  `main` for `contact.dto.ts`, `tenant.service.ts`, `operator-contact.controller.ts` and
+  `tenant.types.ts`. Fixed in this commit. Cause: `Path.write_text` on Windows, which also silently
+  rewrote those files CRLF; git's `core.autocrlf=input` normalized the blobs, so neither the diffs
+  nor the test suite ever showed it. Lint was the only thing that did.
+
 ---
 
 > **Cross-service decision list.** The consolidated list of everything still open across all four

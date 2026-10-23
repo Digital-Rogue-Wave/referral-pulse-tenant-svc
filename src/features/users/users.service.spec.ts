@@ -79,7 +79,7 @@ describe('UsersService — tenant membership', () => {
                 const row = rows.get(where.id);
                 return row && !row.deletedAt ? row : null;
             }),
-            count: jest.fn(async () => [...rows.values()].filter((r) => !r.deletedAt && [RoleEnum.OWNER, RoleEnum.ADMIN].includes(r.role)).length)
+            count: jest.fn(async () => [...rows.values()].filter((r) => !r.deletedAt && r.role === RoleEnum.OWNER).length)
         };
         tenantAware.forModel.mockReturnValue(prisma.user as never);
         kratos.revokeSessions.mockResolvedValue(undefined);
@@ -152,25 +152,25 @@ describe('UsersService — tenant membership', () => {
             await expectStatus(service.addUser(actorAs('owner'), { kratosIdentityId: 'kratos-new', role: RoleEnum.OWNER }), HttpStatus.FORBIDDEN);
         });
 
-        it('then an Operator cannot grant a role above their own', async () => {
-            seed(member('op', RoleEnum.OPERATOR));
-            await expectStatus(service.addUser(actorAs('op'), { kratosIdentityId: 'kratos-new', role: RoleEnum.ADMIN }), HttpStatus.FORBIDDEN);
+        it('then a Viewer cannot grant a role above their own', async () => {
+            seed(member('vw', RoleEnum.VIEWER));
+            await expectStatus(service.addUser(actorAs('vw'), { kratosIdentityId: 'kratos-new', role: RoleEnum.OPERATOR }), HttpStatus.FORBIDDEN);
         });
 
-        it('then an Admin can add an Operator, taking the email from Ory rather than the request', async () => {
-            seed(member('admin', RoleEnum.ADMIN));
+        it('then the Owner can add an Operator, taking the email from Ory rather than the request', async () => {
+            seed(member('owner', RoleEnum.OWNER));
 
-            await service.addUser(actorAs('admin'), { kratosIdentityId: 'kratos-new', role: RoleEnum.OPERATOR });
+            await service.addUser(actorAs('owner'), { kratosIdentityId: 'kratos-new', role: RoleEnum.OPERATOR });
 
             expect(tx.user.create).toHaveBeenCalledWith({ data: expect.objectContaining({ email: 'new@acme.io', role: RoleEnum.OPERATOR }) });
         });
 
         it('then no member is added once the plan’s seats are all taken', async () => {
-            seed(member('admin', RoleEnum.ADMIN));
+            seed(member('owner', RoleEnum.OWNER));
             planLimits.assertSeatAvailable.mockRejectedValue(new LimitExceededException({ metric: 'seats', currentUsage: 5, limit: 5 }));
 
             await expectStatus(
-                service.addUser(actorAs('admin'), { kratosIdentityId: 'kratos-new', role: RoleEnum.OPERATOR }),
+                service.addUser(actorAs('owner'), { kratosIdentityId: 'kratos-new', role: RoleEnum.OPERATOR }),
                 HttpStatus.PAYMENT_REQUIRED
             );
             expect(tx.user.create).not.toHaveBeenCalled();
@@ -178,26 +178,26 @@ describe('UsersService — tenant membership', () => {
     });
 
     describe('when changing a role', () => {
-        it('then an Admin cannot demote another Admin — peers and superiors are out of reach', async () => {
-            seed(member('owner', RoleEnum.OWNER), member('a1', RoleEnum.ADMIN), member('a2', RoleEnum.ADMIN));
-            await expectStatus(service.updateRole(actorAs('a1'), 'a2', { role: RoleEnum.VIEWER }), HttpStatus.FORBIDDEN);
+        it('then an Operator cannot demote another Operator — peers and superiors are out of reach', async () => {
+            seed(member('owner', RoleEnum.OWNER), member('o1', RoleEnum.OPERATOR), member('o2', RoleEnum.OPERATOR));
+            await expectStatus(service.updateRole(actorAs('o1'), 'o2', { role: RoleEnum.VIEWER }), HttpStatus.FORBIDDEN);
         });
 
         it('then nobody can change their own role', async () => {
             seed(member('owner', RoleEnum.OWNER));
-            await expectStatus(service.updateRole(actorAs('owner'), 'owner', { role: RoleEnum.ADMIN }), HttpStatus.FORBIDDEN);
+            await expectStatus(service.updateRole(actorAs('owner'), 'owner', { role: RoleEnum.OPERATOR }), HttpStatus.FORBIDDEN);
         });
 
-        it('then the Owner can promote an Operator, replacing the projection and emitting user.role_changed', async () => {
+        it('then the Owner can move an Operator to Support, replacing the projection and emitting user.role_changed', async () => {
             seed(member('owner', RoleEnum.OWNER), member('op', RoleEnum.OPERATOR));
 
-            await service.updateRole(actorAs('owner'), 'op', { role: RoleEnum.ADMIN });
+            await service.updateRole(actorAs('owner'), 'op', { role: RoleEnum.SUPPORT });
 
-            expect(tx.user.update).toHaveBeenCalledWith({ where: { id: 'op' }, data: { role: RoleEnum.ADMIN } });
+            expect(tx.user.update).toHaveBeenCalledWith({ where: { id: 'op' }, data: { role: RoleEnum.SUPPORT } });
             expect(tx.userRole.deleteMany).toHaveBeenCalledWith({ where: { userId: 'op' } });
             expect(events.emitAfterCommit).toHaveBeenCalledWith(
                 'user.role_changed',
-                expect.objectContaining({ oldRole: RoleEnum.OPERATOR, newRole: RoleEnum.ADMIN })
+                expect.objectContaining({ oldRole: RoleEnum.OPERATOR, newRole: RoleEnum.SUPPORT })
             );
         });
     });
@@ -214,29 +214,34 @@ describe('UsersService — tenant membership', () => {
             expect(events.emitAfterCommit).toHaveBeenCalledWith('user.removed', expect.objectContaining({ aggregateId: 'op', tenantId: TENANT }));
         });
 
-        it('then the last Owner/Admin cannot be removed', async () => {
-            seed(member('owner', RoleEnum.OWNER, { deletedAt: null }), member('admin', RoleEnum.ADMIN));
-            rows.get('owner')!.deletedAt = null;
-            (prisma.user.count as jest.Mock).mockResolvedValueOnce(1);
+        /**
+         * Owner is the only privileged role since R-ACT-01, so "the last privileged member" and "the
+         * Owner" are now the same person — and RoleGrantPolicy already puts them out of reach, from
+         * both directions. `remove()`'s `state_conflict` branch is defensive and unreachable through
+         * the policy; it predates this change and is left alone.
+         */
+        it('then the Owner cannot be removed, by themselves or by anyone else', async () => {
+            seed(member('owner', RoleEnum.OWNER), member('op', RoleEnum.OPERATOR));
 
-            await expectStatus(service.remove(actorAs('owner'), 'admin'), HttpStatus.CONFLICT);
+            await expectStatus(service.remove(actorAs('owner'), 'owner'), HttpStatus.FORBIDDEN);
+            await expectStatus(service.remove(actorAs('op'), 'owner'), HttpStatus.FORBIDDEN);
         });
     });
 
     describe('when transferring ownership', () => {
         it('then only the Owner may do it', async () => {
-            seed(member('owner', RoleEnum.OWNER), member('admin', RoleEnum.ADMIN));
-            await expectStatus(service.transferOwnership(actorAs('admin'), 'owner'), HttpStatus.FORBIDDEN);
+            seed(member('owner', RoleEnum.OWNER), member('op', RoleEnum.OPERATOR));
+            await expectStatus(service.transferOwnership(actorAs('op'), 'owner'), HttpStatus.FORBIDDEN);
         });
 
-        it('then the new Owner is promoted and the old Owner becomes an Admin in one transaction', async () => {
+        it('then the new Owner is promoted and the old Owner becomes an Operator in one transaction', async () => {
             seed(member('owner', RoleEnum.OWNER), member('op', RoleEnum.OPERATOR));
 
             await service.transferOwnership(actorAs('owner'), 'op');
 
             expect(prisma.$transaction).toHaveBeenCalledTimes(1);
             expect(tx.user.update).toHaveBeenCalledWith({ where: { id: 'op' }, data: { role: RoleEnum.OWNER } });
-            expect(tx.user.update).toHaveBeenCalledWith({ where: { id: 'owner' }, data: { role: RoleEnum.ADMIN } });
+            expect(tx.user.update).toHaveBeenCalledWith({ where: { id: 'owner' }, data: { role: RoleEnum.OPERATOR } });
         });
     });
 });

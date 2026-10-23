@@ -115,7 +115,11 @@ export class HttpClientService implements OnModuleInit {
         if (skipCircuitBreaker) {
             response = await execute();
         } else {
-            const serviceName = new URL(url).hostname;
+            // `host`, not `hostname`: the port is part of which service this is. Keyed on the
+            // hostname alone, every service on one host shared a single breaker — locally that is
+            // all of them, so three dead targets tripped the breaker and the DSR fan-out recorded a
+            // *healthy* notification-service as "Breaker is open" (NOTE.md §V5.19).
+            const serviceName = new URL(url).host;
             response = await this.circuitBreakerService.execute(serviceName, execute);
         }
 
