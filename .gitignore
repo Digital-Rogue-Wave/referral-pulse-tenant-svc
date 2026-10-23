@@ -44,3 +44,4 @@ lerna-debug.log*
 # Prisma
 /src/prisma/generated
 .tsbuildinfo
+test/bdd/reports/

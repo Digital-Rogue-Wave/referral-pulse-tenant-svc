@@ -1,5 +1,482 @@
 [
   {
+    "description": "  As an authenticated tenant\n  I want to create and rotate API keys\n  So that I can manage credentials without losing access",
+    "elements": [
+      {
+        "description": "",
+        "id": "api-key-lifecycle;create-then-rotate-an-api-key-issues-a-fresh-secret",
+        "keyword": "Scenario",
+        "line": 11,
+        "name": "Create then rotate an API key issues a fresh secret",
+        "steps": [
+          {
+            "arguments": [],
+            "keyword": "Given ",
+            "line": 8,
+            "name": "the application is running",
+            "match": {
+              "location": "test\\bdd\\step-definitions\\common.steps.ts:14"
+            },
+            "result": {
+              "status": "passed",
+              "duration": 451300
+            }
+          },
+          {
+            "arguments": [],
+            "keyword": "And ",
+            "line": 9,
+            "name": "I have a valid JWT for tenant \"default-tenant\"",
+            "match": {
+              "location": "test\\bdd\\step-definitions\\auth.steps.ts:12"
+            },
+            "result": {
+              "status": "passed",
+              "duration": 2147399
+            }
+          },
+          {
+            "arguments": [],
+            "keyword": "When ",
+            "line": 12,
+            "name": "I create an API key",
+            "match": {
+              "location": "test\\bdd\\step-definitions\\api-key.steps.ts:15"
+            },
+            "result": {
+              "status": "passed",
+              "duration": 423966199
+            }
+          },
+          {
+            "arguments": [],
+            "keyword": "Then ",
+            "line": 13,
+            "name": "the response status should be 201",
+            "match": {
+              "location": "test\\bdd\\step-definitions\\common.steps.ts:73"
+            },
+            "result": {
+              "status": "passed",
+              "duration": 141999
+            }
+          },
+          {
+            "arguments": [],
+            "keyword": "And ",
+            "line": 14,
+            "name": "the response should contain a \"raw_key\" field",
+            "match": {
+              "location": "test\\bdd\\step-definitions\\common.steps.ts:114"
+            },
+            "result": {
+              "status": "passed",
+              "duration": 101599
+            }
+          },
+          {
+            "arguments": [],
+            "keyword": "When ",
+            "line": 15,
+            "name": "I rotate that API key",
+            "match": {
+              "location": "test\\bdd\\step-definitions\\api-key.steps.ts:30"
+            },
+            "result": {
+              "status": "passed",
+              "duration": 111326800
+            }
+          },
+          {
+            "arguments": [],
+            "keyword": "Then ",
+            "line": 16,
+            "name": "the response status should be 200",
+            "match": {
+              "location": "test\\bdd\\step-definitions\\common.steps.ts:73"
+            },
+            "result": {
+              "status": "passed",
+              "duration": 99000
+            }
+          },
+          {
+            "arguments": [],
+            "keyword": "And ",
+            "line": 17,
+            "name": "the response should contain a \"raw_key\" field",
+            "match": {
+              "location": "test\\bdd\\step-definitions\\common.steps.ts:114"
+            },
+            "result": {
+              "status": "passed",
+              "duration": 64100
+            }
+          },
+          {
+            "arguments": [],
+            "keyword": "And ",
+            "line": 18,
+            "name": "the response rawKey should differ from the created key",
+            "match": {
+              "location": "test\\bdd\\step-definitions\\api-key.steps.ts:38"
+            },
+            "result": {
+              "status": "passed",
+              "duration": 164399
+            }
+          }
+        ],
+        "tags": [
+          {
+            "name": "@api-keys",
+            "line": 1
+          }
+        ],
+        "type": "scenario"
+      },
+      {
+        "description": "",
+        "id": "api-key-lifecycle;rotating-a-non-existent-key-returns-404",
+        "keyword": "Scenario",
+        "line": 20,
+        "name": "Rotating a non-existent key returns 404",
+        "steps": [
+          {
+            "arguments": [],
+            "keyword": "Given ",
+            "line": 8,
+            "name": "the application is running",
+            "match": {
+              "location": "test\\bdd\\step-definitions\\common.steps.ts:14"
+            },
+            "result": {
+              "status": "passed",
+              "duration": 141299
+            }
+          },
+          {
+            "arguments": [],
+            "keyword": "And ",
+            "line": 9,
+            "name": "I have a valid JWT for tenant \"default-tenant\"",
+            "match": {
+              "location": "test\\bdd\\step-definitions\\auth.steps.ts:12"
+            },
+            "result": {
+              "status": "passed",
+              "duration": 980299
+            }
+          },
+          {
+            "arguments": [],
+            "keyword": "When ",
+            "line": 21,
+            "name": "I send a POST request to \"/api/v1/api-keys/does-not-exist/rotate\" with that token",
+            "match": {
+              "location": "test\\bdd\\step-definitions\\common.steps.ts:30"
+            },
+            "result": {
+              "status": "passed",
+              "duration": 71785599
+            }
+          },
+          {
+            "arguments": [],
+            "keyword": "Then ",
+            "line": 22,
+            "name": "the response status should be 404",
+            "match": {
+              "location": "test\\bdd\\step-definitions\\common.steps.ts:73"
+            },
+            "result": {
+              "status": "passed",
+              "duration": 126000
+            }
+          }
+        ],
+        "tags": [
+          {
+            "name": "@api-keys",
+            "line": 1
+          }
+        ],
+        "type": "scenario"
+      },
+      {
+        "description": "",
+        "id": "api-key-lifecycle;a-retried-create-with-the-same-idempotency-key-returns-the-original-key,-not-a-second-one",
+        "keyword": "Scenario",
+        "line": 24,
+        "name": "A retried create with the same Idempotency-Key returns the original key, not a second one",
+        "steps": [
+          {
+            "arguments": [],
+            "keyword": "Given ",
+            "line": 8,
+            "name": "the application is running",
+            "match": {
+              "location": "test\\bdd\\step-definitions\\common.steps.ts:14"
+            },
+            "result": {
+              "status": "passed",
+              "duration": 113100
+            }
+          },
+          {
+            "arguments": [],
+            "keyword": "And ",
+            "line": 9,
+            "name": "I have a valid JWT for tenant \"default-tenant\"",
+            "match": {
+              "location": "test\\bdd\\step-definitions\\auth.steps.ts:12"
+            },
+            "result": {
+              "status": "passed",
+              "duration": 443899
+            }
+          },
+          {
+            "arguments": [],
+            "keyword": "When ",
+            "line": 25,
+            "name": "I create an API key with Idempotency-Key \"bdd-retry-create-001\"",
+            "match": {
+              "location": "test\\bdd\\step-definitions\\api-key.steps.ts:51"
+            },
+            "result": {
+              "status": "passed",
+              "duration": 129953800
+            }
+          },
+          {
+            "arguments": [],
+            "keyword": "Then ",
+            "line": 26,
+            "name": "the response status should be 201",
+            "match": {
+              "location": "test\\bdd\\step-definitions\\common.steps.ts:73"
+            },
+            "result": {
+              "status": "passed",
+              "duration": 58499
+            }
+          },
+          {
+            "arguments": [],
+            "keyword": "When ",
+            "line": 27,
+            "name": "I create an API key with Idempotency-Key \"bdd-retry-create-001\"",
+            "match": {
+              "location": "test\\bdd\\step-definitions\\api-key.steps.ts:51"
+            },
+            "result": {
+              "status": "passed",
+              "duration": 72990999
+            }
+          },
+          {
+            "arguments": [],
+            "keyword": "Then ",
+            "line": 28,
+            "name": "the response status should be 201",
+            "match": {
+              "location": "test\\bdd\\step-definitions\\common.steps.ts:73"
+            },
+            "result": {
+              "status": "passed",
+              "duration": 100499
+            }
+          },
+          {
+            "arguments": [],
+            "keyword": "And ",
+            "line": 29,
+            "name": "the response should be the same API key as the first attempt",
+            "match": {
+              "location": "test\\bdd\\step-definitions\\api-key.steps.ts:45"
+            },
+            "result": {
+              "status": "passed",
+              "duration": 114000
+            }
+          }
+        ],
+        "tags": [
+          {
+            "name": "@api-keys",
+            "line": 1
+          }
+        ],
+        "type": "scenario"
+      },
+      {
+        "description": "",
+        "id": "api-key-lifecycle;a-create-without-an-idempotency-key-is-rejected",
+        "keyword": "Scenario",
+        "line": 31,
+        "name": "A create without an Idempotency-Key is rejected",
+        "steps": [
+          {
+            "arguments": [],
+            "keyword": "Given ",
+            "line": 8,
+            "name": "the application is running",
+            "match": {
+              "location": "test\\bdd\\step-definitions\\common.steps.ts:14"
+            },
+            "result": {
+              "status": "passed",
+              "duration": 96700
+            }
+          },
+          {
+            "arguments": [],
+            "keyword": "And ",
+            "line": 9,
+            "name": "I have a valid JWT for tenant \"default-tenant\"",
+            "match": {
+              "location": "test\\bdd\\step-definitions\\auth.steps.ts:12"
+            },
+            "result": {
+              "status": "passed",
+              "duration": 463400
+            }
+          },
+          {
+            "arguments": [],
+            "keyword": "When ",
+            "line": 32,
+            "name": "I send a POST request to \"/api/v1/api-keys\" with that token but no Idempotency-Key",
+            "match": {
+              "location": "test\\bdd\\step-definitions\\common.steps.ts:50"
+            },
+            "result": {
+              "status": "passed",
+              "duration": 5749700
+            }
+          },
+          {
+            "arguments": [],
+            "keyword": "Then ",
+            "line": 33,
+            "name": "the response status should be 400",
+            "match": {
+              "location": "test\\bdd\\step-definitions\\common.steps.ts:73"
+            },
+            "result": {
+              "status": "passed",
+              "duration": 48999
+            }
+          },
+          {
+            "arguments": [],
+            "keyword": "And ",
+            "line": 34,
+            "name": "the response should contain errorCode \"idempotency_key_required\"",
+            "match": {
+              "location": "test\\bdd\\step-definitions\\common.steps.ts:130"
+            },
+            "result": {
+              "status": "passed",
+              "duration": 118599
+            }
+          }
+        ],
+        "tags": [
+          {
+            "name": "@api-keys",
+            "line": 1
+          }
+        ],
+        "type": "scenario"
+      },
+      {
+        "description": "",
+        "id": "api-key-lifecycle;creating-an-api-key-requires-authentication",
+        "keyword": "Scenario",
+        "line": 37,
+        "name": "Creating an API key requires authentication",
+        "steps": [
+          {
+            "arguments": [],
+            "keyword": "Given ",
+            "line": 8,
+            "name": "the application is running",
+            "match": {
+              "location": "test\\bdd\\step-definitions\\common.steps.ts:14"
+            },
+            "result": {
+              "status": "passed",
+              "duration": 62799
+            }
+          },
+          {
+            "arguments": [],
+            "keyword": "And ",
+            "line": 9,
+            "name": "I have a valid JWT for tenant \"default-tenant\"",
+            "match": {
+              "location": "test\\bdd\\step-definitions\\auth.steps.ts:12"
+            },
+            "result": {
+              "status": "passed",
+              "duration": 380199
+            }
+          },
+          {
+            "arguments": [],
+            "keyword": "When ",
+            "line": 38,
+            "name": "I send a POST request to \"/api/v1/api-keys\" without any token",
+            "match": {
+              "location": "test\\bdd\\step-definitions\\common.steps.ts:22"
+            },
+            "result": {
+              "status": "passed",
+              "duration": 4324699
+            }
+          },
+          {
+            "arguments": [],
+            "keyword": "Then ",
+            "line": 39,
+            "name": "the response status should be 401",
+            "match": {
+              "location": "test\\bdd\\step-definitions\\common.steps.ts:73"
+            },
+            "result": {
+              "status": "passed",
+              "duration": 56300
+            }
+          }
+        ],
+        "tags": [
+          {
+            "name": "@api-keys",
+            "line": 1
+          },
+          {
+            "name": "@public-endpoint",
+            "line": 36
+          }
+        ],
+        "type": "scenario"
+      }
+    ],
+    "id": "api-key-lifecycle",
+    "line": 2,
+    "keyword": "Feature",
+    "name": "API Key lifecycle",
+    "tags": [
+      {
+        "name": "@api-keys",
+        "line": 1
+      }
+    ],
+    "uri": "test\\bdd\\features\\api-key.feature"
+  },
+  {
     "description": "  As a backend API\n  I want to enforce JWT authentication on all protected endpoints\n  So that only properly authenticated clients can access tenant data",
     "elements": [
       {
@@ -15,11 +492,11 @@
             "line": 8,
             "name": "the application is running",
             "match": {
-              "location": "test\\bdd\\step-definitions\\common.steps.ts:13"
+              "location": "test\\bdd\\step-definitions\\common.steps.ts:14"
             },
             "result": {
-              "status": "skipped",
-              "duration": 0
+              "status": "passed",
+              "duration": 67999
             }
           },
           {
@@ -28,11 +505,11 @@
             "line": 11,
             "name": "I send a GET request to \"/api/v1/billings/subscription\" without any token",
             "match": {
-              "location": "test\\bdd\\step-definitions\\common.steps.ts:21"
+              "location": "test\\bdd\\step-definitions\\common.steps.ts:22"
             },
             "result": {
-              "status": "skipped",
-              "duration": 0
+              "status": "passed",
+              "duration": 4010200
             }
           },
           {
@@ -41,24 +518,24 @@
             "line": 12,
             "name": "the response status should be 401",
             "match": {
-              "location": "test\\bdd\\step-definitions\\common.steps.ts:47"
+              "location": "test\\bdd\\step-definitions\\common.steps.ts:73"
             },
             "result": {
-              "status": "skipped",
-              "duration": 0
+              "status": "passed",
+              "duration": 61099
             }
           },
           {
             "arguments": [],
             "keyword": "And ",
             "line": 13,
-            "name": "the response should contain a \"title\" field with value \"Unauthorized\"",
+            "name": "the response should contain errorCode \"authentication_error\"",
             "match": {
-              "location": "test\\bdd\\step-definitions\\common.steps.ts:94"
+              "location": "test\\bdd\\step-definitions\\common.steps.ts:130"
             },
             "result": {
-              "status": "skipped",
-              "duration": 0
+              "status": "passed",
+              "duration": 28500
             }
           }
         ],
@@ -83,11 +560,11 @@
             "line": 8,
             "name": "the application is running",
             "match": {
-              "location": "test\\bdd\\step-definitions\\common.steps.ts:13"
+              "location": "test\\bdd\\step-definitions\\common.steps.ts:14"
             },
             "result": {
-              "status": "skipped",
-              "duration": 0
+              "status": "passed",
+              "duration": 64599
             }
           },
           {
@@ -99,8 +576,8 @@
               "location": "test\\bdd\\step-definitions\\auth.steps.ts:16"
             },
             "result": {
-              "status": "skipped",
-              "duration": 0
+              "status": "passed",
+              "duration": 556500
             }
           },
           {
@@ -109,11 +586,11 @@
             "line": 17,
             "name": "I send a GET request to \"/api/v1/billings/subscription\" with that token",
             "match": {
-              "location": "test\\bdd\\step-definitions\\common.steps.ts:25"
+              "location": "test\\bdd\\step-definitions\\common.steps.ts:30"
             },
             "result": {
-              "status": "skipped",
-              "duration": 0
+              "status": "passed",
+              "duration": 3693799
             }
           },
           {
@@ -122,11 +599,11 @@
             "line": 18,
             "name": "the response status should be 401",
             "match": {
-              "location": "test\\bdd\\step-definitions\\common.steps.ts:47"
+              "location": "test\\bdd\\step-definitions\\common.steps.ts:73"
             },
             "result": {
-              "status": "skipped",
-              "duration": 0
+              "status": "passed",
+              "duration": 49800
             }
           }
         ],
@@ -151,11 +628,11 @@
             "line": 8,
             "name": "the application is running",
             "match": {
-              "location": "test\\bdd\\step-definitions\\common.steps.ts:13"
+              "location": "test\\bdd\\step-definitions\\common.steps.ts:14"
             },
             "result": {
-              "status": "skipped",
-              "duration": 0
+              "status": "passed",
+              "duration": 57500
             }
           },
           {
@@ -167,8 +644,8 @@
               "location": "test\\bdd\\step-definitions\\auth.steps.ts:20"
             },
             "result": {
-              "status": "skipped",
-              "duration": 0
+              "status": "passed",
+              "duration": 47800
             }
           },
           {
@@ -177,11 +654,11 @@
             "line": 22,
             "name": "I send a GET request to \"/api/v1/billings/subscription\" with that token",
             "match": {
-              "location": "test\\bdd\\step-definitions\\common.steps.ts:25"
+              "location": "test\\bdd\\step-definitions\\common.steps.ts:30"
             },
             "result": {
-              "status": "skipped",
-              "duration": 0
+              "status": "passed",
+              "duration": 3081600
             }
           },
           {
@@ -190,11 +667,11 @@
             "line": 23,
             "name": "the response status should be 401",
             "match": {
-              "location": "test\\bdd\\step-definitions\\common.steps.ts:47"
+              "location": "test\\bdd\\step-definitions\\common.steps.ts:73"
             },
             "result": {
-              "status": "skipped",
-              "duration": 0
+              "status": "passed",
+              "duration": 41799
             }
           }
         ],
@@ -219,11 +696,11 @@
             "line": 8,
             "name": "the application is running",
             "match": {
-              "location": "test\\bdd\\step-definitions\\common.steps.ts:13"
+              "location": "test\\bdd\\step-definitions\\common.steps.ts:14"
             },
             "result": {
-              "status": "skipped",
-              "duration": 0
+              "status": "passed",
+              "duration": 54399
             }
           },
           {
@@ -235,8 +712,8 @@
               "location": "test\\bdd\\step-definitions\\auth.steps.ts:12"
             },
             "result": {
-              "status": "skipped",
-              "duration": 0
+              "status": "passed",
+              "duration": 416900
             }
           },
           {
@@ -245,11 +722,11 @@
             "line": 27,
             "name": "I send a GET request to \"/api/v1/billings/subscription\" with that token",
             "match": {
-              "location": "test\\bdd\\step-definitions\\common.steps.ts:25"
+              "location": "test\\bdd\\step-definitions\\common.steps.ts:30"
             },
             "result": {
-              "status": "skipped",
-              "duration": 0
+              "status": "passed",
+              "duration": 10393400
             }
           },
           {
@@ -258,24 +735,24 @@
             "line": 28,
             "name": "the response status should be 404",
             "match": {
-              "location": "test\\bdd\\step-definitions\\common.steps.ts:47"
+              "location": "test\\bdd\\step-definitions\\common.steps.ts:73"
             },
             "result": {
-              "status": "skipped",
-              "duration": 0
+              "status": "passed",
+              "duration": 52799
             }
           },
           {
             "arguments": [],
             "keyword": "And ",
             "line": 29,
-            "name": "the response should contain errorCode \"TENANT_NOT_FOUND\"",
+            "name": "the response should contain errorCode \"tenant_not_found\"",
             "match": {
-              "location": "test\\bdd\\step-definitions\\common.steps.ts:101"
+              "location": "test\\bdd\\step-definitions\\common.steps.ts:130"
             },
             "result": {
-              "status": "skipped",
-              "duration": 0
+              "status": "passed",
+              "duration": 32699
             }
           }
         ],
@@ -300,11 +777,11 @@
             "line": 8,
             "name": "the application is running",
             "match": {
-              "location": "test\\bdd\\step-definitions\\common.steps.ts:13"
+              "location": "test\\bdd\\step-definitions\\common.steps.ts:14"
             },
             "result": {
-              "status": "skipped",
-              "duration": 0
+              "status": "passed",
+              "duration": 62299
             }
           },
           {
@@ -316,8 +793,8 @@
               "location": "test\\bdd\\step-definitions\\auth.steps.ts:12"
             },
             "result": {
-              "status": "skipped",
-              "duration": 0
+              "status": "passed",
+              "duration": 379200
             }
           },
           {
@@ -326,11 +803,11 @@
             "line": 33,
             "name": "I send a GET request to \"/api/v1/billings/subscription\" with that token",
             "match": {
-              "location": "test\\bdd\\step-definitions\\common.steps.ts:25"
+              "location": "test\\bdd\\step-definitions\\common.steps.ts:30"
             },
             "result": {
-              "status": "skipped",
-              "duration": 0
+              "status": "passed",
+              "duration": 91913499
             }
           },
           {
@@ -339,11 +816,11 @@
             "line": 34,
             "name": "the response status is not 401",
             "match": {
-              "location": "test\\bdd\\step-definitions\\common.steps.ts:56"
+              "location": "test\\bdd\\step-definitions\\common.steps.ts:82"
             },
             "result": {
-              "status": "skipped",
-              "duration": 0
+              "status": "passed",
+              "duration": 186099
             }
           },
           {
@@ -352,11 +829,11 @@
             "line": 35,
             "name": "the response status is not 403",
             "match": {
-              "location": "test\\bdd\\step-definitions\\common.steps.ts:56"
+              "location": "test\\bdd\\step-definitions\\common.steps.ts:82"
             },
             "result": {
-              "status": "skipped",
-              "duration": 0
+              "status": "passed",
+              "duration": 47700
             }
           }
         ],
@@ -381,11 +858,11 @@
             "line": 8,
             "name": "the application is running",
             "match": {
-              "location": "test\\bdd\\step-definitions\\common.steps.ts:13"
+              "location": "test\\bdd\\step-definitions\\common.steps.ts:14"
             },
             "result": {
-              "status": "skipped",
-              "duration": 0
+              "status": "passed",
+              "duration": 82300
             }
           },
           {
@@ -394,11 +871,11 @@
             "line": 39,
             "name": "I send a GET request to \"/api/v1/billings/plans\" without any token",
             "match": {
-              "location": "test\\bdd\\step-definitions\\common.steps.ts:21"
+              "location": "test\\bdd\\step-definitions\\common.steps.ts:22"
             },
             "result": {
-              "status": "skipped",
-              "duration": 0
+              "status": "passed",
+              "duration": 14956900
             }
           },
           {
@@ -407,11 +884,11 @@
             "line": 40,
             "name": "the response status should be 200",
             "match": {
-              "location": "test\\bdd\\step-definitions\\common.steps.ts:47"
+              "location": "test\\bdd\\step-definitions\\common.steps.ts:73"
             },
             "result": {
-              "status": "skipped",
-              "duration": 0
+              "status": "passed",
+              "duration": 102300
             }
           },
           {
@@ -420,11 +897,11 @@
             "line": 41,
             "name": "the response should be a non-empty array",
             "match": {
-              "location": "test\\bdd\\step-definitions\\common.steps.ts:72"
+              "location": "test\\bdd\\step-definitions\\common.steps.ts:98"
             },
             "result": {
-              "status": "skipped",
-              "duration": 0
+              "status": "passed",
+              "duration": 73400
             }
           }
         ],
@@ -453,11 +930,11 @@
             "line": 8,
             "name": "the application is running",
             "match": {
-              "location": "test\\bdd\\step-definitions\\common.steps.ts:13"
+              "location": "test\\bdd\\step-definitions\\common.steps.ts:14"
             },
             "result": {
-              "status": "skipped",
-              "duration": 0
+              "status": "passed",
+              "duration": 67399
             }
           },
           {
@@ -469,8 +946,8 @@
               "location": "test\\bdd\\step-definitions\\auth.steps.ts:25"
             },
             "result": {
-              "status": "skipped",
-              "duration": 0
+              "status": "passed",
+              "duration": 1183699
             }
           },
           {
@@ -479,11 +956,11 @@
             "line": 45,
             "name": "I send a GET request to \"/api/v1/internal/tenants/default-tenant/status\" with that token",
             "match": {
-              "location": "test\\bdd\\step-definitions\\common.steps.ts:25"
+              "location": "test\\bdd\\step-definitions\\common.steps.ts:30"
             },
             "result": {
-              "status": "skipped",
-              "duration": 0
+              "status": "passed",
+              "duration": 70550900
             }
           },
           {
@@ -492,11 +969,11 @@
             "line": 46,
             "name": "the response status should be 200",
             "match": {
-              "location": "test\\bdd\\step-definitions\\common.steps.ts:47"
+              "location": "test\\bdd\\step-definitions\\common.steps.ts:73"
             },
             "result": {
-              "status": "skipped",
-              "duration": 0
+              "status": "passed",
+              "duration": 78199
             }
           }
         ],
@@ -537,11 +1014,11 @@
             "line": 8,
             "name": "the application is running",
             "match": {
-              "location": "test\\bdd\\step-definitions\\common.steps.ts:13"
+              "location": "test\\bdd\\step-definitions\\common.steps.ts:14"
             },
             "result": {
-              "status": "skipped",
-              "duration": 0
+              "status": "passed",
+              "duration": 73599
             }
           },
           {
@@ -553,8 +1030,8 @@
               "location": "test\\bdd\\step-definitions\\auth.steps.ts:12"
             },
             "result": {
-              "status": "skipped",
-              "duration": 0
+              "status": "passed",
+              "duration": 444199
             }
           },
           {
@@ -563,11 +1040,11 @@
             "line": 12,
             "name": "I send a GET request to \"/api/v1/billings/subscription\" with that token",
             "match": {
-              "location": "test\\bdd\\step-definitions\\common.steps.ts:25"
+              "location": "test\\bdd\\step-definitions\\common.steps.ts:30"
             },
             "result": {
-              "status": "skipped",
-              "duration": 0
+              "status": "passed",
+              "duration": 11140600
             }
           },
           {
@@ -576,11 +1053,11 @@
             "line": 13,
             "name": "the response status should be 200",
             "match": {
-              "location": "test\\bdd\\step-definitions\\common.steps.ts:47"
+              "location": "test\\bdd\\step-definitions\\common.steps.ts:73"
             },
             "result": {
-              "status": "skipped",
-              "duration": 0
+              "status": "passed",
+              "duration": 89599
             }
           },
           {
@@ -589,24 +1066,24 @@
             "line": 14,
             "name": "the response should contain a \"plan\" field",
             "match": {
-              "location": "test\\bdd\\step-definitions\\common.steps.ts:88"
+              "location": "test\\bdd\\step-definitions\\common.steps.ts:114"
             },
             "result": {
-              "status": "skipped",
-              "duration": 0
+              "status": "passed",
+              "duration": 65200
             }
           },
           {
             "arguments": [],
             "keyword": "And ",
             "line": 15,
-            "name": "the response should contain a \"status\" field",
+            "name": "the response should contain a \"subscription_status\" field",
             "match": {
-              "location": "test\\bdd\\step-definitions\\common.steps.ts:88"
+              "location": "test\\bdd\\step-definitions\\common.steps.ts:114"
             },
             "result": {
-              "status": "skipped",
-              "duration": 0
+              "status": "passed",
+              "duration": 40699
             }
           }
         ],
@@ -631,11 +1108,11 @@
             "line": 8,
             "name": "the application is running",
             "match": {
-              "location": "test\\bdd\\step-definitions\\common.steps.ts:13"
+              "location": "test\\bdd\\step-definitions\\common.steps.ts:14"
             },
             "result": {
-              "status": "skipped",
-              "duration": 0
+              "status": "passed",
+              "duration": 94499
             }
           },
           {
@@ -647,8 +1124,8 @@
               "location": "test\\bdd\\step-definitions\\auth.steps.ts:12"
             },
             "result": {
-              "status": "skipped",
-              "duration": 0
+              "status": "passed",
+              "duration": 564200
             }
           },
           {
@@ -657,11 +1134,11 @@
             "line": 19,
             "name": "I send a GET request to \"/api/v1/billings/plans\" without any token",
             "match": {
-              "location": "test\\bdd\\step-definitions\\common.steps.ts:21"
+              "location": "test\\bdd\\step-definitions\\common.steps.ts:22"
             },
             "result": {
-              "status": "skipped",
-              "duration": 0
+              "status": "passed",
+              "duration": 6417499
             }
           },
           {
@@ -670,11 +1147,11 @@
             "line": 20,
             "name": "the response status should be 200",
             "match": {
-              "location": "test\\bdd\\step-definitions\\common.steps.ts:47"
+              "location": "test\\bdd\\step-definitions\\common.steps.ts:73"
             },
             "result": {
-              "status": "skipped",
-              "duration": 0
+              "status": "passed",
+              "duration": 85200
             }
           },
           {
@@ -683,11 +1160,11 @@
             "line": 21,
             "name": "the response should be a non-empty array",
             "match": {
-              "location": "test\\bdd\\step-definitions\\common.steps.ts:72"
+              "location": "test\\bdd\\step-definitions\\common.steps.ts:98"
             },
             "result": {
-              "status": "skipped",
-              "duration": 0
+              "status": "passed",
+              "duration": 31100
             }
           },
           {
@@ -696,11 +1173,11 @@
             "line": 22,
             "name": "each item in the response should have a \"name\" field",
             "match": {
-              "location": "test\\bdd\\step-definitions\\common.steps.ts:78"
+              "location": "test\\bdd\\step-definitions\\common.steps.ts:104"
             },
             "result": {
-              "status": "skipped",
-              "duration": 0
+              "status": "passed",
+              "duration": 174299
             }
           }
         ],
@@ -729,11 +1206,11 @@
             "line": 8,
             "name": "the application is running",
             "match": {
-              "location": "test\\bdd\\step-definitions\\common.steps.ts:13"
+              "location": "test\\bdd\\step-definitions\\common.steps.ts:14"
             },
             "result": {
-              "status": "skipped",
-              "duration": 0
+              "status": "passed",
+              "duration": 97199
             }
           },
           {
@@ -745,8 +1222,8 @@
               "location": "test\\bdd\\step-definitions\\auth.steps.ts:12"
             },
             "result": {
-              "status": "skipped",
-              "duration": 0
+              "status": "passed",
+              "duration": 541699
             }
           },
           {
@@ -758,8 +1235,8 @@
               "location": "test\\bdd\\step-definitions\\billing.steps.ts:12"
             },
             "result": {
-              "status": "skipped",
-              "duration": 0
+              "status": "passed",
+              "duration": 491700
             }
           },
           {
@@ -773,11 +1250,11 @@
             "line": 26,
             "name": "I send a POST request to \"/api/v1/billings/subscription/checkout\" with body:",
             "match": {
-              "location": "test\\bdd\\step-definitions\\common.steps.ts:33"
+              "location": "test\\bdd\\step-definitions\\common.steps.ts:58"
             },
             "result": {
-              "status": "skipped",
-              "duration": 0
+              "status": "passed",
+              "duration": 163441100
             }
           },
           {
@@ -786,24 +1263,24 @@
             "line": 30,
             "name": "the response status should be 200",
             "match": {
-              "location": "test\\bdd\\step-definitions\\common.steps.ts:47"
+              "location": "test\\bdd\\step-definitions\\common.steps.ts:73"
             },
             "result": {
-              "status": "skipped",
-              "duration": 0
+              "status": "passed",
+              "duration": 78400
             }
           },
           {
             "arguments": [],
             "keyword": "And ",
             "line": 31,
-            "name": "the response should contain a \"checkoutUrl\" field",
+            "name": "the response should contain a \"checkout_url\" field",
             "match": {
-              "location": "test\\bdd\\step-definitions\\common.steps.ts:88"
+              "location": "test\\bdd\\step-definitions\\common.steps.ts:114"
             },
             "result": {
-              "status": "skipped",
-              "duration": 0
+              "status": "passed",
+              "duration": 50999
             }
           }
         ],
@@ -828,11 +1305,11 @@
             "line": 8,
             "name": "the application is running",
             "match": {
-              "location": "test\\bdd\\step-definitions\\common.steps.ts:13"
+              "location": "test\\bdd\\step-definitions\\common.steps.ts:14"
             },
             "result": {
-              "status": "skipped",
-              "duration": 0
+              "status": "passed",
+              "duration": 70799
             }
           },
           {
@@ -844,8 +1321,8 @@
               "location": "test\\bdd\\step-definitions\\auth.steps.ts:12"
             },
             "result": {
-              "status": "skipped",
-              "duration": 0
+              "status": "passed",
+              "duration": 373100
             }
           },
           {
@@ -854,11 +1331,11 @@
             "line": 34,
             "name": "I send a GET request to \"/api/v1/billings/usage\" with that token",
             "match": {
-              "location": "test\\bdd\\step-definitions\\common.steps.ts:25"
+              "location": "test\\bdd\\step-definitions\\common.steps.ts:30"
             },
             "result": {
-              "status": "skipped",
-              "duration": 0
+              "status": "passed",
+              "duration": 52846999
             }
           },
           {
@@ -867,11 +1344,11 @@
             "line": 35,
             "name": "the response status should be 200",
             "match": {
-              "location": "test\\bdd\\step-definitions\\common.steps.ts:47"
+              "location": "test\\bdd\\step-definitions\\common.steps.ts:73"
             },
             "result": {
-              "status": "skipped",
-              "duration": 0
+              "status": "passed",
+              "duration": 74299
             }
           },
           {
@@ -880,11 +1357,11 @@
             "line": 36,
             "name": "the response should contain a \"metrics\" field",
             "match": {
-              "location": "test\\bdd\\step-definitions\\common.steps.ts:88"
+              "location": "test\\bdd\\step-definitions\\common.steps.ts:114"
             },
             "result": {
-              "status": "skipped",
-              "duration": 0
+              "status": "passed",
+              "duration": 49600
             }
           }
         ],
@@ -900,20 +1377,28 @@
         "description": "",
         "id": "billing-management;preview-subscription-upgrade-returns-200",
         "keyword": "Scenario",
-        "line": 38,
+        "line": 39,
         "name": "Preview subscription upgrade returns 200",
         "steps": [
+          {
+            "keyword": "Before",
+            "hidden": true,
+            "result": {
+              "status": "passed",
+              "duration": 60204300
+            }
+          },
           {
             "arguments": [],
             "keyword": "Given ",
             "line": 8,
             "name": "the application is running",
             "match": {
-              "location": "test\\bdd\\step-definitions\\common.steps.ts:13"
+              "location": "test\\bdd\\step-definitions\\common.steps.ts:14"
             },
             "result": {
-              "status": "skipped",
-              "duration": 0
+              "status": "passed",
+              "duration": 106700
             }
           },
           {
@@ -925,39 +1410,47 @@
               "location": "test\\bdd\\step-definitions\\auth.steps.ts:12"
             },
             "result": {
-              "status": "skipped",
-              "duration": 0
+              "status": "passed",
+              "duration": 429100
             }
           },
           {
             "arguments": [
               {
                 "content": "{ \"targetPlan\": \"Growth\" }",
-                "line": 40
+                "line": 41
               }
             ],
             "keyword": "When ",
-            "line": 39,
+            "line": 40,
             "name": "I send a POST request to \"/api/v1/billings/subscription/upgrade/preview\" with body:",
             "match": {
-              "location": "test\\bdd\\step-definitions\\common.steps.ts:33"
+              "location": "test\\bdd\\step-definitions\\common.steps.ts:58"
             },
             "result": {
-              "status": "skipped",
-              "duration": 0
+              "status": "passed",
+              "duration": 58778299
             }
           },
           {
             "arguments": [],
             "keyword": "Then ",
-            "line": 43,
+            "line": 44,
             "name": "the response status should be 200",
             "match": {
-              "location": "test\\bdd\\step-definitions\\common.steps.ts:47"
+              "location": "test\\bdd\\step-definitions\\common.steps.ts:73"
             },
             "result": {
-              "status": "skipped",
-              "duration": 0
+              "status": "passed",
+              "duration": 65699
+            }
+          },
+          {
+            "keyword": "After",
+            "hidden": true,
+            "result": {
+              "status": "passed",
+              "duration": 26958300
             }
           }
         ],
@@ -965,6 +1458,10 @@
           {
             "name": "@billing",
             "line": 1
+          },
+          {
+            "name": "@needs-active-subscription",
+            "line": 38
           }
         ],
         "type": "scenario"
@@ -983,6 +1480,953 @@
     "uri": "test\\bdd\\features\\billing.feature"
   },
   {
+    "description": "  As an authenticated tenant\n  I want to invite teammates and manage invitations\n  So that new members can join the tenant",
+    "elements": [
+      {
+        "description": "",
+        "id": "team-invitations;create-a-pending-invitation",
+        "keyword": "Scenario",
+        "line": 12,
+        "name": "Create a pending invitation",
+        "steps": [
+          {
+            "keyword": "Before",
+            "hidden": true,
+            "result": {
+              "status": "passed",
+              "duration": 61708500
+            }
+          },
+          {
+            "arguments": [],
+            "keyword": "Given ",
+            "line": 8,
+            "name": "the application is running",
+            "match": {
+              "location": "test\\bdd\\step-definitions\\common.steps.ts:14"
+            },
+            "result": {
+              "status": "passed",
+              "duration": 183300
+            }
+          },
+          {
+            "arguments": [],
+            "keyword": "And ",
+            "line": 9,
+            "name": "I have a valid JWT for tenant \"default-tenant\"",
+            "match": {
+              "location": "test\\bdd\\step-definitions\\auth.steps.ts:12"
+            },
+            "result": {
+              "status": "passed",
+              "duration": 527699
+            }
+          },
+          {
+            "arguments": [
+              {
+                "content": "{ \"email\": \"newteammate@acme.com\", \"role\": \"OPERATOR\" }",
+                "line": 14
+              }
+            ],
+            "keyword": "When ",
+            "line": 13,
+            "name": "I send a POST request to \"/api/v1/invitations\" with body:",
+            "match": {
+              "location": "test\\bdd\\step-definitions\\common.steps.ts:58"
+            },
+            "result": {
+              "status": "passed",
+              "duration": 177305700
+            }
+          },
+          {
+            "arguments": [],
+            "keyword": "Then ",
+            "line": 17,
+            "name": "the response status should be 201",
+            "match": {
+              "location": "test\\bdd\\step-definitions\\common.steps.ts:73"
+            },
+            "result": {
+              "status": "passed",
+              "duration": 45799
+            }
+          },
+          {
+            "arguments": [],
+            "keyword": "And ",
+            "line": 18,
+            "name": "the response should contain a \"email\" field",
+            "match": {
+              "location": "test\\bdd\\step-definitions\\common.steps.ts:114"
+            },
+            "result": {
+              "status": "passed",
+              "duration": 31299
+            }
+          },
+          {
+            "arguments": [],
+            "keyword": "And ",
+            "line": 19,
+            "name": "the response should contain a \"status\" field",
+            "match": {
+              "location": "test\\bdd\\step-definitions\\common.steps.ts:114"
+            },
+            "result": {
+              "status": "passed",
+              "duration": 21999
+            }
+          }
+        ],
+        "tags": [
+          {
+            "name": "@invitations",
+            "line": 1
+          },
+          {
+            "name": "@needs-clean-invitations",
+            "line": 11
+          }
+        ],
+        "type": "scenario"
+      },
+      {
+        "description": "",
+        "id": "team-invitations;list-invitations-is-paginated",
+        "keyword": "Scenario",
+        "line": 21,
+        "name": "List invitations is paginated",
+        "steps": [
+          {
+            "arguments": [],
+            "keyword": "Given ",
+            "line": 8,
+            "name": "the application is running",
+            "match": {
+              "location": "test\\bdd\\step-definitions\\common.steps.ts:14"
+            },
+            "result": {
+              "status": "passed",
+              "duration": 55500
+            }
+          },
+          {
+            "arguments": [],
+            "keyword": "And ",
+            "line": 9,
+            "name": "I have a valid JWT for tenant \"default-tenant\"",
+            "match": {
+              "location": "test\\bdd\\step-definitions\\auth.steps.ts:12"
+            },
+            "result": {
+              "status": "passed",
+              "duration": 306100
+            }
+          },
+          {
+            "arguments": [],
+            "keyword": "When ",
+            "line": 22,
+            "name": "I send a GET request to \"/api/v1/invitations\" with that token",
+            "match": {
+              "location": "test\\bdd\\step-definitions\\common.steps.ts:30"
+            },
+            "result": {
+              "status": "passed",
+              "duration": 7065500
+            }
+          },
+          {
+            "arguments": [],
+            "keyword": "Then ",
+            "line": 23,
+            "name": "the response status should be 200",
+            "match": {
+              "location": "test\\bdd\\step-definitions\\common.steps.ts:73"
+            },
+            "result": {
+              "status": "passed",
+              "duration": 47099
+            }
+          },
+          {
+            "arguments": [],
+            "keyword": "And ",
+            "line": 24,
+            "name": "the response should contain a \"data\" field",
+            "match": {
+              "location": "test\\bdd\\step-definitions\\common.steps.ts:114"
+            },
+            "result": {
+              "status": "passed",
+              "duration": 31300
+            }
+          }
+        ],
+        "tags": [
+          {
+            "name": "@invitations",
+            "line": 1
+          }
+        ],
+        "type": "scenario"
+      },
+      {
+        "description": "",
+        "id": "team-invitations;validating-an-unknown-invitation-token-returns-404",
+        "keyword": "Scenario",
+        "line": 27,
+        "name": "Validating an unknown invitation token returns 404",
+        "steps": [
+          {
+            "arguments": [],
+            "keyword": "Given ",
+            "line": 8,
+            "name": "the application is running",
+            "match": {
+              "location": "test\\bdd\\step-definitions\\common.steps.ts:14"
+            },
+            "result": {
+              "status": "passed",
+              "duration": 58800
+            }
+          },
+          {
+            "arguments": [],
+            "keyword": "And ",
+            "line": 9,
+            "name": "I have a valid JWT for tenant \"default-tenant\"",
+            "match": {
+              "location": "test\\bdd\\step-definitions\\auth.steps.ts:12"
+            },
+            "result": {
+              "status": "passed",
+              "duration": 303700
+            }
+          },
+          {
+            "arguments": [],
+            "keyword": "When ",
+            "line": 28,
+            "name": "I send a GET request to \"/api/v1/invitations/public/nonexistent-token\" without any token",
+            "match": {
+              "location": "test\\bdd\\step-definitions\\common.steps.ts:22"
+            },
+            "result": {
+              "status": "passed",
+              "duration": 5513100
+            }
+          },
+          {
+            "arguments": [],
+            "keyword": "Then ",
+            "line": 29,
+            "name": "the response status should be 404",
+            "match": {
+              "location": "test\\bdd\\step-definitions\\common.steps.ts:73"
+            },
+            "result": {
+              "status": "passed",
+              "duration": 59699
+            }
+          }
+        ],
+        "tags": [
+          {
+            "name": "@invitations",
+            "line": 1
+          },
+          {
+            "name": "@public-endpoint",
+            "line": 26
+          }
+        ],
+        "type": "scenario"
+      },
+      {
+        "description": "",
+        "id": "team-invitations;creating-an-invitation-requires-authentication",
+        "keyword": "Scenario",
+        "line": 32,
+        "name": "Creating an invitation requires authentication",
+        "steps": [
+          {
+            "arguments": [],
+            "keyword": "Given ",
+            "line": 8,
+            "name": "the application is running",
+            "match": {
+              "location": "test\\bdd\\step-definitions\\common.steps.ts:14"
+            },
+            "result": {
+              "status": "passed",
+              "duration": 60900
+            }
+          },
+          {
+            "arguments": [],
+            "keyword": "And ",
+            "line": 9,
+            "name": "I have a valid JWT for tenant \"default-tenant\"",
+            "match": {
+              "location": "test\\bdd\\step-definitions\\auth.steps.ts:12"
+            },
+            "result": {
+              "status": "passed",
+              "duration": 360999
+            }
+          },
+          {
+            "arguments": [],
+            "keyword": "When ",
+            "line": 33,
+            "name": "I send a POST request to \"/api/v1/invitations\" without any token",
+            "match": {
+              "location": "test\\bdd\\step-definitions\\common.steps.ts:22"
+            },
+            "result": {
+              "status": "passed",
+              "duration": 2844500
+            }
+          },
+          {
+            "arguments": [],
+            "keyword": "Then ",
+            "line": 34,
+            "name": "the response status should be 401",
+            "match": {
+              "location": "test\\bdd\\step-definitions\\common.steps.ts:73"
+            },
+            "result": {
+              "status": "passed",
+              "duration": 38099
+            }
+          }
+        ],
+        "tags": [
+          {
+            "name": "@invitations",
+            "line": 1
+          },
+          {
+            "name": "@public-endpoint",
+            "line": 31
+          }
+        ],
+        "type": "scenario"
+      },
+      {
+        "description": "",
+        "id": "team-invitations;validate-a-pending-invitation-token",
+        "keyword": "Scenario",
+        "line": 37,
+        "name": "Validate a pending invitation token",
+        "steps": [
+          {
+            "keyword": "Before",
+            "hidden": true,
+            "result": {
+              "status": "passed",
+              "duration": 33873200
+            }
+          },
+          {
+            "arguments": [],
+            "keyword": "Given ",
+            "line": 8,
+            "name": "the application is running",
+            "match": {
+              "location": "test\\bdd\\step-definitions\\common.steps.ts:14"
+            },
+            "result": {
+              "status": "passed",
+              "duration": 74699
+            }
+          },
+          {
+            "arguments": [],
+            "keyword": "And ",
+            "line": 9,
+            "name": "I have a valid JWT for tenant \"default-tenant\"",
+            "match": {
+              "location": "test\\bdd\\step-definitions\\auth.steps.ts:12"
+            },
+            "result": {
+              "status": "passed",
+              "duration": 319899
+            }
+          },
+          {
+            "arguments": [],
+            "keyword": "When ",
+            "line": 38,
+            "name": "I send a GET request to \"/api/v1/invitations/public/bdd-invite-token\" without any token",
+            "match": {
+              "location": "test\\bdd\\step-definitions\\common.steps.ts:22"
+            },
+            "result": {
+              "status": "passed",
+              "duration": 4004399
+            }
+          },
+          {
+            "arguments": [],
+            "keyword": "Then ",
+            "line": 39,
+            "name": "the response status should be 200",
+            "match": {
+              "location": "test\\bdd\\step-definitions\\common.steps.ts:73"
+            },
+            "result": {
+              "status": "passed",
+              "duration": 42699
+            }
+          },
+          {
+            "arguments": [],
+            "keyword": "And ",
+            "line": 40,
+            "name": "the response should contain a \"email\" field",
+            "match": {
+              "location": "test\\bdd\\step-definitions\\common.steps.ts:114"
+            },
+            "result": {
+              "status": "passed",
+              "duration": 33800
+            }
+          },
+          {
+            "arguments": [],
+            "keyword": "And ",
+            "line": 41,
+            "name": "the response should contain a \"role\" field",
+            "match": {
+              "location": "test\\bdd\\step-definitions\\common.steps.ts:114"
+            },
+            "result": {
+              "status": "passed",
+              "duration": 19699
+            }
+          },
+          {
+            "keyword": "After",
+            "hidden": true,
+            "result": {
+              "status": "passed",
+              "duration": 32674399
+            }
+          }
+        ],
+        "tags": [
+          {
+            "name": "@invitations",
+            "line": 1
+          },
+          {
+            "name": "@public-endpoint",
+            "line": 36
+          },
+          {
+            "name": "@needs-pending-invitation",
+            "line": 36
+          }
+        ],
+        "type": "scenario"
+      },
+      {
+        "description": "",
+        "id": "team-invitations;accept-an-invitation-with-the-matching-ory-identity-provisions-membership",
+        "keyword": "Scenario",
+        "line": 44,
+        "name": "Accept an invitation with the matching Ory identity provisions membership",
+        "steps": [
+          {
+            "keyword": "Before",
+            "hidden": true,
+            "result": {
+              "status": "passed",
+              "duration": 28312500
+            }
+          },
+          {
+            "arguments": [],
+            "keyword": "Given ",
+            "line": 8,
+            "name": "the application is running",
+            "match": {
+              "location": "test\\bdd\\step-definitions\\common.steps.ts:14"
+            },
+            "result": {
+              "status": "passed",
+              "duration": 82300
+            }
+          },
+          {
+            "arguments": [],
+            "keyword": "And ",
+            "line": 9,
+            "name": "I have a valid JWT for tenant \"default-tenant\"",
+            "match": {
+              "location": "test\\bdd\\step-definitions\\auth.steps.ts:12"
+            },
+            "result": {
+              "status": "passed",
+              "duration": 344599
+            }
+          },
+          {
+            "arguments": [],
+            "keyword": "Given ",
+            "line": 45,
+            "name": "I have an invitee token for email \"invitee-bdd@acme.com\"",
+            "match": {
+              "location": "test\\bdd\\step-definitions\\invitation.steps.ts:16"
+            },
+            "result": {
+              "status": "passed",
+              "duration": 410799
+            }
+          },
+          {
+            "arguments": [],
+            "keyword": "When ",
+            "line": 46,
+            "name": "I send a POST request to \"/api/v1/invitations/public/bdd-invite-token/accept\" with that token",
+            "match": {
+              "location": "test\\bdd\\step-definitions\\common.steps.ts:30"
+            },
+            "result": {
+              "status": "passed",
+              "duration": 136761700
+            }
+          },
+          {
+            "arguments": [],
+            "keyword": "Then ",
+            "line": 47,
+            "name": "the response status should be 200",
+            "match": {
+              "location": "test\\bdd\\step-definitions\\common.steps.ts:73"
+            },
+            "result": {
+              "status": "passed",
+              "duration": 42500
+            }
+          },
+          {
+            "arguments": [],
+            "keyword": "And ",
+            "line": 48,
+            "name": "the response should contain a \"id\" field",
+            "match": {
+              "location": "test\\bdd\\step-definitions\\common.steps.ts:114"
+            },
+            "result": {
+              "status": "passed",
+              "duration": 38700
+            }
+          },
+          {
+            "arguments": [],
+            "keyword": "And ",
+            "line": 49,
+            "name": "the response should contain a \"tenant_id\" field",
+            "match": {
+              "location": "test\\bdd\\step-definitions\\common.steps.ts:114"
+            },
+            "result": {
+              "status": "passed",
+              "duration": 18700
+            }
+          },
+          {
+            "keyword": "After",
+            "hidden": true,
+            "result": {
+              "status": "passed",
+              "duration": 106980600
+            }
+          }
+        ],
+        "tags": [
+          {
+            "name": "@invitations",
+            "line": 1
+          },
+          {
+            "name": "@needs-pending-invitation",
+            "line": 43
+          }
+        ],
+        "type": "scenario"
+      },
+      {
+        "description": "",
+        "id": "team-invitations;accepting-with-a-non-matching-email-is-forbidden",
+        "keyword": "Scenario",
+        "line": 52,
+        "name": "Accepting with a non-matching email is forbidden",
+        "steps": [
+          {
+            "keyword": "Before",
+            "hidden": true,
+            "result": {
+              "status": "passed",
+              "duration": 36706899
+            }
+          },
+          {
+            "arguments": [],
+            "keyword": "Given ",
+            "line": 8,
+            "name": "the application is running",
+            "match": {
+              "location": "test\\bdd\\step-definitions\\common.steps.ts:14"
+            },
+            "result": {
+              "status": "passed",
+              "duration": 91800
+            }
+          },
+          {
+            "arguments": [],
+            "keyword": "And ",
+            "line": 9,
+            "name": "I have a valid JWT for tenant \"default-tenant\"",
+            "match": {
+              "location": "test\\bdd\\step-definitions\\auth.steps.ts:12"
+            },
+            "result": {
+              "status": "passed",
+              "duration": 403399
+            }
+          },
+          {
+            "arguments": [],
+            "keyword": "Given ",
+            "line": 53,
+            "name": "I have an invitee token for email \"intruder-bdd@acme.com\"",
+            "match": {
+              "location": "test\\bdd\\step-definitions\\invitation.steps.ts:16"
+            },
+            "result": {
+              "status": "passed",
+              "duration": 485499
+            }
+          },
+          {
+            "arguments": [],
+            "keyword": "When ",
+            "line": 54,
+            "name": "I send a POST request to \"/api/v1/invitations/public/bdd-invite-token/accept\" with that token",
+            "match": {
+              "location": "test\\bdd\\step-definitions\\common.steps.ts:30"
+            },
+            "result": {
+              "status": "passed",
+              "duration": 75453999
+            }
+          },
+          {
+            "arguments": [],
+            "keyword": "Then ",
+            "line": 55,
+            "name": "the response status should be 403",
+            "match": {
+              "location": "test\\bdd\\step-definitions\\common.steps.ts:73"
+            },
+            "result": {
+              "status": "passed",
+              "duration": 71500
+            }
+          },
+          {
+            "keyword": "After",
+            "hidden": true,
+            "result": {
+              "status": "passed",
+              "duration": 26819199
+            }
+          }
+        ],
+        "tags": [
+          {
+            "name": "@invitations",
+            "line": 1
+          },
+          {
+            "name": "@needs-pending-invitation",
+            "line": 51
+          }
+        ],
+        "type": "scenario"
+      }
+    ],
+    "id": "team-invitations",
+    "line": 2,
+    "keyword": "Feature",
+    "name": "Team Invitations",
+    "tags": [
+      {
+        "name": "@invitations",
+        "line": 1
+      }
+    ],
+    "uri": "test\\bdd\\features\\invitation.feature"
+  },
+  {
+    "description": "  As the platform\n  I want every Stripe event applied exactly once, and only when Stripe really sent it\n  So that billing state never drifts from Stripe",
+    "elements": [
+      {
+        "description": "",
+        "id": "stripe-webhooks;a-signed-event-is-applied-once,-and-a-redelivery-is-acknowledged-without-effect",
+        "keyword": "Scenario",
+        "line": 11,
+        "name": "A signed event is applied once, and a redelivery is acknowledged without effect",
+        "steps": [
+          {
+            "keyword": "Before",
+            "hidden": true,
+            "result": {
+              "status": "passed",
+              "duration": 28330299
+            }
+          },
+          {
+            "arguments": [],
+            "keyword": "Given ",
+            "line": 8,
+            "name": "the application is running",
+            "match": {
+              "location": "test\\bdd\\step-definitions\\common.steps.ts:14"
+            },
+            "result": {
+              "status": "passed",
+              "duration": 104699
+            }
+          },
+          {
+            "arguments": [],
+            "keyword": "Given ",
+            "line": 12,
+            "name": "Stripe event \"evt_bdd_subscription_deleted\" was never received",
+            "match": {
+              "location": "test\\bdd\\step-definitions\\stripe-webhook.steps.ts:26"
+            },
+            "result": {
+              "status": "passed",
+              "duration": 45071200
+            }
+          },
+          {
+            "arguments": [],
+            "keyword": "When ",
+            "line": 13,
+            "name": "Stripe delivers a signed \"customer.subscription.deleted\" event \"evt_bdd_subscription_deleted\" for subscription \"sub_bdd_active\"",
+            "match": {
+              "location": "test\\bdd\\step-definitions\\stripe-webhook.steps.ts:30"
+            },
+            "result": {
+              "status": "passed",
+              "duration": 75637300
+            }
+          },
+          {
+            "arguments": [],
+            "keyword": "Then ",
+            "line": 14,
+            "name": "the response status should be 200",
+            "match": {
+              "location": "test\\bdd\\step-definitions\\common.steps.ts:73"
+            },
+            "result": {
+              "status": "passed",
+              "duration": 48600
+            }
+          },
+          {
+            "arguments": [],
+            "keyword": "And ",
+            "line": 15,
+            "name": "tenant \"default-tenant\" billing is on plan \"Free\" with status \"canceled\"",
+            "match": {
+              "location": "test\\bdd\\step-definitions\\stripe-webhook.steps.ts:53"
+            },
+            "result": {
+              "status": "passed",
+              "duration": 1994400
+            }
+          },
+          {
+            "arguments": [],
+            "keyword": "And ",
+            "line": 16,
+            "name": "Stripe event \"evt_bdd_subscription_deleted\" is recorded as \"processed\"",
+            "match": {
+              "location": "test\\bdd\\step-definitions\\stripe-webhook.steps.ts:59"
+            },
+            "result": {
+              "status": "passed",
+              "duration": 1495299
+            }
+          },
+          {
+            "arguments": [],
+            "keyword": "When ",
+            "line": 17,
+            "name": "Stripe delivers the same event again",
+            "match": {
+              "location": "test\\bdd\\step-definitions\\stripe-webhook.steps.ts:44"
+            },
+            "result": {
+              "status": "passed",
+              "duration": 33905499
+            }
+          },
+          {
+            "arguments": [],
+            "keyword": "Then ",
+            "line": 18,
+            "name": "the response status should be 200",
+            "match": {
+              "location": "test\\bdd\\step-definitions\\common.steps.ts:73"
+            },
+            "result": {
+              "status": "passed",
+              "duration": 66600
+            }
+          },
+          {
+            "arguments": [],
+            "keyword": "And ",
+            "line": 19,
+            "name": "Stripe event \"evt_bdd_subscription_deleted\" was applied exactly once",
+            "match": {
+              "location": "test\\bdd\\step-definitions\\stripe-webhook.steps.ts:64"
+            },
+            "result": {
+              "status": "passed",
+              "duration": 6825200
+            }
+          },
+          {
+            "keyword": "After",
+            "hidden": true,
+            "result": {
+              "status": "passed",
+              "duration": 32003199
+            }
+          }
+        ],
+        "tags": [
+          {
+            "name": "@billing",
+            "line": 1
+          },
+          {
+            "name": "@stripe-webhook",
+            "line": 1
+          },
+          {
+            "name": "@needs-active-subscription",
+            "line": 10
+          }
+        ],
+        "type": "scenario"
+      },
+      {
+        "description": "",
+        "id": "stripe-webhooks;an-event-with-an-invalid-signature-is-rejected-and-not-recorded",
+        "keyword": "Scenario",
+        "line": 21,
+        "name": "An event with an invalid signature is rejected and not recorded",
+        "steps": [
+          {
+            "arguments": [],
+            "keyword": "Given ",
+            "line": 8,
+            "name": "the application is running",
+            "match": {
+              "location": "test\\bdd\\step-definitions\\common.steps.ts:14"
+            },
+            "result": {
+              "status": "passed",
+              "duration": 164099
+            }
+          },
+          {
+            "arguments": [],
+            "keyword": "When ",
+            "line": 22,
+            "name": "a Stripe event arrives with an invalid signature",
+            "match": {
+              "location": "test\\bdd\\step-definitions\\stripe-webhook.steps.ts:48"
+            },
+            "result": {
+              "status": "passed",
+              "duration": 4791499
+            }
+          },
+          {
+            "arguments": [],
+            "keyword": "Then ",
+            "line": 23,
+            "name": "the response status should be 400",
+            "match": {
+              "location": "test\\bdd\\step-definitions\\common.steps.ts:73"
+            },
+            "result": {
+              "status": "passed",
+              "duration": 59000
+            }
+          },
+          {
+            "arguments": [],
+            "keyword": "And ",
+            "line": 24,
+            "name": "Stripe event \"evt_bdd_forged\" is not recorded",
+            "match": {
+              "location": "test\\bdd\\step-definitions\\stripe-webhook.steps.ts:70"
+            },
+            "result": {
+              "status": "passed",
+              "duration": 1861199
+            }
+          }
+        ],
+        "tags": [
+          {
+            "name": "@billing",
+            "line": 1
+          },
+          {
+            "name": "@stripe-webhook",
+            "line": 1
+          }
+        ],
+        "type": "scenario"
+      }
+    ],
+    "id": "stripe-webhooks",
+    "line": 2,
+    "keyword": "Feature",
+    "name": "Stripe webhooks",
+    "tags": [
+      {
+        "name": "@billing",
+        "line": 1
+      },
+      {
+        "name": "@stripe-webhook",
+        "line": 1
+      }
+    ],
+    "uri": "test\\bdd\\features\\stripe-webhook.feature"
+  },
+  {
     "description": "  As the platform\n  I want to enforce tenant status restrictions on protected endpoints\n  So that suspended or locked tenants cannot access resources",
     "elements": [
       {
@@ -996,8 +2440,8 @@
             "keyword": "Before",
             "hidden": true,
             "result": {
-              "status": "skipped",
-              "duration": 0
+              "status": "passed",
+              "duration": 71609600
             }
           },
           {
@@ -1006,11 +2450,11 @@
             "line": 8,
             "name": "the application is running",
             "match": {
-              "location": "test\\bdd\\step-definitions\\common.steps.ts:13"
+              "location": "test\\bdd\\step-definitions\\common.steps.ts:14"
             },
             "result": {
-              "status": "skipped",
-              "duration": 0
+              "status": "passed",
+              "duration": 123400
             }
           },
           {
@@ -1022,8 +2466,8 @@
               "location": "test\\bdd\\step-definitions\\tenant-guards.steps.ts:14"
             },
             "result": {
-              "status": "skipped",
-              "duration": 0
+              "status": "passed",
+              "duration": 537000
             }
           },
           {
@@ -1032,11 +2476,11 @@
             "line": 13,
             "name": "I send a GET request to \"/api/v1/billings/subscription\" with that token",
             "match": {
-              "location": "test\\bdd\\step-definitions\\common.steps.ts:25"
+              "location": "test\\bdd\\step-definitions\\common.steps.ts:30"
             },
             "result": {
-              "status": "skipped",
-              "duration": 0
+              "status": "passed",
+              "duration": 6281899
             }
           },
           {
@@ -1045,45 +2489,45 @@
             "line": 14,
             "name": "the response status should be 403",
             "match": {
-              "location": "test\\bdd\\step-definitions\\common.steps.ts:47"
+              "location": "test\\bdd\\step-definitions\\common.steps.ts:73"
             },
             "result": {
-              "status": "skipped",
-              "duration": 0
+              "status": "passed",
+              "duration": 48099
             }
           },
           {
             "arguments": [],
             "keyword": "And ",
             "line": 15,
-            "name": "the response should contain errorCode \"TENANT_SUSPENDED\"",
+            "name": "the response should contain errorCode \"tenant_suspended\"",
             "match": {
-              "location": "test\\bdd\\step-definitions\\common.steps.ts:101"
+              "location": "test\\bdd\\step-definitions\\common.steps.ts:130"
             },
             "result": {
-              "status": "skipped",
-              "duration": 0
+              "status": "passed",
+              "duration": 29099
             }
           },
           {
             "arguments": [],
             "keyword": "And ",
             "line": 16,
-            "name": "the response should contain a \"title\" field with value \"Forbidden\"",
+            "name": "the response error should contain a \"message\" field",
             "match": {
-              "location": "test\\bdd\\step-definitions\\common.steps.ts:94"
+              "location": "test\\bdd\\step-definitions\\common.steps.ts:140"
             },
             "result": {
-              "status": "skipped",
-              "duration": 0
+              "status": "passed",
+              "duration": 79700
             }
           },
           {
             "keyword": "After",
             "hidden": true,
             "result": {
-              "status": "skipped",
-              "duration": 0
+              "status": "passed",
+              "duration": 197662800
             }
           }
         ],
@@ -1110,8 +2554,8 @@
             "keyword": "Before",
             "hidden": true,
             "result": {
-              "status": "skipped",
-              "duration": 0
+              "status": "passed",
+              "duration": 58091599
             }
           },
           {
@@ -1120,11 +2564,11 @@
             "line": 8,
             "name": "the application is running",
             "match": {
-              "location": "test\\bdd\\step-definitions\\common.steps.ts:13"
+              "location": "test\\bdd\\step-definitions\\common.steps.ts:14"
             },
             "result": {
-              "status": "skipped",
-              "duration": 0
+              "status": "passed",
+              "duration": 99500
             }
           },
           {
@@ -1136,8 +2580,8 @@
               "location": "test\\bdd\\step-definitions\\tenant-guards.steps.ts:14"
             },
             "result": {
-              "status": "skipped",
-              "duration": 0
+              "status": "passed",
+              "duration": 590199
             }
           },
           {
@@ -1146,11 +2590,11 @@
             "line": 21,
             "name": "I send a GET request to \"/api/v1/billings/subscription\" with that token",
             "match": {
-              "location": "test\\bdd\\step-definitions\\common.steps.ts:25"
+              "location": "test\\bdd\\step-definitions\\common.steps.ts:30"
             },
             "result": {
-              "status": "skipped",
-              "duration": 0
+              "status": "passed",
+              "duration": 7824500
             }
           },
           {
@@ -1159,32 +2603,32 @@
             "line": 22,
             "name": "the response status should be 403",
             "match": {
-              "location": "test\\bdd\\step-definitions\\common.steps.ts:47"
+              "location": "test\\bdd\\step-definitions\\common.steps.ts:73"
             },
             "result": {
-              "status": "skipped",
-              "duration": 0
+              "status": "passed",
+              "duration": 63600
             }
           },
           {
             "arguments": [],
             "keyword": "And ",
             "line": 23,
-            "name": "the response should contain errorCode \"TENANT_LOCKED\"",
+            "name": "the response should contain errorCode \"tenant_locked\"",
             "match": {
-              "location": "test\\bdd\\step-definitions\\common.steps.ts:101"
+              "location": "test\\bdd\\step-definitions\\common.steps.ts:130"
             },
             "result": {
-              "status": "skipped",
-              "duration": 0
+              "status": "passed",
+              "duration": 30699
             }
           },
           {
             "keyword": "After",
             "hidden": true,
             "result": {
-              "status": "skipped",
-              "duration": 0
+              "status": "passed",
+              "duration": 57298600
             }
           }
         ],
@@ -1211,8 +2655,8 @@
             "keyword": "Before",
             "hidden": true,
             "result": {
-              "status": "skipped",
-              "duration": 0
+              "status": "passed",
+              "duration": 66450099
             }
           },
           {
@@ -1221,11 +2665,11 @@
             "line": 8,
             "name": "the application is running",
             "match": {
-              "location": "test\\bdd\\step-definitions\\common.steps.ts:13"
+              "location": "test\\bdd\\step-definitions\\common.steps.ts:14"
             },
             "result": {
-              "status": "skipped",
-              "duration": 0
+              "status": "passed",
+              "duration": 137200
             }
           },
           {
@@ -1237,8 +2681,8 @@
               "location": "test\\bdd\\step-definitions\\tenant-guards.steps.ts:14"
             },
             "result": {
-              "status": "skipped",
-              "duration": 0
+              "status": "passed",
+              "duration": 637800
             }
           },
           {
@@ -1247,11 +2691,11 @@
             "line": 28,
             "name": "I send a GET request to \"/api/v1/billings/subscription\" with that token",
             "match": {
-              "location": "test\\bdd\\step-definitions\\common.steps.ts:25"
+              "location": "test\\bdd\\step-definitions\\common.steps.ts:30"
             },
             "result": {
-              "status": "skipped",
-              "duration": 0
+              "status": "passed",
+              "duration": 5143199
             }
           },
           {
@@ -1260,58 +2704,110 @@
             "line": 29,
             "name": "the response status should be 403",
             "match": {
-              "location": "test\\bdd\\step-definitions\\common.steps.ts:47"
+              "location": "test\\bdd\\step-definitions\\common.steps.ts:73"
             },
             "result": {
-              "status": "skipped",
-              "duration": 0
+              "status": "passed",
+              "duration": 45099
             }
           },
           {
             "arguments": [],
             "keyword": "And ",
             "line": 30,
-            "name": "the response should contain a \"title\" field with value \"Forbidden\"",
+            "name": "the response error should contain a \"type\" field",
             "match": {
-              "location": "test\\bdd\\step-definitions\\common.steps.ts:94"
+              "location": "test\\bdd\\step-definitions\\common.steps.ts:140"
             },
             "result": {
-              "status": "skipped",
-              "duration": 0
+              "status": "passed",
+              "duration": 30299
             }
           },
           {
             "arguments": [],
             "keyword": "And ",
             "line": 31,
-            "name": "the response should contain a \"detail\" field",
+            "name": "the response error should contain a \"code\" field",
             "match": {
-              "location": "test\\bdd\\step-definitions\\common.steps.ts:88"
+              "location": "test\\bdd\\step-definitions\\common.steps.ts:140"
             },
             "result": {
-              "status": "skipped",
-              "duration": 0
+              "status": "passed",
+              "duration": 22100
             }
           },
           {
             "arguments": [],
             "keyword": "And ",
             "line": 32,
-            "name": "the response should contain a \"errorCode\" field",
+            "name": "the response error should contain a \"message\" field",
             "match": {
-              "location": "test\\bdd\\step-definitions\\common.steps.ts:88"
+              "location": "test\\bdd\\step-definitions\\common.steps.ts:140"
             },
             "result": {
-              "status": "skipped",
-              "duration": 0
+              "status": "passed",
+              "duration": 29399
+            }
+          },
+          {
+            "arguments": [],
+            "keyword": "And ",
+            "line": 33,
+            "name": "the response error should contain a \"request_id\" field",
+            "match": {
+              "location": "test\\bdd\\step-definitions\\common.steps.ts:140"
+            },
+            "result": {
+              "status": "passed",
+              "duration": 22999
+            }
+          },
+          {
+            "arguments": [],
+            "keyword": "And ",
+            "line": 34,
+            "name": "the response error should contain a \"doc_url\" field",
+            "match": {
+              "location": "test\\bdd\\step-definitions\\common.steps.ts:140"
+            },
+            "result": {
+              "status": "passed",
+              "duration": 18799
+            }
+          },
+          {
+            "arguments": [],
+            "keyword": "And ",
+            "line": 35,
+            "name": "the response should carry the header \"X-Request-Id\"",
+            "match": {
+              "location": "test\\bdd\\step-definitions\\common.steps.ts:145"
+            },
+            "result": {
+              "status": "passed",
+              "duration": 94199
+            }
+          },
+          {
+            "arguments": [],
+            "keyword": "And ",
+            "line": 36,
+            "name": "the error request_id should match the X-Request-Id header",
+            "match": {
+              "location": "test\\bdd\\step-definitions\\common.steps.ts:150"
+            },
+            "result": {
+              "status": "passed",
+              "duration": 32500
             }
           },
           {
             "keyword": "After",
             "hidden": true,
             "result": {
-              "status": "skipped",
-              "duration": 0
+              "status": "passed",
+              "duration": 59326400
             }
           }
         ],
@@ -1331,15 +2827,15 @@
         "description": "",
         "id": "tenant-status-guards;active-tenant-passes-the-tenant-status-guard",
         "keyword": "Scenario",
-        "line": 35,
+        "line": 39,
         "name": "Active tenant passes the tenant status guard",
         "steps": [
           {
             "keyword": "Before",
             "hidden": true,
             "result": {
-              "status": "skipped",
-              "duration": 0
+              "status": "passed",
+              "duration": 65958299
             }
           },
           {
@@ -1348,58 +2844,58 @@
             "line": 8,
             "name": "the application is running",
             "match": {
-              "location": "test\\bdd\\step-definitions\\common.steps.ts:13"
+              "location": "test\\bdd\\step-definitions\\common.steps.ts:14"
             },
             "result": {
-              "status": "skipped",
-              "duration": 0
+              "status": "passed",
+              "duration": 157500
             }
           },
           {
             "arguments": [],
             "keyword": "Given ",
-            "line": 36,
+            "line": 40,
             "name": "I have a valid JWT for the current fixture tenant",
             "match": {
               "location": "test\\bdd\\step-definitions\\tenant-guards.steps.ts:14"
             },
             "result": {
-              "status": "skipped",
-              "duration": 0
+              "status": "passed",
+              "duration": 596799
             }
           },
           {
             "arguments": [],
             "keyword": "When ",
-            "line": 37,
+            "line": 41,
             "name": "I send a GET request to \"/api/v1/billings/subscription\" with that token",
             "match": {
-              "location": "test\\bdd\\step-definitions\\common.steps.ts:25"
+              "location": "test\\bdd\\step-definitions\\common.steps.ts:30"
             },
             "result": {
-              "status": "skipped",
-              "duration": 0
+              "status": "passed",
+              "duration": 18983599
             }
           },
           {
             "arguments": [],
             "keyword": "Then ",
-            "line": 38,
+            "line": 42,
             "name": "the response status is not 403",
             "match": {
-              "location": "test\\bdd\\step-definitions\\common.steps.ts:56"
+              "location": "test\\bdd\\step-definitions\\common.steps.ts:82"
             },
             "result": {
-              "status": "skipped",
-              "duration": 0
+              "status": "passed",
+              "duration": 48900
             }
           },
           {
             "keyword": "After",
             "hidden": true,
             "result": {
-              "status": "skipped",
-              "duration": 0
+              "status": "passed",
+              "duration": 53929100
             }
           }
         ],
@@ -1410,7 +2906,7 @@
           },
           {
             "name": "@needs-active-tenant",
-            "line": 34
+            "line": 38
           }
         ],
         "type": "scenario"
@@ -1419,7 +2915,7 @@
         "description": "",
         "id": "tenant-status-guards;public-endpoint-bypasses-tenant-status-guard-entirely",
         "keyword": "Scenario",
-        "line": 41,
+        "line": 45,
         "name": "Public endpoint bypasses tenant status guard entirely",
         "steps": [
           {
@@ -1428,37 +2924,37 @@
             "line": 8,
             "name": "the application is running",
             "match": {
-              "location": "test\\bdd\\step-definitions\\common.steps.ts:13"
+              "location": "test\\bdd\\step-definitions\\common.steps.ts:14"
             },
             "result": {
-              "status": "skipped",
-              "duration": 0
+              "status": "passed",
+              "duration": 89899
             }
           },
           {
             "arguments": [],
             "keyword": "When ",
-            "line": 42,
+            "line": 46,
             "name": "I send a GET request to \"/api/v1/billings/plans\" without any token",
             "match": {
-              "location": "test\\bdd\\step-definitions\\common.steps.ts:21"
+              "location": "test\\bdd\\step-definitions\\common.steps.ts:22"
             },
             "result": {
-              "status": "skipped",
-              "duration": 0
+              "status": "passed",
+              "duration": 3685099
             }
           },
           {
             "arguments": [],
             "keyword": "Then ",
-            "line": 43,
+            "line": 47,
             "name": "the response status should be 200",
             "match": {
-              "location": "test\\bdd\\step-definitions\\common.steps.ts:47"
+              "location": "test\\bdd\\step-definitions\\common.steps.ts:73"
             },
             "result": {
-              "status": "skipped",
-              "duration": 0
+              "status": "passed",
+              "duration": 39900
             }
           }
         ],
@@ -1469,7 +2965,7 @@
           },
           {
             "name": "@public-endpoint",
-            "line": 40
+            "line": 44
           }
         ],
         "type": "scenario"
@@ -1486,5 +2982,317 @@
       }
     ],
     "uri": "test\\bdd\\features\\tenant-guards.feature"
+  },
+  {
+    "description": "  As an authenticated tenant\n  I want to read and update my tenant settings\n  So that branding and preferences persist per tenant",
+    "elements": [
+      {
+        "description": "",
+        "id": "tenant-settings;upsert-tenant-settings-then-read-them-back-from-current",
+        "keyword": "Scenario",
+        "line": 11,
+        "name": "Upsert tenant settings then read them back from current",
+        "steps": [
+          {
+            "arguments": [],
+            "keyword": "Given ",
+            "line": 8,
+            "name": "the application is running",
+            "match": {
+              "location": "test\\bdd\\step-definitions\\common.steps.ts:14"
+            },
+            "result": {
+              "status": "passed",
+              "duration": 47500
+            }
+          },
+          {
+            "arguments": [],
+            "keyword": "And ",
+            "line": 9,
+            "name": "I have a valid JWT for tenant \"default-tenant\"",
+            "match": {
+              "location": "test\\bdd\\step-definitions\\auth.steps.ts:12"
+            },
+            "result": {
+              "status": "passed",
+              "duration": 295900
+            }
+          },
+          {
+            "arguments": [
+              {
+                "content": "{ \"branding\": { \"primaryColor\": \"#112233\" }, \"general\": { \"timezone\": \"UTC\" } }",
+                "line": 13
+              }
+            ],
+            "keyword": "When ",
+            "line": 12,
+            "name": "I send a PUT request to \"/api/v1/tenant-settings\" with body:",
+            "match": {
+              "location": "test\\bdd\\step-definitions\\common.steps.ts:58"
+            },
+            "result": {
+              "status": "passed",
+              "duration": 34313200
+            }
+          },
+          {
+            "arguments": [],
+            "keyword": "Then ",
+            "line": 16,
+            "name": "the response status should be 200",
+            "match": {
+              "location": "test\\bdd\\step-definitions\\common.steps.ts:73"
+            },
+            "result": {
+              "status": "passed",
+              "duration": 42600
+            }
+          },
+          {
+            "arguments": [],
+            "keyword": "And ",
+            "line": 17,
+            "name": "the response should contain a \"tenant_id\" field",
+            "match": {
+              "location": "test\\bdd\\step-definitions\\common.steps.ts:114"
+            },
+            "result": {
+              "status": "passed",
+              "duration": 26300
+            }
+          },
+          {
+            "arguments": [],
+            "keyword": "And ",
+            "line": 18,
+            "name": "the response should contain a \"branding\" field",
+            "match": {
+              "location": "test\\bdd\\step-definitions\\common.steps.ts:114"
+            },
+            "result": {
+              "status": "passed",
+              "duration": 32600
+            }
+          },
+          {
+            "arguments": [],
+            "keyword": "When ",
+            "line": 19,
+            "name": "I send a GET request to \"/api/v1/tenant-settings/current\" with that token",
+            "match": {
+              "location": "test\\bdd\\step-definitions\\common.steps.ts:30"
+            },
+            "result": {
+              "status": "passed",
+              "duration": 7342800
+            }
+          },
+          {
+            "arguments": [],
+            "keyword": "Then ",
+            "line": 20,
+            "name": "the response status should be 200",
+            "match": {
+              "location": "test\\bdd\\step-definitions\\common.steps.ts:73"
+            },
+            "result": {
+              "status": "passed",
+              "duration": 49200
+            }
+          },
+          {
+            "arguments": [],
+            "keyword": "And ",
+            "line": 21,
+            "name": "the response should contain a \"tenant_id\" field",
+            "match": {
+              "location": "test\\bdd\\step-definitions\\common.steps.ts:114"
+            },
+            "result": {
+              "status": "passed",
+              "duration": 25300
+            }
+          }
+        ],
+        "tags": [
+          {
+            "name": "@tenant-settings",
+            "line": 1
+          }
+        ],
+        "type": "scenario"
+      },
+      {
+        "description": "",
+        "id": "tenant-settings;upsert-updates-existing-settings-in-place-(singleton-per-tenant)",
+        "keyword": "Scenario",
+        "line": 23,
+        "name": "Upsert updates existing settings in place (singleton per tenant)",
+        "steps": [
+          {
+            "arguments": [],
+            "keyword": "Given ",
+            "line": 8,
+            "name": "the application is running",
+            "match": {
+              "location": "test\\bdd\\step-definitions\\common.steps.ts:14"
+            },
+            "result": {
+              "status": "passed",
+              "duration": 61499
+            }
+          },
+          {
+            "arguments": [],
+            "keyword": "And ",
+            "line": 9,
+            "name": "I have a valid JWT for tenant \"default-tenant\"",
+            "match": {
+              "location": "test\\bdd\\step-definitions\\auth.steps.ts:12"
+            },
+            "result": {
+              "status": "passed",
+              "duration": 360100
+            }
+          },
+          {
+            "arguments": [
+              {
+                "content": "{ \"general\": { \"locale\": \"en-US\" } }",
+                "line": 25
+              }
+            ],
+            "keyword": "When ",
+            "line": 24,
+            "name": "I send a PUT request to \"/api/v1/tenant-settings\" with body:",
+            "match": {
+              "location": "test\\bdd\\step-definitions\\common.steps.ts:58"
+            },
+            "result": {
+              "status": "passed",
+              "duration": 50080200
+            }
+          },
+          {
+            "arguments": [],
+            "keyword": "Then ",
+            "line": 28,
+            "name": "the response status should be 200",
+            "match": {
+              "location": "test\\bdd\\step-definitions\\common.steps.ts:73"
+            },
+            "result": {
+              "status": "passed",
+              "duration": 68800
+            }
+          },
+          {
+            "arguments": [],
+            "keyword": "And ",
+            "line": 29,
+            "name": "the response should contain a \"general\" field",
+            "match": {
+              "location": "test\\bdd\\step-definitions\\common.steps.ts:114"
+            },
+            "result": {
+              "status": "passed",
+              "duration": 43299
+            }
+          }
+        ],
+        "tags": [
+          {
+            "name": "@tenant-settings",
+            "line": 1
+          }
+        ],
+        "type": "scenario"
+      },
+      {
+        "description": "",
+        "id": "tenant-settings;reading-settings-requires-authentication",
+        "keyword": "Scenario",
+        "line": 32,
+        "name": "Reading settings requires authentication",
+        "steps": [
+          {
+            "arguments": [],
+            "keyword": "Given ",
+            "line": 8,
+            "name": "the application is running",
+            "match": {
+              "location": "test\\bdd\\step-definitions\\common.steps.ts:14"
+            },
+            "result": {
+              "status": "passed",
+              "duration": 87400
+            }
+          },
+          {
+            "arguments": [],
+            "keyword": "And ",
+            "line": 9,
+            "name": "I have a valid JWT for tenant \"default-tenant\"",
+            "match": {
+              "location": "test\\bdd\\step-definitions\\auth.steps.ts:12"
+            },
+            "result": {
+              "status": "passed",
+              "duration": 390599
+            }
+          },
+          {
+            "arguments": [],
+            "keyword": "When ",
+            "line": 33,
+            "name": "I send a GET request to \"/api/v1/tenant-settings/current\" without any token",
+            "match": {
+              "location": "test\\bdd\\step-definitions\\common.steps.ts:22"
+            },
+            "result": {
+              "status": "passed",
+              "duration": 3405000
+            }
+          },
+          {
+            "arguments": [],
+            "keyword": "Then ",
+            "line": 34,
+            "name": "the response status should be 401",
+            "match": {
+              "location": "test\\bdd\\step-definitions\\common.steps.ts:73"
+            },
+            "result": {
+              "status": "passed",
+              "duration": 39100
+            }
+          }
+        ],
+        "tags": [
+          {
+            "name": "@tenant-settings",
+            "line": 1
+          },
+          {
+            "name": "@public-endpoint",
+            "line": 31
+          }
+        ],
+        "type": "scenario"
+      }
+    ],
+    "id": "tenant-settings",
+    "line": 2,
+    "keyword": "Feature",
+    "name": "Tenant Settings",
+    "tags": [
+      {
+        "name": "@tenant-settings",
+        "line": 1
+      }
+    ],
+    "uri": "test\\bdd\\features\\tenant-settings.feature"
   }
 ]
