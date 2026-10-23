@@ -21,12 +21,12 @@ the suite requires and no document defines, so it is deliberately recorded rathe
 |---|---|
 | Product Spec | 7 |
 | API Contract | 8 |
-| Event Model | 9 |
+| Event Model | 10 |
 | DB Model | 8 |
 | Architecture | 6 |
 | Per-Pulse Event Flows | 1 |
 | Failure & Observability | 2 |
-| **Total** | **41** |
+| **Total** | **42** |
 
 Service NOTE.md files hold the full reasoning: `referral-pulse-event-svc/NOTE.md` §11,
 `referral-pulse-tenant-svc/NOTE.md` §V5, `referral-pulse-analytics-svc/NOTE.md` §A5,
@@ -313,6 +313,29 @@ belong.
   The alternative — each consumer remembering `reward_id → recipient_type` from the earlier
   `reward.earned` — makes every consumer hold reward facts it does not own, to recover a field the
   producer already had.
+
+### D-42 · R-ATT-05 requires an analytics rollup by a dimension no event carries
+
+- **Says** R-ATT-05: "ClickHouse rollups sum attributed MRR/ARR by participant, variant, **segment**
+  and **cohort month**."
+- **Against** The envelope has no segment. §2's `attribution_context` carries participant · referral ·
+  campaign · program · variant, and §1's scope note defers "compliance, identity-access,
+  campaign/program, **segmentation**, attribution-analytics and AI" to Event Model v2.1 — the document
+  **D-02** records as missing from every repo. So the dimension is unpopulatable by the service the
+  rule assigns it to, for the same reason `program_id` was before it was added to the envelope.
+  "Cohort month" is a second problem of a different kind: it is specified by name only, and a cohort
+  needs an acquisition month — of the participant, or of the referral? — carried onto every later
+  revenue event, which is a definition rather than a column.
+- **Built** The two dimensions that are reachable, which were also missing: `total_attributed_mrr` and
+  `total_attributed_arr` on the participant and variant rollups (analytics NOTE.md §A5.12, migration
+  026). Until then **no** rollup summed recurring revenue on **any** dimension, so the participant
+  leaderboard — the product's headline ranking — ranked twelve £10/month subscribers below one £200
+  one-off purchase, which is precisely what R-ATT-05's first sentence forbids: "credit is measured in
+  recurring revenue, not signup counts".
+- **Fix** Either put `segment_id` on the tracked-event `attribution_context` (and say which segment,
+  since a participant can be in several), or drop the segment dimension from R-ATT-05 and say where
+  segment-grained revenue is meant to be read instead. Separately, define the cohort: which date
+  anchors it, and which events carry it forward.
 
 ---
 
