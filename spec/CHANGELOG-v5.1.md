@@ -25,7 +25,8 @@ the suite requires and no document defines, so it is deliberately recorded rathe
 | DB Model | 8 |
 | Architecture | 6 |
 | Per-Pulse Event Flows | 1 |
-| **Total** | **38** |
+| Failure & Observability | 2 |
+| **Total** | **40** |
 
 Service NOTE.md files hold the full reasoning: `referral-pulse-event-svc/NOTE.md` §11,
 `referral-pulse-tenant-svc/NOTE.md` §V5, `referral-pulse-analytics-svc/NOTE.md` §A5,
@@ -491,6 +492,45 @@ belong.
 - **Fix** Drop the "5 s" from the flow tables, or state the actual contract: durable on ack, visible
   to a query in well under a second. Other services are reading "5 s" as the freshness they can
   promise a dashboard, and it is neither the floor nor the ceiling.
+
+---
+
+## Failure & Observability Model
+
+### D-39 · §4.4 gives `resolve-link` a status code the API Contract contradicts
+
+- **Says** §4.4, on a blocked participant: "their referral links **resolve to 410** with no cookie set
+  and touches rejected at the guard", and then: "A **410 on resolve-link** therefore has two meanings
+  — expired link or blocked participant — and triage must distinguish them."
+- **Against** API Contract §4.2, which owns the endpoint: "Invalid/expired/revoked codes return
+  `{ "valid": false, "reason": "..." }`" — a 200 with a discriminated result, not an error status.
+- **Built** The API Contract's version, because it is the authority for an HTTP endpoint and because
+  it is the better design: `reason` is one of `unknown_code` · `referrer_blocked` · `link_expired` ·
+  `campaign_ended`, so the SDK can tell them apart and a normal unknown code does not put a 410 in
+  the client's browser console. The triage problem §4.4 then complains about **does not exist** —
+  the field it says is missing is the field that is there.
+- **Fix** Correct §4.4 to the `{valid, reason}` contract and drop the "two meanings" caveat. It
+  describes a pre-v5 design, and a reader who implements §4.4 as written breaks the SDK.
+
+### D-40 · §4.1's DLQ names are not a convention any service can follow
+
+- **Says** §4.1 names one DLQ per service — `dlq-event-ingestion`, `dlq-workflow-runtime`,
+  `dlq-attribution`, `dlq-reward-eval`, `dlq-fraud`, `dlq-webhooks`, and `dlq-integrations` for
+  "Event Ingestion — inbound deployment" — each with its own alert threshold.
+- **Against** A service consumes several queues, and the DLQ is a property of the queue, not of the
+  service: SQS redrive is configured per queue. One DLQ per service would mean every queue of that
+  service redriving into the same place, which loses which queue failed.
+- **Built** `<queue-name>-dlq.fifo`, derived per queue (`DlqConsumerService.deriveDlqUrl`). The
+  substance of §4.1 holds — every consumer's retry exhaustion lands in a DLQ, none is auto-replayed —
+  but none of the seven names in the table exists.
+  **And `dlq-integrations` cannot exist as described:** the inbound deployment's receivers are HTTP,
+  not queue consumers. A provider payload that fails is a 5xx the provider retries, and once verified
+  it is a receipt plus an outbox row in one transaction — so its failure surface is a stuck outbox
+  row, which the relay worker owns, not a queue with a redrive policy.
+- **Fix** Either state the naming convention as `<queue>-dlq.fifo` and give the thresholds per queue,
+  or keep the service-level table as a logical grouping and say so. For the inbound deployment, say
+  that the outbox is the failure surface — a reader looking for `dlq-integrations` will not find it
+  and may conclude the path is unguarded.
 
 ---
 
