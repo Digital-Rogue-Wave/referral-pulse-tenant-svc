@@ -15,6 +15,18 @@ export enum BillingPlanEnum {
     ENTERPRISE = 'Enterprise'
 }
 
+const PLAN_BY_LOWER_NAME = new Map<string, BillingPlanEnum>(Object.values(BillingPlanEnum).map((plan) => [plan.toLowerCase(), plan]));
+
+/**
+ * The canonical plan for a name written in any casing (`FREE`, `free`, ` Free `), or null for a name that is
+ * not one of the five (a custom plan). Anything that reads a plan name from outside this service (a Stripe
+ * product name) goes through here, so the stored names stay `BillingPlanEnum` values whatever the source's
+ * casing. Renaming a plan then means changing `BillingPlanEnum` (plus a data migration), nothing else.
+ */
+export function canonicalPlanName(name: string | null | undefined): BillingPlanEnum | null {
+    return name ? (PLAN_BY_LOWER_NAME.get(name.trim().toLowerCase()) ?? null) : null;
+}
+
 /**
  * Subscription state, mirroring Stripe's subscription statuses (`incomplete_expired` is recorded as
  * `canceled`). `none` means the tenant never subscribed.

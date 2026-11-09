@@ -20,6 +20,7 @@ model Plan {
 model Billing {
   id                      String    @id @default(ulid()) @db.VarChar(26)
   tenantId                String    @unique @map("tenant_id") @db.VarChar(26)
+  // A BillingPlanEnum value; the default is BillingPlanEnum.FREE (Prisma can't reference the enum).
   plan                    String    @default("Free") @db.VarChar(50)
   status                  String    @default("none") @db.VarChar(50)
   stripeCustomerId        String?   @map("stripe_customer_id") @db.VarChar(255)

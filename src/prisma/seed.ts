@@ -26,6 +26,7 @@ dotenv.config({ path: path.resolve(process.cwd(), '.env.development') });
 dotenv.config(); // fallback to .env
 
 import { ROLE_GRANTS } from '../common/auth/authz/permission-catalog';
+import { BillingPlanEnum } from '../common/enums/billing.enum';
 import { RoleEnum } from '../common/enums/role.enum';
 import { PrismaClient } from './generated/client';
 import { PrismaPg } from '@prisma/adapter-pg';
@@ -44,21 +45,21 @@ const TEST_TENANT_ID = 'AZP-772-OMEGA';
 const DEFAULT_TENANT_ID = 'default-tenant';
 
 /** Stripe Price IDs — read from env so the seed works in all environments. */
-const STRIPE_PRICE = {
-    Free: process.env.STRIPE_FREE_PRICE_ID ?? '',
-    Starter: process.env.STRIPE_STARTER_PRICE_ID ?? '',
-    Growth: process.env.STRIPE_GROWTH_PRICE_ID ?? '',
-    Scale: process.env.STRIPE_SCALE_PRICE_ID ?? '',
-    Enterprise: process.env.STRIPE_ENTERPRISE_PRICE_ID ?? ''
+const STRIPE_PRICE: Record<BillingPlanEnum, string> = {
+    [BillingPlanEnum.FREE]: process.env.STRIPE_FREE_PRICE_ID ?? '',
+    [BillingPlanEnum.STARTER]: process.env.STRIPE_STARTER_PRICE_ID ?? '',
+    [BillingPlanEnum.GROWTH]: process.env.STRIPE_GROWTH_PRICE_ID ?? '',
+    [BillingPlanEnum.SCALE]: process.env.STRIPE_SCALE_PRICE_ID ?? '',
+    [BillingPlanEnum.ENTERPRISE]: process.env.STRIPE_ENTERPRISE_PRICE_ID ?? ''
 };
 
 /** Stripe Product IDs — optional, used for matching during sync. */
-const STRIPE_PRODUCT = {
-    Free: process.env.STRIPE_FREE_PRODUCT_ID ?? '',
-    Starter: process.env.STRIPE_STARTER_PRODUCT_ID ?? '',
-    Growth: process.env.STRIPE_GROWTH_PRODUCT_ID ?? '',
-    Scale: process.env.STRIPE_SCALE_PRODUCT_ID ?? '',
-    Enterprise: process.env.STRIPE_ENTERPRISE_PRODUCT_ID ?? ''
+const STRIPE_PRODUCT: Record<BillingPlanEnum, string> = {
+    [BillingPlanEnum.FREE]: process.env.STRIPE_FREE_PRODUCT_ID ?? '',
+    [BillingPlanEnum.STARTER]: process.env.STRIPE_STARTER_PRODUCT_ID ?? '',
+    [BillingPlanEnum.GROWTH]: process.env.STRIPE_GROWTH_PRODUCT_ID ?? '',
+    [BillingPlanEnum.SCALE]: process.env.STRIPE_SCALE_PRODUCT_ID ?? '',
+    [BillingPlanEnum.ENTERPRISE]: process.env.STRIPE_ENTERPRISE_PRODUCT_ID ?? ''
 };
 
 // ─── Setup ────────────────────────────────────────────────────────────────────
@@ -93,9 +94,9 @@ async function seedCurrencies() {
 async function seedPlans() {
     const plans = [
         {
-            name: 'Free',
-            stripePriceId: STRIPE_PRICE.Free || null,
-            stripeProductId: STRIPE_PRODUCT.Free || null,
+            name: BillingPlanEnum.FREE,
+            stripePriceId: STRIPE_PRICE[BillingPlanEnum.FREE] || null,
+            stripeProductId: STRIPE_PRODUCT[BillingPlanEnum.FREE] || null,
             interval: null,
             isActive: true,
             manualInvoicing: false,
@@ -109,9 +110,9 @@ async function seedPlans() {
             }
         },
         {
-            name: 'Starter',
-            stripePriceId: STRIPE_PRICE.Starter || null,
-            stripeProductId: STRIPE_PRODUCT.Starter || null,
+            name: BillingPlanEnum.STARTER,
+            stripePriceId: STRIPE_PRICE[BillingPlanEnum.STARTER] || null,
+            stripeProductId: STRIPE_PRODUCT[BillingPlanEnum.STARTER] || null,
             interval: 'month',
             isActive: true,
             manualInvoicing: false,
@@ -125,9 +126,9 @@ async function seedPlans() {
             }
         },
         {
-            name: 'Growth',
-            stripePriceId: STRIPE_PRICE.Growth || null,
-            stripeProductId: STRIPE_PRODUCT.Growth || null,
+            name: BillingPlanEnum.GROWTH,
+            stripePriceId: STRIPE_PRICE[BillingPlanEnum.GROWTH] || null,
+            stripeProductId: STRIPE_PRODUCT[BillingPlanEnum.GROWTH] || null,
             interval: 'month',
             isActive: true,
             manualInvoicing: false,
@@ -144,9 +145,9 @@ async function seedPlans() {
             // DB Model section 3 names a fifth tier between Growth and Enterprise. No document gives its
             // price or limits: these limits are interpolated on the progression and its Stripe price is a
             // TEST price (US1.8.1, 2026-11-09), so it can be bought and tested. Replace both before launch.
-            name: 'Scale',
-            stripePriceId: STRIPE_PRICE.Scale || null,
-            stripeProductId: STRIPE_PRODUCT.Scale || null,
+            name: BillingPlanEnum.SCALE,
+            stripePriceId: STRIPE_PRICE[BillingPlanEnum.SCALE] || null,
+            stripeProductId: STRIPE_PRODUCT[BillingPlanEnum.SCALE] || null,
             interval: 'month',
             isActive: true,
             manualInvoicing: false,
@@ -160,9 +161,9 @@ async function seedPlans() {
             }
         },
         {
-            name: 'Enterprise',
-            stripePriceId: STRIPE_PRICE.Enterprise || null,
-            stripeProductId: STRIPE_PRODUCT.Enterprise || null,
+            name: BillingPlanEnum.ENTERPRISE,
+            stripePriceId: STRIPE_PRICE[BillingPlanEnum.ENTERPRISE] || null,
+            stripeProductId: STRIPE_PRODUCT[BillingPlanEnum.ENTERPRISE] || null,
             interval: 'year',
             isActive: true,
             manualInvoicing: false,
@@ -229,7 +230,7 @@ async function seedTestBilling() {
         update: {}, // Don't overwrite if already modified during testing
         create: {
             tenantId: TEST_TENANT_ID,
-            plan: 'Free',
+            plan: BillingPlanEnum.FREE,
             status: 'none'
         }
     });
@@ -262,7 +263,7 @@ async function seedDefaultTenant() {
         update: {},
         create: {
             tenantId: DEFAULT_TENANT_ID,
-            plan: 'Free',
+            plan: BillingPlanEnum.FREE,
             status: 'none'
         }
     });

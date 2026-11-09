@@ -55,7 +55,13 @@ export class StripeService {
         const firstItem = items[0];
         const priceId = firstItem?.price?.id ?? null;
 
-        if (!priceId || !cfg) {
+        return priceId ? this.planForPriceId(priceId) : null;
+    }
+
+    /** The plan a configured Stripe price id (`STRIPE_<PLAN>_PRICE_ID`) belongs to, or null for an unknown price. */
+    planForPriceId(priceId: string): BillingPlanEnum | null {
+        const cfg = this.configService.get('stripeConfig', { infer: true });
+        if (!cfg) {
             return null;
         }
 
