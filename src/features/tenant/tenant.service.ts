@@ -186,55 +186,88 @@ export class TenantService {
         }
 
         const id = ulid();
-        const slug = data.slug ?? this.generateSlug(data.name, id);
-        if ((await this.prisma.tenant.count({ where: { slug } })) > 0) {
-            throw new BaseException('duplicate_resource', `Slug "${slug}" is already in use`, HttpStatus.CONFLICT, 'slug');
-        }
-
-        const trialStartedAt = this.dateService.nowMoment().toDate();
-        const trialEndsAt = this.dateService.nowMoment().add(TRIAL_PERIOD_DAYS, 'days').toDate();
+        const slug = await this.freeSlug(data.name, id, data.slug);
         const imageId = options.file ? await this.uploadLogo(id, options.file) : undefined;
 
         const { tenant, ownerUser } = await this.prisma.$transaction(async (tx) => {
-            const created = await tx.tenant.create({
-                data: {
-                    id,
-                    name: data.name,
-                    slug,
-                    imageId: imageId ?? null,
-                    status: TenantStatus.ACTIVE,
-                    verificationStatus: VerificationStatus.PENDING,
-                    paymentStatus: 'active',
-                    trialStartedAt,
-                    trialEndsAt,
-                    // The secret the tenant's backend signs widget identity tokens with and Event
-                    // Ingestion verifies them with (API Contract §4.1). Set here rather than as a
-                    // column default so rotation has one home in application code, and set at
-                    // creation because ingestion fails closed: a tenant without one has a widget
-                    // that silently never renders (NOTE.md §V5.22).
-                    widgetTokenSecret: randomBytes(WIDGET_TOKEN_SECRET_BYTES).toString('hex')
-                }
+            const { tenant: created, verificationId } = await this.insertTenant(tx, {
+                id,
+                name: data.name,
+                slug,
+                imageId,
+                ownerIdentityId: owner.identityId
             });
-            // Company verification at signup: the workflow service runs the account_verification workflow.
-            const verification = await tx.tenantVerification.create({ data: { tenantId: created.id, verificationType: VerificationType.COMPANY } });
-            // Emitted before the owner's user.registered so the tenant's Keto grants are queued first.
-            this.txEventEmitter.emitAfterCommit(
-                TenantEvents.CREATED,
-                new TenantCreatedEvent(created.id, created.id, created.name, created.slug, owner.identityId, trialStartedAt, trialEndsAt, undefined, {
-                    dataRegion: created.dataRegion,
-                    retentionMonths: created.retentionMonths
-                })
-            );
             const createdOwner = await this.usersService.createOwner(tx, created.id, owner);
             this.txEventEmitter.emitAfterCommit(
                 TenantEvents.VERIFICATION_REQUESTED,
-                new TenantVerificationRequestedEvent(created.id, created.id, created.name, createdOwner.id, verification.id)
+                new TenantVerificationRequestedEvent(created.id, created.id, created.name, createdOwner.id, verificationId)
             );
             return { tenant: created, ownerUser: createdOwner };
         });
 
         this.logger.log('Tenant created', { tenantId: tenant.id, slug: tenant.slug, ownerUserId: ownerUser.id });
         return tenantResponseMapper.toResponse(tenant);
+    }
+
+    /** The requested slug, or one derived from the name; 409 when another tenant already uses it. */
+    async freeSlug(name: string, id: string, requested?: string): Promise<string> {
+        const slug = requested ?? this.generateSlug(name, id);
+        if ((await this.prisma.tenant.count({ where: { slug } })) > 0) {
+            throw new BaseException('duplicate_resource', `Slug "${slug}" is already in use`, HttpStatus.CONFLICT, 'slug');
+        }
+        return slug;
+    }
+
+    /**
+     * Writes the tenant row and its company verification inside the caller's transaction and queues
+     * `tenant.created`. The caller adds the Owner (self-onboarding) or the Owner's invitation (platform admin).
+     */
+    async insertTenant(
+        tx: Prisma.TransactionClient,
+        params: { id: string; name: string; slug: string; imageId?: string; ownerIdentityId: string | null; actingUserId?: string }
+    ): Promise<{ tenant: Tenant; verificationId: string }> {
+        const trialStartedAt = this.dateService.nowMoment().toDate();
+        const trialEndsAt = this.dateService.nowMoment().add(TRIAL_PERIOD_DAYS, 'days').toDate();
+        const created = await tx.tenant.create({
+            data: {
+                id: params.id,
+                name: params.name,
+                slug: params.slug,
+                imageId: params.imageId ?? null,
+                status: TenantStatus.ACTIVE,
+                verificationStatus: VerificationStatus.PENDING,
+                paymentStatus: 'active',
+                trialStartedAt,
+                trialEndsAt,
+                // The secret the tenant's backend signs widget identity tokens with and Event
+                // Ingestion verifies them with (API Contract §4.1). Set here rather than as a
+                // column default so rotation has one home in application code, and set at
+                // creation because ingestion fails closed: a tenant without one has a widget
+                // that silently never renders (NOTE.md §V5.22).
+                widgetTokenSecret: randomBytes(WIDGET_TOKEN_SECRET_BYTES).toString('hex')
+            }
+        });
+        // Company verification at signup: the workflow service runs the account_verification workflow.
+        const verification = await tx.tenantVerification.create({ data: { tenantId: created.id, verificationType: VerificationType.COMPANY } });
+        // Emitted before the owner's user.registered so the tenant's Keto grants are queued first.
+        this.txEventEmitter.emitAfterCommit(
+            TenantEvents.CREATED,
+            new TenantCreatedEvent(
+                created.id,
+                created.id,
+                created.name,
+                created.slug,
+                params.ownerIdentityId,
+                trialStartedAt,
+                trialEndsAt,
+                params.actingUserId,
+                {
+                    dataRegion: created.dataRegion,
+                    retentionMonths: created.retentionMonths
+                }
+            )
+        );
+        return { tenant: created, verificationId: verification.id };
     }
 
     /** Self-service tenant creation by a signed-in identity that has no tenant yet. */

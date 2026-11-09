@@ -31,6 +31,7 @@ import { AdminTenantController } from './tenant/agnostic/admin-tenant.controller
 import { AwareTenantController } from './tenant/aware/aware-tenant.controller';
 import { TenantStatsService } from './tenant/aware/tenant-stats.service';
 import { TenantService } from './tenant/tenant.service';
+import { AdminTenantService } from './tenant/admin-tenant.service';
 import { UserNotificationPreferenceController } from './tenant-setting/user-notification-preference.controller';
 import { UserNotificationPreferenceService } from './tenant-setting/user-notification-preference.service';
 import { OperatorContactController } from './users/operator-contact.controller';
@@ -118,7 +119,8 @@ describe('Controllers delegate to their services', () => {
         const service = mock<TenantService>();
         const stats = mock<TenantStatsService>();
         const aware = new AwareTenantController(service, stats);
-        const admin = new AdminTenantController(service);
+        const adminTenants = mock<AdminTenantService>();
+        const admin = new AdminTenantController(service, adminTenants);
         expectDelegation([
             [() => aware.checkSubdomain('acme'), service.checkSubdomainAvailability],
             [() => aware.getStats(), stats.getStats],
@@ -133,7 +135,8 @@ describe('Controllers delegate to their services', () => {
             [() => admin.suspend('t2', { reason: 'fraud' }), service.suspend],
             [() => admin.unsuspend('t2'), service.unsuspend],
             [() => admin.lock('t2', { reason: 'r', lockUntil: '2026-10-01T00:00:00Z' }, USER), service.lockAsAdmin],
-            [() => admin.unlock('t2', USER), service.unlockAsAdmin]
+            [() => admin.unlock('t2', USER), service.unlockAsAdmin],
+            [() => admin.create({ name: 'Acme', ownerEmail: 'owner@acme.com' }, USER), adminTenants.create]
         ]);
     });
 

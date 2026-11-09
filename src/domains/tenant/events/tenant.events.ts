@@ -12,7 +12,8 @@ export class TenantCreatedEvent extends BaseDomainEvent {
         public readonly tenantId: string,
         public readonly name: string,
         public readonly slug: string,
-        public readonly ownerId: string,
+        /** Null when a platform admin creates the tenant: the Owner joins later by invitation. */
+        public readonly ownerId: string | null,
         public readonly trialStartedAt: Date,
         public readonly trialEndsAt: Date,
         public readonly userId?: string,

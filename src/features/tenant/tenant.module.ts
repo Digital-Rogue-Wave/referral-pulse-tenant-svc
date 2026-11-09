@@ -15,11 +15,13 @@ import { InternalWidgetSecretController } from './internal-widget-secret.control
 
 // Services
 import { TenantService } from './tenant.service';
+import { AdminTenantService } from './admin-tenant.service';
 import { TenantStatsService } from './aware/tenant-stats.service';
 
 // Listeners
 import { TenantListener } from './listeners/tenant.listener';
 import { UsersModule } from '../users/users.module';
+import { InvitationModule } from '../invitation/invitation.module';
 
 // Processors
 import { TenantUnlockProcessor } from './processors/tenant-unlock.processor';
@@ -31,7 +33,8 @@ import { TenantUnlockProcessor } from './processors/tenant-unlock.processor';
         HttpModule,
         TenantSettingModule,
         DnsModule,
-        UsersModule
+        UsersModule,
+        InvitationModule
 
         // BullJobsModule is @Global() - no need to import
     ],
@@ -45,6 +48,7 @@ import { TenantUnlockProcessor } from './processors/tenant-unlock.processor';
     providers: [
         // Core Services
         TenantService,
+        AdminTenantService,
         TenantStatsService,
 
         // Listeners

@@ -1,5 +1,6 @@
 import { HttpStatus, Injectable, NotFoundException, ConflictException, BadRequestException } from '@nestjs/common';
 import { randomBytes } from 'crypto';
+import type { Prisma } from '@prisma-gen/generated/client';
 
 import { BaseException } from '@common/exceptions/base.exceptions';
 import { sha256Hex } from '@common/helper/hashing';
@@ -68,36 +69,46 @@ export class InvitationService {
         // A pending invitation holds a seat, so accepting it later never exceeds the plan.
         await this.planLimits.assertSeatAvailable(actor.tenantId);
 
-        const token = this.generateToken();
-        const expiresAt = this.expiry();
-
-        const saved = await this.prisma.$transaction(async (tx) => {
-            const created = (await tx.invitation.create({
-                data: {
-                    tenantId: actor.tenantId,
-                    email: dto.email,
-                    role: dto.role,
-                    status: InvitationStatusEnum.PENDING,
-                    tokenHash: sha256Hex(token),
-                    expiresAt
-                }
-            })) as InvitationProps;
-            // The invitation email needs the raw token, so this in-process event carries it; it is never published.
-            this.txEventEmitter.emitAfterCommit(
-                'invitation.created',
-                new InvitationCreatedEvent(
-                    created.id,
-                    created.tenantId,
-                    { invitationId: created.id, tenantId: created.tenantId, email: created.email, role: created.role, token, expiresAt },
-                    actingUserId
-                )
-            );
-            this.txEventEmitter.emitAfterCommit('user.invited', new UserInvitedEvent(created.id, created.tenantId, created.role, actingUserId));
-            return created;
-        });
+        const saved = await this.prisma.$transaction((tx) =>
+            this.issue(tx, { tenantId: actor.tenantId, email: dto.email, role: dto.role, actingUserId })
+        );
 
         this.logger.log(`Invitation created: ${saved.id}`, { invitationId: saved.id });
         return invitationResponseMapper.toResponse(saved);
+    }
+
+    /**
+     * Writes a PENDING invitation inside the caller's transaction and queues its email. Callers check who may
+     * invite at which role; a platform admin uses it to invite a new tenant's Owner (US1.1.1).
+     */
+    async issue(
+        tx: Prisma.TransactionClient,
+        params: { tenantId: string; email: string; role: RoleEnum; actingUserId: string }
+    ): Promise<InvitationProps> {
+        const token = this.generateToken();
+        const expiresAt = this.expiry();
+        const created = (await tx.invitation.create({
+            data: {
+                tenantId: params.tenantId,
+                email: params.email,
+                role: params.role,
+                status: InvitationStatusEnum.PENDING,
+                tokenHash: sha256Hex(token),
+                expiresAt
+            }
+        })) as InvitationProps;
+        // The invitation email needs the raw token, so this in-process event carries it; it is never published.
+        this.txEventEmitter.emitAfterCommit(
+            'invitation.created',
+            new InvitationCreatedEvent(
+                created.id,
+                created.tenantId,
+                { invitationId: created.id, tenantId: created.tenantId, email: created.email, role: created.role, token, expiresAt },
+                params.actingUserId
+            )
+        );
+        this.txEventEmitter.emitAfterCommit('user.invited', new UserInvitedEvent(created.id, created.tenantId, created.role, params.actingUserId));
+        return created;
     }
 
     async findAll(query: ListQueryDto): Promise<CursorPage<InvitationResponse>> {

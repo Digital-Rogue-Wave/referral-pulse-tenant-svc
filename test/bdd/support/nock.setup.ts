@@ -22,6 +22,7 @@ const KETO_CHECK_PATH = '/relation-tuples/check/openapi';
 
 let jwksScope: nock.Scope;
 let ketoScope: nock.Scope;
+const deniedSubjects = new Set<string>();
 
 /**
  * Register all persistent nock interceptors.
@@ -36,8 +37,11 @@ export function setupNock(): void {
     jwksScope = nock(HYDRA_BASE).persist().get('/.well-known/jwks.json').reply(200, buildHydraJwks());
     nock(INTERNAL_JWKS_BASE).persist().get('/.well-known/jwks.json').reply(200, buildInternalJwks());
 
-    // ── Keto permission check (allow everything by default) ──
-    ketoScope = nock(KETO_READ_BASE).persist().post(KETO_CHECK_PATH).reply(200, { allowed: true });
+    // ── Keto permission check (allow everything except the subjects a scenario denies) ──
+    ketoScope = nock(KETO_READ_BASE)
+        .persist()
+        .post(KETO_CHECK_PATH)
+        .reply(200, (_uri, body) => ({ allowed: !deniedSubjects.has(String((body as { subject_id?: unknown }).subject_id)) }));
 }
 
 /**
@@ -49,11 +53,12 @@ export function teardownNock(): void {
 }
 
 /**
- * Temporarily override Keto to deny permission for a single request.
- * nock uses the most recently registered matching interceptor first.
+ * Make Keto deny every check for this subject (e.g. `user:{id}`). nock answers with the first matching
+ * interceptor, so a later `.once()` deny never wins over the persisted allow; the allow consults this set
+ * instead. Use a fresh subject per run: decisions are cached in Redis.
  */
-export function denyNextKetoCheck(): void {
-    nock(KETO_READ_BASE).post(KETO_CHECK_PATH).once().reply(200, { allowed: false });
+export function denyKetoFor(subjectId: string): void {
+    deniedSubjects.add(subjectId);
 }
 
 /** Make Kratos (the credential authority) know an identity with this email. */

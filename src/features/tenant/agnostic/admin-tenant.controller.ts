@@ -1,12 +1,13 @@
 import { Controller, Post, Body, Param, HttpCode, HttpStatus } from '@nestjs/common';
-import { ApiBearerAuth, ApiOkResponse, ApiOperation, ApiTags } from '@nestjs/swagger';
+import { ApiBearerAuth, ApiCreatedResponse, ApiOkResponse, ApiOperation, ApiTags } from '@nestjs/swagger';
 
-import { AdminLockTenantDto, TenantResponse, SuspendTenantDto } from '@domains/tenant';
+import { AdminCreateTenantDto, AdminLockTenantDto, AdminTenantCreatedResponse, TenantResponse, SuspendTenantDto } from '@domains/tenant';
 import { CurrentUser } from '@common/auth/current-user.decorator';
 import type { IAuthenticatedUser } from '@app/types';
 import { AllowServices, PlatformAdmin } from '@common/auth/require-permission.decorator';
 import { ServiceCapability } from '@common/auth/authz/keto-tuples';
 
+import { AdminTenantService } from '../admin-tenant.service';
 import { TenantService } from '../tenant.service';
 
 /**
@@ -20,7 +21,20 @@ import { TenantService } from '../tenant.service';
 @AllowServices(ServiceCapability.TENANT_SUSPEND)
 @Controller({ path: 'admin/tenants', version: '1' })
 export class AdminTenantController {
-    constructor(private readonly tenantService: TenantService) {}
+    constructor(
+        private readonly tenantService: TenantService,
+        private readonly adminTenantService: AdminTenantService
+    ) {}
+
+    /** Platform admins only: the `tenant.suspend` service capability does not cover creation. */
+    @Post()
+    @AllowServices()
+    @HttpCode(HttpStatus.CREATED)
+    @ApiOperation({ summary: 'Create a tenant from the platform console and invite its Owner by email' })
+    @ApiCreatedResponse({ type: AdminTenantCreatedResponse })
+    async create(@Body() dto: AdminCreateTenantDto, @CurrentUser() user: IAuthenticatedUser): Promise<AdminTenantCreatedResponse> {
+        return await this.adminTenantService.create(dto, user.userId);
+    }
 
     @Post(':id/suspend')
     @HttpCode(HttpStatus.OK)
