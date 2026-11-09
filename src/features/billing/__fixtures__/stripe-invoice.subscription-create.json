@@ -1,0 +1,36 @@
+{
+    "_source": "Real Stripe test-mode invoice (API 2025-03-31+ shape), first invoice of a Starter subscription, captured 2026-11-09 for US1.8.3; trimmed to the fields we read, URL tokens redacted",
+    "invoice": {
+        "id": "in_1UZxKOLbrWszeoGnIxfSMPV0",
+        "object": "invoice",
+        "number": "IIKWUNYT-0025",
+        "status": "paid",
+        "billing_reason": "subscription_create",
+        "currency": "eur",
+        "amount_due": 1000,
+        "amount_paid": 1000,
+        "created": 1794249000,
+        "period_start": 1794249000,
+        "period_end": 1794249000,
+        "next_payment_attempt": null,
+        "customer": "cus_fixture",
+        "hosted_invoice_url": "https://invoice.stripe.com/i/acct_1SeZLhLbrWszeoGn/test_REDACTED?s=ap",
+        "invoice_pdf": "https://pay.stripe.com/invoice/acct_1SeZLhLbrWszeoGn/test_REDACTED/pdf?s=ap",
+        "lines": {
+            "object": "list",
+            "has_more": false,
+            "data": [
+                {
+                    "object": "line_item",
+                    "amount": 1000,
+                    "currency": "eur",
+                    "description": "1 × STARTER (at €10.00 / month)",
+                    "period": {
+                        "end": 1796841000,
+                        "start": 1794249000
+                    }
+                }
+            ]
+        }
+    }
+}

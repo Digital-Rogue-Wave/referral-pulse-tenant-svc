@@ -10,7 +10,8 @@
 
 import Stripe from 'stripe';
 
-import type { StripeService } from '../../../src/features/billing/stripe.service';
+import { DateService } from '../../../src/common/helper/date.service';
+import { StripeService } from '../../../src/features/billing/stripe.service';
 
 type FakeStripe = Pick<
     StripeService,
@@ -20,6 +21,8 @@ type FakeStripe = Pick<
     | 'resolvePlanFromSubscription'
     | 'getSubscription'
     | 'upgradeSubscription'
+    | 'listInvoicesForCustomer'
+    | 'retrieveUpcomingInvoiceForCustomer'
 >;
 
 /** BDD price ids, one per plan, so a subscription event can name the plan it moved to. */
@@ -27,6 +30,26 @@ export const BDD_PRICE_BY_PLAN: Record<string, string> = { Starter: 'price_bdd_s
 
 /** Set by a scenario to make the next upgrade fail the way Stripe refuses a card. Reset before each scenario. */
 export const stripeBehaviour = { declineNextUpgrade: false, upgradeRequests: [] as Array<{ stripeSubscriptionId: string; targetPlan: string }> };
+
+/**
+ * Invoices as Stripe's API returns them (amounts in cents). Read by the real `StripeService` mapping below, so
+ * the BDD proves our shape, not the fake's. A scenario sets them; reset before each scenario.
+ */
+export const stripeInvoices = { list: [] as Array<Record<string, unknown>>, upcoming: null as Record<string, unknown> | null };
+
+const offlineStripeSdk = {
+    invoices: {
+        list: async (params: { limit: number }) => ({
+            has_more: stripeInvoices.list.length > params.limit,
+            data: stripeInvoices.list.slice(0, params.limit)
+        }),
+        createPreview: async () => stripeInvoices.upcoming
+    }
+};
+const silentLogger = { setContext() {}, log() {}, warn() {}, error() {}, debug() {} };
+/** The real StripeService over an offline SDK: only the invoice reads are routed to it. */
+const realInvoiceReads = new StripeService({ get: () => undefined } as never, silentLogger as never, new DateService(), {} as never);
+Object.assign(realInvoiceReads, { client: offlineStripeSdk });
 
 /** Signs BDD webhook payloads; never a real Stripe secret. */
 export const BDD_STRIPE_WEBHOOK_SECRET = 'whsec_bdd_only_not_a_real_secret';
@@ -61,5 +84,13 @@ export const fakeStripeService: FakeStripe = {
             throw Stripe.errors.StripeError.generate({ type: 'card_error', code: 'card_declined', message: 'Your card was declined.' } as never);
         }
         stripeBehaviour.upgradeRequests.push(params);
+    },
+
+    listInvoicesForCustomer(customerId, page) {
+        return realInvoiceReads.listInvoicesForCustomer(customerId, page);
+    },
+
+    retrieveUpcomingInvoiceForCustomer(params) {
+        return realInvoiceReads.retrieveUpcomingInvoiceForCustomer(params);
     }
 };

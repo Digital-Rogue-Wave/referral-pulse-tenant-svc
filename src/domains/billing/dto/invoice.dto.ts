@@ -10,13 +10,13 @@ export class InvoiceDto {
     @ApiPropertyOptional({ nullable: true })
     status!: string | null;
 
-    @ApiProperty()
+    @ApiProperty({ description: 'ISO 4217, lowercase, as Stripe sends it', example: 'eur' })
     currency!: string;
 
-    @ApiProperty()
+    @ApiProperty({ description: 'Integer in minor units (cents), as Stripe sends it', example: 4900 })
     amountDue!: number;
 
-    @ApiProperty()
+    @ApiProperty({ description: 'Integer in minor units (cents), as Stripe sends it', example: 4900 })
     amountPaid!: number;
 
     @ApiProperty()

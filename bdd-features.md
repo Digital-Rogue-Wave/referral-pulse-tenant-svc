@@ -141,6 +141,24 @@ Run alone: `pnpm test:bdd --tags @billing-plan-change`.
 
 ---
 
+### `invoice-history.feature` (5 scenarios) `@invoice-history` — US1.8.3
+
+> Each scenario signs a fresh company up (reusing the `@billing-plan` steps and clean-up). Stripe's invoices are
+> set in Stripe's own shape (cents) in `stripe.fake.ts` and read through the **real** `StripeService` mapping over
+> an offline SDK, so the amounts and links checked are the ones the Owner receives.
+
+```gherkin
+Scenario: A company that has never paid has no invoices, and Stripe is not asked → 200, empty page
+Scenario: Amounts are integers in minor units, as the API contract requires        → amount_due 4950, eur, PDF + hosted links
+Scenario: The list is paged with Stripe's cursors                                  → 2 of 3, has_more, next_cursor in_bdd_2
+Scenario: The next invoice is in minor units too                                   → amount_due 990, eur
+Scenario: A member without billing:read cannot see the invoices                    → 403
+```
+
+Run alone: `pnpm test:bdd --tags @invoice-history`.
+
+---
+
 ### `tenant-guards.feature` (5 scenarios) `@guards`
 
 > Fixture tenants are created/destroyed per scenario via tagged hooks.

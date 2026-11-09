@@ -29,13 +29,13 @@ async function removeCompanies(): Promise<void> {
     await fixturesPrisma.tenant.deleteMany({ where: { id: { in: ids } } });
 }
 
-Before({ tags: '@billing-plan or @billing-plan-change' }, async function () {
+Before({ tags: '@billing-plan or @billing-plan-change or @invoice-history' }, async function () {
     company = null;
     await removeCompanies();
     await getTestApp().get(PlanService).invalidateCaches();
 });
 
-After({ tags: '@billing-plan or @billing-plan-change' }, async function () {
+After({ tags: '@billing-plan or @billing-plan-change or @invoice-history' }, async function () {
     await removeCompanies();
 });
 

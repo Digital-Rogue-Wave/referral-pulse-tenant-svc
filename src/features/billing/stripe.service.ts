@@ -315,8 +315,8 @@ export class StripeService {
             }
         });
 
-        const amountDueNow = (upcoming.amount_due ?? 0) / 100;
-        const currency = upcoming.currency ?? 'usd';
+        const amountDueNow = upcoming.amount_due;
+        const currency = upcoming.currency;
         const nextInvoiceDate = upcoming.next_payment_attempt ? this.dateService.fromUnix(upcoming.next_payment_attempt).toDate() : null;
 
         this.logger.log(
@@ -530,24 +530,33 @@ export class StripeService {
 
         const data = list.data.map((invoice) => {
             const createdTs = invoice.created ?? 0;
-            const periodStartTs = invoice.period_start as number | undefined;
-            const periodEndTs = invoice.period_end as number | undefined;
 
             return {
                 id: invoice.id,
                 number: invoice.number ?? null,
                 status: invoice.status ?? null,
-                currency: invoice.currency ?? 'usd',
-                amountDue: (invoice.amount_due ?? 0) / 100,
-                amountPaid: (invoice.amount_paid ?? 0) / 100,
+                currency: invoice.currency,
+                amountDue: invoice.amount_due,
+                amountPaid: invoice.amount_paid,
                 createdAt: this.dateService.fromUnix(createdTs).toDate(),
-                periodStart: periodStartTs ? this.dateService.fromUnix(periodStartTs).toDate() : null,
-                periodEnd: periodEndTs ? this.dateService.fromUnix(periodEndTs).toDate() : null,
+                ...this.billedPeriod(invoice),
                 hostedInvoiceUrl: invoice.hosted_invoice_url ?? null,
                 invoicePdfUrl: invoice.invoice_pdf ?? null
             };
         });
         return { hasMore: list.has_more, data };
+    }
+
+    /**
+     * The period an invoice bills for. On a subscription invoice Stripe's own `period_start`/`period_end` is the
+     * previous period (both equal the creation time on the first invoice); the billed period is on its lines.
+     */
+    private billedPeriod(invoice: Stripe.Invoice): { periodStart: Date | null; periodEnd: Date | null } {
+        const lines = invoice.lines?.data ?? [];
+        const start = lines.length ? Math.min(...lines.map((line) => line.period.start)) : invoice.period_start;
+        const end = lines.length ? Math.max(...lines.map((line) => line.period.end)) : invoice.period_end;
+        const toDate = (ts: number | undefined): Date | null => (ts ? this.dateService.fromUnix(ts).toDate() : null);
+        return { periodStart: toDate(start), periodEnd: toDate(end) };
     }
 
     /**
@@ -584,16 +593,12 @@ export class StripeService {
                 : {})
         });
 
-        const amountDue = (upcoming.amount_due ?? 0) / 100;
-        const currency = upcoming.currency ?? 'usd';
+        const amountDue = upcoming.amount_due;
+        const currency = upcoming.currency;
 
         const nextPaymentAttempt = upcoming.next_payment_attempt ? this.dateService.fromUnix(upcoming.next_payment_attempt).toDate() : null;
 
-        const periodStartTs = upcoming.period_start as number | undefined;
-        const periodEndTs = upcoming.period_end as number | undefined;
-
-        const periodStart = periodStartTs ? this.dateService.fromUnix(periodStartTs).toDate() : null;
-        const periodEnd = periodEndTs ? this.dateService.fromUnix(periodEndTs).toDate() : null;
+        const { periodStart, periodEnd } = this.billedPeriod(upcoming);
 
         this.logger.log(
             `Retrieved upcoming Stripe invoice preview for customer ${params.customerId} (subscription=${

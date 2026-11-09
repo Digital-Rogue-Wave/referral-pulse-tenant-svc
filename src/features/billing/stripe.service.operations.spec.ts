@@ -8,6 +8,7 @@ import { DateService } from '@common/helper/date.service';
 import { AppLoggerService } from '@common/logging/app-logger.service';
 import { TenantContextService } from '@common/tenant-aware/tenant-context.service';
 
+import realInvoice from './__fixtures__/stripe-invoice.subscription-create.json';
 import { StripeService } from './stripe.service';
 
 const PRICES = { freePriceId: 'price_free', starterPriceId: 'price_starter', growthPriceId: 'price_growth', enterprisePriceId: 'price_ent' };
@@ -85,7 +86,7 @@ describe('StripeService — Stripe operations', () => {
         expect(stripe.invoices!.createPreview).toHaveBeenCalledWith(
             expect.objectContaining({ customer: 'cus_1', subscription_details: { items: [{ id: 'si_1', price: 'price_ent' }] } })
         );
-        expect(preview).toEqual({ amountDueNow: 15, currency: 'eur', nextInvoiceDate: new Date(PERIOD_END * 1000) });
+        expect(preview).toEqual({ amountDueNow: 1500, currency: 'eur', nextInvoiceDate: new Date(PERIOD_END * 1000) });
     });
 
     it('refuses an upgrade preview for a subscription without customer or items', async () => {
@@ -173,7 +174,7 @@ describe('StripeService — Stripe operations', () => {
         await expect(service.getChargeCustomerId('ch_2')).resolves.toBe('cus_2');
     });
 
-    it('maps invoices and the upcoming invoice to our shape (amounts in major units)', async () => {
+    it('maps invoices and the upcoming invoice to our shape (amounts stay in minor units, as Stripe sends them)', async () => {
         (stripe.invoices!.list as jest.Mock).mockResolvedValue({
             has_more: false,
             data: [
@@ -191,13 +192,56 @@ describe('StripeService — Stripe operations', () => {
             ]
         });
         const page = await service.listInvoicesForCustomer('cus_1', { limit: 10, endingBefore: 'in_0' });
-        expect(page.data[0]).toMatchObject({ id: 'in_1', amountDue: 49, amountPaid: 49, createdAt: new Date(PERIOD_END * 1000) });
+        expect(page.data[0]).toMatchObject({
+            id: 'in_1',
+            amountDue: 4900,
+            amountPaid: 4900,
+            currency: 'eur',
+            createdAt: new Date(PERIOD_END * 1000)
+        });
         expect(stripe.invoices!.list).toHaveBeenCalledWith({ customer: 'cus_1', limit: 10, ending_before: 'in_0' });
 
         (stripe.invoices!.createPreview as jest.Mock).mockResolvedValue({ amount_due: 990, currency: 'eur', next_payment_attempt: null });
         await expect(service.retrieveUpcomingInvoiceForCustomer({ customerId: 'cus_1', subscriptionId: 'sub_1' })).resolves.toMatchObject({
-            amountDue: 9.9,
+            amountDue: 990,
+            currency: 'eur',
             nextPaymentAttempt: null
+        });
+    });
+
+    it('maps a real first subscription invoice: cents kept, period taken from its lines, not from the invoice', async () => {
+        (stripe.invoices!.list as jest.Mock).mockResolvedValue({ has_more: false, data: [realInvoice.invoice] });
+
+        const page = await service.listInvoicesForCustomer('cus_fixture', { limit: 10 });
+
+        expect(page.data[0]).toEqual({
+            id: 'in_1UZxKOLbrWszeoGnIxfSMPV0',
+            number: 'IIKWUNYT-0025',
+            status: 'paid',
+            currency: 'eur',
+            amountDue: 1000,
+            amountPaid: 1000,
+            createdAt: new Date(1794249000 * 1000),
+            periodStart: new Date(1794249000 * 1000),
+            periodEnd: new Date(1796841000 * 1000),
+            hostedInvoiceUrl: realInvoice.invoice.hosted_invoice_url,
+            invoicePdfUrl: realInvoice.invoice.invoice_pdf
+        });
+    });
+
+    it("previews the next invoice's billed period from its lines", async () => {
+        (stripe.invoices!.createPreview as jest.Mock).mockResolvedValue({
+            amount_due: 1000,
+            currency: 'eur',
+            next_payment_attempt: 1796844600,
+            period_start: 1794249000,
+            period_end: 1796841000,
+            lines: { data: [{ period: { start: 1796841000, end: 1799519400 } }] }
+        });
+
+        await expect(service.retrieveUpcomingInvoiceForCustomer({ customerId: 'cus_1', subscriptionId: 'sub_1' })).resolves.toMatchObject({
+            periodStart: new Date(1796841000 * 1000),
+            periodEnd: new Date(1799519400 * 1000)
         });
     });
 });
