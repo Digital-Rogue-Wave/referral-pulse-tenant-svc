@@ -128,28 +128,32 @@ export class InvitationService {
 
         const token = this.generateToken();
         const newExpiresAt = this.expiry();
-        const updated = (await this.invitation.update({
-            where: { id },
-            data: { tokenHash: sha256Hex(token), expiresAt: newExpiresAt }
-        })) as InvitationProps;
-
-        this.txEventEmitter.emitAfterCommit(
-            'invitation.resent',
-            new InvitationResentEvent(
-                updated.id,
-                updated.tenantId,
-                {
-                    invitationId: updated.id,
-                    tenantId: updated.tenantId,
-                    email: updated.email,
-                    role: updated.role,
-                    token,
-                    newExpiresAt,
-                    resentAt: new Date()
-                },
-                actingUserId
-            )
-        );
+        // In a transaction, so the audit row commits with the new token (US1.9.1 F8). `existing` was read
+        // through the tenant filter, so the id belongs to this tenant.
+        const updated = await this.prisma.$transaction(async (tx) => {
+            const row = (await tx.invitation.update({
+                where: { id },
+                data: { tokenHash: sha256Hex(token), expiresAt: newExpiresAt }
+            })) as InvitationProps;
+            this.txEventEmitter.emitAfterCommit(
+                'invitation.resent',
+                new InvitationResentEvent(
+                    row.id,
+                    row.tenantId,
+                    {
+                        invitationId: row.id,
+                        tenantId: row.tenantId,
+                        email: row.email,
+                        role: row.role,
+                        token,
+                        newExpiresAt,
+                        resentAt: new Date()
+                    },
+                    actingUserId
+                )
+            );
+            return row;
+        });
 
         this.logger.log(`Invitation resent: ${id}`, { invitationId: id });
         return invitationResponseMapper.toResponse(updated);

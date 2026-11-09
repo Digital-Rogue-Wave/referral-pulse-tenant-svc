@@ -79,7 +79,11 @@ export class RetentionSweeperWorker extends BaseWorkerService<IBaseJobData> {
         if (tenants.length === 0) {
             return 0;
         }
-        const purged = await this.prisma.auditLog.deleteMany({ where: { tenantId: { in: tenants.map((tenant) => tenant.id) } } });
+        // US1.9.1 F3: the append-only trigger refuses DELETE unless this transaction opts in.
+        const purged = await this.prisma.$transaction(async (tx) => {
+            await tx.$executeRaw`SELECT set_config('app.audit_purge', 'on', true)`;
+            return tx.auditLog.deleteMany({ where: { tenantId: { in: tenants.map((tenant) => tenant.id) } } });
+        });
         return purged.count;
     }
 

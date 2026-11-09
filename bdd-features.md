@@ -159,6 +159,22 @@ Run alone: `pnpm test:bdd --tags @invoice-history`.
 
 ---
 
+### `audit-trail.feature` (4 scenarios) `@audit-trail` — US1.9.1
+
+> Each scenario signs a fresh company up (reusing the `@billing-plan` steps and clean-up). Actions go through the
+> real HTTP stack; the append-only trigger is exercised straight on the database.
+
+```gherkin
+Scenario: A settings change leaves one audit row: who, before, after and the request id → by the Owner, EUR → USD, X-Request-Id
+Scenario: A refused change leaves no audit row                                         → 403, no row
+Scenario: The database refuses to change or delete an audit row                        → "append-only: UPDATE/DELETE refused"
+Scenario: Only a transaction that opts in, like the retention sweep, can delete audit rows → rows gone
+```
+
+Run alone: `pnpm test:bdd --tags @audit-trail`.
+
+---
+
 ### `tenant-guards.feature` (5 scenarios) `@guards`
 
 > Fixture tenants are created/destroyed per scenario via tagged hooks.

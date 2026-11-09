@@ -2,6 +2,7 @@ import { mock, MockProxy } from 'jest-mock-extended';
 import type { Prisma } from '@prisma-gen/generated/client';
 
 import { AppLoggerService } from '@common/logging/app-logger.service';
+import { MetricsService } from '@common/monitoring/metrics.service';
 import { TenantContextService } from '@common/tenant-aware/tenant-context.service';
 import { BeforeCommitHook, TransactionEventEmitterService } from '@common/events/transaction-event-emitter.service';
 import { sha256Hex } from '@common/helper/hashing';
@@ -62,6 +63,15 @@ describe('Audited actions', () => {
         expect(toAuditEntry(kept)).toMatchObject({ action: 'subscription.reactivated', targetId: 'b1' });
     });
 
+    it('puts the replaced value of a published change in before, and the new one in after (F7)', () => {
+        expect(toAuditEntry(new UserRoleChangedEvent('u2', 't1', 'viewer', 'operator', 'u1'))).toMatchObject({
+            action: 'user.role_changed',
+            targetId: 'u2',
+            before: { role: 'viewer' },
+            after: { user_id: 'u2', tenant_id: 't1', role: 'operator' }
+        });
+    });
+
     it('ignores sign-ins, which are not actions on the tenant', () => {
         expect(toAuditEntry(new UserLoggedInEvent('u1', 't1', 'password', 'u1'))).toBeNull();
     });
@@ -79,6 +89,8 @@ describe('AuditLogWriter', () => {
     let txEvents: MockProxy<TransactionEventEmitterService>;
     let writer: AuditLogWriter;
     let createMany: jest.Mock;
+    let metrics: MockProxy<MetricsService>;
+    const failures = { add: jest.fn() };
 
     beforeEach(() => {
         createMany = jest.fn().mockResolvedValue({ count: 1 });
@@ -88,7 +100,10 @@ describe('AuditLogWriter', () => {
         context.getIp.mockReturnValue('203.0.113.9');
         context.getRequestId.mockReturnValue('req_01');
         txEvents = mock<TransactionEventEmitterService>();
-        writer = new AuditLogWriter(prisma, txEvents, context, mock<AppLoggerService>());
+        metrics = mock<MetricsService>();
+        metrics.createCounter.mockReturnValue(failures as never);
+        failures.add.mockClear();
+        writer = new AuditLogWriter(prisma, txEvents, context, mock<AppLoggerService>(), metrics);
     });
 
     it('writes the row with the transaction client before commit, with a hashed IP and the request id', async () => {
@@ -123,5 +138,14 @@ describe('AuditLogWriter', () => {
     it('records an event without an operator under the system (US1.9.1 F4)', async () => {
         await writer.onEmitted(revoked());
         expect(createMany).toHaveBeenCalledWith(expect.objectContaining({ data: [expect.objectContaining({ actorUserId: 'system' })] }));
+    });
+
+    it('counts a row it could not write outside a transaction, without failing the action (F8)', async () => {
+        createMany.mockRejectedValue(new Error('db down'));
+
+        await expect(writer.onEmitted(revoked('u1'))).resolves.toBeUndefined();
+
+        expect(metrics.createCounter).toHaveBeenCalledWith('audit_log_write_failures_total');
+        expect(failures.add).toHaveBeenCalledWith(1, { event: 'api-key.deleted' });
     });
 });

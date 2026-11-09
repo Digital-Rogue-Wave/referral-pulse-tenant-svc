@@ -11,7 +11,7 @@ import { randomUUID } from 'crypto';
 
 import { makeActiveUserToken, makeServiceToken } from '../support/jwt.helper';
 import { denyKetoFor } from '../support/nock.setup';
-import { fixturesPrisma } from '../support/db.fixtures';
+import { fixturesPrisma, purgeAuditRows } from '../support/db.fixtures';
 import type { BddWorldInterface } from '../support/world';
 
 const SLUG_PREFIX = 'bdd-ws-';
@@ -27,7 +27,7 @@ async function removeCompanies(): Promise<void> {
         return;
     }
     await fixturesPrisma.eventOutbox.deleteMany({ where: { tenantId: { in: ids } } });
-    await fixturesPrisma.auditLog.deleteMany({ where: { tenantId: { in: ids } } });
+    await purgeAuditRows(ids);
     await fixturesPrisma.tenant.deleteMany({ where: { id: { in: ids } } });
 }
 

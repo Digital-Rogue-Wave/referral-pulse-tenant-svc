@@ -1,6 +1,6 @@
 import type { Prisma } from '@prisma-gen/generated/client';
 
-import { isPublishedEvent, toPublishedEvents } from '@common/events/outbox/published-events';
+import { isPublishedEvent, toPublishedEvents, type FlatProperties } from '@common/events/outbox/published-events';
 import type { BaseDomainEvent } from '@domains/common/events';
 
 /** What one audited action records (DB Model §3 `audit_log`), before the request context is added. */
@@ -16,6 +16,10 @@ export interface AuditEntry {
 type Change = { from: unknown; to: unknown };
 type Changes = Record<string, Change>;
 type EventWithPayload = BaseDomainEvent & { payload?: Record<string, unknown>; changes?: unknown };
+
+/** Published property prefixes that name a replaced value and its replacement (`previous_role` / `new_role`). */
+const PREVIOUS = 'previous_';
+const NEW = 'new_';
 
 /**
  * Published events that are not operator actions: sign-ins, meters and trial clocks.
@@ -79,7 +83,7 @@ export function toAuditEntry(event: BaseDomainEvent): AuditEntry | null {
             targetType: draft.object.type,
             targetId: draft.object.id,
             reason: reasonOf(draft.properties),
-            ...(changes ? splitChanges(changes) : { before: null, after: draft.properties })
+            ...(changes ? splitChanges(changes) : splitReplaced(draft.properties))
         };
     }
     const internal = INTERNAL_ACTIONS[type];
@@ -93,6 +97,30 @@ export function toAuditEntry(event: BaseDomainEvent): AuditEntry | null {
 function reasonOf(properties: Record<string, unknown>): string | null {
     const found = Object.entries(properties).find(([key, value]) => key.endsWith('reason') && typeof value === 'string');
     return found ? (found[1] as string) : null;
+}
+
+/**
+ * A published event that names what it replaced (`previous_role`, `previous_owner_id`, `previous_plan`, …) reads
+ * like any other change (US1.9.1 F7): `before` holds the replaced values, `after` the rest with `new_<field>`
+ * under the same `<field>` name. Without a `previous_` property, `after` is the properties as published.
+ */
+function splitReplaced(properties: FlatProperties): Pick<AuditEntry, 'before' | 'after'> {
+    const replaced = Object.keys(properties).filter((key) => key.startsWith(PREVIOUS));
+    if (replaced.length === 0) {
+        return { before: null, after: properties };
+    }
+    const before: FlatProperties = {};
+    const after: FlatProperties = { ...properties };
+    for (const key of replaced) {
+        const field = key.slice(PREVIOUS.length);
+        before[field] = properties[key] ?? null;
+        delete after[key];
+        if (`${NEW}${field}` in after) {
+            after[field] = after[`${NEW}${field}`] ?? null;
+            delete after[`${NEW}${field}`];
+        }
+    }
+    return { before, after };
 }
 
 function changesOf(event: EventWithPayload): Changes | null {

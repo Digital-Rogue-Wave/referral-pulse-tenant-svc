@@ -11,7 +11,7 @@ import { randomUUID } from 'crypto';
 import { PlanService } from '../../../src/features/billing/plan.service';
 import { getTestApp } from '../support/app.bootstrap';
 import { makeActiveUserToken, makeServiceToken } from '../support/jwt.helper';
-import { fixturesPrisma } from '../support/db.fixtures';
+import { fixturesPrisma, purgeAuditRows } from '../support/db.fixtures';
 import type { BddWorldInterface } from '../support/world';
 
 const SLUG_PREFIX = 'bdd-bp-';
@@ -25,17 +25,17 @@ async function removeCompanies(): Promise<void> {
         return;
     }
     await fixturesPrisma.eventOutbox.deleteMany({ where: { tenantId: { in: ids } } });
-    await fixturesPrisma.auditLog.deleteMany({ where: { tenantId: { in: ids } } });
+    await purgeAuditRows(ids);
     await fixturesPrisma.tenant.deleteMany({ where: { id: { in: ids } } });
 }
 
-Before({ tags: '@billing-plan or @billing-plan-change or @invoice-history' }, async function () {
+Before({ tags: '@billing-plan or @billing-plan-change or @invoice-history or @audit-trail' }, async function () {
     company = null;
     await removeCompanies();
     await getTestApp().get(PlanService).invalidateCaches();
 });
 
-After({ tags: '@billing-plan or @billing-plan-change or @invoice-history' }, async function () {
+After({ tags: '@billing-plan or @billing-plan-change or @invoice-history or @audit-trail' }, async function () {
     await removeCompanies();
 });
 
