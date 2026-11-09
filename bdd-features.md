@@ -120,6 +120,27 @@ Scenario: Preview subscription upgrade returns 200
 
 ---
 
+### `billing-plan-change.feature` (8 scenarios) `@billing-plan-change` — US1.8.2
+
+> Each scenario signs a fresh company up (reusing the `@billing-plan` steps and clean-up) and, where
+> needed, puts it on a live `Growth` subscription in the database. Stripe's API is the BDD fake
+> (`stripe.fake.ts`); Stripe's webhooks are signed for real and posted to `/api/webhooks/stripe`.
+
+```gherkin
+Scenario: A company that already pays cannot open a second subscription      → 409 state_conflict
+Scenario: Free needs no checkout, and Enterprise is sold by sales            → 400 twice
+Scenario: An upgrade can only go up                                          → 400, Stripe not called
+Scenario: The plan changes when Stripe confirms the upgrade, not before      → 202 still Growth; webhook → Scale
+Scenario: A declined card is a 402 with Stripe's message, not a 500          → 402 card_declined, plan unchanged
+Scenario: Paying a late invoice in Stripe's current shape restores the company → payment status active
+Scenario: When the subscription ends, the company is Free and owes nothing   → Free|canceled, active, audit row by system
+Scenario: The embedded card-form routes are gone                             → 404
+```
+
+Run alone: `pnpm test:bdd --tags @billing-plan-change`.
+
+---
+
 ### `tenant-guards.feature` (5 scenarios) `@guards`
 
 > Fixture tenants are created/destroyed per scenario via tagged hooks.

@@ -29,17 +29,17 @@ async function removeCompanies(): Promise<void> {
     await fixturesPrisma.tenant.deleteMany({ where: { id: { in: ids } } });
 }
 
-Before({ tags: '@billing-plan' }, async function () {
+Before({ tags: '@billing-plan or @billing-plan-change' }, async function () {
     company = null;
     await removeCompanies();
     await getTestApp().get(PlanService).invalidateCaches();
 });
 
-After({ tags: '@billing-plan' }, async function () {
+After({ tags: '@billing-plan or @billing-plan-change' }, async function () {
     await removeCompanies();
 });
 
-function theCompany(): { tenantId: string; ownerUserId: string } {
+export function theCompany(): { tenantId: string; ownerUserId: string } {
     assert.ok(company, 'No company signed up in this scenario');
     return company;
 }

@@ -34,9 +34,6 @@ const NOT_OPERATOR_ACTIONS = new Set([
     'audit.logged'
 ]);
 
-/** Recorded even when the system performs them (DB Model §0.5: erasure is always audited). */
-const AUDITED_WHEN_SYSTEM = new Set(['tenant.deleted', 'user.anonymised', 'erasure.completed']);
-
 /** Operator actions that are not published on the bus, keyed by in-process event type. */
 const INTERNAL_ACTIONS: Record<string, (event: EventWithPayload) => Pick<AuditEntry, 'action' | 'targetType' | 'targetId'>> = {
     'tenant-setting.created': (e) => ({ action: 'tenant_setting.created', targetType: 'tenant_setting', targetId: e.aggregateId }),
@@ -45,16 +42,20 @@ const INTERNAL_ACTIONS: Record<string, (event: EventWithPayload) => Pick<AuditEn
     'invitation.resent': (e) => ({ action: 'invitation.resent', targetType: 'invitation', targetId: e.aggregateId }),
     // US1.5.4 F2: every Owner read of the widget-token secret is on the trail.
     'tenant.widget_secret_revealed': (e) => ({ action: 'tenant.widget_secret_revealed', targetType: 'tenant', targetId: e.aggregateId }),
+    // US1.8.2 F9: the two plan actions that are not published.
+    'subscription.downgrade-cancelled': (e) => ({ action: 'subscription.downgrade_cancelled', targetType: 'subscription', targetId: e.aggregateId }),
+    'subscription.reactivated': (e) => ({ action: 'subscription.reactivated', targetType: 'subscription', targetId: e.aggregateId }),
     'dns.reserved': (e) => ({ action: 'subdomain.reserved', targetType: 'subdomain', targetId: String(e.payload?.slug ?? e.aggregateId) }),
     'dns.released': (e) => ({ action: 'subdomain.released', targetType: 'subdomain', targetId: String(e.payload?.slug ?? e.aggregateId) })
 };
 
-/** The principal behind an event, or null when nobody the trail should name performed it. */
-export function auditActor(event: BaseDomainEvent): string | null {
-    if (event.userId && event.userId !== 'system') {
-        return event.userId;
-    }
-    return AUDITED_WHEN_SYSTEM.has(event.eventType) ? 'system' : null;
+/**
+ * The principal behind an event: the user who acted, or `system` for a change nobody in the dashboard made
+ * (a Stripe webhook, dunning, a scheduled job). US1.9.1 F4 / US1.8.2 F9: those changes alter what a tenant
+ * may do, so they belong on the trail too; `NOT_OPERATOR_ACTIONS` keeps the noise out.
+ */
+export function auditActor(event: BaseDomainEvent): string {
+    return event.userId || 'system';
 }
 
 /**

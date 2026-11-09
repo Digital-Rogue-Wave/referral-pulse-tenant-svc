@@ -96,7 +96,9 @@ export type EventAction =
     | 'changed'
     | 'cancelled'
     | 'downgrade-scheduled'
+    | 'downgrade-cancelled'
     | 'upgraded'
+    | 'reactivated'
     | 'payment-status-changed'
     | 'reminder'
     | 'restricted'
@@ -399,6 +401,8 @@ export type SubscriptionEventType =
     | 'subscription.changed'
     | 'subscription.cancelled'
     | 'subscription.upgraded'
+    | 'subscription.downgrade-cancelled'
+    | 'subscription.reactivated'
     | 'subscription.downgrade-scheduled';
 
 // Trial domain events

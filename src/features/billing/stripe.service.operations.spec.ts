@@ -173,45 +173,6 @@ describe('StripeService — Stripe operations', () => {
         await expect(service.getChargeCustomerId('ch_2')).resolves.toBe('cus_2');
     });
 
-    describe('payment methods', () => {
-        beforeEach(() => {
-            (stripe.customers!.retrieve as jest.Mock).mockResolvedValue({ deleted: false, invoice_settings: { default_payment_method: 'pm_1' } });
-            (stripe.paymentMethods!.list as jest.Mock).mockResolvedValue({
-                data: [
-                    { id: 'pm_1', card: { brand: 'visa', last4: '4242', exp_month: 1, exp_year: 2030 } },
-                    { id: 'pm_2', card: null }
-                ]
-            });
-        });
-
-        it('lists cards and marks the default', async () => {
-            await expect(service.listPaymentMethods('cus_1')).resolves.toEqual([
-                { id: 'pm_1', brand: 'visa', last4: '4242', expMonth: 1, expYear: 2030, isDefault: true },
-                { id: 'pm_2', brand: null, last4: null, expMonth: null, expYear: null, isDefault: false }
-            ]);
-        });
-
-        it('creates a SetupIntent for off-session card collection', async () => {
-            await service.createSetupIntent('cus_1');
-            expect(stripe.setupIntents!.create).toHaveBeenCalledWith(
-                { customer: 'cus_1', usage: 'off_session', payment_method_types: ['card'] },
-                undefined
-            );
-        });
-
-        it('detaches or sets as default only the tenant’s own cards', async () => {
-            (stripe.paymentMethods!.retrieve as jest.Mock).mockResolvedValue({ customer: 'cus_1' });
-            await service.detachPaymentMethodForCustomer('cus_1', 'pm_1');
-            await service.setDefaultPaymentMethodForCustomer('cus_1', 'pm_1');
-            expect(stripe.paymentMethods!.detach).toHaveBeenCalled();
-            expect(stripe.customers!.update).toHaveBeenCalledWith('cus_1', { invoice_settings: { default_payment_method: 'pm_1' } }, undefined);
-
-            (stripe.paymentMethods!.retrieve as jest.Mock).mockResolvedValue({ customer: { id: 'cus_other' } });
-            await expect(service.detachPaymentMethodForCustomer('cus_1', 'pm_9')).rejects.toBeInstanceOf(HttpException);
-            await expect(service.setDefaultPaymentMethodForCustomer('cus_1', 'pm_9')).rejects.toBeInstanceOf(HttpException);
-        });
-    });
-
     it('maps invoices and the upcoming invoice to our shape (amounts in major units)', async () => {
         (stripe.invoices!.list as jest.Mock).mockResolvedValue({
             has_more: false,

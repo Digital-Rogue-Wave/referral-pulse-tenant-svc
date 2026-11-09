@@ -1,6 +1,7 @@
 import { ArgumentsHost, BadRequestException, ForbiddenException, HttpException, HttpStatus, NotFoundException } from '@nestjs/common';
 import { mock } from 'jest-mock-extended';
 import { PrismaClientKnownRequestError } from '@prisma/client/runtime/client';
+import Stripe from 'stripe';
 
 import { AppLoggerService } from '@common/logging/app-logger.service';
 import { TenantContextService } from '@common/tenant-aware/tenant-context.service';
@@ -82,6 +83,21 @@ describe('GlobalExceptionsFilter', () => {
 
         const validation = capture(new BadRequestException({ message: ['email must be an email', 'name should not be empty'] })).body.error;
         expect(validation).toMatchObject({ code: 'validation_failed', details: [{ param: 'email' }, { param: 'name' }] });
+    });
+
+    it.each([
+        [{ type: 'card_error', code: 'card_declined', message: 'Your card was declined.' }, 402, 'card_declined', 'Your card was declined.'],
+        [{ type: 'invalid_request_error', code: 'resource_missing', message: 'No such subscription: sub_x' }, 404, 'not_found', undefined],
+        [{ type: 'api_error', message: 'Stripe is down' }, 502, 'payment_provider_error', undefined]
+    ])('maps a Stripe %p to %i %s, never a 500 (US1.8.2 F5)', (raw, status, code, message) => {
+        const result = capture(Stripe.errors.StripeError.generate(raw as never));
+        expect(result.status).toBe(status);
+        expect(result.body.error.code).toBe(code);
+        if (message) {
+            expect(result.body.error.message).toBe(message);
+        } else {
+            expect(result.body.error.message).not.toContain('sub_x');
+        }
     });
 
     it('hides unexpected errors behind a 500 with no internals', () => {

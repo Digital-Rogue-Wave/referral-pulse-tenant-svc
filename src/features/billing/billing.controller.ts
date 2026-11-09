@@ -1,5 +1,5 @@
-import { Body, Controller, Delete, Get, HttpCode, HttpStatus, Param, Post, Query } from '@nestjs/common';
-import { ApiBearerAuth, ApiOkResponse, ApiTags } from '@nestjs/swagger';
+import { Body, Controller, Get, HttpCode, HttpStatus, Post, Query } from '@nestjs/common';
+import { ApiAcceptedResponse, ApiBearerAuth, ApiOkResponse, ApiTags } from '@nestjs/swagger';
 import { RequirePermission } from '@common/auth/require-permission.decorator';
 import { AllowUnpaidTenant } from '@common/auth/tenant-access.guard';
 import { CursorPage, ListQueryDto } from '@common/http-contract/cursor-page';
@@ -13,8 +13,6 @@ import {
     SubscriptionUpgradePreviewResponseDto,
     SubscriptionDowngradeRequestDto,
     SubscriptionCancelRequestDto,
-    PaymentMethodSetupResponseDto,
-    PaymentMethodDto,
     InvoiceDto,
     UpcomingInvoiceDto,
     UsageSummaryDto
@@ -58,9 +56,10 @@ export class BillingController {
         return await this.billingService.previewSubscriptionUpgrade(dto.targetPlan);
     }
 
-    @ApiOkResponse({ type: SubscriptionStatusDto })
+    /** 202: Stripe took the upgrade; the plan changes when its webhook arrives (US1.8.2 F10). */
+    @ApiAcceptedResponse({ type: SubscriptionStatusDto })
     @RequirePermission('billing:write')
-    @HttpCode(HttpStatus.OK)
+    @HttpCode(HttpStatus.ACCEPTED)
     @Post('subscription/upgrade')
     async upgradeSubscription(@Body() dto: SubscriptionUpgradeRequestDto): Promise<SubscriptionStatusDto> {
         return await this.billingService.upgradeSubscription(dto.targetPlan);
@@ -96,36 +95,6 @@ export class BillingController {
     @Post('subscription/reactivate')
     async reactivateSubscription(): Promise<SubscriptionStatusDto> {
         return await this.billingService.reactivateSubscription();
-    }
-
-    @ApiOkResponse({ type: PaymentMethodSetupResponseDto })
-    @RequirePermission('billing:write')
-    @HttpCode(HttpStatus.OK)
-    @Post('payment-methods')
-    async createPaymentMethodSetupIntent(): Promise<PaymentMethodSetupResponseDto> {
-        return await this.billingService.createPaymentMethodSetupIntent();
-    }
-
-    @ApiOkResponse({ type: PaymentMethodDto, isArray: true })
-    @RequirePermission('billing:read')
-    @HttpCode(HttpStatus.OK)
-    @Get('payment-methods')
-    async listPaymentMethods(): Promise<PaymentMethodDto[]> {
-        return await this.billingService.listPaymentMethods();
-    }
-
-    @RequirePermission('billing:write')
-    @HttpCode(HttpStatus.NO_CONTENT)
-    @Delete('payment-methods/:id')
-    async deletePaymentMethod(@Param('id') id: string): Promise<void> {
-        await this.billingService.deletePaymentMethod(id);
-    }
-
-    @RequirePermission('billing:write')
-    @HttpCode(HttpStatus.NO_CONTENT)
-    @Post('payment-methods/:id/default')
-    async setDefaultPaymentMethod(@Param('id') id: string): Promise<void> {
-        await this.billingService.setDefaultPaymentMethod(id);
     }
 
     @ApiOkResponse({ description: 'A page of invoices, newest first', type: CursorPage })
