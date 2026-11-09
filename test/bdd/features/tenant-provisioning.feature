@@ -16,6 +16,7 @@ Feature: Tenant provisioning by a Super Admin (US1.1.1)
     Then the response status should be 201
     And the response holds an active tenant "Acme Provisioned" whose verification is "pending"
     And the response holds a pending "OWNER" invitation for "owner-prov@acme.com"
+    And the response carries neither the widget token secret nor the invitation token hash
     And the new tenant has no members yet
     And the new tenant has exactly one pending "OWNER" invitation for "owner-prov@acme.com"
     And "tenant.created" is queued in the outbox for the new tenant
@@ -37,6 +38,12 @@ Feature: Tenant provisioning by a Super Admin (US1.1.1)
     Then the response status should be 409
     And the response should contain errorCode "duplicate_resource"
     And no invitation exists for "owner-other@acme.com"
+
+  Scenario: Two companies with the same name can both sign up themselves
+    When a company named "bdd-prov same" signs up through the Ory sign-up hook
+    And another company named "bdd-prov same" signs up through the Ory sign-up hook
+    Then both sign-ups created a tenant
+    And the second tenant's slug is the first one's plus a 6-character suffix
 
   Scenario: An invalid owner email is refused
     Given I am signed in as a Super Admin

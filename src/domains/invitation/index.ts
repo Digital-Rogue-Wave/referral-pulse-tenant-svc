@@ -126,13 +126,10 @@ export class InvitationResponse {
     createdAt!: Date;
 }
 
-/** Public view returned from the token-validation endpoint (no token echoed back). */
+/** Public view returned from the token-validation endpoint: only what the acceptance page shows (no token, no ids). */
 export class PublicInvitationResponse {
     @ApiProperty()
     email!: string;
-
-    @ApiProperty()
-    tenantId!: string;
 
     @ApiProperty({ enum: RoleEnum })
     role!: string;
@@ -148,15 +145,38 @@ export class PublicInvitationResponse {
 // Mappers
 // ============================================================
 
+/** Explicit field lists, as for API keys (NOTE.md K6): the token hash never leaves the service. */
 class InvitationResponseMapper extends BaseResponseMapper<InvitationProps, InvitationResponse> {
     constructor() {
         super(InvitationResponse);
     }
+
+    override toResponse(entity: InvitationProps): InvitationResponse {
+        return Object.assign(new InvitationResponse(), {
+            id: entity.id,
+            tenantId: entity.tenantId,
+            email: entity.email,
+            role: entity.role,
+            status: entity.status,
+            expiresAt: entity.expiresAt,
+            createdAt: entity.createdAt
+        });
+    }
 }
 
+/** The unauthenticated lookup also hides the tenant id: a token holder learns only what the acceptance page shows. */
 class PublicInvitationResponseMapper extends BaseResponseMapper<InvitationProps, PublicInvitationResponse> {
     constructor() {
         super(PublicInvitationResponse);
+    }
+
+    override toResponse(entity: InvitationProps): PublicInvitationResponse {
+        return Object.assign(new PublicInvitationResponse(), {
+            email: entity.email,
+            role: entity.role,
+            status: entity.status,
+            expiresAt: entity.expiresAt
+        });
     }
 }
 

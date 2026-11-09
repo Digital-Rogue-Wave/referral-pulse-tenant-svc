@@ -209,13 +209,31 @@ export class TenantService {
         return tenantResponseMapper.toResponse(tenant);
     }
 
-    /** The requested slug, or one derived from the name; 409 when another tenant already uses it. */
+    /**
+     * The requested slug (409 when another tenant uses it), or one derived from the name. A derived slug is a
+     * convenience and must never stop a sign-up: when two companies share a name, the second one's slug gets the
+     * random end of its ULID (`acme-4f7k2q`).
+     */
     async freeSlug(name: string, id: string, requested?: string): Promise<string> {
-        const slug = requested ?? this.generateSlug(name, id);
-        if ((await this.prisma.tenant.count({ where: { slug } })) > 0) {
+        if (requested) {
+            return this.assertSlugFree(requested);
+        }
+        const derived = this.generateSlug(name, id);
+        if (!(await this.isSlugTaken(derived))) {
+            return derived;
+        }
+        return this.assertSlugFree(`${derived.slice(0, 25)}-${id.slice(-6).toLowerCase()}`);
+    }
+
+    private async assertSlugFree(slug: string): Promise<string> {
+        if (await this.isSlugTaken(slug)) {
             throw new BaseException('duplicate_resource', `Slug "${slug}" is already in use`, HttpStatus.CONFLICT, 'slug');
         }
         return slug;
+    }
+
+    private async isSlugTaken(slug: string): Promise<boolean> {
+        return (await this.prisma.tenant.count({ where: { slug } })) > 0;
     }
 
     /**

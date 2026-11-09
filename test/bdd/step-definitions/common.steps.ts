@@ -117,6 +117,12 @@ Then('the response should contain a {string} field', function (this: BddWorldInt
     assert.ok(field in body, `Expected response to contain field "${field}". Body: ${JSON.stringify(body)}`);
 });
 
+Then('the response should not contain a {string} field', function (this: BddWorldInterface, field: string) {
+    assert.ok(this.response, 'No HTTP response');
+    const body = this.response.body as Record<string, unknown>;
+    assert.ok(!(field in body), `Expected response NOT to contain field "${field}". Body: ${JSON.stringify(body)}`);
+});
+
 Then('the response should contain a {string} field with value {string}', function (this: BddWorldInterface, field: string, expectedValue: string) {
     assert.ok(this.response, 'No HTTP response');
     const body = this.response.body as Record<string, unknown>;

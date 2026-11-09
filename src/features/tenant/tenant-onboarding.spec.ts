@@ -95,6 +95,15 @@ describe('TenantService.create — tenant onboarding', () => {
             expect((error as BaseException).getStatus()).toBe(HttpStatus.CONFLICT);
             expect(prisma.$transaction).not.toHaveBeenCalled();
         });
+
+        it('then a second company with the same name still signs up, its slug suffixed with the end of its ULID', async () => {
+            (prisma.tenant.count as jest.Mock).mockResolvedValueOnce(1).mockResolvedValueOnce(0);
+
+            await service.create({ name: 'Acme' }, owner, { onExisting: 'return' });
+
+            const { data } = tx.tenant.create.mock.calls[0][0] as { data: { id: string; slug: string } };
+            expect(data.slug).toBe(`acme-${data.id.slice(-6).toLowerCase()}`);
+        });
     });
 
     describe('given an identity that already owns a tenant', () => {

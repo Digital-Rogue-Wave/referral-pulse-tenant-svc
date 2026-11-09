@@ -39,6 +39,8 @@ Feature: Team Invitations
     Then the response status should be 200
     And the response should contain a "email" field
     And the response should contain a "role" field
+    And the response should not contain a "tenant_id" field
+    And the response should not contain a "token_hash" field
 
   @needs-pending-invitation
   Scenario: Accept an invitation with the matching Ory identity provisions membership
