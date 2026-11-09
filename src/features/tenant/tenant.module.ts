@@ -25,6 +25,7 @@ import { TenantStatsService } from './aware/tenant-stats.service';
 import { TenantListener } from './listeners/tenant.listener';
 import { UsersModule } from '../users/users.module';
 import { InvitationModule } from '../invitation/invitation.module';
+import { PlanLimitModule } from '../billing/plan-limit.module';
 
 // Processors
 import { TenantUnlockProcessor } from './processors/tenant-unlock.processor';
@@ -37,7 +38,8 @@ import { TenantUnlockProcessor } from './processors/tenant-unlock.processor';
         TenantSettingModule,
         DnsModule,
         UsersModule,
-        InvitationModule
+        InvitationModule,
+        PlanLimitModule
 
         // BullJobsModule is @Global() - no need to import
     ],

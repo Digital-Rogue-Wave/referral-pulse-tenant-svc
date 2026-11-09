@@ -1,5 +1,6 @@
 import { invitationResponseMapper, publicInvitationResponseMapper, type InvitationProps } from '@domains/invitation';
 import { tenantResponseMapper, type TenantProps } from '@domains/tenant';
+import { planResponseMapper } from '@domains/billing';
 
 /** US1.1.1 C15 (US1.5.4 F1, US1.2.3 F1): secrets and token hashes never leave the service in a response. */
 describe('response mappers — explicit field lists', () => {
@@ -26,6 +27,16 @@ describe('response mappers — explicit field lists', () => {
 
         expect(response).not.toHaveProperty('widgetTokenSecret');
         expect(response).toMatchObject({ id: 't1', slug: 'acme', billingCountry: 'DE', invitationChannel: null, retentionMonths: 24 });
+    });
+
+    it('a plan answer carries the display price the Stripe sync stored (US1.8.1 F5), or null before any sync', () => {
+        const plan = { id: 'p1', name: 'Scale', isActive: true, manualInvoicing: false, createdAt: now, updatedAt: now };
+
+        expect(planResponseMapper.toResponse({ ...plan, metadata: { price: { amount: 2500, currency: 'eur' } } } as never).price).toEqual({
+            amount: 2500,
+            currency: 'eur'
+        });
+        expect(planResponseMapper.toResponse({ ...plan, metadata: null } as never).price).toBeNull();
     });
 
     it('an invitation answer never carries the token hash, and the public lookup hides the tenant id too', () => {

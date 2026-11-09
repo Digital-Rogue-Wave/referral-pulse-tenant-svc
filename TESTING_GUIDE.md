@@ -153,7 +153,7 @@ describe('MyService', () => {
 Scenario: Usage summary returns metrics
   Given the application is running
   And I have a valid JWT for tenant "default-tenant"
-  When I send a GET request to "/api/v1/billings/usage" with that token
+  When I send a GET request to "/api/v1/billing/usage" with that token
   Then the response status should be 200
   And the response should contain a "metrics" field
 ```
@@ -168,7 +168,7 @@ Scenario: Checkout returns a Stripe URL
   Given the application is running
   And I have a valid JWT for tenant "default-tenant"
   Given the Stripe checkout API is mocked to return a checkout URL
-  When I send a POST request to "/api/v1/billings/subscription/checkout" with body:
+  When I send a POST request to "/api/v1/billing/subscription/checkout" with body:
     """
     { "plan": "Starter" }
     """

@@ -59,20 +59,15 @@ export class StripeService {
             return null;
         }
 
-        if (cfg.freePriceId && priceId === cfg.freePriceId) {
-            return BillingPlanEnum.FREE;
-        }
-        if (cfg.starterPriceId && priceId === cfg.starterPriceId) {
-            return BillingPlanEnum.STARTER;
-        }
-        if (cfg.growthPriceId && priceId === cfg.growthPriceId) {
-            return BillingPlanEnum.GROWTH;
-        }
-        if (cfg.enterprisePriceId && priceId === cfg.enterprisePriceId) {
-            return BillingPlanEnum.ENTERPRISE;
-        }
-
-        return null;
+        // One entry per plan (US1.8.1 F1): an `if` per plan had already lost Scale once.
+        const planByPriceId: [string | undefined, BillingPlanEnum][] = [
+            [cfg.freePriceId, BillingPlanEnum.FREE],
+            [cfg.starterPriceId, BillingPlanEnum.STARTER],
+            [cfg.growthPriceId, BillingPlanEnum.GROWTH],
+            [cfg.scalePriceId, BillingPlanEnum.SCALE],
+            [cfg.enterprisePriceId, BillingPlanEnum.ENTERPRISE]
+        ];
+        return planByPriceId.find(([configured]) => configured && configured === priceId)?.[1] ?? null;
     }
 
     async applyScheduledDowngrade(params: { stripeSubscriptionId: string; targetPlan: BillingPlanEnum }): Promise<void> {

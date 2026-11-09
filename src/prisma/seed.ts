@@ -104,7 +104,8 @@ async function seedPlans() {
                 referred_users: 100,
                 seats: 2,
                 leaderboard_entries: 100,
-                email_sends: 500
+                email_sends: 500,
+                sdk_requests_per_minute: 20
             }
         },
         {
@@ -119,7 +120,8 @@ async function seedPlans() {
                 referred_users: 1_000,
                 seats: 5,
                 leaderboard_entries: 1_000,
-                email_sends: 5_000
+                email_sends: 5_000,
+                sdk_requests_per_minute: 200
             }
         },
         {
@@ -134,26 +136,27 @@ async function seedPlans() {
                 referred_users: 10_000,
                 seats: 15,
                 leaderboard_entries: 10_000,
-                email_sends: 50_000
+                email_sends: 50_000,
+                sdk_requests_per_minute: 2_000
             }
         },
         {
-            // DB Model section 3 names a fifth tier between Growth and Enterprise. Seeded
-            // INACTIVE on purpose: no document specifies its limits or price, and these numbers are
-            // a dev placeholder interpolated on the existing progression, not a commercial
-            // decision. Set real limits and flip isActive before offering it.
+            // DB Model section 3 names a fifth tier between Growth and Enterprise. No document gives its
+            // price or limits: these limits are interpolated on the progression and its Stripe price is a
+            // TEST price (US1.8.1, 2026-11-09), so it can be bought and tested. Replace both before launch.
             name: 'Scale',
             stripePriceId: STRIPE_PRICE.Scale || null,
             stripeProductId: STRIPE_PRODUCT.Scale || null,
             interval: 'month',
-            isActive: false,
+            isActive: true,
             manualInvoicing: false,
             limits: {
                 campaigns: 150,
                 referred_users: 35_000,
                 seats: 40,
                 leaderboard_entries: 35_000,
-                email_sends: 150_000
+                email_sends: 150_000,
+                sdk_requests_per_minute: 7_000
             }
         },
         {
@@ -168,7 +171,8 @@ async function seedPlans() {
                 referred_users: 100_000,
                 seats: 100,
                 leaderboard_entries: 100_000,
-                email_sends: 500_000
+                email_sends: 500_000,
+                sdk_requests_per_minute: 20_000
             }
         }
     ];

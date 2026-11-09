@@ -12,7 +12,7 @@ import { NullableType } from '@app/types';
 @ApiTags('Billing Plans (Admin)')
 @ApiBearerAuth()
 @PlatformAdmin()
-@Controller({ path: 'billings/admin/plans', version: '1' })
+@Controller({ path: 'billing/admin/plans', version: '1' })
 export class PlanAdminController {
     constructor(
         private readonly planService: PlanService,

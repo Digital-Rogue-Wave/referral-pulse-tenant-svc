@@ -79,7 +79,11 @@ export class BillingService {
         const billing = await this.getOrCreateBillingForCurrentTenant();
         const tenantId = billing.tenantId;
 
-        const limits = await this.planLimitService.getPlanLimits(tenantId);
+        // US1.8.1 F2: limits and current use are live (`entitlementsOf`, the same view other services get);
+        // the daily `tenant_usages` snapshot only feeds the 7-day history.
+        const entitlements = await this.planLimitService.entitlementsOf(tenantId);
+        const limits: Record<string, number | null> = entitlements?.limits ?? {};
+        const liveUsage: Record<string, number> = entitlements?.usage ?? {};
 
         const today = this.dateService.nowMoment();
         const todayStr = this.dateService.format(today, 'YYYY-MM-DD');
@@ -105,6 +109,10 @@ export class BillingService {
             }
         >();
 
+        for (const metricName of new Set([...Object.keys(limits), ...Object.keys(liveUsage)])) {
+            metricsMap.set(metricName, { currentUsage: liveUsage[metricName] ?? 0, history: [] });
+        }
+
         for (const row of rows) {
             let entry = metricsMap.get(row.metricName);
             if (!entry) {
@@ -120,7 +128,7 @@ export class BillingService {
                 usage: row.currentUsage
             });
 
-            if (row.periodDate === todayStr) {
+            if (row.periodDate === todayStr && liveUsage[row.metricName] === undefined) {
                 entry.currentUsage = row.currentUsage;
             }
         }
@@ -128,8 +136,7 @@ export class BillingService {
         const metrics: UsageMetricSummaryDto[] = [];
 
         for (const [metricName, value] of metricsMap.entries()) {
-            const rawLimit = limits ? (limits as Record<string, number | undefined>)[metricName] : undefined;
-            const limit: number | null = rawLimit === null || rawLimit === undefined ? null : rawLimit;
+            const limit: number | null = limits[metricName] ?? null;
             const percentageUsed: number | null = limit !== null && limit > 0 ? Math.min((value.currentUsage / limit) * 100, 100) : null;
 
             const history = [...value.history].sort((a, b) => a.periodDate.localeCompare(b.periodDate));

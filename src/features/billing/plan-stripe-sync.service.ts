@@ -22,7 +22,14 @@ export class PlanStripeSyncService {
     }
 
     private buildLimitsFromMetadata(price: Stripe.Price, product: Stripe.Product | null): PlanLimits | null {
-        const limitKeys: (keyof PlanLimits)[] = ['referred_users', 'campaigns', 'seats', 'leaderboard_entries', 'email_sends'];
+        const limitKeys: (keyof PlanLimits)[] = [
+            'referred_users',
+            'campaigns',
+            'seats',
+            'leaderboard_entries',
+            'email_sends',
+            'sdk_requests_per_minute'
+        ];
 
         const limits: PlanLimits = {};
 
@@ -55,7 +62,9 @@ export class PlanStripeSyncService {
 
     private buildMetadataSnapshot(price: Stripe.Price, product: Stripe.Product | null): Record<string, unknown> | null {
         const metadata: Record<string, unknown> = {
-            priceMetadata: { ...price.metadata }
+            priceMetadata: { ...price.metadata },
+            // US1.8.1 F5: the display price, in minor units, as Stripe bills it.
+            ...(price.unit_amount !== null ? { price: { amount: price.unit_amount, currency: price.currency } } : {})
         };
 
         if (product) {
@@ -120,7 +129,7 @@ export class PlanStripeSyncService {
             if (!limits) {
                 this.logger.debug(
                     `Skipping Stripe price ${price.id} because no recognized plan limit metadata was found; ` +
-                        'add PlanLimits keys (referred_users, campaigns, seats, leaderboard_entries, email_sends) to Stripe metadata to include it.'
+                        'add PlanLimits keys (referred_users, campaigns, seats, leaderboard_entries, email_sends, sdk_requests_per_minute) to Stripe metadata to include it.'
                 );
                 return false;
             }

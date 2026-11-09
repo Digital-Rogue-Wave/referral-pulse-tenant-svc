@@ -32,6 +32,12 @@ export class PlanDto {
     @ApiPropertyOptional({ nullable: true })
     metadata!: Record<string, unknown> | null;
 
+    @ApiPropertyOptional({
+        nullable: true,
+        description: 'Display price in minor units, as Stripe bills it; null until the plan sync has seen a Stripe price'
+    })
+    price!: { amount: number; currency: string } | null;
+
     @ApiProperty()
     createdAt!: Date;
 

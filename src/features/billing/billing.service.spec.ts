@@ -131,8 +131,11 @@ describe('BillingService — the tenant’s subscription', () => {
             await expect(service.getCurrentSubscription()).resolves.toMatchObject({ stripeSubscriptionStatus: null, planUsagePercentage: null });
         });
 
-        it('summarises the last 7 days of usage per metric against the plan limits', async () => {
-            planLimits.getPlanLimits.mockResolvedValue({ email_sends: 100 });
+        it('shows every plan limit with its live use, and keeps the daily snapshots as the 7-day history (US1.8.1 F2)', async () => {
+            planLimits.entitlementsOf.mockResolvedValue({
+                limits: { email_sends: 100, seats: 2 },
+                usage: { email_sends: 45, seats: 2 }
+            } as never);
             prisma.tenantUsage.findMany!.mockResolvedValue([
                 { metricName: 'email_sends', periodDate: '2026-09-21', currentUsage: 30 },
                 { metricName: 'email_sends', periodDate: '2026-09-22', currentUsage: 40 },
@@ -142,13 +145,16 @@ describe('BillingService — the tenant’s subscription', () => {
             const summary = await service.getUsageSummary();
 
             expect(summary.metrics).toEqual([
+                // live, not the snapshot's 40
                 expect.objectContaining({
                     metric: 'email_sends',
-                    currentUsage: 40,
+                    currentUsage: 45,
                     limit: 100,
-                    percentageUsed: 40,
+                    percentageUsed: 45,
                     history: [expect.anything(), expect.anything()]
                 }),
+                // a limit with no snapshot row yet is still shown
+                expect.objectContaining({ metric: 'seats', currentUsage: 2, limit: 2, percentageUsed: 100, history: [] }),
                 expect.objectContaining({ metric: 'webhooks', currentUsage: 5, limit: null, percentageUsed: null })
             ]);
         });

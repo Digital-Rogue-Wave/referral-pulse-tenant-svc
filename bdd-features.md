@@ -61,27 +61,27 @@ Tests run against the dev PostgreSQL instance. Fixture tenants (`bdd-suspended-0
 
 ```gherkin
 Scenario: Request without Authorization header is rejected
-  → GET /billings/subscription, no token
+  → GET /billing/plan, no token
   → 401
 
 Scenario: Request with expired JWT is rejected
-  → GET /billings/subscription, expired token
+  → GET /billing/plan, expired token
   → 401
 
 Scenario: Request with malformed JWT is rejected
-  → GET /billings/subscription, "not.a.valid.jwt.at.all"
+  → GET /billing/plan, "not.a.valid.jwt.at.all"
   → 401
 
 Scenario: Valid JWT for non-existent tenant returns 404
-  → GET /billings/subscription, tenant "bdd-nonexistent-tenant-xyz"
+  → GET /billing/plan, tenant "bdd-nonexistent-tenant-xyz"
   → 404, errorCode: TENANT_NOT_FOUND
 
 Scenario: Active tenant with valid JWT can access the API
-  → GET /billings/subscription, tenant "default-tenant"
+  → GET /billing/plan, tenant "default-tenant"
   → not 401, not 403
 
 Scenario: Public endpoint is accessible without any token  @public-endpoint
-  → GET /billings/plans, no token
+  → GET /billing/plans, no token
   → 200, non-empty array
 
 Scenario: Service token can access internal endpoint
@@ -97,24 +97,24 @@ Scenario: Service token can access internal endpoint
 
 ```gherkin
 Scenario: Get current subscription returns plan data
-  → GET /billings/subscription
+  → GET /billing/plan
   → 200, body contains "plan" and "status"
 
 Scenario: List public billing plans without authentication  @public-endpoint
-  → GET /billings/plans, no token
+  → GET /billing/plans, no token
   → 200, non-empty array, each item has "name"
 
 Scenario: Create checkout session returns a Stripe URL
-  → POST /billings/subscription/checkout  { "plan": "Starter" }
+  → POST /billing/subscription/checkout  { "plan": "Starter" }
   → Stripe mocked (nock one-shot)
   → 200, body contains "checkoutUrl"
 
 Scenario: Get usage summary returns usage metrics
-  → GET /billings/usage
+  → GET /billing/usage
   → 200, body contains "metrics"
 
 Scenario: Preview subscription upgrade returns 200
-  → POST /billings/subscription/upgrade/preview  { "targetPlan": "Growth" }
+  → POST /billing/subscription/upgrade/preview  { "targetPlan": "Growth" }
   → 200
 ```
 
@@ -126,23 +126,23 @@ Scenario: Preview subscription upgrade returns 200
 
 ```gherkin
 Scenario: Suspended tenant is blocked  @needs-suspended-tenant
-  → GET /billings/subscription, JWT for bdd-suspended-001 (status: suspended)
+  → GET /billing/plan, JWT for bdd-suspended-001 (status: suspended)
   → 403, errorCode: TENANT_SUSPENDED, title: "Forbidden"
 
 Scenario: Locked tenant is blocked  @needs-locked-tenant
-  → GET /billings/subscription, JWT for bdd-locked-001 (status: locked)
+  → GET /billing/plan, JWT for bdd-locked-001 (status: locked)
   → 403, errorCode: TENANT_LOCKED
 
 Scenario: Locked tenant error response has the correct shape  @needs-locked-tenant
-  → GET /billings/subscription, JWT for bdd-locked-001
+  → GET /billing/plan, JWT for bdd-locked-001
   → 403, response contains "title", "detail", "errorCode"
 
 Scenario: Active tenant passes the tenant status guard  @needs-active-tenant
-  → GET /billings/subscription, JWT for bdd-active-001 (status: active)
+  → GET /billing/plan, JWT for bdd-active-001 (status: active)
   → not 403
 
 Scenario: Public endpoint bypasses tenant status guard  @public-endpoint
-  → GET /billings/plans, no token
+  → GET /billing/plans, no token
   → 200
 ```
 

@@ -1950,6 +1950,17 @@ code that predates this change. The test now asserts the reachable behaviour and
 
 ---
 
+## V5.23 Platform billing on the v5.1 paths, the Scale plan, and an SDK limit per plan (2026-11-09)
+
+Decided with Ahmed while fixing US1.8.1 (user-stories-verification, E1 F1.8).
+
+| # | Decision | Why |
+|---|---|---|
+| B23-1 | **Routes move to `/v1/billing/*`** (Product Spec v5.1 §13): the current-plan read is `GET /v1/billing/plan` (was `GET /v1/billings/subscription`); invoices and the portal session keep their names under the new base; checkout, upgrade, downgrade, cancel and payment-method routes keep theirs under `/v1/billing/subscription/…` and `/v1/billing/payment-methods`. No alias. | v5.1 names the paths; no frontend is built yet, so the switch costs nothing now. |
+| B23-2 | **Scale is active, on a Stripe TEST price** (`SCALE`, €25/month, `STRIPE_SCALE_PRICE_ID`). Its limits stay the interpolated seed values. | Lets Scale be bought and tested end to end; both the price and the limits must be replaced by the real ones before launch. |
+| B23-3 | **`sdk_requests_per_minute` is a plan limit** (R-SDK-03): Free 20, Starter 200, Growth 2,000, Scale 7,000, Enterprise 20,000 — `referred_users ÷ 5`, from the spec's sizing rule (each logged-in user may miss the 5-minute widget-config cache once). Event Ingestion reads it from `GET /internal/tenants/{id}/entitlements` (capability `tenant_entitlements.read`, granted to `ingestion-svc`). | One home for every limit; Stripe metadata can carry it like the others. |
+| B23-4 | **`GET /v1/billing/usage` is live** (`entitlementsOf`); `tenant_usages` only feeds the 7-day history. `plan_usage_percentage` is seats in use over the plan's seat limit. | The daily snapshot showed nothing for a new tenant and a stale value all day; the hard-coded 10 seats was wrong for every plan. |
+
 > **Cross-service decision list.** The consolidated list of everything still open across all four
 > services — the three blockers and their dependency chain, the decisions already taken, the
 > ratifications, and the spec defects — lives in `referral-pulse-event-svc/NOTE.md` §11. This

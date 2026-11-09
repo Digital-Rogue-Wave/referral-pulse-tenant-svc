@@ -7,7 +7,7 @@ import { PlanDto } from '@domains/billing';
 import { PlanService } from './plan.service';
 
 @ApiTags('Billing Plans')
-@Controller({ path: 'billings/plans', version: '1' })
+@Controller({ path: 'billing/plans', version: '1' })
 export class PlanPublicController {
     constructor(private readonly planService: PlanService) {}
 

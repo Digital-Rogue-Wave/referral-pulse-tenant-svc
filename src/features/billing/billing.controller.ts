@@ -25,7 +25,7 @@ import { BillingService } from './billing.service';
 @ApiTags('billings')
 @ApiBearerAuth()
 @AllowUnpaidTenant()
-@Controller({ path: 'billings', version: '1' })
+@Controller({ path: 'billing', version: '1' })
 export class BillingController {
     constructor(
         private readonly billingService: BillingService,
@@ -37,7 +37,7 @@ export class BillingController {
     @ApiOkResponse({ type: SubscriptionStatusDto })
     @RequirePermission('billing:read')
     @HttpCode(HttpStatus.OK)
-    @Get('subscription')
+    @Get('plan')
     async getCurrentSubscription(): Promise<SubscriptionStatusDto> {
         return await this.billingService.getCurrentSubscription();
     }
