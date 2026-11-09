@@ -456,12 +456,28 @@ export class AdminTenantCreatedResponse {
 }
 
 /**
- * API Contract §4.1's "shared secret" for widget identity tokens. Returned only to a service holding
- * `widget_secret.read`; see `internal-widget-secret.controller.ts`.
+ * API Contract §4.1's "shared secret" for widget identity tokens, as a service holding `widget_secret.read`
+ * receives it (see `internal-widget-secret.controller.ts`). Within an hour of a rotation the replaced
+ * secret comes too, so tokens signed just before the switch still verify.
  */
 export class WidgetTokenSecretDto {
     @ApiProperty({ description: '32 bytes as 64 hex characters' })
     secret!: string;
+
+    @ApiPropertyOptional({ description: 'The replaced secret, still accepted until previous_valid_until' })
+    previousSecret?: string;
+
+    @ApiPropertyOptional()
+    previousValidUntil?: Date;
+}
+
+/** The secret as the Owner reads or receives it after a rotation (US1.5.4 F2/F3). */
+export class WidgetSecretResponse {
+    @ApiProperty({ description: '32 bytes as 64 hex characters: sign the widget user JWT (HS256, 1-hour expiry) with it' })
+    secret!: string;
+
+    @ApiPropertyOptional({ description: 'Set after a rotation: until then, tokens signed with the previous secret still work' })
+    previousValidUntil?: Date | null;
 }
 
 // Re-export events for convenience

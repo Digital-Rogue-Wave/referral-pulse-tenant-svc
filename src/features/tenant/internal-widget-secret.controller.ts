@@ -1,10 +1,11 @@
-import { Controller, Get, HttpCode, HttpStatus, NotFoundException, Param, ServiceUnavailableException } from '@nestjs/common';
+import { Controller, Get, HttpCode, HttpStatus, Param } from '@nestjs/common';
 import { ApiBearerAuth, ApiOkResponse, ApiOperation, ApiTags } from '@nestjs/swagger';
 
 import { ServiceCapability } from '@common/auth/authz/keto-tuples';
 import { AllowServices } from '@common/auth/require-permission.decorator';
-import { DatabaseService } from '@app/database/database.service';
 import { WidgetTokenSecretDto } from '@domains/tenant';
+
+import { WidgetSecretService } from './widget-secret.service';
 
 /**
  * A tenant's widget-token secret (API Contract §4.1).
@@ -16,10 +17,9 @@ import { WidgetTokenSecretDto } from '@domains/tenant';
  * key this service already serves, for the same reason: two services must agree on one value, so it
  * lives in neither.
  *
- * Service tokens only, under its own capability. There is deliberately **no dashboard route**: this
- * value signs identities, and an operator session that could read another tenant's secret could mint
- * widget tokens for their participants. Handing it to the tenant who must sign with it is a separate,
- * API-key-shaped problem (shown once, rotatable) and is not built here.
+ * Service tokens only, under its own capability. The Owner reads the same secret through the tenant-scoped
+ * `GET /v1/tenants/widget-secret` (Owner only, audited); this route serves any tenant, so it stays
+ * service-only. Within an hour of a rotation the previous secret comes too (US1.5.4 F3).
  *
  * `tenantId` comes from the path rather than the caller's token because the caller is ingestion,
  * whose service token carries no tenant — the same shape as the other internal per-tenant reads.
@@ -28,7 +28,7 @@ import { WidgetTokenSecretDto } from '@domains/tenant';
 @ApiBearerAuth()
 @Controller({ path: 'internal/tenants', version: '1' })
 export class InternalWidgetSecretController {
-    constructor(private readonly prisma: DatabaseService) {}
+    constructor(private readonly widgetSecrets: WidgetSecretService) {}
 
     @ApiOperation({ summary: 'The secret a tenant’s widget identity tokens are signed and verified with' })
     @ApiOkResponse({ type: WidgetTokenSecretDto })
@@ -36,21 +36,6 @@ export class InternalWidgetSecretController {
     @HttpCode(HttpStatus.OK)
     @Get(':tenantId/widget-token-secret')
     async widgetTokenSecret(@Param('tenantId') tenantId: string): Promise<WidgetTokenSecretDto> {
-        const tenant = await this.prisma.tenant.findFirst({
-            where: { id: tenantId, deletedAt: null },
-            select: { widgetTokenSecret: true }
-        });
-
-        if (!tenant) {
-            throw new NotFoundException(`Tenant ${tenantId} not found`);
-        }
-        if (!tenant.widgetTokenSecret) {
-            // 503, not 404 and not an empty string: the caller's correct response is to fail the
-            // request and retry, never to treat "no secret" as a secret and accept unverified tokens.
-            // The migration backfills every tenant, so this is a tenant created without one.
-            throw new ServiceUnavailableException(`Tenant ${tenantId} has no widget token secret`);
-        }
-
-        return { secret: tenant.widgetTokenSecret };
+        return await this.widgetSecrets.forService(tenantId);
     }
 }

@@ -43,6 +43,8 @@ const INTERNAL_ACTIONS: Record<string, (event: EventWithPayload) => Pick<AuditEn
     'tenant-setting.updated': (e) => ({ action: 'tenant_setting.updated', targetType: 'tenant_setting', targetId: e.aggregateId }),
     'api-key.updated': (e) => ({ action: 'api_key.updated', targetType: 'api_key', targetId: e.aggregateId }),
     'invitation.resent': (e) => ({ action: 'invitation.resent', targetType: 'invitation', targetId: e.aggregateId }),
+    // US1.5.4 F2: every Owner read of the widget-token secret is on the trail.
+    'tenant.widget_secret_revealed': (e) => ({ action: 'tenant.widget_secret_revealed', targetType: 'tenant', targetId: e.aggregateId }),
     'dns.reserved': (e) => ({ action: 'subdomain.reserved', targetType: 'subdomain', targetId: String(e.payload?.slug ?? e.aggregateId) }),
     'dns.released': (e) => ({ action: 'subdomain.released', targetType: 'subdomain', targetId: String(e.payload?.slug ?? e.aggregateId) })
 };

@@ -115,6 +115,8 @@ export type EventAction =
     | 'refunded'
     | 'verification_requested'
     | 'verification_status_changed'
+    | 'widget_secret_revealed'
+    | 'widget_secret_rotated'
     // Compliance
     | 'recorded'
     | 'requested'
@@ -378,7 +380,9 @@ export type TenantEventType =
     | 'tenant.restored'
     | 'tenant.payment-status-changed'
     | 'tenant.verification_requested'
-    | 'tenant.verification_status_changed';
+    | 'tenant.verification_status_changed'
+    | 'tenant.widget_secret_revealed'
+    | 'tenant.widget_secret_rotated';
 
 // Billing domain events
 export type BillingEventType =

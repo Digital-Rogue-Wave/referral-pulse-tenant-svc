@@ -16,6 +16,7 @@ import { SubdomainService } from '../dns/subdomain.service';
 import { DnsVerificationService } from '../dns/dns-verification.service';
 import { FilesService } from '../files/files.service';
 import { UsersService } from '../users/users.service';
+import { WidgetSecretVault } from './widget-secret.vault';
 
 const TENANT = {
     id: 't1',
@@ -63,7 +64,8 @@ describe('TenantService.applyVerificationReport', () => {
                 { provide: FilesService, useValue: mock<FilesService>() },
                 { provide: KratosService, useValue: mock<KratosService>() },
                 { provide: ConfigService, useValue: mock<ConfigService>() },
-                { provide: UsersService, useValue: mock<UsersService>() }
+                { provide: UsersService, useValue: mock<UsersService>() },
+                { provide: WidgetSecretVault, useValue: { generate: () => ({ raw: 'a'.repeat(64), sealed: 'sealed-secret' }) } }
             ]
         }).compile();
         service = module.get(TenantService);

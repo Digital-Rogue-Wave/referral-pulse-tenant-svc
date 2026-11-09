@@ -30,7 +30,8 @@ import {
     TenantUnsuspendedEvent,
     TenantUpdatedEvent,
     TenantVerificationRequestedEvent,
-    TenantVerificationStatusChangedEvent
+    TenantVerificationStatusChangedEvent,
+    TenantWidgetSecretRotatedEvent
 } from '@domains/tenant/events/tenant.events';
 import { UserAnonymisedEvent, UserInvitedEvent, UserLoggedInEvent, UserRegisteredEvent, UserRemovedEvent, UserRoleChangedEvent } from '@domains/user';
 
@@ -57,6 +58,7 @@ const EVENTS: BaseDomainEvent[] = [
     new TenantDomainVerifiedEvent(T, T, 'refer.acme.io', NOW),
     new TenantVerificationRequestedEvent(T, T, 'Acme', 'u1', 'v1'),
     new TenantVerificationStatusChangedEvent(T, T, 'pending', 'verified', undefined, 'system'),
+    new TenantWidgetSecretRotatedEvent(T, T, new Date('2026-11-09T11:00:00Z'), 'u1'),
     new UserRegisteredEvent('u1', T, 'OWNER'),
     new UserRoleChangedEvent('u2', T, 'VIEWER', 'ADMIN', 'u1'),
     new UserRemovedEvent('u2', T, 'OPERATOR', 'u1'),

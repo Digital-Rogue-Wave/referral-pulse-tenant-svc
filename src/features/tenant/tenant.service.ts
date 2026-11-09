@@ -1,5 +1,3 @@
-import { randomBytes } from 'crypto';
-
 import { BadRequestException, HttpStatus, Injectable, NotFoundException } from '@nestjs/common';
 import { ulid } from 'ulid';
 import { ConfigService } from '@nestjs/config';
@@ -21,6 +19,7 @@ import { SubdomainService } from '../dns/subdomain.service';
 import { DnsVerificationService } from '../dns/dns-verification.service';
 import { FilesService } from '../files/files.service';
 import { UsersService, MemberIdentity } from '../users/users.service';
+import { WidgetSecretVault } from './widget-secret.vault';
 
 import {
     CreateTenantDto,
@@ -61,9 +60,6 @@ import {
 } from '@domains/tenant/events/tenant.events';
 
 /** Default trial period in days */
-/** HMAC-SHA256's block size; hex-encoded to the column's 64 characters. */
-const WIDGET_TOKEN_SECRET_BYTES = 32;
-
 const TRIAL_PERIOD_DAYS = 14;
 
 /** Default days until deletion after scheduling */
@@ -90,7 +86,8 @@ export class TenantService {
         private readonly filesService: FilesService,
         private readonly kratos: KratosService,
         private readonly usersService: UsersService,
-        private readonly config: ConfigService<AllConfigType>
+        private readonly config: ConfigService<AllConfigType>,
+        private readonly widgetSecretVault: WidgetSecretVault
     ) {
         this.logger.setContext(TenantService.name);
     }
@@ -261,8 +258,8 @@ export class TenantService {
                 // Ingestion verifies them with (API Contract §4.1). Set here rather than as a
                 // column default so rotation has one home in application code, and set at
                 // creation because ingestion fails closed: a tenant without one has a widget
-                // that silently never renders (NOTE.md §V5.22).
-                widgetTokenSecret: randomBytes(WIDGET_TOKEN_SECRET_BYTES).toString('hex')
+                // that silently never renders (NOTE.md §V5.22). Sealed at rest (US1.5.4 F5).
+                widgetTokenSecret: this.widgetSecretVault.generate().sealed
             }
         });
         // Company verification at signup: the workflow service runs the account_verification workflow.

@@ -28,7 +28,8 @@ import type {
     TenantUnlockedEvent,
     TenantUpdatedEvent,
     TenantVerificationRequestedEvent,
-    TenantVerificationStatusChangedEvent
+    TenantVerificationStatusChangedEvent,
+    TenantWidgetSecretRotatedEvent
 } from '@domains/tenant/events/tenant.events';
 import type {
     UserAnonymisedEvent,
@@ -170,6 +171,15 @@ const MAPPERS: Record<string, Mapper<never>> = {
             externalId: `tenant.verification_requested:${e.verificationId ?? e.eventId}`,
             object: tenantObject(e),
             properties: { tenant_id: e.tenantId, verification_id: e.verificationId ?? null, verification_type: 'company' }
+        }
+    ],
+    // US1.5.4 F3: Event Ingestion drops its cached secret on this. No secret travels, only the grace end.
+    'tenant.widget_secret_rotated': (e: TenantWidgetSecretRotatedEvent) => [
+        {
+            eventType: 'tenant.widget_secret_rotated',
+            externalId: `tenant.widget_secret_rotated:${e.eventId}`,
+            object: tenantObject(e),
+            properties: { tenant_id: e.tenantId, previous_valid_until: iso(e.previousValidUntil) }
         }
     ],
     'tenant.verification_status_changed': (e: TenantVerificationStatusChangedEvent) => [

@@ -16,6 +16,9 @@ import { InternalWidgetSecretController } from './internal-widget-secret.control
 // Services
 import { TenantService } from './tenant.service';
 import { AdminTenantService } from './admin-tenant.service';
+import { WidgetSecretService } from './widget-secret.service';
+import { WidgetSecretVault } from './widget-secret.vault';
+import { ProviderSecretCipher } from '../connection/provider-secret.cipher';
 import { TenantStatsService } from './aware/tenant-stats.service';
 
 // Listeners
@@ -49,6 +52,9 @@ import { TenantUnlockProcessor } from './processors/tenant-unlock.processor';
         // Core Services
         TenantService,
         AdminTenantService,
+        WidgetSecretService,
+        WidgetSecretVault,
+        ProviderSecretCipher,
         TenantStatsService,
 
         // Listeners
