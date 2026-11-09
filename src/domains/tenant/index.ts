@@ -1,7 +1,8 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { IsString, IsOptional, IsEnum, IsDateString, IsInt, Min, Max, IsNotEmpty, IsObject, Length, MaxLength } from 'class-validator';
+import { IsString, IsOptional, IsEnum, IsDateString, IsEmail, IsInt, Min, Max, IsNotEmpty, IsObject, Length, MaxLength } from 'class-validator';
 
 import { BaseResponseMapper } from '@common/helper';
+import { InvitationResponse } from '@domains/invitation';
 
 // ============================================================
 // Enums (canonical definition lives in tenant.types.ts)
@@ -164,6 +165,26 @@ export class AdminLockTenantDto {
     @IsOptional()
     @IsDateString()
     lockUntil?: string;
+}
+
+/** Platform-admin tenant creation (US1.1.1): the client's Owner joins through the invitation sent to `owner_email`. */
+export class AdminCreateTenantDto {
+    @ApiProperty()
+    @IsString()
+    @IsNotEmpty()
+    @MaxLength(255)
+    name!: string;
+
+    @ApiPropertyOptional({ description: 'Derived from the name when omitted' })
+    @IsOptional()
+    @IsString()
+    @IsNotEmpty()
+    @MaxLength(63)
+    slug?: string;
+
+    @ApiProperty()
+    @IsEmail()
+    ownerEmail!: string;
 }
 
 export class SuspendTenantDto {
@@ -369,6 +390,15 @@ class TenantResponseMapper extends BaseResponseMapper<TenantProps, TenantRespons
 }
 
 export const tenantResponseMapper = new TenantResponseMapper();
+
+/** US1.1.1: the tenant a platform admin created, and the invitation its Owner joins through. */
+export class AdminTenantCreatedResponse {
+    @ApiProperty({ type: () => TenantResponse })
+    tenant!: TenantResponse;
+
+    @ApiProperty({ type: () => InvitationResponse })
+    ownerInvitation!: InvitationResponse;
+}
 
 /**
  * API Contract §4.1's "shared secret" for widget identity tokens. Returned only to a service holding
