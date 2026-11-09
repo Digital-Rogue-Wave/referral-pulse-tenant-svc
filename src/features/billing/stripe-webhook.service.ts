@@ -110,7 +110,7 @@ export class StripeWebhookService {
                 if (!subscriptionId) {
                     return {};
                 }
-                return { plan: this.stripe.resolvePlanFromSubscription(await this.stripe.getSubscription(subscriptionId)) };
+                return { plan: await this.planOfSubscription(subscriptionId) };
             }
             case 'charge.dispute.created':
             case 'charge.dispute.closed': {
@@ -146,6 +146,23 @@ export class StripeWebhookService {
             default:
                 // `invoice_payment.paid` duplicates `invoice.paid`; everything else is not billing state.
                 return 'ignored';
+        }
+    }
+
+    /**
+     * The plan a paid invoice's subscription is on now. A subscription Stripe no longer knows yields no plan
+     * rather than an error: retrying could never succeed, and the payment must still restore the tenant
+     * (US1.8.2 F1). Any other Stripe failure still throws, so Stripe redelivers the event.
+     */
+    private async planOfSubscription(subscriptionId: string): Promise<BillingPlanEnum | null> {
+        try {
+            return this.stripe.resolvePlanFromSubscription(await this.stripe.getSubscription(subscriptionId));
+        } catch (error) {
+            if ((error as { code?: string }).code !== 'resource_missing') {
+                throw error;
+            }
+            this.logger.warn('A paid invoice names a subscription Stripe no longer knows; applying the payment only', { subscriptionId });
+            return null;
         }
     }
 

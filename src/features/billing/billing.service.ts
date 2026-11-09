@@ -297,8 +297,8 @@ export class BillingService {
         if (!billing.stripeSubscriptionId) {
             throw new HttpException('No active subscription to upgrade for this tenant', HttpStatus.BAD_REQUEST);
         }
-        this.assertSelfServicePlan(targetPlan);
         this.assertPlanDirection(billing.plan, targetPlan, 'up');
+        this.assertSelfServicePlan(targetPlan);
 
         const preview = await this.stripeService.previewSubscriptionUpgrade({
             stripeSubscriptionId: billing.stripeSubscriptionId,
@@ -325,8 +325,8 @@ export class BillingService {
         if (!billing.stripeSubscriptionId) {
             throw new HttpException('No active subscription to upgrade for this tenant', HttpStatus.BAD_REQUEST);
         }
-        this.assertSelfServicePlan(targetPlan);
         this.assertPlanDirection(billing.plan, targetPlan, 'up');
+        this.assertSelfServicePlan(targetPlan);
 
         const previousPlan = billing.plan;
         const userId = this.tenantContext.getUserId();

@@ -256,6 +256,21 @@ describe('StripeWebhookService', () => {
             });
         });
 
+        it('still restores the tenant when Stripe no longer knows the invoice’s subscription, but rethrows other Stripe failures (F1)', async () => {
+            tx.tenant.findUnique.mockResolvedValue({ paymentStatus: PaymentStatusEnum.PAST_DUE });
+            stripe.getSubscription.mockRejectedValueOnce(Object.assign(new Error('No such subscription'), { code: 'resource_missing' }));
+            const paid = { id: 'in_5', customer: 'cus_1', parent: { subscription_details: { subscription: 'sub_123' } } };
+
+            await deliver(stripeEvent('invoice.paid', paid));
+
+            expect(tx.tenant.updateMany).toHaveBeenCalledWith(
+                expect.objectContaining({ data: expect.objectContaining({ paymentStatus: PaymentStatusEnum.ACTIVE }) })
+            );
+
+            stripe.getSubscription.mockRejectedValueOnce(Object.assign(new Error('Stripe is down'), { code: 'api_error' }));
+            await expect(deliver(stripeEvent('invoice.paid', paid))).rejects.toThrow('Stripe is down');
+        });
+
         it('finds the tenant of a paid invoice by its customer when the invoice names no subscription (F1)', async () => {
             tx.tenant.findUnique.mockResolvedValue({ paymentStatus: PaymentStatusEnum.PAST_DUE });
 
