@@ -1,4 +1,5 @@
 import { HttpStatus, Injectable } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { Prisma } from '@prisma-gen/generated/client';
 
 import { DatabaseService } from '@app/database/database.service';
@@ -6,16 +7,19 @@ import { TenantAwareService } from '@common/tenant-aware/tenant-aware.service';
 import { TransactionEventEmitterService } from '@common/events/transaction-event-emitter.service';
 import { AppLoggerService } from '@common/logging/app-logger.service';
 import { RedisService } from '@common/redis/redis.service';
+import type { AllConfigType } from '@config/config.type';
 import { BaseException } from '@common/exceptions/base.exceptions';
 import { cursorPage, CursorPage, ListQueryDto } from '@common/http-contract/cursor-page';
 
 import {
+    CONNECTION_TYPE_OF,
     ConnectionCreatedEvent,
     ConnectionEvents,
     ConnectionProps,
     ConnectionProvider,
     ConnectionResponse,
     ConnectionRevokedEvent,
+    ConnectionType,
     CreateConnectionDto,
     InternalConnectionDto,
     REVOKED_CONNECTION_MARKER_TTL_SECONDS,
@@ -42,7 +46,8 @@ export class ConnectionService {
         private readonly txEventEmitter: TransactionEventEmitterService,
         private readonly cipher: ProviderSecretCipher,
         private readonly logger: AppLoggerService,
-        private readonly redis: RedisService
+        private readonly redis: RedisService,
+        private readonly configService: ConfigService<AllConfigType>
     ) {
         this.logger.setContext(ConnectionService.name);
     }
@@ -59,6 +64,7 @@ export class ConnectionService {
      */
     async create(userId: string, dto: CreateConnectionDto): Promise<ConnectionResponse> {
         const tenantId = this.tenantAware.getRequiredTenantId();
+        const connectionType = this.connectionTypeOf(dto);
         const signingSecret = this.cipher.encrypt(dto.signingSecret);
 
         try {
@@ -67,7 +73,7 @@ export class ConnectionService {
                     data: {
                         tenantId,
                         provider: dto.provider,
-                        connectionType: dto.connectionType,
+                        connectionType,
                         name: dto.name ?? null,
                         signingSecret,
                         config: (dto.config ?? {}) as Prisma.InputJsonValue,
@@ -86,7 +92,7 @@ export class ConnectionService {
                 return row;
             });
             this.logger.log('Provider connection created', { connectionId: created.id, provider: created.provider });
-            return connectionResponseMapper.toResponse(created);
+            return this.toResponse(created);
         } catch (error) {
             if (isUniqueViolation(error)) {
                 // `idx_provider_conn_live` — one live connection per tenant per provider, so a second one
@@ -102,7 +108,28 @@ export class ConnectionService {
     }
 
     async findAll(query: ListQueryDto): Promise<CursorPage<ConnectionResponse>> {
-        return cursorPage(this.connection, {}, query, (row) => connectionResponseMapper.toResponse(row as ConnectionProps));
+        return cursorPage(this.connection, {}, query, (row) => this.toResponse(row as ConnectionProps));
+    }
+
+    /** US1.5.1 F5: the type follows from the provider; a client that sends another one is told so. */
+    private connectionTypeOf(dto: CreateConnectionDto): ConnectionType {
+        const derived = CONNECTION_TYPE_OF[dto.provider];
+        if (dto.connectionType && dto.connectionType !== derived) {
+            throw new BaseException(
+                'invalid_request',
+                `A ${dto.provider} connection is a ${derived} connection, not ${dto.connectionType}`,
+                HttpStatus.BAD_REQUEST,
+                'connection_type'
+            );
+        }
+        return derived;
+    }
+
+    /** US1.5.1 F4: the receiver URL is absolute when the public base URL is configured, so it can be pasted as is. */
+    private toResponse(row: ConnectionProps): ConnectionResponse {
+        const response = connectionResponseMapper.toResponse(row);
+        const base = this.configService.get('connectionConfig.inboundPublicBaseUrl', { infer: true });
+        return base ? { ...response, receiverUrl: `${base.replace(/\/+$/, '')}${response.receiverUrl}` } : response;
     }
 
     /**
@@ -115,7 +142,12 @@ export class ConnectionService {
             await tx.providerConnection.update({ where: { id }, data: { enabled: false, revokedAt: new Date() } });
             this.txEventEmitter.emitAfterCommit(
                 ConnectionEvents.REVOKED,
-                new ConnectionRevokedEvent(id, existing.tenantId, { connectionId: id, provider: existing.provider, revokedBy: userId }, userId)
+                new ConnectionRevokedEvent(
+                    id,
+                    existing.tenantId,
+                    { connectionId: id, provider: existing.provider, connectionType: existing.connectionType, revokedBy: userId },
+                    userId
+                )
             );
         });
         await this.markRevoked(id);

@@ -30,7 +30,7 @@ async function removeCompanies(): Promise<void> {
 }
 
 Before(
-    { tags: '@billing-plan or @billing-plan-change or @invoice-history or @audit-trail or @audit-log-read or @connection-revoke' },
+    { tags: '@billing-plan or @billing-plan-change or @invoice-history or @audit-trail or @audit-log-read or @connection-revoke or @connection-create' },
     async function () {
         company = null;
         await removeCompanies();
@@ -39,7 +39,7 @@ Before(
 );
 
 After(
-    { tags: '@billing-plan or @billing-plan-change or @invoice-history or @audit-trail or @audit-log-read or @connection-revoke' },
+    { tags: '@billing-plan or @billing-plan-change or @invoice-history or @audit-trail or @audit-log-read or @connection-revoke or @connection-create' },
     async function () {
         await removeCompanies();
     }

@@ -92,7 +92,7 @@ const EVENTS: BaseDomainEvent[] = [
     new UsageThresholdCrossedEvent(T, T, 'email_sends', 80, 80, 100, 80, '2026-09', ISO),
     new UsageMonthlySummaryEvent(T, T, 'email_sends', '2026-08', 90, 100, '2026-08-31', ISO),
     new ConnectionCreatedEvent('c1', T, { connectionId: 'c1', provider: 'stripe', connectionType: 'billing', createdBy: 'u1' }, 'u1'),
-    new ConnectionRevokedEvent('c1', T, { connectionId: 'c1', provider: 'stripe', revokedBy: 'u1' }, 'u1'),
+    new ConnectionRevokedEvent('c1', T, { connectionId: 'c1', provider: 'stripe', connectionType: 'billing', revokedBy: 'u1' }, 'u1'),
     new ConsentRecordedEvent('cs1', T, {
         subjectEmailHash: HASH,
         subjectExternalId: 'cust-9',

@@ -280,6 +280,8 @@ const MAPPERS: Record<string, Mapper<never>> = {
                 tenant_id: e.tenantId,
                 provider: e.payload.provider,
                 connection_type: e.payload.connectionType,
+                // US1.5.1 F9: reward-svc keeps a copy of active connections from these two events (Payout gate 2).
+                status: 'active',
                 created_by: e.payload.createdBy
             }
         }
@@ -293,6 +295,8 @@ const MAPPERS: Record<string, Mapper<never>> = {
                 connection_id: e.payload.connectionId,
                 tenant_id: e.tenantId,
                 provider: e.payload.provider,
+                connection_type: e.payload.connectionType,
+                status: 'revoked',
                 revoked_by: e.payload.revokedBy
             }
         }

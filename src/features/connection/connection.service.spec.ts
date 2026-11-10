@@ -43,7 +43,11 @@ interface Harness {
     redisSet: jest.Mock;
 }
 
-const harness = (cipher: ProviderSecretCipher = cipherWith(KEY_HEX), redisSet = jest.fn().mockResolvedValue('OK')): Harness => {
+const harness = (
+    cipher: ProviderSecretCipher = cipherWith(KEY_HEX),
+    redisSet = jest.fn().mockResolvedValue('OK'),
+    inboundPublicBaseUrl?: string
+): Harness => {
     const create = jest.fn().mockResolvedValue(row());
     const update = jest.fn().mockResolvedValue(row({ revokedAt: new Date() }));
     const findFirst = jest.fn();
@@ -65,7 +69,8 @@ const harness = (cipher: ProviderSecretCipher = cipherWith(KEY_HEX), redisSet = 
         { emitAfterCommit: (name: string, event: unknown) => emitted.push({ name, event }) } as never,
         cipher,
         { setContext: jest.fn(), log: jest.fn(), warn: jest.fn() } as never,
-        { getClient: () => ({ set: redisSet }) } as never
+        { getClient: () => ({ set: redisSet }) } as never,
+        { get: () => inboundPublicBaseUrl } as never
     );
 
     return { service, create, update, findFirst, scopedFindFirst, emitted, redisSet };
@@ -172,6 +177,39 @@ describe('Provider connections', () => {
 
             expect(findFirst).toHaveBeenCalled();
             expect(scopedFindFirst).not.toHaveBeenCalled();
+        });
+    });
+
+    describe('given the provider decides the type (US1.5.1 F5, F7)', () => {
+        it('then a Tremendous connection is a gift-card connection without the client saying so', async () => {
+            const { service, create } = harness();
+
+            await service.create('user-1', { provider: ConnectionProvider.TREMENDOUS, signingSecret: 'tremendous_secret_0123456789' });
+
+            expect(create.mock.calls[0][0].data.connectionType).toBe(ConnectionType.GIFT_CARD);
+        });
+
+        it('then a wrong pair is refused with 400 before anything is stored', async () => {
+            const { service, create } = harness();
+
+            await expect(
+                service.create('user-1', {
+                    provider: ConnectionProvider.PADDLE,
+                    connectionType: ConnectionType.CRM,
+                    signingSecret: 'pdl_ntfset_0123456789abcdef'
+                })
+            ).rejects.toMatchObject({ status: HttpStatus.BAD_REQUEST });
+            expect(create).not.toHaveBeenCalled();
+        });
+    });
+
+    describe('given a public base URL for the receivers (US1.5.1 F4)', () => {
+        it('then the receiver URL is absolute, ready to paste into the provider console', async () => {
+            const { service } = harness(cipherWith(KEY_HEX), jest.fn(), 'https://in.example.com/');
+
+            const response = await service.create('user-1', { provider: ConnectionProvider.STRIPE, signingSecret: 'whsec_live_abcdefghijklmnop' });
+
+            expect(response.receiverUrl).toBe(`https://in.example.com/inbound/stripe/${CONNECTION_ID}`);
         });
     });
 

@@ -9,13 +9,11 @@ import { BaseDomainEvent } from '@domains/common/events';
 // ============================================================
 
 /**
- * The providers a connection may be for. This is DB Model v5 §10's CHECK list on
- * `inbound_webhook_receipts.provider`, so a connection and the receipt a callback produces cannot
- * disagree about who sent it.
- *
- * API Contract §6.5's revision line names `tremendous` in place of `gift_card` and omits `crm`, while
- * the table directly below it lists "Gift-card (Tremendous/Tango)" and "CRM (HubSpot/Salesforce)".
- * Two of the three mentions name categories, so categories win — recorded in NOTE.md §V5.13.
+ * The providers a connection may be for: real vendors, not categories (US1.5.1 F7, v5.1). The platform calls
+ * each provider's own API for payouts and gift cards (Payout Model R-PAY-01/03, R-RWD-07), so it must know which
+ * one it is. Mirrored by event-svc's `InboundProvider` and the CHECK on its `inbound_webhook_receipts.provider`,
+ * so a connection and the receipt its callback produces cannot disagree about who sent it.
+ * Replaced the categories `gift_card` (→ `tremendous`) and `crm` (→ `hubspot` | `salesforce`) on 2026-11-10.
  */
 export enum ConnectionProvider {
     STRIPE = 'stripe',
@@ -23,16 +21,30 @@ export enum ConnectionProvider {
     CHARGEBEE = 'chargebee',
     PAYPAL = 'paypal',
     WISE = 'wise',
+    TREMENDOUS = 'tremendous',
+    HUBSPOT = 'hubspot',
+    SALESFORCE = 'salesforce'
+}
+
+/** What a connection is for (US1.5.1 F7): billing, payout, gift card or CRM. Derived from the provider. */
+export enum ConnectionType {
+    BILLING = 'billing',
+    PAYOUT = 'payout',
     GIFT_CARD = 'gift_card',
     CRM = 'crm'
 }
 
-/** The three kinds Architecture §2.1 names: "billing, payout, CRM". */
-export enum ConnectionType {
-    BILLING = 'billing',
-    PAYOUT = 'payout',
-    CRM = 'crm'
-}
+/** Each provider belongs to exactly one type (US1.5.1 F5), so a client can't pair Paddle with CRM. */
+export const CONNECTION_TYPE_OF: Readonly<Record<ConnectionProvider, ConnectionType>> = {
+    [ConnectionProvider.STRIPE]: ConnectionType.BILLING,
+    [ConnectionProvider.PADDLE]: ConnectionType.BILLING,
+    [ConnectionProvider.CHARGEBEE]: ConnectionType.BILLING,
+    [ConnectionProvider.PAYPAL]: ConnectionType.PAYOUT,
+    [ConnectionProvider.WISE]: ConnectionType.PAYOUT,
+    [ConnectionProvider.TREMENDOUS]: ConnectionType.GIFT_CARD,
+    [ConnectionProvider.HUBSPOT]: ConnectionType.CRM,
+    [ConnectionProvider.SALESFORCE]: ConnectionType.CRM
+};
 
 export const isConnectionProvider = (value: string): value is ConnectionProvider => (Object.values(ConnectionProvider) as string[]).includes(value);
 
@@ -68,9 +80,13 @@ export class CreateConnectionDto {
     @IsEnum(ConnectionProvider)
     provider!: ConnectionProvider;
 
-    @ApiProperty({ enum: ConnectionType })
+    @ApiPropertyOptional({
+        enum: ConnectionType,
+        description: 'Derived from the provider; when sent it must match it (US1.5.1 F5), otherwise 400'
+    })
+    @IsOptional()
     @IsEnum(ConnectionType)
-    connectionType!: ConnectionType;
+    connectionType?: ConnectionType;
 
     @ApiPropertyOptional({ maxLength: 100, description: 'Operator-facing label' })
     @IsOptional()
@@ -117,7 +133,9 @@ export class ConnectionResponse {
     @ApiPropertyOptional()
     name?: string | null;
 
-    @ApiProperty({ description: 'Where the provider sends its callbacks' })
+    @ApiProperty({
+        description: 'Where the provider sends its callbacks: absolute when INBOUND_PUBLIC_BASE_URL is set, so the Owner can paste it as is'
+    })
     receiverUrl!: string;
 
     @ApiProperty({ type: 'object', additionalProperties: true })
@@ -218,7 +236,7 @@ export class ConnectionRevokedEvent extends BaseDomainEvent {
     constructor(
         public readonly aggregateId: string,
         public readonly tenantId: string,
-        public readonly payload: { connectionId: string; provider: string; revokedBy: string },
+        public readonly payload: { connectionId: string; provider: string; connectionType: string; revokedBy: string },
         public readonly userId?: string
     ) {
         super();

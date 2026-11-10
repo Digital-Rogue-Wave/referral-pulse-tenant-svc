@@ -1,5 +1,5 @@
 import { registerAs } from '@nestjs/config';
-import { IsHexadecimal, IsOptional, IsString, Length } from 'class-validator';
+import { IsHexadecimal, IsOptional, IsString, IsUrl, Length } from 'class-validator';
 
 import validateConfig from '@common/validators/validate-config';
 import { MaybeType } from '@app/types';
@@ -19,6 +19,11 @@ export type ConnectionConfig = {
      * signature, so a per-tenant key would add rotation surface without adding isolation.
      */
     trackingTokenKey?: MaybeType<string>;
+    /**
+     * US1.5.1 F4: the public origin of Event Ingestion's receivers (`/inbound/{provider}/{connection_id}`), so the
+     * receiver URL handed to the Owner is absolute. Optional: without it the URL stays a path, as before.
+     */
+    inboundPublicBaseUrl?: MaybeType<string>;
 };
 
 class ConnectionEnvValidator {
@@ -39,6 +44,10 @@ class ConnectionEnvValidator {
     @IsHexadecimal()
     @Length(64, 64, { message: 'TRACKING_TOKEN_KEY must be 64 hex characters (32 bytes)' })
     TRACKING_TOKEN_KEY?: MaybeType<string>;
+
+    @IsOptional()
+    @IsUrl({ require_tld: false, require_protocol: true, protocols: ['http', 'https'] })
+    INBOUND_PUBLIC_BASE_URL?: MaybeType<string>;
 }
 
 export default registerAs<ConnectionConfig>('connectionConfig', () => {
@@ -46,6 +55,7 @@ export default registerAs<ConnectionConfig>('connectionConfig', () => {
 
     return {
         providerSecretEncryptionKey: process.env.PROVIDER_SECRET_ENCRYPTION_KEY,
-        trackingTokenKey: process.env.TRACKING_TOKEN_KEY
+        trackingTokenKey: process.env.TRACKING_TOKEN_KEY,
+        inboundPublicBaseUrl: process.env.INBOUND_PUBLIC_BASE_URL
     };
 });

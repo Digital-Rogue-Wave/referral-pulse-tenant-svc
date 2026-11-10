@@ -209,6 +209,23 @@ Run alone: `pnpm test:bdd --tags @connection-revoke`.
 
 ---
 
+### `connection-create.feature` (5 scenarios) `@connection-create` — US1.5.1
+
+> Each scenario signs a fresh company up (reusing the `@billing-plan` steps and clean-up) and calls the connection
+> routes against the real Postgres. `INBOUND_PUBLIC_BASE_URL` is fixed to `https://in.bdd.example` by the bootstrap.
+
+```gherkin
+Scenario: A connection names its real provider, and its type follows from it → tremendous: 201, gift_card, absolute receiver_url
+Scenario: The old category names are refused                                 → gift_card, crm: 400
+Scenario: A provider can't be paired with another type                       → paddle + crm: 400, param connection_type
+Scenario: The Owner lists the company's connections                          → 200, billing/stripe and crm/hubspot
+Scenario: The permission is re-checked live in Keto, not read from the token → token lists it, Keto denies: 403
+```
+
+Run alone: `pnpm test:bdd --tags @connection-create`.
+
+---
+
 ### `tenant-guards.feature` (5 scenarios) `@guards`
 
 > Fixture tenants are created/destroyed per scenario via tagged hooks.
