@@ -175,6 +175,24 @@ Run alone: `pnpm test:bdd --tags @audit-trail`.
 
 ---
 
+### `audit-log-read.feature` (5 scenarios) `@audit-log-read` — US1.9.2
+
+> Each scenario signs a fresh company up (reusing the `@billing-plan` steps and clean-up), changes its currency
+> twice through the API, and reads `GET /api/v1/audit-log` against the real Postgres (F3: a mocked unit test hid
+> the `deletedAt` 500).
+
+```gherkin
+Scenario: The Owner reads the trail, newest first, without the IP hash → tenant_setting.updated EUR → USD first, no ip_hash
+Scenario: Filters narrow the trail                                    → action=tenant_setting.created: 1 entry
+Scenario: The trail is paged with cursors                             → limit=1, has_more, next page older
+Scenario: Another company's entries never show                        → 0 entries
+Scenario: Only the Owner may read it                                  → 403 without audit:read
+```
+
+Run alone: `pnpm test:bdd --tags @audit-log-read`.
+
+---
+
 ### `tenant-guards.feature` (5 scenarios) `@guards`
 
 > Fixture tenants are created/destroyed per scenario via tagged hooks.

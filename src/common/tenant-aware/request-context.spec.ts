@@ -75,7 +75,9 @@ describe('Request context', () => {
             findFirstOrThrow: jest.fn(async (args) => args),
             update: jest.fn(async (args) => args),
             delete: jest.fn(async (args) => args),
-            count: jest.fn(async (args) => args)
+            count: jest.fn(async (args) => args),
+            // Prisma's field references: this model has a `deletedAt` column.
+            fields: { id: {}, tenantId: {}, deletedAt: {} }
         };
         const scoped = aware.forModel(delegate as unknown as IPrismaDelegate<unknown>);
 
@@ -99,10 +101,33 @@ describe('Request context', () => {
             expect(delegate.delete).toHaveBeenCalledWith({ where: { id: '1', tenantId: 't1' } });
         });
 
+        it('never adds deletedAt to a model without the column, and deletes for real there (US1.9.2 F2)', async () => {
+            const plain = {
+                findMany: jest.fn(async (args) => args),
+                findFirst: jest.fn(async (args) => args),
+                update: jest.fn(async (args) => args),
+                delete: jest.fn(async (args) => args),
+                fields: { id: {}, tenantId: {} }
+            };
+            const noSoftDelete = aware.forModel(plain as unknown as IPrismaDelegate<unknown>);
+
+            await inRequest(async () => {
+                await noSoftDelete.findMany({ where: { enabled: true } });
+                await noSoftDelete.findFirst({ where: { id: '1' } });
+                await noSoftDelete.delete({ where: { id: '1' } });
+            });
+
+            expect(plain.findMany).toHaveBeenCalledWith({ where: { enabled: true, tenantId: 't1' } });
+            expect(plain.findFirst).toHaveBeenCalledWith({ where: { id: '1', tenantId: 't1' } });
+            expect(plain.delete).toHaveBeenCalledWith({ where: { id: '1', tenantId: 't1' } });
+            expect(plain.update).not.toHaveBeenCalled();
+        });
+
         it('builds tenant filters, and refuses to run without a tenant', async () => {
             await inRequest(async () => {
-                expect(aware.withTenantFilter({ status: 'active' })).toEqual({ status: 'active', tenantId: 't1', deletedAt: null });
-                expect(aware.withTenantFilter({}, { includeSoftDeleted: true })).toEqual({ tenantId: 't1' });
+                // The tenant only: the caller states `deletedAt: null` for a soft-deleting model (US1.9.2 F2).
+                expect(aware.withTenantFilter({ status: 'active' })).toEqual({ status: 'active', tenantId: 't1' });
+                expect(aware.withTenantFilter({ deletedAt: null })).toEqual({ deletedAt: null, tenantId: 't1' });
             });
             expect(aware.withSoftDelete({ a: 1 })).toEqual({ a: 1, deletedAt: null });
             expect(aware.softDeleteData().deletedAt).toBeInstanceOf(Date);
