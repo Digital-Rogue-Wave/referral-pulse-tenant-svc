@@ -121,8 +121,16 @@ export class ApiKeyService {
     /** Renames a key. */
     async update(id: string, userId: string, dto: UpdateApiKeyDto): Promise<ApiKeyResponse> {
         const existing = await this.findLive(id);
-        const updated = (await this.apiKey.update({ where: { id }, data: { label: dto.label } })) as ApiKeyProps;
+        // In a transaction, so the audit row commits with the rename (US1.9.1 F8).
+        return this.prisma.$transaction(async (tx) => {
+            const updated = (await tx.apiKey.update({ where: { id }, data: { label: dto.label } })) as ApiKeyProps;
+            this.emitRenamed(existing, updated, userId, dto);
+            return apiKeyResponseMapper.toResponse(updated);
+        });
+    }
 
+    private emitRenamed(existing: ApiKeyProps, updated: ApiKeyProps, userId: string, dto: UpdateApiKeyDto): void {
+        const id = existing.id;
         if (dto.label && dto.label !== existing.label) {
             const event = new ApiKeyUpdatedEvent(
                 id,
@@ -138,7 +146,6 @@ export class ApiKeyService {
             );
             this.txEventEmitter.emitAfterCommit('api-key.updated', event);
         }
-        return apiKeyResponseMapper.toResponse(updated);
     }
 
     /**

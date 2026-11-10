@@ -28,7 +28,8 @@ import type {
     TenantUnlockedEvent,
     TenantUpdatedEvent,
     TenantVerificationRequestedEvent,
-    TenantVerificationStatusChangedEvent
+    TenantVerificationStatusChangedEvent,
+    TenantWidgetSecretRotatedEvent
 } from '@domains/tenant/events/tenant.events';
 import type {
     UserAnonymisedEvent,
@@ -172,6 +173,15 @@ const MAPPERS: Record<string, Mapper<never>> = {
             properties: { tenant_id: e.tenantId, verification_id: e.verificationId ?? null, verification_type: 'company' }
         }
     ],
+    // US1.5.4 F3: Event Ingestion drops its cached secret on this. No secret travels, only the grace end.
+    'tenant.widget_secret_rotated': (e: TenantWidgetSecretRotatedEvent) => [
+        {
+            eventType: 'tenant.widget_secret_rotated',
+            externalId: `tenant.widget_secret_rotated:${e.eventId}`,
+            object: tenantObject(e),
+            properties: { tenant_id: e.tenantId, previous_valid_until: iso(e.previousValidUntil) }
+        }
+    ],
     'tenant.verification_status_changed': (e: TenantVerificationStatusChangedEvent) => [
         {
             eventType: 'tenant.verification_status_changed',
@@ -270,6 +280,8 @@ const MAPPERS: Record<string, Mapper<never>> = {
                 tenant_id: e.tenantId,
                 provider: e.payload.provider,
                 connection_type: e.payload.connectionType,
+                // US1.5.1 F9: reward-svc keeps a copy of active connections from these two events (Payout gate 2).
+                status: 'active',
                 created_by: e.payload.createdBy
             }
         }
@@ -283,6 +295,8 @@ const MAPPERS: Record<string, Mapper<never>> = {
                 connection_id: e.payload.connectionId,
                 tenant_id: e.tenantId,
                 provider: e.payload.provider,
+                connection_type: e.payload.connectionType,
+                status: 'revoked',
                 revoked_by: e.payload.revokedBy
             }
         }

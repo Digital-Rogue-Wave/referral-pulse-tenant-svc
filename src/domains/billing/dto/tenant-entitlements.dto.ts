@@ -1,5 +1,7 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 
+import { BillingPlanEnum } from '@common/enums/billing.enum';
+
 /**
  * What a tenant may do right now (`GET /v1/internal/tenants/{id}/entitlements`): the plan's limits, current
  * usage against them, and the account state that gates access. A metric absent from `limits` (or null)
@@ -9,7 +11,7 @@ export class TenantEntitlementsDto {
     @ApiProperty()
     tenantId!: string;
 
-    @ApiProperty({ example: 'Growth' })
+    @ApiProperty({ example: BillingPlanEnum.GROWTH })
     plan!: string;
 
     @ApiProperty({ example: 'active' })

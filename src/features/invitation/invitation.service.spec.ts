@@ -26,7 +26,7 @@ describe('InvitationService', () => {
     let txEventEmitter: MockProxy<TransactionEventEmitterService>;
     let usersService: MockProxy<UsersService>;
     let delegate: { findFirst: jest.Mock; findUnique: jest.Mock; create: jest.Mock; update: jest.Mock };
-    let tx: { invitation: { updateMany: jest.Mock; create: jest.Mock } };
+    let tx: { invitation: { updateMany: jest.Mock; create: jest.Mock; update: jest.Mock } };
 
     const tenantId = 'tenant-123';
     const TOKEN = 'tok-1';
@@ -51,7 +51,7 @@ describe('InvitationService', () => {
         usersService = mock<UsersService>();
 
         delegate = { findFirst: jest.fn(), findUnique: jest.fn(), create: jest.fn(), update: jest.fn() };
-        tx = { invitation: { updateMany: jest.fn().mockResolvedValue({ count: 1 }), create: jest.fn() } };
+        tx = { invitation: { updateMany: jest.fn().mockResolvedValue({ count: 1 }), create: jest.fn(), update: jest.fn() } };
         tenantAware.forModel.mockReturnValue(delegate as never);
         tx.invitation.create = delegate.create;
         tenantAware.withTenantFilter.mockImplementation((w) => ({ ...w, tenantId }) as never);
@@ -178,11 +178,12 @@ describe('InvitationService', () => {
     describe('resend / revoke', () => {
         it('then resend stores the hash of a fresh token and emits invitation.resent', async () => {
             delegate.findUnique.mockResolvedValue(pending);
-            delegate.update.mockImplementation(({ data }: { data: Record<string, unknown> }) => Promise.resolve({ ...pending, ...data }));
+            tx.invitation.update.mockImplementation(({ data }: { data: Record<string, unknown> }) => Promise.resolve({ ...pending, ...data }));
 
             await service.resend('inv-1', 'actor-1');
 
-            const { data } = delegate.update.mock.calls[0][0] as { data: { tokenHash: string } };
+            // In a transaction, so the audit row commits with the new token (US1.9.1 F8).
+            const { data } = tx.invitation.update.mock.calls[0][0] as { data: { tokenHash: string } };
             expect(data.tokenHash).toMatch(/^[0-9a-f]{64}$/);
             expect(data.tokenHash).not.toBe(pending.tokenHash);
             expect(txEventEmitter.emitAfterCommit).toHaveBeenCalledWith('invitation.resent', expect.anything());

@@ -70,7 +70,7 @@ The platform's **identity/tenant** service, plus **client billing** (a sanctione
 | Tenant | `POST /tenants`; `GET /tenants/profile`, `PATCH /tenants`, `PUT /tenants/lock`, `/unlock`, `/transfer-ownership`, `/schedule-deletion`, `/cancel-deletion`; custom domain + subdomain routes | `tenants:*` |
 | Settings | `/tenant-settings`, `/me/notification-preferences` | tenant |
 | Audit | `GET /audit-log` (cursor + filters) | `audit:read` (Owner, Admin) |
-| Billing | `/billings/subscription…`, `/billings/payment-methods…`, `GET /billings/invoices` (cursor), `POST /billings/portal-session`, `/billings/usage`, `/billings/plans`, admin `/billings/admin/plans` | `billing:*`; reachable while unpaid |
+| Billing | `GET /billing/plan`, `/billing/subscription/…` (checkout only without a live subscription, Free and Enterprise refused; upgrade answers 202 and the webhook writes the plan), `GET /billing/invoices` (cursor), `POST /billing/portal-session`, `/billing/usage`, `/billing/plans`, admin `/billing/admin/plans` | `billing:*`; reachable while unpaid |
 | Platform admin | `POST /admin/tenants/{id}/suspend`, `/unsuspend`, `/lock`, `/unlock` | platform admin or `tenant.suspend` |
 | Internal (services) | `GET /internal/tenants/{id}/status`, `/entitlements`; `POST …/usage/increment`, `/decrement`; `PATCH …/verification`; `GET …/users/{userId}/contact`, `…/contacts?role=`; `POST /internal/erasures/operators` | service capabilities (see `NOTE.md` A6) |
 | Webhooks | `POST /webhook/ory/signup`, `/webhook/ory/login` (shared key); `POST /webhook/stripe`, `/webhooks/stripe` (signature) | public, verified |

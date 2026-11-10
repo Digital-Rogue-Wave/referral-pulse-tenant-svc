@@ -9,6 +9,7 @@ import servicesConfig from '@config/services.config';
 
 import { DatabaseService } from '@app/database/database.service';
 import { TenantStatsDto } from '@domains/tenant';
+import { PlanLimitService, SEATS_METRIC } from '@app/features/billing/plan-limit.service';
 
 @Injectable()
 export class TenantStatsService {
@@ -22,7 +23,8 @@ export class TenantStatsService {
         private readonly redisService: RedisService,
         private readonly prisma: DatabaseService,
         private readonly tenantContext: TenantContextService,
-        private readonly logger: AppLoggerService
+        private readonly logger: AppLoggerService,
+        private readonly planLimits: PlanLimitService
     ) {
         this.logger.setContext(TenantStatsService.name);
 
@@ -81,15 +83,23 @@ export class TenantStatsService {
             stats.pendingPayouts = results[4].value.data?.amount || 0;
         }
 
-        // For plan usage, calculate members usage
-        // Note: Assuming a hardcoded limit of 10 members for now
-        const memberCount = await this.prisma.user.count({ where: { tenantId, deletedAt: null } });
-        const MEMBER_LIMIT = 10;
-        stats.planUsagePercentage = Math.min((memberCount / MEMBER_LIMIT) * 100, 100);
+        stats.planUsagePercentage = await this.seatUsagePercentage(tenantId);
 
         // 3. Cache results (5 minutes = 300 seconds)
         await this.redisService.set(cacheKey, stats, { ttl: 300 });
 
         return stats;
+    }
+
+    /**
+     * US1.8.1 F3: seats in use (members plus open invitations, as the seat limit counts them) over the plan's
+     * seat limit. A plan without a seat limit is never "full", so it reads 0.
+     */
+    private async seatUsagePercentage(tenantId: string): Promise<number> {
+        const seatLimit = (await this.planLimits.getPlanLimits(tenantId))?.[SEATS_METRIC];
+        if (!seatLimit) {
+            return 0;
+        }
+        return Math.min(((await this.planLimits.seatsInUse(tenantId)) / seatLimit) * 100, 100);
     }
 }

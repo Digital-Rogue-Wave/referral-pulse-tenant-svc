@@ -4,6 +4,7 @@ import type Stripe from 'stripe';
 import { Prisma } from '@prisma-gen/generated/client';
 
 import { DatabaseService } from '@app/database/database.service';
+import { canonicalPlanName } from '@common/enums/billing.enum';
 import { AppLoggerService } from '@common/logging/app-logger.service';
 
 import { StripeService } from './stripe.service';
@@ -22,7 +23,14 @@ export class PlanStripeSyncService {
     }
 
     private buildLimitsFromMetadata(price: Stripe.Price, product: Stripe.Product | null): PlanLimits | null {
-        const limitKeys: (keyof PlanLimits)[] = ['referred_users', 'campaigns', 'seats', 'leaderboard_entries', 'email_sends'];
+        const limitKeys: (keyof PlanLimits)[] = [
+            'referred_users',
+            'campaigns',
+            'seats',
+            'leaderboard_entries',
+            'email_sends',
+            'sdk_requests_per_minute'
+        ];
 
         const limits: PlanLimits = {};
 
@@ -55,7 +63,9 @@ export class PlanStripeSyncService {
 
     private buildMetadataSnapshot(price: Stripe.Price, product: Stripe.Product | null): Record<string, unknown> | null {
         const metadata: Record<string, unknown> = {
-            priceMetadata: { ...price.metadata }
+            priceMetadata: { ...price.metadata },
+            // US1.8.1 F5: the display price, in minor units, as Stripe bills it.
+            ...(price.unit_amount !== null ? { price: { amount: price.unit_amount, currency: price.currency } } : {})
         };
 
         if (product) {
@@ -120,7 +130,7 @@ export class PlanStripeSyncService {
             if (!limits) {
                 this.logger.debug(
                     `Skipping Stripe price ${price.id} because no recognized plan limit metadata was found; ` +
-                        'add PlanLimits keys (referred_users, campaigns, seats, leaderboard_entries, email_sends) to Stripe metadata to include it.'
+                        'add PlanLimits keys (referred_users, campaigns, seats, leaderboard_entries, email_sends, sdk_requests_per_minute) to Stripe metadata to include it.'
                 );
                 return false;
             }
@@ -171,7 +181,16 @@ export class PlanStripeSyncService {
         }
     }
 
+    /**
+     * The plan's stored name. A configured price id, or a product named after one of the five plans in any
+     * casing (`FREE`), resolves to the `BillingPlanEnum` value: `billings.plan` holds those values, so a
+     * Stripe-cased name would orphan every tenant on that plan. Any other product keeps its own name.
+     */
     private resolvePlanName(price: Stripe.Price, product: Stripe.Product | null): string {
+        const known = this.stripeService.planForPriceId(price.id) ?? canonicalPlanName(product?.name);
+        if (known) {
+            return known;
+        }
         if (product && product.name.trim().length > 0) {
             return product.name.trim();
         }

@@ -131,8 +131,11 @@ describe('BillingService — the tenant’s subscription', () => {
             await expect(service.getCurrentSubscription()).resolves.toMatchObject({ stripeSubscriptionStatus: null, planUsagePercentage: null });
         });
 
-        it('summarises the last 7 days of usage per metric against the plan limits', async () => {
-            planLimits.getPlanLimits.mockResolvedValue({ email_sends: 100 });
+        it('shows every plan limit with its live use, and keeps the daily snapshots as the 7-day history (US1.8.1 F2)', async () => {
+            planLimits.entitlementsOf.mockResolvedValue({
+                limits: { email_sends: 100, seats: 2 },
+                usage: { email_sends: 45, seats: 2 }
+            } as never);
             prisma.tenantUsage.findMany!.mockResolvedValue([
                 { metricName: 'email_sends', periodDate: '2026-09-21', currentUsage: 30 },
                 { metricName: 'email_sends', periodDate: '2026-09-22', currentUsage: 40 },
@@ -142,13 +145,16 @@ describe('BillingService — the tenant’s subscription', () => {
             const summary = await service.getUsageSummary();
 
             expect(summary.metrics).toEqual([
+                // live, not the snapshot's 40
                 expect.objectContaining({
                     metric: 'email_sends',
-                    currentUsage: 40,
+                    currentUsage: 45,
                     limit: 100,
-                    percentageUsed: 40,
+                    percentageUsed: 45,
                     history: [expect.anything(), expect.anything()]
                 }),
+                // a limit with no snapshot row yet is still shown
+                expect.objectContaining({ metric: 'seats', currentUsage: 2, limit: 2, percentageUsed: 100, history: [] }),
                 expect.objectContaining({ metric: 'webhooks', currentUsage: 5, limit: null, percentageUsed: null })
             ]);
         });
@@ -156,6 +162,7 @@ describe('BillingService — the tenant’s subscription', () => {
 
     describe('checkout and payment methods', () => {
         it('starts a checkout with the tenant’s existing Stripe customer', async () => {
+            prisma.billing.findUnique!.mockResolvedValue(billingRow({ plan: BillingPlanEnum.FREE, status: 'canceled', stripeSubscriptionId: null }));
             stripe.createSubscriptionCheckoutSession.mockResolvedValue({ id: 'cs_1', url: 'https://checkout.stripe.com/x' });
 
             await expect(service.subscriptionCheckout(BillingPlanEnum.STARTER)).resolves.toMatchObject({
@@ -167,27 +174,21 @@ describe('BillingService — the tenant’s subscription', () => {
             );
         });
 
-        it('manages payment methods on the tenant’s customer and refuses without one', async () => {
-            stripe.createSetupIntent.mockResolvedValue({ client_secret: 'seti_secret' } as never);
-            await expect(service.createPaymentMethodSetupIntent()).resolves.toEqual({ clientSecret: 'seti_secret', customerId: 'cus_1' });
-
-            await service.listPaymentMethods();
-            await service.deletePaymentMethod('pm_1');
-            await service.setDefaultPaymentMethod('pm_2');
-            expect(stripe.detachPaymentMethodForCustomer).toHaveBeenCalledWith('cus_1', 'pm_1');
-            expect(stripe.setDefaultPaymentMethodForCustomer).toHaveBeenCalledWith('cus_1', 'pm_2');
-
-            prisma.billing.findUnique!.mockResolvedValue(billingRow({ stripeCustomerId: null }));
-            await expectHttp(service.createPaymentMethodSetupIntent(), HttpStatus.BAD_REQUEST);
-            await expectHttp(service.listPaymentMethods(), HttpStatus.BAD_REQUEST);
-            await expectHttp(service.deletePaymentMethod('pm_1'), HttpStatus.BAD_REQUEST);
-            await expectHttp(service.setDefaultPaymentMethod('pm_1'), HttpStatus.BAD_REQUEST);
-            await expectHttp(service.createPortalSession(), HttpStatus.BAD_REQUEST);
+        it('refuses a second checkout while a subscription is live, so nobody pays twice (F2)', async () => {
+            await expect(service.subscriptionCheckout(BillingPlanEnum.SCALE)).rejects.toMatchObject({ status: HttpStatus.CONFLICT });
+            expect(stripe.createSubscriptionCheckoutSession).not.toHaveBeenCalled();
         });
 
-        it('fails loudly when Stripe returns a SetupIntent without a client secret', async () => {
-            stripe.createSetupIntent.mockResolvedValue({ client_secret: null } as never);
-            await expectHttp(service.createPaymentMethodSetupIntent(), HttpStatus.INTERNAL_SERVER_ERROR);
+        it('refuses Free and Enterprise at checkout: Free needs none, Enterprise is sold by sales (F2, F6)', async () => {
+            prisma.billing.findUnique!.mockResolvedValue(billingRow({ status: 'none', stripeSubscriptionId: null }));
+            await expectHttp(service.subscriptionCheckout(BillingPlanEnum.FREE), HttpStatus.BAD_REQUEST);
+            await expectHttp(service.subscriptionCheckout(BillingPlanEnum.ENTERPRISE), HttpStatus.BAD_REQUEST);
+            expect(stripe.createSubscriptionCheckoutSession).not.toHaveBeenCalled();
+        });
+
+        it('refuses the portal without a Stripe customer', async () => {
+            prisma.billing.findUnique!.mockResolvedValue(billingRow({ stripeCustomerId: null }));
+            await expectHttp(service.createPortalSession(), HttpStatus.BAD_REQUEST);
         });
 
         it('pages invoices with Stripe cursors in both directions', async () => {
@@ -211,21 +212,26 @@ describe('BillingService — the tenant’s subscription', () => {
     });
 
     describe('changing the plan', () => {
-        it('upgrades in Stripe first, then records the plan and announces it in one transaction', async () => {
+        it('upgrades in Stripe and leaves the plan to Stripe’s webhook (F10)', async () => {
             stripe.previewSubscriptionUpgrade.mockResolvedValue({ amountDueNow: 1500, currency: 'eur', nextInvoiceDate: FUTURE });
-            await expect(service.previewSubscriptionUpgrade(BillingPlanEnum.ENTERPRISE)).resolves.toMatchObject({ amountDueNow: 1500 });
+            await expect(service.previewSubscriptionUpgrade(BillingPlanEnum.SCALE)).resolves.toMatchObject({ amountDueNow: 1500 });
 
-            await service.upgradeSubscription(BillingPlanEnum.ENTERPRISE);
+            await expect(service.upgradeSubscription(BillingPlanEnum.SCALE)).resolves.toMatchObject({ plan: BillingPlanEnum.GROWTH });
 
-            expect(stripe.upgradeSubscription).toHaveBeenCalledWith({ stripeSubscriptionId: 'sub_1', targetPlan: BillingPlanEnum.ENTERPRISE });
-            expect(prisma.billing.update).toHaveBeenCalledWith({
-                where: { id: 'bil_1' },
-                data: { plan: BillingPlanEnum.ENTERPRISE, status: 'active' }
-            });
+            expect(stripe.upgradeSubscription).toHaveBeenCalledWith({ stripeSubscriptionId: 'sub_1', targetPlan: BillingPlanEnum.SCALE });
+            expect(prisma.billing.update).not.toHaveBeenCalled();
             expect(events.emitAfterCommit).toHaveBeenCalledWith(
                 'subscription.upgraded',
-                expect.objectContaining({ billingPlan: BillingPlanEnum.ENTERPRISE })
+                expect.objectContaining({ billingPlan: BillingPlanEnum.SCALE })
             );
+        });
+
+        it('lets an upgrade only go up, so it can’t skip the downgrade’s usage check (F3)', async () => {
+            await expectHttp(service.upgradeSubscription(BillingPlanEnum.STARTER), HttpStatus.BAD_REQUEST);
+            await expectHttp(service.upgradeSubscription(BillingPlanEnum.GROWTH), HttpStatus.BAD_REQUEST);
+            await expectHttp(service.previewSubscriptionUpgrade(BillingPlanEnum.FREE), HttpStatus.BAD_REQUEST);
+            await expectHttp(service.upgradeSubscription(BillingPlanEnum.ENTERPRISE), HttpStatus.BAD_REQUEST);
+            expect(stripe.upgradeSubscription).not.toHaveBeenCalled();
         });
 
         it('refuses plan changes without a subscription', async () => {
@@ -283,6 +289,10 @@ describe('BillingService — the tenant’s subscription', () => {
                 where: { id: 'bil_1' },
                 data: { pendingDowngradePlan: null, downgradeScheduledAt: null }
             });
+            expect(events.emitAfterCommit).toHaveBeenCalledWith(
+                'subscription.downgrade-cancelled',
+                expect.objectContaining({ userId: 'u1', changes: { pendingDowngradePlan: { from: 'Starter', to: null } } })
+            );
 
             prisma.billing.findUnique!.mockResolvedValue(billingRow());
             await expectHttp(service.cancelPendingDowngrade(), HttpStatus.BAD_REQUEST);
@@ -318,6 +328,7 @@ describe('BillingService — the tenant’s subscription', () => {
             prisma.billing.findUnique!.mockResolvedValue(billingRow({ cancellationRequestedAt: PAST, cancellationEffectiveAt: FUTURE }));
             await service.reactivateSubscription();
             expect(stripe.reactivateSubscription).toHaveBeenCalledWith('sub_1');
+            expect(events.emitAfterCommit).toHaveBeenCalledWith('subscription.reactivated', expect.objectContaining({ userId: 'u1' }));
 
             prisma.billing.findUnique!.mockResolvedValue(billingRow({ cancellationRequestedAt: PAST, cancellationEffectiveAt: PAST }));
             await expectHttp(service.reactivateSubscription(), HttpStatus.BAD_REQUEST);

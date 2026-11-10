@@ -1265,6 +1265,8 @@ export interface IPrismaDelegate<T> {
     update(args: { where: any; data: any; select?: any; include?: any }): Promise<T>;
     delete(args: { where: any }): Promise<T>;
     count(args?: { where?: any }): Promise<number>;
+    /** Prisma's field references (`prisma.<model>.fields`): a column the model lacks is `undefined`. */
+    readonly fields?: object;
 }
 
 /**

@@ -204,6 +204,36 @@ export class TenantVerificationStatusChangedEvent extends BaseDomainEvent {
 // Event type constants
 // ============================================================
 
+/** The Owner read the widget-token secret (US1.5.4 F2). In-process only: it exists for the audit trail. */
+export class TenantWidgetSecretRevealedEvent extends BaseDomainEvent {
+    readonly eventType = 'tenant.widget_secret_revealed' as const;
+
+    constructor(
+        public readonly aggregateId: string,
+        public readonly tenantId: string,
+        public readonly userId: string
+    ) {
+        super();
+    }
+}
+
+/**
+ * The widget-token secret was replaced (US1.5.4 F3). Published so Event Ingestion drops its cached copy at
+ * once; it carries no secret, only until when the previous one is still accepted.
+ */
+export class TenantWidgetSecretRotatedEvent extends BaseDomainEvent {
+    readonly eventType = 'tenant.widget_secret_rotated' as const;
+
+    constructor(
+        public readonly aggregateId: string,
+        public readonly tenantId: string,
+        public readonly previousValidUntil: Date,
+        public readonly userId: string
+    ) {
+        super();
+    }
+}
+
 export const TenantEvents = {
     CREATED: 'tenant.created',
     UPDATED: 'tenant.updated',
@@ -217,5 +247,7 @@ export const TenantEvents = {
     OWNERSHIP_TRANSFERRED: 'tenant.ownership-transferred',
     DOMAIN_VERIFIED: 'tenant.domain-verified',
     VERIFICATION_REQUESTED: 'tenant.verification_requested',
-    VERIFICATION_STATUS_CHANGED: 'tenant.verification_status_changed'
+    VERIFICATION_STATUS_CHANGED: 'tenant.verification_status_changed',
+    WIDGET_SECRET_REVEALED: 'tenant.widget_secret_revealed',
+    WIDGET_SECRET_ROTATED: 'tenant.widget_secret_rotated'
 } as const;

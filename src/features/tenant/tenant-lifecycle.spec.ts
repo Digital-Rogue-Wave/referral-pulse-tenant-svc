@@ -16,6 +16,7 @@ import { DnsVerificationService } from '../dns/dns-verification.service';
 import { SubdomainService } from '../dns/subdomain.service';
 import { FilesService } from '../files/files.service';
 import { UsersService } from '../users/users.service';
+import { WidgetSecretVault } from './widget-secret.vault';
 import { TenantService } from './tenant.service';
 
 const OWNER: IAuthenticatedUser = { userId: 'u1', tenantId: 't1', source: 'dashboard' };
@@ -83,7 +84,8 @@ describe('TenantService — tenant lifecycle', () => {
             files,
             mock<KratosService>(),
             users,
-            config as never
+            config as never,
+            { generate: () => ({ raw: 'a'.repeat(64), sealed: 'sealed-secret' }) } as unknown as WidgetSecretVault
         );
     });
 

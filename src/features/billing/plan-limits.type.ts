@@ -4,6 +4,8 @@ export type PlanLimits = {
     seats?: number;
     leaderboard_entries?: number;
     email_sends?: number;
+    /** R-SDK-03 (v5.1): requests per minute a tenant's SDK may make to `widget-config`. */
+    sdk_requests_per_minute?: number;
     [key: string]: number | undefined;
 };
 

@@ -24,6 +24,7 @@ export interface TenantProps {
     status: string;
     verificationStatus: string;
     paymentStatus: string;
+    paymentStatusChangedAt?: Date | null;
     trialStartedAt?: Date | null;
     trialEndsAt?: Date | null;
     suspendedAt?: Date | null;
@@ -36,6 +37,8 @@ export interface TenantProps {
     customDomain?: string | null;
     domainVerificationStatus?: string | null;
     domainVerificationToken?: string | null;
+    billingCountry?: string | null;
+    invitationChannel?: string | null;
     dataRegion: string;
     retentionMonths: number;
     metadata?: unknown;
@@ -270,6 +273,9 @@ export class TenantResponse {
     paymentStatus!: string;
 
     @ApiPropertyOptional()
+    paymentStatusChangedAt?: Date | null;
+
+    @ApiPropertyOptional()
     trialStartedAt?: Date | null;
 
     @ApiPropertyOptional()
@@ -294,6 +300,9 @@ export class TenantResponse {
     deletionReason?: string | null;
 
     @ApiPropertyOptional()
+    deletionDueAt?: Date | null;
+
+    @ApiPropertyOptional()
     customDomain?: string | null;
 
     @ApiPropertyOptional()
@@ -302,11 +311,20 @@ export class TenantResponse {
     @ApiPropertyOptional()
     domainVerificationToken?: string | null;
 
+    @ApiPropertyOptional({ description: 'ISO 3166-1 alpha-2 billing country' })
+    billingCountry?: string | null;
+
+    @ApiPropertyOptional({ description: 'R-PRT-02 setting; null = no explicit choice (the platform default applies)' })
+    invitationChannel?: string | null;
+
     @ApiProperty({ example: 'eu-central-1' })
     dataRegion!: string;
 
     @ApiProperty({ minimum: 6, maximum: 36 })
     retentionMonths!: number;
+
+    @ApiPropertyOptional()
+    metadata?: unknown;
 
     @ApiProperty()
     createdAt!: Date;
@@ -387,6 +405,43 @@ class TenantResponseMapper extends BaseResponseMapper<TenantProps, TenantRespons
     constructor() {
         super(TenantResponse);
     }
+
+    /**
+     * Explicit field list, as for API keys (NOTE.md K6): `widget_token_secret` is never part of a response
+     * (it goes only to a service holding `widget_secret.read`), and a new column stays private until listed here.
+     */
+    override toResponse(entity: TenantProps): TenantResponse {
+        return Object.assign(new TenantResponse(), {
+            id: entity.id,
+            name: entity.name,
+            slug: entity.slug,
+            imageId: entity.imageId ?? null,
+            status: entity.status,
+            verificationStatus: entity.verificationStatus,
+            paymentStatus: entity.paymentStatus,
+            paymentStatusChangedAt: entity.paymentStatusChangedAt ?? null,
+            trialStartedAt: entity.trialStartedAt ?? null,
+            trialEndsAt: entity.trialEndsAt ?? null,
+            suspendedAt: entity.suspendedAt ?? null,
+            lockedAt: entity.lockedAt ?? null,
+            lockUntil: entity.lockUntil ?? null,
+            lockReason: entity.lockReason ?? null,
+            deletionScheduledAt: entity.deletionScheduledAt ?? null,
+            deletionReason: entity.deletionReason ?? null,
+            deletionDueAt: entity.deletionDueAt ?? null,
+            customDomain: entity.customDomain ?? null,
+            domainVerificationStatus: entity.domainVerificationStatus ?? null,
+            domainVerificationToken: entity.domainVerificationToken ?? null,
+            billingCountry: entity.billingCountry ?? null,
+            invitationChannel: entity.invitationChannel ?? null,
+            dataRegion: entity.dataRegion,
+            retentionMonths: entity.retentionMonths,
+            metadata: entity.metadata ?? null,
+            createdAt: entity.createdAt,
+            updatedAt: entity.updatedAt,
+            deletedAt: entity.deletedAt ?? null
+        });
+    }
 }
 
 export const tenantResponseMapper = new TenantResponseMapper();
@@ -401,12 +456,28 @@ export class AdminTenantCreatedResponse {
 }
 
 /**
- * API Contract §4.1's "shared secret" for widget identity tokens. Returned only to a service holding
- * `widget_secret.read`; see `internal-widget-secret.controller.ts`.
+ * API Contract §4.1's "shared secret" for widget identity tokens, as a service holding `widget_secret.read`
+ * receives it (see `internal-widget-secret.controller.ts`). Within an hour of a rotation the replaced
+ * secret comes too, so tokens signed just before the switch still verify.
  */
 export class WidgetTokenSecretDto {
     @ApiProperty({ description: '32 bytes as 64 hex characters' })
     secret!: string;
+
+    @ApiPropertyOptional({ description: 'The replaced secret, still accepted until previous_valid_until' })
+    previousSecret?: string;
+
+    @ApiPropertyOptional()
+    previousValidUntil?: Date;
+}
+
+/** The secret as the Owner reads or receives it after a rotation (US1.5.4 F2/F3). */
+export class WidgetSecretResponse {
+    @ApiProperty({ description: '32 bytes as 64 hex characters: sign the widget user JWT (HS256, 1-hour expiry) with it' })
+    secret!: string;
+
+    @ApiPropertyOptional({ description: 'Set after a rotation: until then, tokens signed with the previous secret still work' })
+    previousValidUntil?: Date | null;
 }
 
 // Re-export events for convenience

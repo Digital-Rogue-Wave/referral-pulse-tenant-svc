@@ -1,4 +1,4 @@
-import { Controller, Get, Body, Put, HttpCode, HttpStatus, UploadedFile, UseInterceptors, Query } from '@nestjs/common';
+import { Controller, Get, Body, Post, Put, HttpCode, HttpStatus, UploadedFile, UseInterceptors, Query } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 
 import { FILE_UPLOAD_OPTIONS } from '@app/features/files/file-upload.policy';
@@ -21,11 +21,13 @@ import {
     CancelDeletionDto,
     LockTenantDto,
     UnlockTenantDto,
-    TenantStatsDto
+    TenantStatsDto,
+    WidgetSecretResponse
 } from '@domains/tenant';
 
 import { TenantService } from '../tenant.service';
 import { TenantStatsService } from './tenant-stats.service';
+import { WidgetSecretService } from '../widget-secret.service';
 
 @ApiTags('Aware Tenants')
 @ApiBearerAuth()
@@ -33,7 +35,8 @@ import { TenantStatsService } from './tenant-stats.service';
 export class AwareTenantController {
     constructor(
         private readonly tenantService: TenantService,
-        private readonly statsService: TenantStatsService
+        private readonly statsService: TenantStatsService,
+        private readonly widgetSecrets: WidgetSecretService
     ) {}
 
     @RequirePermission('tenants:read')
@@ -75,6 +78,27 @@ export class AwareTenantController {
     @HttpCode(HttpStatus.OK)
     async getProfile(): Promise<TenantProfileResponse> {
         return await this.tenantService.getProfile();
+    }
+
+    /**
+     * The secret the tenant's backend signs widget user JWTs with (US1.5.4 F2). A credential of the same kind
+     * as an API key, so the same relation gates it: Owner only, checked live; every read is audit-logged.
+     */
+    @RequirePermission('api_keys:manage')
+    @Get('widget-secret')
+    @ApiOkResponse({ type: WidgetSecretResponse })
+    @HttpCode(HttpStatus.OK)
+    async getWidgetSecret(@CurrentUser() user: IAuthenticatedUser): Promise<WidgetSecretResponse> {
+        return await this.widgetSecrets.reveal(user.tenantId, user.userId);
+    }
+
+    /** Replaces the secret (US1.5.4 F3); the previous one keeps working for an hour. */
+    @RequirePermission('api_keys:manage')
+    @Post('widget-secret/rotate')
+    @ApiOkResponse({ type: WidgetSecretResponse })
+    @HttpCode(HttpStatus.OK)
+    async rotateWidgetSecret(@CurrentUser() user: IAuthenticatedUser): Promise<WidgetSecretResponse> {
+        return await this.widgetSecrets.rotate(user.tenantId, user.userId);
     }
 
     @Put()

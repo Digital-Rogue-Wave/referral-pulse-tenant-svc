@@ -124,6 +124,8 @@ export const LIVE_CHECK_PERMISSIONS: ReadonlySet<Permission> = new Set<Permissio
     'payouts:write',
     'payouts:confirm',
     'api_keys:manage',
+    // US1.5.1 F3 (v5.1 §4: Connection routes are live-checked): a connection decides whose webhooks count as money.
+    'connections:manage',
     'users:write',
     'billing:write',
     'tenants:delete'

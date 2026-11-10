@@ -197,6 +197,18 @@ describe('StripeWebhookService', () => {
             expect(emitted()).toEqual(['subscription.created', 'subscription.changed']);
         });
 
+        it('puts a past-due tenant back to active when its subscription ends: a Free tenant owes nothing (F4)', async () => {
+            tx.tenant.findUnique.mockResolvedValue({ paymentStatus: PaymentStatusEnum.PAST_DUE });
+
+            await deliver(stripeEvent('customer.subscription.deleted', { id: 'sub_123', ended_at: CREATED }));
+
+            expect(tx.tenant.updateMany).toHaveBeenCalledWith({
+                where: { id: 'ten_1', paymentStatus: PaymentStatusEnum.PAST_DUE },
+                data: expect.objectContaining({ paymentStatus: PaymentStatusEnum.ACTIVE })
+            });
+            expect(emitted()).toEqual(['tenant.payment-status-changed', 'subscription.cancelled']);
+        });
+
         it('ignores a subscription it cannot link yet (checkout.session.completed links it)', async () => {
             tx.billing.findFirst.mockResolvedValue(null);
 
@@ -219,6 +231,53 @@ describe('StripeWebhookService', () => {
                 where: { id: 'ten_1', paymentStatus: PaymentStatusEnum.RESTRICTED },
                 data: expect.objectContaining({ paymentStatus: PaymentStatusEnum.ACTIVE })
             });
+        });
+
+        it('reads a paid invoice in Stripe’s current shape (API 2025-03-31+): parent.subscription_details and payments (F1)', async () => {
+            tx.tenant.findUnique.mockResolvedValue({ paymentStatus: PaymentStatusEnum.PAST_DUE });
+            stripe.getSubscription.mockResolvedValue({} as Stripe.Subscription);
+            stripe.resolvePlanFromSubscription.mockReturnValue(BillingPlanEnum.GROWTH);
+
+            await deliver(
+                stripeEvent('invoice.paid', {
+                    id: 'in_3',
+                    customer: 'cus_1',
+                    parent: { type: 'subscription_details', subscription_details: { subscription: 'sub_123' } },
+                    payments: { data: [{ payment: { type: 'payment_intent', payment_intent: 'pi_3' } }] }
+                })
+            );
+
+            expect(stripe.getSubscription).toHaveBeenCalledWith('sub_123');
+            expect(tx.billing.findFirst).toHaveBeenCalledWith({ where: { stripeSubscriptionId: 'sub_123' } });
+            expect(tx.billing.updateMany.mock.calls[0]![0].data).toMatchObject({ stripeTransactionId: 'pi_3' });
+            expect(tx.tenant.updateMany).toHaveBeenCalledWith({
+                where: { id: 'ten_1', paymentStatus: PaymentStatusEnum.PAST_DUE },
+                data: expect.objectContaining({ paymentStatus: PaymentStatusEnum.ACTIVE })
+            });
+        });
+
+        it('still restores the tenant when Stripe no longer knows the invoice’s subscription, but rethrows other Stripe failures (F1)', async () => {
+            tx.tenant.findUnique.mockResolvedValue({ paymentStatus: PaymentStatusEnum.PAST_DUE });
+            stripe.getSubscription.mockRejectedValueOnce(Object.assign(new Error('No such subscription'), { code: 'resource_missing' }));
+            const paid = { id: 'in_5', customer: 'cus_1', parent: { subscription_details: { subscription: 'sub_123' } } };
+
+            await deliver(stripeEvent('invoice.paid', paid));
+
+            expect(tx.tenant.updateMany).toHaveBeenCalledWith(
+                expect.objectContaining({ data: expect.objectContaining({ paymentStatus: PaymentStatusEnum.ACTIVE }) })
+            );
+
+            stripe.getSubscription.mockRejectedValueOnce(Object.assign(new Error('Stripe is down'), { code: 'api_error' }));
+            await expect(deliver(stripeEvent('invoice.paid', paid))).rejects.toThrow('Stripe is down');
+        });
+
+        it('finds the tenant of a paid invoice by its customer when the invoice names no subscription (F1)', async () => {
+            tx.tenant.findUnique.mockResolvedValue({ paymentStatus: PaymentStatusEnum.PAST_DUE });
+
+            await deliver(stripeEvent('invoice.paid', { id: 'in_4', customer: 'cus_1', parent: null }));
+
+            expect(tx.billing.findFirst).toHaveBeenCalledWith({ where: { stripeCustomerId: 'cus_1' } });
+            expect(tx.tenant.updateMany).toHaveBeenCalled();
         });
 
         it('never moves an already restricted tenant back to past_due on another failed payment', async () => {

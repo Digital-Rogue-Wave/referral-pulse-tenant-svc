@@ -14,7 +14,7 @@ const CONFIG: Record<string, unknown> = {
     'stripeConfig.cancelUrl': 'https://app.example/cancel',
     'stripeConfig.automaticTax': true,
     'stripeConfig.portalReturnUrl': 'https://app.example/billing',
-    stripeConfig: { starterPriceId: 'price_starter', growthPriceId: 'price_growth' }
+    stripeConfig: { starterPriceId: 'price_starter', growthPriceId: 'price_growth', scalePriceId: 'price_scale' }
 };
 
 describe('StripeService', () => {
@@ -44,6 +44,19 @@ describe('StripeService', () => {
         };
         service = new StripeService(config as never, mock<AppLoggerService>(), mock<DateService>(), context);
         Object.assign(service, { client: stripe });
+    });
+
+    describe('which plan a Stripe subscription is on (US1.8.1 F1)', () => {
+        const subscription = (priceId: string) => ({ items: { data: [{ price: { id: priceId } }] } }) as never;
+
+        it('maps each configured price to its plan, Scale included', () => {
+            expect(service.resolvePlanFromSubscription(subscription('price_scale'))).toBe(BillingPlanEnum.SCALE);
+            expect(service.resolvePlanFromSubscription(subscription('price_growth'))).toBe(BillingPlanEnum.GROWTH);
+        });
+
+        it('knows no plan for a price nobody configured', () => {
+            expect(service.resolvePlanFromSubscription(subscription('price_unknown'))).toBeNull();
+        });
     });
 
     describe('checkout', () => {

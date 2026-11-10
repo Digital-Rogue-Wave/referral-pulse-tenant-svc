@@ -9,7 +9,9 @@ import { TenantContextService } from './tenant-context.service';
  * Prisma Tenant-Aware Service
  *
  * Provides tenant-scoped database operations via the proxy pattern.
- * All operations auto-inject `tenantId` and apply soft-delete guards.
+ * All operations auto-inject `tenantId`. Soft-delete guards apply only to models that have a `deletedAt`
+ * column (read from Prisma's field references), so a model without one (`audit_log`, `provider_connections`)
+ * is never queried on a column it lacks (US1.9.2 F2, US1.5.1, US1.5.3).
  *
  * @example
  * ```typescript
@@ -23,12 +25,12 @@ import { TenantContextService } from './tenant-context.service';
  * await this.toto.findMany({ where: { status } });    // filters by tenantId + excludes deleted
  * await this.toto.findUnique({ where: { id } });      // scoped to tenant
  * await this.toto.update({ where: { id }, data });    // scoped to tenant
- * await this.toto.delete({ where: { id } });          // soft-delete (sets deletedAt)
+ * await this.toto.delete({ where: { id } });          // soft-delete (sets deletedAt); a real delete without the column
  * await this.toto.hardDelete({ where: { id } });      // permanent delete
  * await this.toto.count();                            // count for tenant
  *
- * // For pagination or complex queries, use withTenantFilter:
- * const where = this.tenantAware.withTenantFilter({ status: 'active' });
+ * // For pagination or complex queries, use withTenantFilter (tenant only: state `deletedAt: null` yourself):
+ * const where = this.tenantAware.withTenantFilter({ status: 'active', deletedAt: null });
  * await cursorPage(this.prisma.toto, where, query, toItem);
  * ```
  */
@@ -43,6 +45,7 @@ export class TenantAwareService {
      * @param delegate - Prisma model delegate (e.g., `this.prisma.toto`)
      */
     forModel<T>(delegate: IPrismaDelegate<T>): ITenantScopedDelegate<T> {
+        const softDeletes = (delegate.fields as Record<string, unknown> | undefined)?.deletedAt !== undefined;
         return {
             create: (args: { data: Record<string, unknown>; select?: unknown; include?: unknown }) => {
                 const tenantId = this.getRequiredTenantId();
@@ -53,7 +56,7 @@ export class TenantAwareService {
             },
 
             findMany: (args = {}, options: ITenantReadOptions = {}) => {
-                const where = this.scopeWhere(args.where, options);
+                const where = this.scopeWhere(args.where, options, softDeletes);
                 return delegate.findMany({ ...args, where });
             },
 
@@ -65,17 +68,17 @@ export class TenantAwareService {
                 },
                 options: ITenantReadOptions = {}
             ) => {
-                const where = this.scopeWhere(args.where, options);
+                const where = this.scopeWhere(args.where, options, softDeletes);
                 return delegate.findUnique({ ...args, where });
             },
 
             findFirst: (args = {}, options: ITenantReadOptions = {}) => {
-                const where = this.scopeWhere(args.where, options);
+                const where = this.scopeWhere(args.where, options, softDeletes);
                 return delegate.findFirst({ ...args, where });
             },
 
             findFirstOrThrow: (args = {}, options: ITenantReadOptions = {}) => {
-                const where = this.scopeWhere(args.where, options);
+                const where = this.scopeWhere(args.where, options, softDeletes);
                 return delegate.findFirstOrThrow({ ...args, where });
             },
 
@@ -88,7 +91,7 @@ export class TenantAwareService {
             delete: (args: { where: Record<string, unknown> }) => {
                 const tenantId = this.getRequiredTenantId();
                 const where = { ...args.where, tenantId };
-                return delegate.update({ where, data: { deletedAt: new Date() } });
+                return softDeletes ? delegate.update({ where, data: { deletedAt: new Date() } }) : delegate.delete({ where });
             },
 
             hardDelete: (args: { where: Record<string, unknown> }) => {
@@ -98,7 +101,7 @@ export class TenantAwareService {
             },
 
             count: (args = {}, options: ITenantReadOptions = {}) => {
-                const where = this.scopeWhere(args.where, options);
+                const where = this.scopeWhere(args.where, options, softDeletes);
                 return delegate.count({ ...args, where });
             }
         };
@@ -120,24 +123,14 @@ export class TenantAwareService {
      * Build a tenant-scoped where clause for direct Prisma queries.
      * Use for pagination or complex queries not covered by forModel().
      *
+     * Adds the tenant only. It doesn't know the model, so it can't tell whether a `deletedAt` column exists:
+     * a caller listing a soft-deleting model states `deletedAt: null` itself (US1.9.2 F2: the implicit
+     * default queried `audit_log` on a column it doesn't have, so every read failed).
+     *
      * @param where - Base where conditions
-     * @param options - { includeSoftDeleted: true } to include deleted records
      */
-    withTenantFilter<T extends Record<string, unknown>>(
-        where: T = {} as T,
-        options: { includeSoftDeleted?: boolean } = {}
-    ): T & { tenantId: string; deletedAt?: null } {
-        const tenantId = this.getRequiredTenantId();
-        const result = { ...where, tenantId } as T & {
-            tenantId: string;
-            deletedAt?: null;
-        };
-
-        if (!options.includeSoftDeleted && !('deletedAt' in where)) {
-            result.deletedAt = null;
-        }
-
-        return result;
+    withTenantFilter<T extends Record<string, unknown>>(where: T = {} as T): T & { tenantId: string } {
+        return { ...where, tenantId: this.getRequiredTenantId() };
     }
 
     /**
@@ -154,11 +147,11 @@ export class TenantAwareService {
         return { deletedAt: new Date() };
     }
 
-    private scopeWhere(where: Record<string, unknown> = {}, options: ITenantReadOptions = {}): Record<string, unknown> {
+    private scopeWhere(where: Record<string, unknown> = {}, options: ITenantReadOptions = {}, softDeletes = true): Record<string, unknown> {
         const tenantId = this.getRequiredTenantId();
         const scoped: Record<string, unknown> = { ...where, tenantId };
 
-        if (!options.includeSoftDeleted && !('deletedAt' in where)) {
+        if (softDeletes && !options.includeSoftDeleted && !('deletedAt' in where)) {
             scoped.deletedAt = null;
         }
 

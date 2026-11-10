@@ -55,24 +55,25 @@ export class StripeService {
         const firstItem = items[0];
         const priceId = firstItem?.price?.id ?? null;
 
-        if (!priceId || !cfg) {
+        return priceId ? this.planForPriceId(priceId) : null;
+    }
+
+    /** The plan a configured Stripe price id (`STRIPE_<PLAN>_PRICE_ID`) belongs to, or null for an unknown price. */
+    planForPriceId(priceId: string): BillingPlanEnum | null {
+        const cfg = this.configService.get('stripeConfig', { infer: true });
+        if (!cfg) {
             return null;
         }
 
-        if (cfg.freePriceId && priceId === cfg.freePriceId) {
-            return BillingPlanEnum.FREE;
-        }
-        if (cfg.starterPriceId && priceId === cfg.starterPriceId) {
-            return BillingPlanEnum.STARTER;
-        }
-        if (cfg.growthPriceId && priceId === cfg.growthPriceId) {
-            return BillingPlanEnum.GROWTH;
-        }
-        if (cfg.enterprisePriceId && priceId === cfg.enterprisePriceId) {
-            return BillingPlanEnum.ENTERPRISE;
-        }
-
-        return null;
+        // One entry per plan (US1.8.1 F1): an `if` per plan had already lost Scale once.
+        const planByPriceId: [string | undefined, BillingPlanEnum][] = [
+            [cfg.freePriceId, BillingPlanEnum.FREE],
+            [cfg.starterPriceId, BillingPlanEnum.STARTER],
+            [cfg.growthPriceId, BillingPlanEnum.GROWTH],
+            [cfg.scalePriceId, BillingPlanEnum.SCALE],
+            [cfg.enterprisePriceId, BillingPlanEnum.ENTERPRISE]
+        ];
+        return planByPriceId.find(([configured]) => configured && configured === priceId)?.[1] ?? null;
     }
 
     async applyScheduledDowngrade(params: { stripeSubscriptionId: string; targetPlan: BillingPlanEnum }): Promise<void> {
@@ -314,8 +315,8 @@ export class StripeService {
             }
         });
 
-        const amountDueNow = (upcoming.amount_due ?? 0) / 100;
-        const currency = upcoming.currency ?? 'usd';
+        const amountDueNow = upcoming.amount_due;
+        const currency = upcoming.currency;
         const nextInvoiceDate = upcoming.next_payment_attempt ? this.dateService.fromUnix(upcoming.next_payment_attempt).toDate() : null;
 
         this.logger.log(
@@ -498,92 +499,6 @@ export class StripeService {
         return stripe.webhooks.constructEvent(payload, signature, webhookSecret);
     }
 
-    async createSetupIntent(customerId: string): Promise<Stripe.SetupIntent> {
-        const stripe = this.stripeClient();
-
-        const setupIntent = await stripe.setupIntents.create(
-            { customer: customerId, usage: 'off_session', payment_method_types: ['card'] },
-            this.writeOptions('setup-intent', customerId)
-        );
-
-        this.logger.log(`Created Stripe SetupIntent ${setupIntent.id} for customer ${customerId}`);
-
-        return setupIntent;
-    }
-
-    async listPaymentMethods(customerId: string): Promise<
-        {
-            id: string;
-            brand: string | null;
-            last4: string | null;
-            expMonth: number | null;
-            expYear: number | null;
-            isDefault: boolean;
-        }[]
-    > {
-        const stripe = this.stripeClient();
-
-        const customer = await stripe.customers.retrieve(customerId);
-        const defaultPm = !customer.deleted ? customer.invoice_settings?.default_payment_method : undefined;
-        const defaultPaymentMethodId = typeof defaultPm === 'string' ? defaultPm : (defaultPm?.id ?? null);
-
-        const list = await stripe.paymentMethods.list({
-            customer: customerId,
-            type: 'card',
-            limit: 100
-        });
-
-        this.logger.log(`Listed ${list.data.length} Stripe payment methods for customer ${customerId}, default=${defaultPaymentMethodId ?? 'none'}`);
-
-        return list.data.map((pm) => {
-            const card = pm.card;
-            return {
-                id: pm.id,
-                brand: card?.brand ?? null,
-                last4: card?.last4 ?? null,
-                expMonth: card?.exp_month ?? null,
-                expYear: card?.exp_year ?? null,
-                isDefault: pm.id === defaultPaymentMethodId
-            };
-        });
-    }
-
-    async detachPaymentMethodForCustomer(customerId: string, paymentMethodId: string): Promise<void> {
-        const stripe = this.stripeClient();
-
-        const pm = await stripe.paymentMethods.retrieve(paymentMethodId);
-        const pmCustomer = pm.customer;
-        const pmCustomerId = typeof pmCustomer === 'string' ? pmCustomer : (pmCustomer?.id ?? null);
-
-        if (pmCustomerId !== customerId) {
-            throw new HttpException('Payment method not found for this customer', HttpStatus.NOT_FOUND);
-        }
-
-        await stripe.paymentMethods.detach(paymentMethodId, {}, this.writeOptions('detach', paymentMethodId));
-
-        this.logger.log(`Detached Stripe payment method ${paymentMethodId} from customer ${customerId}`);
-    }
-
-    async setDefaultPaymentMethodForCustomer(customerId: string, paymentMethodId: string): Promise<void> {
-        const stripe = this.stripeClient();
-
-        const pm = await stripe.paymentMethods.retrieve(paymentMethodId);
-        const pmCustomer = pm.customer;
-        const pmCustomerId = typeof pmCustomer === 'string' ? pmCustomer : (pmCustomer?.id ?? null);
-
-        if (pmCustomerId !== customerId) {
-            throw new HttpException('Payment method not found for this customer', HttpStatus.NOT_FOUND);
-        }
-
-        await stripe.customers.update(
-            customerId,
-            { invoice_settings: { default_payment_method: paymentMethodId } },
-            this.writeOptions('default-payment-method', `${customerId}:${paymentMethodId}`)
-        );
-
-        this.logger.log(`Set default payment method ${paymentMethodId} for customer ${customerId}`);
-    }
-
     /** One page of invoices, newest first, paged with Stripe's own cursors (invoice ids). */
     async listInvoicesForCustomer(
         customerId: string,
@@ -615,24 +530,33 @@ export class StripeService {
 
         const data = list.data.map((invoice) => {
             const createdTs = invoice.created ?? 0;
-            const periodStartTs = invoice.period_start as number | undefined;
-            const periodEndTs = invoice.period_end as number | undefined;
 
             return {
                 id: invoice.id,
                 number: invoice.number ?? null,
                 status: invoice.status ?? null,
-                currency: invoice.currency ?? 'usd',
-                amountDue: (invoice.amount_due ?? 0) / 100,
-                amountPaid: (invoice.amount_paid ?? 0) / 100,
+                currency: invoice.currency,
+                amountDue: invoice.amount_due,
+                amountPaid: invoice.amount_paid,
                 createdAt: this.dateService.fromUnix(createdTs).toDate(),
-                periodStart: periodStartTs ? this.dateService.fromUnix(periodStartTs).toDate() : null,
-                periodEnd: periodEndTs ? this.dateService.fromUnix(periodEndTs).toDate() : null,
+                ...this.billedPeriod(invoice),
                 hostedInvoiceUrl: invoice.hosted_invoice_url ?? null,
                 invoicePdfUrl: invoice.invoice_pdf ?? null
             };
         });
         return { hasMore: list.has_more, data };
+    }
+
+    /**
+     * The period an invoice bills for. On a subscription invoice Stripe's own `period_start`/`period_end` is the
+     * previous period (both equal the creation time on the first invoice); the billed period is on its lines.
+     */
+    private billedPeriod(invoice: Stripe.Invoice): { periodStart: Date | null; periodEnd: Date | null } {
+        const lines = invoice.lines?.data ?? [];
+        const start = lines.length ? Math.min(...lines.map((line) => line.period.start)) : invoice.period_start;
+        const end = lines.length ? Math.max(...lines.map((line) => line.period.end)) : invoice.period_end;
+        const toDate = (ts: number | undefined): Date | null => (ts ? this.dateService.fromUnix(ts).toDate() : null);
+        return { periodStart: toDate(start), periodEnd: toDate(end) };
     }
 
     /**
@@ -669,16 +593,12 @@ export class StripeService {
                 : {})
         });
 
-        const amountDue = (upcoming.amount_due ?? 0) / 100;
-        const currency = upcoming.currency ?? 'usd';
+        const amountDue = upcoming.amount_due;
+        const currency = upcoming.currency;
 
         const nextPaymentAttempt = upcoming.next_payment_attempt ? this.dateService.fromUnix(upcoming.next_payment_attempt).toDate() : null;
 
-        const periodStartTs = upcoming.period_start as number | undefined;
-        const periodEndTs = upcoming.period_end as number | undefined;
-
-        const periodStart = periodStartTs ? this.dateService.fromUnix(periodStartTs).toDate() : null;
-        const periodEnd = periodEndTs ? this.dateService.fromUnix(periodEndTs).toDate() : null;
+        const { periodStart, periodEnd } = this.billedPeriod(upcoming);
 
         this.logger.log(
             `Retrieved upcoming Stripe invoice preview for customer ${params.customerId} (subscription=${

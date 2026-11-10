@@ -12,14 +12,17 @@ import { createHash, randomUUID } from 'crypto';
 
 import { BDD_OWNER, makeActiveUserToken, makeInviteeToken } from '../support/jwt.helper';
 import { denyKetoFor, stubKratosIdentity } from '../support/nock.setup';
-import { fixturesPrisma } from '../support/db.fixtures';
+import { fixturesPrisma, purgeAuditRows } from '../support/db.fixtures';
 import type { BddWorldInterface } from '../support/world';
 
 const SLUG_PREFIX = 'bdd-prov-';
+const RUN_ID = Date.now().toString(36);
 const ADMIN_TENANT_ID = 'default-tenant';
 
 /** The tenant the last successful creation returned; one per scenario. */
 let createdTenant: { id: string; slug: string } | null = null;
+/** Tenants created through the Ory sign-up hook in this scenario, in order. */
+let signedUp: { tenantCreated: boolean; tenantId: string | null }[] = [];
 
 async function removeProvisionedTenants(): Promise<void> {
     const tenants = await fixturesPrisma.tenant.findMany({ where: { slug: { startsWith: SLUG_PREFIX } }, select: { id: true } });
@@ -29,12 +32,13 @@ async function removeProvisionedTenants(): Promise<void> {
     }
     // Invitations, users, roles and verifications cascade with the tenant; the outbox and the audit trail don't.
     await fixturesPrisma.eventOutbox.deleteMany({ where: { tenantId: { in: ids } } });
-    await fixturesPrisma.auditLog.deleteMany({ where: { tenantId: { in: ids } } });
+    await purgeAuditRows(ids);
     await fixturesPrisma.tenant.deleteMany({ where: { id: { in: ids } } });
 }
 
 Before({ tags: '@tenant-provisioning' }, async function () {
     createdTenant = null;
+    signedUp = [];
     await removeProvisionedTenants();
 });
 
@@ -96,6 +100,18 @@ When('I create another tenant with the same slug for the owner {string}', async 
     await postTenant(this, { name: 'Acme Again', slug: taken, owner_email: ownerEmail });
 });
 
+When(/^(?:a|another) company named "([^"]+)" signs up through the Ory sign-up hook$/, async function (this: BddWorldInterface, name: string) {
+    // The run id keeps the name unique per run, so a leftover tenant from an earlier run never collides.
+    const company = `${name} ${RUN_ID}`;
+    const identityId = `kratos-bdd-prov-${randomUUID()}`;
+    const response = await this.agent()
+        .post('/api/v1/webhook/ory/signup')
+        .set('x-ory-api-key', String(process.env['ORY_WEBHOOK_API_KEY']))
+        .send({ identity: { id: identityId, traits: { email: `${identityId}@acme.com`, tenantName: company } } });
+    const body = response.body as { tenant_created?: boolean; tenant_id?: string };
+    signedUp.push({ tenantCreated: response.status === 201 && body.tenant_created === true, tenantId: body.tenant_id ?? null });
+});
+
 // ─── Then ────────────────────────────────────────────────────────────────────
 
 Then(
@@ -117,6 +133,28 @@ Then('the response holds a pending {string} invitation for {string}', function (
     assert.strictEqual(invitation['role'], role);
     assert.strictEqual(invitation['status'], 'PENDING');
     assert.strictEqual(invitation['tenant_id'], newTenant().id);
+});
+
+Then('the response carries neither the widget token secret nor the invitation token hash', function (this: BddWorldInterface) {
+    const body = this.response?.body as { tenant: Record<string, unknown>; owner_invitation: Record<string, unknown> };
+    assert.ok(!('widget_token_secret' in body.tenant), 'tenant.widget_token_secret leaked');
+    assert.ok(!('token_hash' in body.owner_invitation), 'owner_invitation.token_hash leaked');
+});
+
+Then('both sign-ups created a tenant', function () {
+    assert.strictEqual(signedUp.length, 2);
+    assert.ok(
+        signedUp.every((s) => s.tenantCreated && s.tenantId),
+        `Expected two created tenants, got ${JSON.stringify(signedUp)}`
+    );
+    assert.notStrictEqual(signedUp[0]!.tenantId, signedUp[1]!.tenantId);
+});
+
+Then("the second tenant's slug is the first one's plus a 6-character suffix", async function () {
+    const [first, second] = await Promise.all(
+        signedUp.map((s) => fixturesPrisma.tenant.findUniqueOrThrow({ where: { id: s.tenantId! }, select: { id: true, slug: true } }))
+    );
+    assert.strictEqual(second!.slug, `${first!.slug}-${second!.id.slice(-6).toLowerCase()}`);
 });
 
 Then('the new tenant has no members yet', async function () {

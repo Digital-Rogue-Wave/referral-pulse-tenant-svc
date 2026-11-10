@@ -3,9 +3,10 @@ import type Stripe from 'stripe';
 import { SubscriptionStatusEnum } from '@common/enums/billing.enum';
 
 /**
- * Invoice fields the Stripe API still returns but the SDK v20+ types no longer declare.
+ * Where an invoice named its subscription and payment intent before API version 2025-03-31 (basil). A
+ * webhook endpoint pinned to an older version still sends them, so they stay as the fallback.
  */
-type InvoiceWithRuntimeFields = Stripe.Invoice & {
+type InvoiceWithLegacyFields = Stripe.Invoice & {
     payment_intent?: string | Stripe.PaymentIntent | null;
     subscription?: string | Stripe.Subscription | null;
 };
@@ -20,12 +21,14 @@ export interface InvoiceRefs {
     customerId: string | undefined;
 }
 
+/** US1.8.2 F1: current API versions put these under `parent.subscription_details` and `payments`. */
 export function invoiceRefs(invoice: Stripe.Invoice): InvoiceRefs {
-    const runtime = invoice as InvoiceWithRuntimeFields;
+    const legacy = invoice as InvoiceWithLegacyFields;
+    const payment = invoice.payments?.data?.find((entry) => entry.payment?.payment_intent)?.payment;
     return {
         invoiceId: invoice.id ?? '',
-        paymentIntentId: idOf(runtime.payment_intent),
-        subscriptionId: idOf(runtime.subscription),
+        paymentIntentId: idOf(payment?.payment_intent) ?? idOf(legacy.payment_intent),
+        subscriptionId: idOf(invoice.parent?.subscription_details?.subscription) ?? idOf(legacy.subscription),
         customerId: idOf(invoice.customer)
     };
 }

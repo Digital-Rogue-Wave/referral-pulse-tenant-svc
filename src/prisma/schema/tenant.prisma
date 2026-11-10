@@ -32,9 +32,14 @@ model Tenant {
   /// from an Owner who deliberately chose `allowed`.
   invitationChannel        String?   @map("invitation_channel") @db.VarChar(20)
   /// The shared secret the tenant's backend signs widget identity tokens with, and Event Ingestion
-  /// verifies them with (API Contract §4.1). 32 random bytes as hex. Never returned to a dashboard
-  /// session — only to a service holding `widget_secret.read`.
-  widgetTokenSecret        String?   @map("widget_token_secret") @db.Char(64)
+  /// verifies them with (API Contract §4.1). 32 random bytes as hex, stored AES-256-GCM encrypted
+  /// (`WidgetSecretVault`); a 64-hex value is a not-yet-encrypted legacy row, sealed on first read.
+  /// Read by the Owner through `GET /v1/tenants/widget-secret` and by services holding `widget_secret.read`.
+  widgetTokenSecret        String?   @map("widget_token_secret") @db.Text
+  /// After a rotation, the replaced secret (encrypted) stays valid until `widgetTokenSecretPreviousUntil`,
+  /// so a client's backend can switch without a broken widget (one hour, the longest a token lives).
+  widgetTokenSecretPrevious      String?   @map("widget_token_secret_previous") @db.Text
+  widgetTokenSecretPreviousUntil DateTime? @map("widget_token_secret_previous_until") @db.Timestamptz
   dataRegion               String    @default("eu-central-1") @map("data_region") @db.VarChar(32)
   retentionMonths          Int       @default(24) @map("retention_months") @db.SmallInt
   metadata                 Json?

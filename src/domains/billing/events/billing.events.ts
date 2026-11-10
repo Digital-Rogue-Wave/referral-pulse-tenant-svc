@@ -85,6 +85,34 @@ export class SubscriptionUpgradedEvent extends BaseDomainEvent {
     }
 }
 
+/** US1.8.2 F9: the Owner withdrew a scheduled downgrade. In-process only; recorded in the audit log. */
+export class SubscriptionDowngradeCancelledEvent extends BaseDomainEvent {
+    readonly eventType = 'subscription.downgrade-cancelled' as const;
+
+    constructor(
+        public readonly aggregateId: string,
+        public readonly tenantId: string,
+        public readonly changes: { pendingDowngradePlan: { from: string; to: null } },
+        public readonly userId?: string
+    ) {
+        super();
+    }
+}
+
+/** US1.8.2 F9: the Owner withdrew a scheduled cancellation. In-process only; recorded in the audit log. */
+export class SubscriptionReactivatedEvent extends BaseDomainEvent {
+    readonly eventType = 'subscription.reactivated' as const;
+
+    constructor(
+        public readonly aggregateId: string,
+        public readonly tenantId: string,
+        public readonly changes: { cancellationEffectiveAt: { from: string; to: null } },
+        public readonly userId?: string
+    ) {
+        super();
+    }
+}
+
 export class TenantPaymentStatusChangedEvent extends BaseDomainEvent {
     readonly eventType = 'tenant.payment-status-changed' as const;
 
@@ -230,6 +258,8 @@ export const BillingEvents = {
     SUBSCRIPTION_CANCELLED: 'subscription.cancelled',
     SUBSCRIPTION_DOWNGRADE_SCHEDULED: 'subscription.downgrade-scheduled',
     SUBSCRIPTION_UPGRADED: 'subscription.upgraded',
+    SUBSCRIPTION_DOWNGRADE_CANCELLED: 'subscription.downgrade-cancelled',
+    SUBSCRIPTION_REACTIVATED: 'subscription.reactivated',
     TENANT_PAYMENT_STATUS_CHANGED: 'tenant.payment-status-changed',
     TRIAL_REMINDER: 'trial.reminder',
     TRIAL_EXPIRED: 'trial.expired',

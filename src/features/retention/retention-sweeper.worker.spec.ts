@@ -23,8 +23,11 @@ describe('RetentionSweeperWorker', () => {
             auditLog: { deleteMany: jest.fn().mockResolvedValue({ count: 12 }) },
             invitation: { deleteMany: jest.fn().mockResolvedValue({ count: 3 }) },
             sideEffectOutbox: { deleteMany: jest.fn().mockResolvedValue({ count: 40 }) },
-            stripeEvent: { deleteMany: jest.fn().mockResolvedValue({ count: 7 }) }
+            stripeEvent: { deleteMany: jest.fn().mockResolvedValue({ count: 7 }) },
+            $executeRaw: jest.fn().mockResolvedValue(1)
         });
+        // The audit purge runs in its own transaction; the mock hands the same client back as `tx`.
+        (prisma.$transaction as unknown as jest.Mock).mockImplementation((fn: (tx: unknown) => unknown) => fn(prisma));
         worker = new RetentionSweeperWorker(
             mock<BullJobsConnectionFactory>(),
             mock<ConfigService>(),
@@ -43,6 +46,15 @@ describe('RetentionSweeperWorker', () => {
 
         expect(prisma.tenant.findMany).toHaveBeenCalledWith(expect.objectContaining({ where: { status: 'closed', deletedAt: { lt: cutoff } } }));
         expect(prisma.auditLog.deleteMany).toHaveBeenCalledWith({ where: { tenantId: { in: ['t-closed'] } } });
+    });
+
+    it('opts its transaction in to the append-only trigger before deleting audit rows', async () => {
+        await worker.purgeAuditOfClosedTenants(cutoff);
+
+        const [sql] = (prisma.$executeRaw as unknown as jest.Mock).mock.calls[0] as [TemplateStringsArray];
+        expect(sql.join('')).toBe("SELECT set_config('app.audit_purge', 'on', true)");
+        const optIn = (prisma.$executeRaw as unknown as jest.Mock).mock.invocationCallOrder[0]!;
+        expect(optIn).toBeLessThan((prisma.auditLog.deleteMany as jest.Mock).mock.invocationCallOrder[0]!);
     });
 
     it('touches no audit row when no tenant closed long enough ago', async () => {

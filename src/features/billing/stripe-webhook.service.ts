@@ -110,7 +110,7 @@ export class StripeWebhookService {
                 if (!subscriptionId) {
                     return {};
                 }
-                return { plan: this.stripe.resolvePlanFromSubscription(await this.stripe.getSubscription(subscriptionId)) };
+                return { plan: await this.planOfSubscription(subscriptionId) };
             }
             case 'charge.dispute.created':
             case 'charge.dispute.closed': {
@@ -146,6 +146,23 @@ export class StripeWebhookService {
             default:
                 // `invoice_payment.paid` duplicates `invoice.paid`; everything else is not billing state.
                 return 'ignored';
+        }
+    }
+
+    /**
+     * The plan a paid invoice's subscription is on now. A subscription Stripe no longer knows yields no plan
+     * rather than an error: retrying could never succeed, and the payment must still restore the tenant
+     * (US1.8.2 F1). Any other Stripe failure still throws, so Stripe redelivers the event.
+     */
+    private async planOfSubscription(subscriptionId: string): Promise<BillingPlanEnum | null> {
+        try {
+            return this.stripe.resolvePlanFromSubscription(await this.stripe.getSubscription(subscriptionId));
+        } catch (error) {
+            if ((error as { code?: string }).code !== 'resource_missing') {
+                throw error;
+            }
+            this.logger.warn('A paid invoice names a subscription Stripe no longer knows; applying the payment only', { subscriptionId });
+            return null;
         }
     }
 
@@ -251,7 +268,9 @@ export class StripeWebhookService {
 
     /**
      * The subscription ended. The plan drops to Free, not only the status: limits resolve from the plan, so
-     * leaving the paid plan in place kept a cancelled tenant on paid entitlements.
+     * leaving the paid plan in place kept a cancelled tenant on paid entitlements. The payment status goes
+     * back to `active` (US1.8.2 F4): a Free tenant owes nothing, so dunning must not restrict or lock it. The
+     * unpaid invoice stays in Stripe's invoice list.
      */
     private async onSubscriptionDeleted(tx: Tx, event: Stripe.Event, subscription: Stripe.Subscription): Promise<Outcome> {
         const billing = await tx.billing.findFirst({ where: { stripeSubscriptionId: subscription.id } });
@@ -269,6 +288,7 @@ export class StripeWebhookService {
         if (!applied) {
             return 'ignored';
         }
+        await this.setPaymentStatus(tx, billing, PaymentStatusEnum.ACTIVE, null, { stripeSubscriptionId: subscription.id });
         this.txEventEmitter.emitAfterCommit(
             BillingEvents.SUBSCRIPTION_CANCELLED,
             new SubscriptionCancelledEvent(
@@ -288,7 +308,7 @@ export class StripeWebhookService {
 
     private async onInvoicePaid(tx: Tx, event: Stripe.Event, invoice: Stripe.Invoice, plan: BillingPlanEnum | null): Promise<Outcome> {
         const refs = invoiceRefs(invoice);
-        const billing = refs.subscriptionId ? await tx.billing.findFirst({ where: { stripeSubscriptionId: refs.subscriptionId } }) : null;
+        const billing = await this.findBilling(tx, refs.subscriptionId, refs.customerId);
         if (!billing) {
             return 'ignored';
         }

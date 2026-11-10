@@ -6,8 +6,6 @@ export * from './dto/create-plan.dto';
 export * from './dto/internal-tenant-billing-status.dto';
 export * from './dto/invoice.dto';
 export * from './dto/tenant-entitlements.dto';
-export * from './dto/payment-method.dto';
-export * from './dto/payment-method-setup-response.dto';
 export * from './dto/plan.dto';
 export * from './dto/subscription-cancel-request.dto';
 export * from './dto/subscription-checkout.dto';

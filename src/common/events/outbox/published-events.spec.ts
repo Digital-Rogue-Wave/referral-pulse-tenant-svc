@@ -30,7 +30,8 @@ import {
     TenantUnsuspendedEvent,
     TenantUpdatedEvent,
     TenantVerificationRequestedEvent,
-    TenantVerificationStatusChangedEvent
+    TenantVerificationStatusChangedEvent,
+    TenantWidgetSecretRotatedEvent
 } from '@domains/tenant/events/tenant.events';
 import { UserAnonymisedEvent, UserInvitedEvent, UserLoggedInEvent, UserRegisteredEvent, UserRemovedEvent, UserRoleChangedEvent } from '@domains/user';
 
@@ -57,6 +58,7 @@ const EVENTS: BaseDomainEvent[] = [
     new TenantDomainVerifiedEvent(T, T, 'refer.acme.io', NOW),
     new TenantVerificationRequestedEvent(T, T, 'Acme', 'u1', 'v1'),
     new TenantVerificationStatusChangedEvent(T, T, 'pending', 'verified', undefined, 'system'),
+    new TenantWidgetSecretRotatedEvent(T, T, new Date('2026-11-09T11:00:00Z'), 'u1'),
     new UserRegisteredEvent('u1', T, 'OWNER'),
     new UserRoleChangedEvent('u2', T, 'VIEWER', 'ADMIN', 'u1'),
     new UserRemovedEvent('u2', T, 'OPERATOR', 'u1'),
@@ -90,7 +92,7 @@ const EVENTS: BaseDomainEvent[] = [
     new UsageThresholdCrossedEvent(T, T, 'email_sends', 80, 80, 100, 80, '2026-09', ISO),
     new UsageMonthlySummaryEvent(T, T, 'email_sends', '2026-08', 90, 100, '2026-08-31', ISO),
     new ConnectionCreatedEvent('c1', T, { connectionId: 'c1', provider: 'stripe', connectionType: 'billing', createdBy: 'u1' }, 'u1'),
-    new ConnectionRevokedEvent('c1', T, { connectionId: 'c1', provider: 'stripe', revokedBy: 'u1' }, 'u1'),
+    new ConnectionRevokedEvent('c1', T, { connectionId: 'c1', provider: 'stripe', connectionType: 'billing', revokedBy: 'u1' }, 'u1'),
     new ConsentRecordedEvent('cs1', T, {
         subjectEmailHash: HASH,
         subjectExternalId: 'cust-9',

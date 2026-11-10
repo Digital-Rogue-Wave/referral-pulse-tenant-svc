@@ -2,6 +2,7 @@ import { BadRequestException } from '@nestjs/common';
 import { mock, MockProxy } from 'jest-mock-extended';
 
 import { DatabaseService } from '@app/database/database.service';
+import { BillingPlanEnum } from '@common/enums/billing.enum';
 import { AppLoggerService } from '@common/logging/app-logger.service';
 import { RedisKeyBuilder } from '@common/redis/redis-key.builder';
 import { RedisService } from '@common/redis/redis.service';
@@ -131,6 +132,23 @@ describe('Plan catalog', () => {
                 expect.objectContaining({ where: { id: 'p1' }, data: expect.objectContaining({ name: 'Stripe price price_growth' }) })
             );
             expect(prisma.plan.update).toHaveBeenCalledWith({ where: { id: 'p-old' }, data: { isActive: false } });
+        });
+
+        it('stores the canonical plan name whatever the Stripe casing, so tenants on that plan keep it', async () => {
+            prisma.plan.findFirst!.mockResolvedValueOnce(PLAN).mockResolvedValueOnce(null).mockResolvedValueOnce(null);
+            stripe.planForPriceId.mockImplementation((id) => (id === 'price_cfg' ? BillingPlanEnum.STARTER : null));
+            stripe.listActiveRecurringPricesWithProducts.mockResolvedValue([
+                price('price_upper', { seats: '15' }, { id: 'prod_g', name: 'GROWTH', metadata: {} }),
+                price('price_cfg', { seats: '3' }, { id: 'prod_s', name: 'Anything', metadata: {} }),
+                price('price_custom', { seats: '9' }, { id: 'prod_c', name: 'Acme custom', metadata: {} })
+            ]);
+
+            await sync.syncFromStripe();
+
+            expect(prisma.plan.update).toHaveBeenCalledWith(
+                expect.objectContaining({ where: { id: 'p1' }, data: expect.objectContaining({ name: 'Growth' }) })
+            );
+            expect(prisma.plan.create!.mock.calls.map(([arg]) => arg.data.name)).toEqual(['Starter', 'Acme custom']);
         });
 
         it('skips inactive or one-time prices and deleted products', async () => {

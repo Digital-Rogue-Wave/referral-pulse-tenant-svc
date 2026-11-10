@@ -2,6 +2,7 @@ import { mock, MockProxy } from 'jest-mock-extended';
 import type { Prisma } from '@prisma-gen/generated/client';
 
 import { AppLoggerService } from '@common/logging/app-logger.service';
+import { MetricsService } from '@common/monitoring/metrics.service';
 import { TenantContextService } from '@common/tenant-aware/tenant-context.service';
 import { BeforeCommitHook, TransactionEventEmitterService } from '@common/events/transaction-event-emitter.service';
 import { sha256Hex } from '@common/helper/hashing';
@@ -9,6 +10,7 @@ import { DatabaseService } from '@app/database/database.service';
 import { ApiKeyDeletedEvent } from '@domains/api-key';
 import { TenantDeletedEvent, TenantUpdatedEvent } from '@domains/tenant/events/tenant.events';
 import { TenantSettingUpdatedEvent } from '@domains/tenant-setting';
+import { SubscriptionDowngradeCancelledEvent, SubscriptionReactivatedEvent } from '@domains/billing';
 import { UserLoggedInEvent, UserRoleChangedEvent } from '@domains/user';
 
 import { auditActor, toAuditEntry } from './audited-actions';
@@ -48,13 +50,35 @@ describe('Audited actions', () => {
         expect(toAuditEntry(event)).toMatchObject({ action: 'tenant_setting.updated', targetId: 's1', after: { currencyCode: 'USD' } });
     });
 
+    it('records the Owner withdrawing a downgrade or a cancellation (US1.8.2 F9)', () => {
+        const withdrawn = new SubscriptionDowngradeCancelledEvent('b1', 't1', { pendingDowngradePlan: { from: 'Starter', to: null } }, 'u1');
+        expect(toAuditEntry(withdrawn)).toMatchObject({
+            action: 'subscription.downgrade_cancelled',
+            targetType: 'subscription',
+            targetId: 'b1',
+            before: { pendingDowngradePlan: 'Starter' },
+            after: { pendingDowngradePlan: null }
+        });
+        const kept = new SubscriptionReactivatedEvent('b1', 't1', { cancellationEffectiveAt: { from: '2026-12-01T00:00:00.000Z', to: null } }, 'u1');
+        expect(toAuditEntry(kept)).toMatchObject({ action: 'subscription.reactivated', targetId: 'b1' });
+    });
+
+    it('puts the replaced value of a published change in before, and the new one in after (F7)', () => {
+        expect(toAuditEntry(new UserRoleChangedEvent('u2', 't1', 'viewer', 'operator', 'u1'))).toMatchObject({
+            action: 'user.role_changed',
+            targetId: 'u2',
+            before: { role: 'viewer' },
+            after: { user_id: 'u2', tenant_id: 't1', role: 'operator' }
+        });
+    });
+
     it('ignores sign-ins, which are not actions on the tenant', () => {
         expect(toAuditEntry(new UserLoggedInEvent('u1', 't1', 'password', 'u1'))).toBeNull();
     });
 
-    it('names the operator, and records the system only for erasure', () => {
+    it('names the operator, and the system for a change nobody in the dashboard made', () => {
         expect(auditActor(new UserRoleChangedEvent('u2', 't1', 'viewer', 'operator', 'u1'))).toBe('u1');
-        expect(auditActor(new UserRoleChangedEvent('u2', 't1', 'viewer', 'operator'))).toBeNull();
+        expect(auditActor(new UserRoleChangedEvent('u2', 't1', 'viewer', 'operator'))).toBe('system');
         expect(auditActor(new TenantDeletedEvent('t1', 't1', 'Acme', 'acme'))).toBe('system');
     });
 });
@@ -65,6 +89,8 @@ describe('AuditLogWriter', () => {
     let txEvents: MockProxy<TransactionEventEmitterService>;
     let writer: AuditLogWriter;
     let createMany: jest.Mock;
+    let metrics: MockProxy<MetricsService>;
+    const failures = { add: jest.fn() };
 
     beforeEach(() => {
         createMany = jest.fn().mockResolvedValue({ count: 1 });
@@ -74,7 +100,10 @@ describe('AuditLogWriter', () => {
         context.getIp.mockReturnValue('203.0.113.9');
         context.getRequestId.mockReturnValue('req_01');
         txEvents = mock<TransactionEventEmitterService>();
-        writer = new AuditLogWriter(prisma, txEvents, context, mock<AppLoggerService>());
+        metrics = mock<MetricsService>();
+        metrics.createCounter.mockReturnValue(failures as never);
+        failures.add.mockClear();
+        writer = new AuditLogWriter(prisma, txEvents, context, mock<AppLoggerService>(), metrics);
     });
 
     it('writes the row with the transaction client before commit, with a hashed IP and the request id', async () => {
@@ -106,8 +135,17 @@ describe('AuditLogWriter', () => {
         expect(createMany).toHaveBeenCalledTimes(1);
     });
 
-    it('writes nothing for an event without an operator', async () => {
+    it('records an event without an operator under the system (US1.9.1 F4)', async () => {
         await writer.onEmitted(revoked());
-        expect(createMany).not.toHaveBeenCalled();
+        expect(createMany).toHaveBeenCalledWith(expect.objectContaining({ data: [expect.objectContaining({ actorUserId: 'system' })] }));
+    });
+
+    it('counts a row it could not write outside a transaction, without failing the action (F8)', async () => {
+        createMany.mockRejectedValue(new Error('db down'));
+
+        await expect(writer.onEmitted(revoked('u1'))).resolves.toBeUndefined();
+
+        expect(metrics.createCounter).toHaveBeenCalledWith('audit_log_write_failures_total');
+        expect(failures.add).toHaveBeenCalledWith(1, { event: 'api-key.deleted' });
     });
 });

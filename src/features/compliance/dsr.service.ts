@@ -85,7 +85,7 @@ export class DsrService {
             // `includeSoftDeleted` because `dsr_requests` has no `deletedAt`: a data-subject request is
             // the proof that the request was answered, so it is never soft-deleted. Without this the
             // filter adds `deletedAt: null` and Prisma rejects the query as an unknown argument.
-            where: this.tenantAware.withTenantFilter({ id }, { includeSoftDeleted: true }),
+            where: this.tenantAware.withTenantFilter({ id }),
             include: { receipts: { orderBy: { serviceName: 'asc' } } }
         })) as DsrRequestProps | null;
         if (!row) {

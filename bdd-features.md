@@ -61,27 +61,27 @@ Tests run against the dev PostgreSQL instance. Fixture tenants (`bdd-suspended-0
 
 ```gherkin
 Scenario: Request without Authorization header is rejected
-  → GET /billings/subscription, no token
+  → GET /billing/plan, no token
   → 401
 
 Scenario: Request with expired JWT is rejected
-  → GET /billings/subscription, expired token
+  → GET /billing/plan, expired token
   → 401
 
 Scenario: Request with malformed JWT is rejected
-  → GET /billings/subscription, "not.a.valid.jwt.at.all"
+  → GET /billing/plan, "not.a.valid.jwt.at.all"
   → 401
 
 Scenario: Valid JWT for non-existent tenant returns 404
-  → GET /billings/subscription, tenant "bdd-nonexistent-tenant-xyz"
+  → GET /billing/plan, tenant "bdd-nonexistent-tenant-xyz"
   → 404, errorCode: TENANT_NOT_FOUND
 
 Scenario: Active tenant with valid JWT can access the API
-  → GET /billings/subscription, tenant "default-tenant"
+  → GET /billing/plan, tenant "default-tenant"
   → not 401, not 403
 
 Scenario: Public endpoint is accessible without any token  @public-endpoint
-  → GET /billings/plans, no token
+  → GET /billing/plans, no token
   → 200, non-empty array
 
 Scenario: Service token can access internal endpoint
@@ -97,26 +97,132 @@ Scenario: Service token can access internal endpoint
 
 ```gherkin
 Scenario: Get current subscription returns plan data
-  → GET /billings/subscription
+  → GET /billing/plan
   → 200, body contains "plan" and "status"
 
 Scenario: List public billing plans without authentication  @public-endpoint
-  → GET /billings/plans, no token
+  → GET /billing/plans, no token
   → 200, non-empty array, each item has "name"
 
 Scenario: Create checkout session returns a Stripe URL
-  → POST /billings/subscription/checkout  { "plan": "Starter" }
+  → POST /billing/subscription/checkout  { "plan": "Starter" }
   → Stripe mocked (nock one-shot)
   → 200, body contains "checkoutUrl"
 
 Scenario: Get usage summary returns usage metrics
-  → GET /billings/usage
+  → GET /billing/usage
   → 200, body contains "metrics"
 
 Scenario: Preview subscription upgrade returns 200
-  → POST /billings/subscription/upgrade/preview  { "targetPlan": "Growth" }
+  → POST /billing/subscription/upgrade/preview  { "targetPlan": "Growth" }
   → 200
 ```
+
+---
+
+### `billing-plan-change.feature` (8 scenarios) `@billing-plan-change` — US1.8.2
+
+> Each scenario signs a fresh company up (reusing the `@billing-plan` steps and clean-up) and, where
+> needed, puts it on a live `Growth` subscription in the database. Stripe's API is the BDD fake
+> (`stripe.fake.ts`); Stripe's webhooks are signed for real and posted to `/api/webhooks/stripe`.
+
+```gherkin
+Scenario: A company that already pays cannot open a second subscription      → 409 state_conflict
+Scenario: Free needs no checkout, and Enterprise is sold by sales            → 400 twice
+Scenario: An upgrade can only go up                                          → 400, Stripe not called
+Scenario: The plan changes when Stripe confirms the upgrade, not before      → 202 still Growth; webhook → Scale
+Scenario: A declined card is a 402 with Stripe's message, not a 500          → 402 card_declined, plan unchanged
+Scenario: Paying a late invoice in Stripe's current shape restores the company → payment status active
+Scenario: When the subscription ends, the company is Free and owes nothing   → Free|canceled, active, audit row by system
+Scenario: The embedded card-form routes are gone                             → 404
+```
+
+Run alone: `pnpm test:bdd --tags @billing-plan-change`.
+
+---
+
+### `invoice-history.feature` (5 scenarios) `@invoice-history` — US1.8.3
+
+> Each scenario signs a fresh company up (reusing the `@billing-plan` steps and clean-up). Stripe's invoices are
+> set in Stripe's own shape (cents) in `stripe.fake.ts` and read through the **real** `StripeService` mapping over
+> an offline SDK, so the amounts and links checked are the ones the Owner receives.
+
+```gherkin
+Scenario: A company that has never paid has no invoices, and Stripe is not asked → 200, empty page
+Scenario: Amounts are integers in minor units, as the API contract requires        → amount_due 4950, eur, PDF + hosted links
+Scenario: The list is paged with Stripe's cursors                                  → 2 of 3, has_more, next_cursor in_bdd_2
+Scenario: The next invoice is in minor units too                                   → amount_due 990, eur
+Scenario: A member without billing:read cannot see the invoices                    → 403
+```
+
+Run alone: `pnpm test:bdd --tags @invoice-history`.
+
+---
+
+### `audit-trail.feature` (4 scenarios) `@audit-trail` — US1.9.1
+
+> Each scenario signs a fresh company up (reusing the `@billing-plan` steps and clean-up). Actions go through the
+> real HTTP stack; the append-only trigger is exercised straight on the database.
+
+```gherkin
+Scenario: A settings change leaves one audit row: who, before, after and the request id → by the Owner, EUR → USD, X-Request-Id
+Scenario: A refused change leaves no audit row                                         → 403, no row
+Scenario: The database refuses to change or delete an audit row                        → "append-only: UPDATE/DELETE refused"
+Scenario: Only a transaction that opts in, like the retention sweep, can delete audit rows → rows gone
+```
+
+Run alone: `pnpm test:bdd --tags @audit-trail`.
+
+---
+
+### `audit-log-read.feature` (5 scenarios) `@audit-log-read` — US1.9.2
+
+> Each scenario signs a fresh company up (reusing the `@billing-plan` steps and clean-up), changes its currency
+> twice through the API, and reads `GET /api/v1/audit-log` against the real Postgres (F3: a mocked unit test hid
+> the `deletedAt` 500).
+
+```gherkin
+Scenario: The Owner reads the trail, newest first, without the IP hash → tenant_setting.updated EUR → USD first, no ip_hash
+Scenario: Filters narrow the trail                                    → action=tenant_setting.created: 1 entry
+Scenario: The trail is paged with cursors                             → limit=1, has_more, next page older
+Scenario: Another company's entries never show                        → 0 entries
+Scenario: Only the Owner may read it                                  → 403 without audit:read
+```
+
+Run alone: `pnpm test:bdd --tags @audit-log-read`.
+
+---
+
+### `connection-revoke.feature` (3 scenarios) `@connection-revoke` — US1.5.3
+
+> Each scenario signs a fresh company up (reusing the `@billing-plan` steps and clean-up), creates a Stripe
+> connection through the API and revokes it against the real Postgres; the revocation marker is read from the real
+> Redis Event Ingestion shares.
+
+```gherkin
+Scenario: Revoking keeps the row, disables it and announces it       → 204, enabled=false, revoked_at, connection.revoked in the outbox
+Scenario: Event Ingestion is told at once through the shared Redis   → connection-revoked:{id} = 1, TTL 3600
+Scenario: A revoked connection can't be revoked again                → 404
+```
+
+Run alone: `pnpm test:bdd --tags @connection-revoke`.
+
+---
+
+### `connection-create.feature` (5 scenarios) `@connection-create` — US1.5.1
+
+> Each scenario signs a fresh company up (reusing the `@billing-plan` steps and clean-up) and calls the connection
+> routes against the real Postgres. `INBOUND_PUBLIC_BASE_URL` is fixed to `https://in.bdd.example` by the bootstrap.
+
+```gherkin
+Scenario: A connection names its real provider, and its type follows from it → tremendous: 201, gift_card, absolute receiver_url
+Scenario: The old category names are refused                                 → gift_card, crm: 400
+Scenario: A provider can't be paired with another type                       → paddle + crm: 400, param connection_type
+Scenario: The Owner lists the company's connections                          → 200, billing/stripe and crm/hubspot
+Scenario: The permission is re-checked live in Keto, not read from the token → token lists it, Keto denies: 403
+```
+
+Run alone: `pnpm test:bdd --tags @connection-create`.
 
 ---
 
@@ -126,23 +232,23 @@ Scenario: Preview subscription upgrade returns 200
 
 ```gherkin
 Scenario: Suspended tenant is blocked  @needs-suspended-tenant
-  → GET /billings/subscription, JWT for bdd-suspended-001 (status: suspended)
+  → GET /billing/plan, JWT for bdd-suspended-001 (status: suspended)
   → 403, errorCode: TENANT_SUSPENDED, title: "Forbidden"
 
 Scenario: Locked tenant is blocked  @needs-locked-tenant
-  → GET /billings/subscription, JWT for bdd-locked-001 (status: locked)
+  → GET /billing/plan, JWT for bdd-locked-001 (status: locked)
   → 403, errorCode: TENANT_LOCKED
 
 Scenario: Locked tenant error response has the correct shape  @needs-locked-tenant
-  → GET /billings/subscription, JWT for bdd-locked-001
+  → GET /billing/plan, JWT for bdd-locked-001
   → 403, response contains "title", "detail", "errorCode"
 
 Scenario: Active tenant passes the tenant status guard  @needs-active-tenant
-  → GET /billings/subscription, JWT for bdd-active-001 (status: active)
+  → GET /billing/plan, JWT for bdd-active-001 (status: active)
   → not 403
 
 Scenario: Public endpoint bypasses tenant status guard  @public-endpoint
-  → GET /billings/plans, no token
+  → GET /billing/plans, no token
   → 200
 ```
 

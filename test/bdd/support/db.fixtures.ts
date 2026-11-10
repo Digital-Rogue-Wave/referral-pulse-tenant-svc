@@ -22,6 +22,17 @@ const adapter = new PrismaPg(pool);
 
 export const fixturesPrisma = new PrismaClient({ adapter });
 
+/**
+ * Deletes the BDD tenants' audit rows. `audit_log` is append-only in the database (US1.9.1 F3): a delete
+ * passes only in a transaction that opts in, as the retention sweeper does.
+ */
+export async function purgeAuditRows(tenantIds: string[]): Promise<void> {
+    await fixturesPrisma.$transaction(async (tx) => {
+        await tx.$executeRaw`SELECT set_config('app.audit_purge', 'on', true)`;
+        await tx.auditLog.deleteMany({ where: { tenantId: { in: tenantIds } } });
+    });
+}
+
 // ─── Fixture IDs ───────────────────────────────────────────────────────────────
 
 export const FIXTURE_IDS = {

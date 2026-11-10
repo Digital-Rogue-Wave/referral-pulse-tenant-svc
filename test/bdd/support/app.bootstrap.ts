@@ -29,6 +29,8 @@ process.env['INTERNAL_JWT_PRIVATE_KEY'] = internalPrivateKeyBase64;
 process.env['GATEWAY_SHARED_SECRET'] = randomBytes(32).toString('hex');
 process.env['ORY_WEBHOOK_API_KEY'] = randomBytes(32).toString('hex');
 process.env['API_KEY_HASH_PEPPER'] = randomBytes(32).toString('hex');
+// US1.5.1 F4: the receivers' public origin, so `receiver_url` is absolute in the scenarios.
+process.env['INBOUND_PUBLIC_BASE_URL'] = 'https://in.bdd.example';
 
 import { AppModule } from '../../../src/app.module';
 import { requestIdMiddleware } from '../../../src/common/http-contract/request-id.middleware';

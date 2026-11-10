@@ -1,6 +1,7 @@
 import { ArgumentsHost, Catch, ExceptionFilter, HttpException, HttpStatus } from '@nestjs/common';
 
 import type { Request, Response } from 'express';
+import Stripe from 'stripe';
 
 import { BaseException } from '@common/exceptions/base.exceptions';
 import { AppLoggerService } from '@common/logging/app-logger.service';
@@ -71,6 +72,10 @@ export class GlobalExceptionsFilter implements ExceptionFilter {
         else if (exception instanceof PrismaClientKnownRequestError) {
             ({ status, apiError } = this.handlePrismaError(exception, requestId, correlationId));
         }
+        // US1.8.2 F5: a refusal from Stripe is the caller's problem or Stripe's, never a 500
+        else if (exception instanceof Stripe.errors.StripeError) {
+            ({ status, apiError } = this.handleStripeError(exception, requestId, correlationId));
+        }
         // Handle NestJS HttpException
         else if (exception instanceof HttpException) {
             ({ status, apiError } = this.handleHttpException(exception, requestId, correlationId));
@@ -139,6 +144,33 @@ export class GlobalExceptionsFilter implements ExceptionFilter {
         }
 
         return { status: exception.getStatus(), apiError };
+    }
+
+    /**
+     * A declined or failed card → 402 with Stripe's message (written for the card holder); an id Stripe
+     * doesn't know → 404; anything else from Stripe → 502, its message kept for the log only.
+     */
+    private handleStripeError(
+        exception: InstanceType<typeof Stripe.errors.StripeError>,
+        requestId: string,
+        correlationId?: string
+    ): { status: HttpStatus; apiError: IApiError } {
+        if (exception.type === 'StripeCardError') {
+            return {
+                status: HttpStatus.PAYMENT_REQUIRED,
+                apiError: { code: exception.code ?? 'card_declined', message: exception.message, requestId, correlationId }
+            };
+        }
+        if (exception.code === 'resource_missing') {
+            return {
+                status: HttpStatus.NOT_FOUND,
+                apiError: { code: 'not_found', message: 'The billing record no longer exists at Stripe', requestId, correlationId }
+            };
+        }
+        return {
+            status: HttpStatus.BAD_GATEWAY,
+            apiError: { code: 'payment_provider_error', message: 'The payment provider could not complete the request', requestId, correlationId }
+        };
     }
 
     private handlePrismaError(

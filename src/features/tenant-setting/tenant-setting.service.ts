@@ -34,14 +34,18 @@ export class TenantSettingService {
         return setting ? tenantSettingResponseMapper.toResponse(setting) : null;
     }
 
-    /** Create-or-update the current tenant's settings. */
+    /** Create-or-update the current tenant's settings, in a transaction so the audit row commits with it (US1.9.1 F8). */
     async upsert(dto: UpdateTenantSettingDto): Promise<TenantSettingResponse> {
+        return this.prisma.$transaction((tx) => this.upsertIn(tx, dto));
+    }
+
+    private async upsertIn(tx: Prisma.TransactionClient, dto: UpdateTenantSettingDto): Promise<TenantSettingResponse> {
         const tenantId = this.tenantContext.getTenantId();
         const userId = this.tenantContext.getUserId();
-        const existing = (await this.prisma.tenantSetting.findUnique({ where: { tenantId } })) as TenantSettingProps | null;
+        const existing = (await tx.tenantSetting.findUnique({ where: { tenantId } })) as TenantSettingProps | null;
 
         if (!existing) {
-            const created = (await this.prisma.tenantSetting.create({
+            const created = (await tx.tenantSetting.create({
                 data: {
                     tenantId: tenantId as string,
                     branding: (dto.branding ?? {}) as Prisma.InputJsonValue,
@@ -63,7 +67,7 @@ export class TenantSettingService {
         }
 
         const { updateData, changes } = this.diff(existing, dto);
-        const updated = (await this.prisma.tenantSetting.update({
+        const updated = (await tx.tenantSetting.update({
             where: { tenantId },
             data: updateData as Prisma.TenantSettingUpdateInput
         })) as TenantSettingProps;

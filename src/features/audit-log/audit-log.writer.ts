@@ -3,6 +3,7 @@ import { OnEvent } from '@nestjs/event-emitter';
 import type { Prisma } from '@prisma-gen/generated/client';
 
 import { AppLoggerService } from '@common/logging/app-logger.service';
+import { MetricsService } from '@common/monitoring/metrics.service';
 import { TenantContextService } from '@common/tenant-aware/tenant-context.service';
 import { TransactionEventEmitterService } from '@common/events/transaction-event-emitter.service';
 import { sha256Hex } from '@common/helper/hashing';
@@ -22,7 +23,9 @@ type Flaggable = BaseDomainEvent & { [AUDIT_WRITTEN]?: true };
  *
  * - Inside a transaction: written just before commit with the transaction client, so an action is audited
  *   if and only if it happened.
- * - Outside a transaction: written when the event is emitted, right after its single-statement change.
+ * - Outside a transaction: written when the event is emitted. Only actions with nothing else to write in the
+ *   database are left there (an upgrade request answered by Stripe); a failed write is logged and counted in
+ *   `audit_log_write_failures_total` (US1.9.1 F8).
  *
  * The row id is the domain event id, so a trail row can be matched to the outbox row of the same fact.
  */
@@ -32,7 +35,8 @@ export class AuditLogWriter implements OnModuleInit {
         private readonly prisma: DatabaseService,
         private readonly txEventEmitter: TransactionEventEmitterService,
         private readonly context: TenantContextService,
-        private readonly logger: AppLoggerService
+        private readonly logger: AppLoggerService,
+        private readonly metrics: MetricsService
     ) {
         this.logger.setContext(AuditLogWriter.name);
     }
@@ -54,6 +58,7 @@ export class AuditLogWriter implements OnModuleInit {
         try {
             await this.write(this.prisma, [payload]);
         } catch (error) {
+            this.metrics.createCounter('audit_log_write_failures_total').add(1, { event: payload.eventType });
             this.logger.error('Could not record an operator action in the audit log', error instanceof Error ? error.stack : undefined, {
                 eventType: payload.eventType,
                 eventId: payload.eventId,

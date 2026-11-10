@@ -32,6 +32,8 @@ describe('TenantSettingService', () => {
         txEventEmitter = mock<TransactionEventEmitterService>();
 
         prisma.tenantSetting = { findUnique: jest.fn(), create: jest.fn(), update: jest.fn() } as never;
+        // The upsert runs in a transaction (US1.9.1 F8); the mock hands the same client back as `tx`.
+        (prisma as unknown as { $transaction: jest.Mock }).$transaction = jest.fn((fn: (tx: unknown) => unknown) => fn(prisma));
         tenantContext.getTenantId.mockReturnValue(tenantId);
         tenantContext.getUserId.mockReturnValue('user-1');
 

@@ -52,11 +52,8 @@ describe('DsrService — POST /v1/dsr and GET /v1/dsr/{id}', () => {
         bullJobs = mock<BullJobsService>();
         tenantAware = mock<TenantAwareService>();
         tenantAware.getRequiredTenantId.mockReturnValue(TENANT);
-        // Mirrors the real implementation, including the `deletedAt: null` it adds unless asked not
-        // to — a mock that skipped that hid a live 500 on a table with no `deletedAt` column.
-        tenantAware.withTenantFilter.mockImplementation(
-            (where, options) => ({ ...where, tenantId: TENANT, ...(options?.includeSoftDeleted ? {} : { deletedAt: null }) }) as never
-        );
+        // Mirrors the real implementation: the tenant only (US1.9.2 F2 removed the implicit `deletedAt: null`).
+        tenantAware.withTenantFilter.mockImplementation((where) => ({ ...where, tenantId: TENANT }) as never);
         service = new DsrService(prisma, tenantAware, txEvents, bullJobs, logger());
     });
 

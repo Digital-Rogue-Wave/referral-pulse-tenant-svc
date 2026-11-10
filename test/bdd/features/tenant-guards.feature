@@ -10,7 +10,7 @@ Feature: Tenant Status Guards
   @needs-suspended-tenant
   Scenario: Suspended tenant is blocked from billing endpoints
     Given I have a valid JWT for the current fixture tenant
-    When I send a GET request to "/api/v1/billings/subscription" with that token
+    When I send a GET request to "/api/v1/billing/plan" with that token
     Then the response status should be 403
     And the response should contain errorCode "tenant_suspended"
     And the response error should contain a "message" field
@@ -18,14 +18,14 @@ Feature: Tenant Status Guards
   @needs-locked-tenant
   Scenario: Locked tenant is blocked from billing endpoints
     Given I have a valid JWT for the current fixture tenant
-    When I send a GET request to "/api/v1/billings/subscription" with that token
+    When I send a GET request to "/api/v1/billing/plan" with that token
     Then the response status should be 403
     And the response should contain errorCode "tenant_locked"
 
   @needs-locked-tenant
   Scenario: Locked tenant error response has the correct shape
     Given I have a valid JWT for the current fixture tenant
-    When I send a GET request to "/api/v1/billings/subscription" with that token
+    When I send a GET request to "/api/v1/billing/plan" with that token
     Then the response status should be 403
     And the response error should contain a "type" field
     And the response error should contain a "code" field
@@ -38,10 +38,10 @@ Feature: Tenant Status Guards
   @needs-active-tenant
   Scenario: Active tenant passes the tenant status guard
     Given I have a valid JWT for the current fixture tenant
-    When I send a GET request to "/api/v1/billings/subscription" with that token
+    When I send a GET request to "/api/v1/billing/plan" with that token
     Then the response status is not 403
 
   @public-endpoint
   Scenario: Public endpoint bypasses tenant status guard entirely
-    When I send a GET request to "/api/v1/billings/plans" without any token
+    When I send a GET request to "/api/v1/billing/plans" without any token
     Then the response status should be 200
