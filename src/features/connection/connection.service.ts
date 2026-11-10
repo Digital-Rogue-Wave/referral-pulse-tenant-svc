@@ -5,6 +5,7 @@ import { DatabaseService } from '@app/database/database.service';
 import { TenantAwareService } from '@common/tenant-aware/tenant-aware.service';
 import { TransactionEventEmitterService } from '@common/events/transaction-event-emitter.service';
 import { AppLoggerService } from '@common/logging/app-logger.service';
+import { RedisService } from '@common/redis/redis.service';
 import { BaseException } from '@common/exceptions/base.exceptions';
 import { cursorPage, CursorPage, ListQueryDto } from '@common/http-contract/cursor-page';
 
@@ -17,7 +18,9 @@ import {
     ConnectionRevokedEvent,
     CreateConnectionDto,
     InternalConnectionDto,
-    connectionResponseMapper
+    REVOKED_CONNECTION_MARKER_TTL_SECONDS,
+    connectionResponseMapper,
+    revokedConnectionMarkerKey
 } from '@domains/connection';
 
 import { ProviderSecretCipher } from './provider-secret.cipher';
@@ -38,7 +41,8 @@ export class ConnectionService {
         private readonly tenantAware: TenantAwareService,
         private readonly txEventEmitter: TransactionEventEmitterService,
         private readonly cipher: ProviderSecretCipher,
-        private readonly logger: AppLoggerService
+        private readonly logger: AppLoggerService,
+        private readonly redis: RedisService
     ) {
         this.logger.setContext(ConnectionService.name);
     }
@@ -114,7 +118,24 @@ export class ConnectionService {
                 new ConnectionRevokedEvent(id, existing.tenantId, { connectionId: id, provider: existing.provider, revokedBy: userId }, userId)
             );
         });
+        await this.markRevoked(id);
         this.logger.log('Provider connection revoked', { connectionId: id, provider: existing.provider });
+    }
+
+    /**
+     * US1.5.3 F2: tells Event Ingestion at once, through the shared Redis, so a connection it still caches is
+     * refused now rather than when `connection.revoked` reaches it or its cache expires. Best effort: the revoke is
+     * committed, and the event still drops the cache entry if this write fails.
+     */
+    private async markRevoked(id: string): Promise<void> {
+        try {
+            await this.redis.getClient().set(revokedConnectionMarkerKey(id), '1', 'EX', REVOKED_CONNECTION_MARKER_TTL_SECONDS);
+        } catch (error) {
+            this.logger.warn('Could not mark the connection revoked for Event Ingestion; its cache drops it on connection.revoked', {
+                connectionId: id,
+                error: error instanceof Error ? error.message : String(error)
+            });
+        }
     }
 
     /**

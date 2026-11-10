@@ -229,3 +229,12 @@ export const ConnectionEvents = {
     CREATED: 'connection.created',
     REVOKED: 'connection.revoked'
 } as const;
+
+/**
+ * US1.5.3 F2 — the revocation marker, a contract with Event Ingestion (event-svc `ConnectionCacheService`).
+ * Written by tenant-service when a connection is revoked, in the Redis both services share and outside either
+ * service's key prefix, so Ingestion refuses a connection it still holds in its cache at once instead of after
+ * its cache TTL (300 s by default). Revocation is permanent, so the marker only has to outlive that cache entry.
+ */
+export const revokedConnectionMarkerKey = (connectionId: string): string => `connection-revoked:${connectionId}`;
+export const REVOKED_CONNECTION_MARKER_TTL_SECONDS = 3600;

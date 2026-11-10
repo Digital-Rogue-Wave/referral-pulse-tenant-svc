@@ -193,6 +193,22 @@ Run alone: `pnpm test:bdd --tags @audit-log-read`.
 
 ---
 
+### `connection-revoke.feature` (3 scenarios) `@connection-revoke` — US1.5.3
+
+> Each scenario signs a fresh company up (reusing the `@billing-plan` steps and clean-up), creates a Stripe
+> connection through the API and revokes it against the real Postgres; the revocation marker is read from the real
+> Redis Event Ingestion shares.
+
+```gherkin
+Scenario: Revoking keeps the row, disables it and announces it       → 204, enabled=false, revoked_at, connection.revoked in the outbox
+Scenario: Event Ingestion is told at once through the shared Redis   → connection-revoked:{id} = 1, TTL 3600
+Scenario: A revoked connection can't be revoked again                → 404
+```
+
+Run alone: `pnpm test:bdd --tags @connection-revoke`.
+
+---
+
 ### `tenant-guards.feature` (5 scenarios) `@guards`
 
 > Fixture tenants are created/destroyed per scenario via tagged hooks.

@@ -40,9 +40,10 @@ interface Harness {
     findFirst: jest.Mock;
     scopedFindFirst: jest.Mock;
     emitted: { name: string; event: unknown }[];
+    redisSet: jest.Mock;
 }
 
-const harness = (cipher: ProviderSecretCipher = cipherWith(KEY_HEX)): Harness => {
+const harness = (cipher: ProviderSecretCipher = cipherWith(KEY_HEX), redisSet = jest.fn().mockResolvedValue('OK')): Harness => {
     const create = jest.fn().mockResolvedValue(row());
     const update = jest.fn().mockResolvedValue(row({ revokedAt: new Date() }));
     const findFirst = jest.fn();
@@ -63,10 +64,11 @@ const harness = (cipher: ProviderSecretCipher = cipherWith(KEY_HEX)): Harness =>
         } as never,
         { emitAfterCommit: (name: string, event: unknown) => emitted.push({ name, event }) } as never,
         cipher,
-        { setContext: jest.fn(), log: jest.fn(), warn: jest.fn() } as never
+        { setContext: jest.fn(), log: jest.fn(), warn: jest.fn() } as never,
+        { getClient: () => ({ set: redisSet }) } as never
     );
 
-    return { service, create, update, findFirst, scopedFindFirst, emitted };
+    return { service, create, update, findFirst, scopedFindFirst, emitted, redisSet };
 };
 
 describe('Provider connections', () => {
@@ -182,6 +184,25 @@ describe('Provider connections', () => {
 
             expect(update.mock.calls[0][0].data).toMatchObject({ enabled: false });
             expect(update.mock.calls[0][0].data.revokedAt).toBeInstanceOf(Date);
+            expect(emitted.map((e) => e.name)).toEqual(['connection.revoked']);
+        });
+
+        it('then Event Ingestion is told at once through the shared Redis marker (F2)', async () => {
+            const { service, scopedFindFirst, redisSet } = harness();
+            scopedFindFirst.mockResolvedValue(row());
+
+            await service.revoke(CONNECTION_ID, 'user-2');
+
+            expect(redisSet).toHaveBeenCalledWith(`connection-revoked:${CONNECTION_ID}`, '1', 'EX', 3600);
+        });
+
+        it('then a failed marker write does not undo or fail the committed revoke', async () => {
+            const { service, scopedFindFirst, update, emitted } = harness(cipherWith(KEY_HEX), jest.fn().mockRejectedValue(new Error('redis down')));
+            scopedFindFirst.mockResolvedValue(row());
+
+            await expect(service.revoke(CONNECTION_ID, 'user-2')).resolves.toBeUndefined();
+
+            expect(update).toHaveBeenCalled();
             expect(emitted.map((e) => e.name)).toEqual(['connection.revoked']);
         });
 

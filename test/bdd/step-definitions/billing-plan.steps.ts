@@ -29,15 +29,21 @@ async function removeCompanies(): Promise<void> {
     await fixturesPrisma.tenant.deleteMany({ where: { id: { in: ids } } });
 }
 
-Before({ tags: '@billing-plan or @billing-plan-change or @invoice-history or @audit-trail or @audit-log-read' }, async function () {
-    company = null;
-    await removeCompanies();
-    await getTestApp().get(PlanService).invalidateCaches();
-});
+Before(
+    { tags: '@billing-plan or @billing-plan-change or @invoice-history or @audit-trail or @audit-log-read or @connection-revoke' },
+    async function () {
+        company = null;
+        await removeCompanies();
+        await getTestApp().get(PlanService).invalidateCaches();
+    }
+);
 
-After({ tags: '@billing-plan or @billing-plan-change or @invoice-history or @audit-trail or @audit-log-read' }, async function () {
-    await removeCompanies();
-});
+After(
+    { tags: '@billing-plan or @billing-plan-change or @invoice-history or @audit-trail or @audit-log-read or @connection-revoke' },
+    async function () {
+        await removeCompanies();
+    }
+);
 
 export function theCompany(): { tenantId: string; ownerUserId: string } {
     assert.ok(company, 'No company signed up in this scenario');
