@@ -471,6 +471,15 @@ export class WidgetTokenSecretDto {
     previousValidUntil?: Date;
 }
 
+/** R-PRT-02's tenant-level envelope as a service holding `tenant_invitation_channel.read` receives it. */
+export class TenantInvitationChannelDto {
+    @ApiProperty()
+    tenantId!: string;
+
+    @ApiProperty({ enum: InvitationChannel, enumName: 'InvitationChannel', description: "The Owner's choice, or the billing country's default" })
+    invitationChannel!: InvitationChannel;
+}
+
 /** The secret as the Owner reads or receives it after a rotation (US1.5.4 F2/F3). */
 export class WidgetSecretResponse {
     @ApiProperty({ description: '32 bytes as 64 hex characters: sign the widget user JWT (HS256, 1-hour expiry) with it' })
