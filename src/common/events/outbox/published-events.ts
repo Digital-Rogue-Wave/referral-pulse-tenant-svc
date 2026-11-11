@@ -255,7 +255,7 @@ const MAPPERS: Record<string, Mapper<never>> = {
             eventType: 'api_key.revoked',
             externalId: `api_key.revoked:${e.payload.apiKeyId}`,
             object: { type: 'api_key', id: e.payload.apiKeyId },
-            properties: { key_id: e.payload.apiKeyId, revoked_by: e.payload.deletedBy, revocation_reason: e.payload.reason }
+            properties: { key_id: e.payload.apiKeyId, tenant_id: e.tenantId, revoked_by: e.payload.deletedBy, revocation_reason: e.payload.reason }
         }
     ],
     'api-key.rotated': (e: ApiKeyRotatedEvent) => [

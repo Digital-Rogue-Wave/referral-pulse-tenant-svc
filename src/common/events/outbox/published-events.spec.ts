@@ -151,6 +151,14 @@ describe('Published events — the wire contract of every tenant-service event',
         expect(draft!.properties).not.toHaveProperty('dsr_id');
     });
 
+    it('tells consumers which tenant a revoked key belonged to, as api_key.created does (US1.4.2 F2)', () => {
+        const event = EVENTS.find((e) => e.eventType === 'api-key.deleted')!;
+
+        const [draft] = toPublishedEvents(event.eventType, event);
+
+        expect(draft).toMatchObject({ eventType: 'api_key.revoked', properties: expect.objectContaining({ tenant_id: T }) });
+    });
+
     it('covers every mapper in the registry', () => {
         const covered = new Set<string>(EVENTS.map((event) => event.eventType));
         expect([...PUBLISHED_EVENT_TYPES].sort()).toEqual([...covered].sort());
