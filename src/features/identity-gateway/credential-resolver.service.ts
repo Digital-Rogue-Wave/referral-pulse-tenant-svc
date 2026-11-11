@@ -46,6 +46,11 @@ function userExchangesKey(userId: string): string {
     return `authn:exchange:user:${userId}`;
 }
 
+/** The cached exchange keys that carry one tenant, so a deleted tenant's can be dropped together. */
+function tenantExchangesKey(tenantId: string): string {
+    return `authn:exchange:tenant:${tenantId}`;
+}
+
 @Injectable()
 export class CredentialResolverService {
     private readonly hydraJwks: JwksClient;
@@ -88,6 +93,9 @@ export class CredentialResolverService {
             if (resolved.claims.user_id) {
                 await this.redis.addToSet(userExchangesKey(resolved.claims.user_id), cacheKey, ttl);
             }
+            if (resolved.claims.tenant_id) {
+                await this.redis.addToSet(tenantExchangesKey(resolved.claims.tenant_id), cacheKey, ttl);
+            }
         }
         return resolved;
     }
@@ -97,7 +105,16 @@ export class CredentialResolverService {
      * Called when a member is removed or their role changes (US1.2.4 F1).
      */
     async forgetUser(userId: string): Promise<number> {
-        const keys = await this.redis.takeSet(userExchangesKey(userId));
+        return this.dropExchanges(userExchangesKey(userId));
+    }
+
+    /** Drops every cached exchange that carries `tenantId`: a deleted tenant authenticates nobody, cached or not. */
+    async forgetTenant(tenantId: string): Promise<number> {
+        return this.dropExchanges(tenantExchangesKey(tenantId));
+    }
+
+    private async dropExchanges(indexKey: string): Promise<number> {
+        const keys = await this.redis.takeSet(indexKey);
         await Promise.all(keys.map((key) => this.redis.del(key, false)));
         return keys.length;
     }

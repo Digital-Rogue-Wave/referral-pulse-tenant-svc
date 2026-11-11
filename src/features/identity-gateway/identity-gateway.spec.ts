@@ -222,6 +222,7 @@ describe('CredentialResolverService', () => {
             expect(cacheKey).toMatch(/^authn:exchange:[0-9a-f]{64}$/);
             expect(options?.ttl).toBeLessThanOrEqual(tokenLifetime - 29);
             expect(redis.addToSet).toHaveBeenCalledWith('authn:exchange:user:u1', cacheKey, options?.ttl);
+            expect(redis.addToSet).toHaveBeenCalledWith('authn:exchange:tenant:t1', cacheKey, options?.ttl);
         });
 
         it('then an invitee (no membership) is cached but indexed under nobody', async () => {
@@ -232,6 +233,17 @@ describe('CredentialResolverService', () => {
 
             expect(redis.set).toHaveBeenCalled();
             expect(redis.addToSet).not.toHaveBeenCalled();
+        });
+    });
+
+    describe('given a tenant is deleted', () => {
+        it('then every cached exchange carrying that tenant is dropped', async () => {
+            redis.takeSet.mockResolvedValue(['authn:exchange:ccc']);
+
+            await expect(resolver.forgetTenant('t1')).resolves.toBe(1);
+
+            expect(redis.takeSet).toHaveBeenCalledWith('authn:exchange:tenant:t1');
+            expect(redis.del).toHaveBeenCalledWith('authn:exchange:ccc', false);
         });
     });
 

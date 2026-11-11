@@ -329,7 +329,7 @@ service knowingly diverges from the responsibility contract — see `NOTE.md` fo
 - **Consumes:** per spec, the identity/tenant service consumes nothing. The billing usage consumer on
   `ANALYTICS_SVC_FIFO` is part of the intentional billing extension. Inbound handlers accept both
   snake_case and camelCase defensively (see `NOTE.md`).
-- `user.logged_in` happens at Ory/gateway and is NOT emitted by this service.
+- `user.logged_in` is emitted here, from the Kratos after-login webhook (`webhook.controller.ts`), through the outbox.
 
 ## Stack notes specific to this service
 

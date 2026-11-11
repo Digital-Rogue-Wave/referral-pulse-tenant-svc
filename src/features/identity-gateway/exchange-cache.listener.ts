@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { OnEvent } from '@nestjs/event-emitter';
 
 import { AppLoggerService } from '@common/logging/app-logger.service';
+import { TenantDeletedEvent, TenantEvents } from '@domains/tenant/events/tenant.events';
 import { UserRemovedEvent, UserRoleChangedEvent } from '@domains/user';
 
 import { CredentialResolverService } from './credential-resolver.service';
@@ -30,18 +31,24 @@ export class ExchangeCacheListener {
         await this.forget(event.aggregateId, 'user.role_changed');
     }
 
+    @OnEvent(TenantEvents.DELETED, { async: true })
+    async onTenantDeleted(event: TenantDeletedEvent): Promise<void> {
+        await this.drop(() => this.credentials.forgetTenant(event.tenantId), { tenantId: event.tenantId, reason: TenantEvents.DELETED });
+    }
+
     private async forget(userId: string, reason: string): Promise<void> {
+        await this.drop(() => this.credentials.forgetUser(userId), { userId, reason });
+    }
+
+    private async drop(forget: () => Promise<number>, context: Record<string, string>): Promise<void> {
         try {
-            const dropped = await this.credentials.forgetUser(userId);
-            this.logger.log('Dropped cached credential exchanges', { userId, reason, dropped });
+            const dropped = await forget();
+            this.logger.log('Dropped cached credential exchanges', { ...context, dropped });
         } catch (error) {
             this.logger.error(
                 'Could not drop cached credential exchanges; they expire with their token',
                 error instanceof Error ? error.stack : undefined,
-                {
-                    userId,
-                    reason
-                }
+                context
             );
         }
     }

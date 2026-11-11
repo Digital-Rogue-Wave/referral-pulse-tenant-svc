@@ -1,6 +1,7 @@
 import { mock, MockProxy } from 'jest-mock-extended';
 
 import { AppLoggerService } from '@common/logging/app-logger.service';
+import { TenantDeletedEvent } from '@domains/tenant/events/tenant.events';
 import { UserRemovedEvent, UserRoleChangedEvent } from '@domains/user';
 
 import { CredentialResolverService } from './credential-resolver.service';
@@ -34,6 +35,16 @@ describe('ExchangeCacheListener (US1.2.4 F1)', () => {
             await listener.onUserRoleChanged(new UserRoleChangedEvent('u1', 't1', 'analyst', 'owner'));
 
             expect(credentials.forgetUser).toHaveBeenCalledWith('u1');
+        });
+    });
+
+    describe('given tenant.deleted', () => {
+        it('then no cached exchange of the tenant survives it', async () => {
+            credentials.forgetTenant.mockResolvedValue(3);
+
+            await listener.onTenantDeleted(new TenantDeletedEvent('t1', 't1', 'Acme', 'acme'));
+
+            expect(credentials.forgetTenant).toHaveBeenCalledWith('t1');
         });
     });
 
