@@ -435,14 +435,14 @@ const MAPPERS: Record<string, Mapper<never>> = {
             }
         }
     ],
-    'dsr.requested': (e: DsrRequestedEvent) => [
+    'data_subject_request.requested': (e: DsrRequestedEvent) => [
         {
-            eventType: 'dsr.requested',
-            externalId: `dsr.requested:${e.aggregateId}`,
+            eventType: 'data_subject_request.requested',
+            externalId: `data_subject_request.requested:${e.aggregateId}`,
             object: { type: 'dsr_request', id: e.aggregateId },
             properties: {
                 tenant_id: e.tenantId,
-                dsr_id: e.aggregateId,
+                data_subject_request_id: e.aggregateId,
                 request_type: e.payload.requestType,
                 subject_email_hash: e.payload.subjectEmailHash,
                 subject_external_id: e.payload.subjectExternalId,
@@ -465,7 +465,7 @@ const MAPPERS: Record<string, Mapper<never>> = {
                 receipt_count: e.payload.receipts.length,
                 // R-CPL-02 says this event "carries all receipts"; Event Model §2.5 says properties are
                 // flat. Both hold here: every receipt travels, as one JSON string, and the per-service
-                // detail stays readable at `GET /v1/dsr/{id}`.
+                // detail stays readable at `GET /v1/data-subject-requests/{id}`.
                 receipts: JSON.stringify(e.payload.receipts),
                 retained_under_obligation: e.payload.receipts.some((receipt) => receipt.retained_under_obligation)
             }

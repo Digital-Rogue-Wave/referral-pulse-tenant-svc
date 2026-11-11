@@ -165,7 +165,7 @@ export class DsrFanOutService {
                     action: ComplianceEvents.ERASURE_COMPLETED,
                     subjectEmailHash: row.subjectEmailHash,
                     receiptCount: receipts.length,
-                    recordUrl: `/api/v1/dsr/${dsrId}`
+                    recordUrl: `/api/v1/data-subject-requests/${dsrId}`
                 })
             );
         });

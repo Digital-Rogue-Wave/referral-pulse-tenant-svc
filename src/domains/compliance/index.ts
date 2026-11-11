@@ -111,7 +111,7 @@ export interface ConsentProps {
 // ============================================================
 
 /**
- * `POST /v1/dsr`, named by API Contract §3.15 with no body specified, so this shape is this service's
+ * `POST /v1/data-subject-requests` (v5.1; API Contract §3.15's `POST /v1/dsr`) with no body specified, so this shape is this service's
  * proposal rather than a contract being implemented (NOTE.md §V5.16).
  *
  * The subject is named by whichever identifier the Owner has. `subjectEmail` is hashed on arrival and
@@ -229,13 +229,14 @@ export const toDsrRequestResponse = (row: DsrRequestProps): DsrRequestResponse =
 
 export const ComplianceEvents = {
     CONSENT_RECORDED: 'consent.recorded',
-    DSR_REQUESTED: 'dsr.requested',
+    // v5.1 renamed `dsr.requested` everywhere, with no alias period (US1.2.4 F5)
+    DSR_REQUESTED: 'data_subject_request.requested',
     ERASURE_COMPLETED: 'erasure.completed',
     AUDIT_LOGGED: 'audit.logged'
 } as const;
 
 /**
- * Product Spec R-CPL-01 calls `consent.recorded`, `dsr.requested`, `erasure.completed` and
+ * Product Spec R-CPL-01 calls `consent.recorded`, `data_subject_request.requested` (v5.1, was `dsr.requested`), `erasure.completed` and
  * `audit.logged` "the Event Model compliance family". They appear nowhere in the Event Model — no
  * payload, no object type, no schema version — so the four shapes below are this service's, derived
  * from what R-CPL-02 says each one has to carry. Sent back as a spec patch; see NOTE.md §V5.16.

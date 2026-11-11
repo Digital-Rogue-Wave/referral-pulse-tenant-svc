@@ -115,7 +115,7 @@ const EVENTS: BaseDomainEvent[] = [
         action: 'erasure.completed',
         subjectEmailHash: HASH,
         receiptCount: 6,
-        recordUrl: '/api/v1/dsr/dsr1'
+        recordUrl: '/api/v1/data-subject-requests/dsr1'
     })
 ];
 
@@ -136,6 +136,19 @@ describe('Published events — the wire contract of every tenant-service event',
                 expect(value === null || ['string', 'number', 'boolean'].includes(typeof value)).toBe(true);
             }
         }
+    });
+
+    it('publishes a data-subject request under its v5.1 name, with no dsr_ alias (US1.2.4 F5)', () => {
+        const event = EVENTS.find((e) => e instanceof DsrRequestedEvent)!;
+
+        const [draft] = toPublishedEvents(event.eventType, event);
+
+        expect(draft).toMatchObject({
+            eventType: 'data_subject_request.requested',
+            externalId: 'data_subject_request.requested:dsr1',
+            properties: expect.objectContaining({ data_subject_request_id: 'dsr1', request_type: 'erasure' })
+        });
+        expect(draft!.properties).not.toHaveProperty('dsr_id');
     });
 
     it('covers every mapper in the registry', () => {

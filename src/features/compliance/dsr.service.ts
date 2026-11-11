@@ -21,7 +21,8 @@ import {
 } from '@domains/compliance';
 
 /**
- * Data-subject requests — `POST /v1/dsr` and `GET /v1/dsr/{id}` (API Contract §3.15).
+ * Data-subject requests — `POST /v1/data-subject-requests` and `GET /v1/data-subject-requests/{id}` (API Contract
+ * §3.15, renamed by v5.1).
  *
  * This service is the single coordinating owner of compliance (Product Spec R-CPL-01), so a request is
  * recorded here, dated here, and — for erasure — fanned out from here. The subject's email never lands
