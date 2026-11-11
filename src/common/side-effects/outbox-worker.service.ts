@@ -182,6 +182,19 @@ export class OutboxWorkerService extends BaseWorkerService<IOutboxJobData> {
     }
 
     /** Mirror a membership change into Keto (idempotent — safe to replay). */
+    /**
+     * US1.3.1 F1: role effects can run late, twice or out of order (the worker is concurrent and the outbox replays),
+     * so the payload's role may be stale. Writing the role the user holds now makes every run converge on the current
+     * membership; a user removed meanwhile ends with none.
+     */
+    private async assignCurrentRole(tenantId: string, userId: string): Promise<void> {
+        const user = await this.prisma.user.findFirst({ where: { id: userId, tenantId }, select: { role: true, deletedAt: true } });
+        if (!user || user.deletedAt) {
+            return this.ketoProvisioning.removeMember(tenantId, userId);
+        }
+        return this.ketoProvisioning.assignRole(tenantId, userId, user.role as RoleEnum);
+    }
+
     private async processKetoEffect(sideEffect: SideEffectOutboxModel): Promise<void> {
         const { operation, tenantId, userId, role } = sideEffect.payload as unknown as IKetoSideEffectPayload;
         switch (operation) {
@@ -193,7 +206,7 @@ export class OutboxWorkerService extends BaseWorkerService<IOutboxJobData> {
                 if (!userId || !role) {
                     throw new Error('Invalid keto payload: missing required userId/role');
                 }
-                return this.ketoProvisioning.assignRole(tenantId, userId, role as RoleEnum);
+                return this.assignCurrentRole(tenantId, userId);
             case 'remove_member':
                 if (!userId) {
                     throw new Error('Invalid keto payload: missing required userId');

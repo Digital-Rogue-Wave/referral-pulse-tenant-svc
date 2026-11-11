@@ -29,6 +29,7 @@ describe('Outbox worker', () => {
     let worker: OutboxWorkerService;
     let row: OutboxRow | null;
     let updateMany: jest.Mock;
+    let currentUser: { role: string; deletedAt: Date | null } | null;
 
     beforeEach(() => {
         prisma = mock<DatabaseService>();
@@ -47,6 +48,8 @@ describe('Outbox worker', () => {
             findUnique: jest.fn(async () => row),
             update: jest.fn(async ({ data }: { data: Partial<OutboxRow> }) => Object.assign(row!, data))
         };
+        currentUser = { role: RoleEnum.OPERATOR, deletedAt: null };
+        (prisma as unknown as { user: unknown }).user = { findFirst: jest.fn(async () => currentUser) };
         worker = Object.create(OutboxWorkerService.prototype) as OutboxWorkerService;
         Object.assign(worker, { prisma, ketoProvisioning: keto, logger: mock<AppLoggerService>() });
     });
@@ -59,6 +62,26 @@ describe('Outbox worker', () => {
         expect(updateMany).toHaveBeenCalledWith({ where: { id: 'se-1', status: 'pending' }, data: { status: 'processing' } });
         expect(keto.assignRole).toHaveBeenCalledWith('t1', 'u1', RoleEnum.OPERATOR);
         expect(row!.status).toBe('completed');
+    });
+
+    describe('given role effects that run late or out of order (US1.3.1 F1)', () => {
+        it('then a stale effect writes the role the user holds now, not the one in its payload', async () => {
+            row!.payload = { operation: 'assign_role', tenantId: 't1', userId: 'u1', role: RoleEnum.OPERATOR };
+            currentUser = { role: RoleEnum.VIEWER, deletedAt: null };
+
+            await process();
+
+            expect(keto.assignRole).toHaveBeenCalledWith('t1', 'u1', RoleEnum.VIEWER);
+        });
+
+        it('then an effect for a user removed meanwhile leaves them no membership', async () => {
+            currentUser = { role: RoleEnum.OPERATOR, deletedAt: new Date() };
+
+            await process();
+
+            expect(keto.assignRole).not.toHaveBeenCalled();
+            expect(keto.removeMember).toHaveBeenCalledWith('t1', 'u1');
+        });
     });
 
     it('retries a job that arrived before its producer’s transaction committed, instead of reporting success', async () => {
