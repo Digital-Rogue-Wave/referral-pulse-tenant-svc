@@ -270,6 +270,19 @@ export class RedisService implements OnModuleInit, OnModuleDestroy {
         }
     }
 
+    /** Adds `member` to the set at `key` and gives the whole set `ttlSeconds` to live. */
+    async addToSet(key: string, member: string, ttlSeconds: number, tenantScoped = false): Promise<void> {
+        const fullKey = this.buildKey(key, tenantScoped);
+        await this.client.multi().sadd(fullKey, member).expire(fullKey, ttlSeconds).exec();
+    }
+
+    /** Returns every member of the set at `key` and deletes the set. */
+    async takeSet(key: string, tenantScoped = false): Promise<string[]> {
+        const fullKey = this.buildKey(key, tenantScoped);
+        const [members] = (await this.client.multi().smembers(fullKey).del(fullKey).exec()) ?? [];
+        return (members?.[1] as string[] | undefined) ?? [];
+    }
+
     // ============================================================================
     // Client Access
     // ============================================================================

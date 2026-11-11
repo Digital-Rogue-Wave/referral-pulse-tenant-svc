@@ -36,9 +36,16 @@ export interface ResolvedCredential extends IssuedToken {
  *   is resolved from Keto now. An identity with no membership yet (an invitee) gets a token without a
  *   tenant, usable only on tenant-optional routes.
  *
- * Closed tenants and disabled users are refused here, once, instead of in every service.
- * User-token exchanges are cached by credential hash until shortly before the minted token would expire.
+ * Closed tenants are refused here, once, instead of in every service. A removed member is not refused: their
+ * token simply carries no tenant, like an invitee's, and their cached exchanges are dropped on removal (`forgetUser`).
+ * User-token exchanges are cached by credential hash until shortly before the minted internal JWT expires (at most
+ * `INTERNAL_JWT_TTL_SECONDS`), and indexed per user so a removal or role change takes effect on the next request.
  */
+/** The cached exchange keys of one user (`authn:exchange:*`), so they can be dropped together. */
+function userExchangesKey(userId: string): string {
+    return `authn:exchange:user:${userId}`;
+}
+
 @Injectable()
 export class CredentialResolverService {
     private readonly hydraJwks: JwksClient;
@@ -78,8 +85,21 @@ export class CredentialResolverService {
         const ttl = Math.floor((resolved.expiresAt.getTime() - Date.now()) / 1000) - 30;
         if (ttl > 0) {
             await this.redis.set(cacheKey, resolved, { tenantScoped: false, ttl });
+            if (resolved.claims.user_id) {
+                await this.redis.addToSet(userExchangesKey(resolved.claims.user_id), cacheKey, ttl);
+            }
         }
         return resolved;
+    }
+
+    /**
+     * Drops every cached exchange of `userId`, so their next request is resolved again from the database and Keto.
+     * Called when a member is removed or their role changes (US1.2.4 F1).
+     */
+    async forgetUser(userId: string): Promise<number> {
+        const keys = await this.redis.takeSet(userExchangesKey(userId));
+        await Promise.all(keys.map((key) => this.redis.del(key, false)));
+        return keys.length;
     }
 
     private isApiKey(credential: string): boolean {

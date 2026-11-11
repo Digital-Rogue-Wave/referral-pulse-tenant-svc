@@ -3,6 +3,7 @@ import { Module } from '@nestjs/common';
 import { ApiKeyModule } from '@app/features/api-key/api-key.module';
 
 import { CredentialResolverService } from './credential-resolver.service';
+import { ExchangeCacheListener } from './exchange-cache.listener';
 import { IdentityGatewayController } from './identity-gateway.controller';
 import { InternalTokenService } from './internal-token.service';
 import { TokenExchangeCallerGuard } from './token-exchange-caller.guard';
@@ -14,6 +15,6 @@ import { TokenExchangeCallerGuard } from './token-exchange-caller.guard';
 @Module({
     imports: [ApiKeyModule],
     controllers: [IdentityGatewayController],
-    providers: [CredentialResolverService, InternalTokenService, TokenExchangeCallerGuard]
+    providers: [CredentialResolverService, InternalTokenService, TokenExchangeCallerGuard, ExchangeCacheListener]
 })
 export class IdentityGatewayModule {}

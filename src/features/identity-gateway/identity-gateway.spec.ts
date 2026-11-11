@@ -209,6 +209,44 @@ describe('CredentialResolverService', () => {
         expect(findUser).not.toHaveBeenCalled();
     });
 
+    describe('given a member signs in (US1.2.1 F1, US1.2.4 F1)', () => {
+        it('then the exchange is cached no longer than the internal JWT it holds, and indexed under the member', async () => {
+            stubHydra({ sub: 'kratos-1' });
+            findUser.mockResolvedValue({ id: 'u1', tenantId: 't1', email: 'ada@acme.io' });
+            authorization.resolvePermissions.mockResolvedValue([]);
+
+            const resolved = await resolver.resolve('hydra.jwt.token');
+
+            const [cacheKey, , options] = redis.set.mock.calls[0]!;
+            const tokenLifetime = Math.round((resolved.expiresAt.getTime() - Date.now()) / 1000);
+            expect(cacheKey).toMatch(/^authn:exchange:[0-9a-f]{64}$/);
+            expect(options?.ttl).toBeLessThanOrEqual(tokenLifetime - 29);
+            expect(redis.addToSet).toHaveBeenCalledWith('authn:exchange:user:u1', cacheKey, options?.ttl);
+        });
+
+        it('then an invitee (no membership) is cached but indexed under nobody', async () => {
+            stubHydra({ sub: 'kratos-new' });
+            findUser.mockResolvedValue(null);
+
+            await resolver.resolve('hydra.jwt.token');
+
+            expect(redis.set).toHaveBeenCalled();
+            expect(redis.addToSet).not.toHaveBeenCalled();
+        });
+    });
+
+    describe('given a member is removed or their role changes', () => {
+        it('then every cached exchange of theirs is dropped, so the next request resolves them again', async () => {
+            redis.takeSet.mockResolvedValue(['authn:exchange:aaa', 'authn:exchange:bbb']);
+
+            await expect(resolver.forgetUser('u1')).resolves.toBe(2);
+
+            expect(redis.takeSet).toHaveBeenCalledWith('authn:exchange:user:u1');
+            expect(redis.del).toHaveBeenCalledWith('authn:exchange:aaa', false);
+            expect(redis.del).toHaveBeenCalledWith('authn:exchange:bbb', false);
+        });
+    });
+
     it('never serves an API key from the exchange cache — its own cache is what revocation clears', async () => {
         redis.get.mockResolvedValue({ token: 'stale', expiresAt: new Date(Date.now() + 120_000).toISOString(), claims: claims() } as never);
         apiKeys.validateKey.mockResolvedValue(null);
