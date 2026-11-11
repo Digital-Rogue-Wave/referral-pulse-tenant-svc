@@ -1,5 +1,19 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { IsString, IsOptional, IsEnum, IsDateString, IsEmail, IsInt, Min, Max, IsNotEmpty, IsObject, Length, MaxLength } from 'class-validator';
+import {
+    IsString,
+    IsOptional,
+    IsEnum,
+    IsDateString,
+    IsEmail,
+    IsInt,
+    Min,
+    Max,
+    IsNotEmpty,
+    IsObject,
+    Length,
+    MaxLength,
+    IsISO31661Alpha2
+} from 'class-validator';
 
 import { BaseResponseMapper } from '@common/helper';
 import { InvitationResponse } from '@domains/invitation';
@@ -81,8 +95,7 @@ export class UpdateTenantDto {
 
     @ApiPropertyOptional({ description: 'ISO 3166-1 alpha-2 billing country — the input to the invitation-channel default' })
     @IsOptional()
-    @IsString()
-    @Length(2, 2)
+    @IsISO31661Alpha2()
     billingCountry?: string;
 
     /**
