@@ -176,7 +176,9 @@ describe('CredentialResolverService', () => {
 
             const payload = verify((await resolver.resolve('hydra.jwt.token')).token);
 
-            expect(findUser).toHaveBeenCalledWith(expect.objectContaining({ where: { kratosIdentityId: 'kratos-1', deletedAt: null, disabledAt: null } }));
+            expect(findUser).toHaveBeenCalledWith(
+                expect.objectContaining({ where: { kratosIdentityId: 'kratos-1', deletedAt: null, disabledAt: null } })
+            );
             expect(payload).toMatchObject({
                 source: 'dashboard',
                 user_id: 'u1',

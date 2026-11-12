@@ -12,7 +12,18 @@ import { cursorPage, CursorPage, ListQueryDto } from '@common/http-contract/curs
 import { RoleEnum } from '@common/enums/role.enum';
 import type { IAuthenticatedUser } from '@app/types';
 
-import { AddUserDto, UpdateUserRoleDto, UserDisabledEvent, UserEnabledEvent, UserProps, UserRegisteredEvent, UserRemovedEvent, UserResponse, userResponseMapper, UserRoleChangedEvent } from '@domains/user';
+import {
+    AddUserDto,
+    UpdateUserRoleDto,
+    UserDisabledEvent,
+    UserEnabledEvent,
+    UserProps,
+    UserRegisteredEvent,
+    UserRemovedEvent,
+    UserResponse,
+    userResponseMapper,
+    UserRoleChangedEvent
+} from '@domains/user';
 
 import { TenantEvents, TenantOwnershipTransferredEvent } from '@domains/tenant/events/tenant.events';
 

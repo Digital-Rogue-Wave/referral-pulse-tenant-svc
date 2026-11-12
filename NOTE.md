@@ -2048,3 +2048,11 @@ removal. Neither event is published: the v5.1 Event Model's identity list has no
 the spec (to discuss). Nobody can disable themselves, so the Owner is never disabled (403); a non-Owner can't reach
 the Owner either (rank rule), so the Owner 409 is a guard only.
 
+## V5.26 A revoked API key stays visible (2026-11-12, E1 decision D6, US1.4.2 F1)
+
+Revocation is the key's soft delete: `DELETE /v1/api-keys/{id}` sets `revoked_at`, `revoked_by` and
+`revocation_reason` (migration `20261112120000_api_key_revocation_kept`) and no longer sets `deleted_at`. Keys
+revoked before were marked deleted at the same instant; the migration makes them visible again as revoked.
+`GET /v1/api-keys` lists live keys by default and `?status=revoked|all` on request; `GET /{id}` answers for a
+revoked key; revoking, rotating or renaming a revoked key is `409`. Validation already refused `revoked_at`.
+

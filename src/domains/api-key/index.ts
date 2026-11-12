@@ -1,5 +1,7 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { IsString, IsOptional, IsDateString, IsEnum } from 'class-validator';
+import { IsString, IsOptional, IsDateString, IsEnum, IsIn } from 'class-validator';
+
+import { ListQueryDto } from '@common/http-contract/cursor-page';
 
 import { BaseResponseMapper } from '@common/helper';
 import { BaseDomainEvent } from '@domains/common/events';
@@ -29,6 +31,8 @@ export interface ApiKeyProps {
     lastUsedAt?: Date | null;
     expiresAt?: Date | null;
     revokedAt?: Date | null;
+    revokedBy?: string | null;
+    revocationReason?: string | null;
     createdAt: Date;
     updatedAt: Date;
     deletedAt?: Date | null;
@@ -62,6 +66,17 @@ export class UpdateApiKeyDto {
 }
 
 /** Optional reason recorded on revocation and carried on `api_key.revoked`. */
+/** Which keys `GET /v1/api-keys` lists: live ones by default, revoked ones on request (E1 decision D6). */
+export const API_KEY_LIST_STATUSES = ['active', 'revoked', 'all'] as const;
+export type ApiKeyListStatus = (typeof API_KEY_LIST_STATUSES)[number];
+
+export class ApiKeyListQueryDto extends ListQueryDto {
+    @ApiPropertyOptional({ enum: API_KEY_LIST_STATUSES, default: 'active' })
+    @IsOptional()
+    @IsIn(API_KEY_LIST_STATUSES)
+    status?: ApiKeyListStatus;
+}
+
 export class RevokeApiKeyQueryDto {
     @ApiPropertyOptional({ maxLength: 500 })
     @IsOptional()
@@ -101,6 +116,12 @@ export class ApiKeyResponse {
     @ApiPropertyOptional({ description: 'Set when the key is revoked (null = active)' })
     revokedAt?: Date | null;
 
+    @ApiPropertyOptional({ description: 'Who revoked the key' })
+    revokedBy?: string | null;
+
+    @ApiPropertyOptional({ description: 'Why the key was revoked, as given at revocation' })
+    revocationReason?: string | null;
+
     @ApiProperty()
     createdAt!: Date;
 
@@ -137,6 +158,8 @@ class ApiKeyResponseMapper extends BaseResponseMapper<ApiKeyProps, ApiKeyRespons
             lastUsedAt: entity.lastUsedAt ?? null,
             expiresAt: entity.expiresAt ?? null,
             revokedAt: entity.revokedAt ?? null,
+            revokedBy: entity.revokedBy ?? null,
+            revocationReason: entity.revocationReason ?? null,
             createdAt: entity.createdAt,
             updatedAt: entity.updatedAt,
             deletedAt: entity.deletedAt ?? null

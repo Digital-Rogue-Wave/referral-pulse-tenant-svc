@@ -6,7 +6,14 @@ import type { IAuthenticatedUser } from '@app/types';
 import { RequirePermission } from '@common/auth/require-permission.decorator';
 import { CursorPage, ListQueryDto } from '@common/http-contract/cursor-page';
 
-import { CreateApiKeyDto, UpdateApiKeyDto, ApiKeyResponse, ApiKeyWithRawKeyResponse, RevokeApiKeyQueryDto } from '@domains/api-key';
+import {
+    CreateApiKeyDto,
+    UpdateApiKeyDto,
+    ApiKeyResponse,
+    ApiKeyWithRawKeyResponse,
+    RevokeApiKeyQueryDto,
+    ApiKeyListQueryDto
+} from '@domains/api-key';
 
 import { ApiKeyService } from './api-key.service';
 
@@ -28,11 +35,11 @@ export class ApiKeyController {
         return this.apiKeyService.create(user.userId, dto);
     }
 
-    @ApiOkResponse({ description: 'A page of API keys, newest first', type: CursorPage })
+    @ApiOkResponse({ description: 'A page of API keys, newest first; live keys unless `status` asks for revoked or all', type: CursorPage })
     @RequirePermission('api_keys:manage')
     @HttpCode(HttpStatus.OK)
     @Get()
-    async findAll(@Query() query: ListQueryDto): Promise<CursorPage<ApiKeyResponse>> {
+    async findAll(@Query() query: ApiKeyListQueryDto): Promise<CursorPage<ApiKeyResponse>> {
         return this.apiKeyService.findAll(query);
     }
 

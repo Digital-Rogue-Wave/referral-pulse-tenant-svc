@@ -160,9 +160,10 @@ describe('ApiKeyService', () => {
             await service.delete('key-1', 'user-1', 'leaked in a public repo');
 
             expect(cache.size).toBe(0);
+            // The row stays as the key's soft delete (E1 decision D6): revoked, with who and why, never deleted.
             expect(delegate.update).toHaveBeenCalledWith({
                 where: { id: 'key-1' },
-                data: { revokedAt: expect.any(Date), deletedAt: expect.any(Date) }
+                data: { revokedAt: expect.any(Date), revokedBy: 'user-1', revocationReason: 'leaked in a public repo' }
             });
             expect(events.emitAfterCommit).toHaveBeenCalledWith(
                 'api-key.deleted',

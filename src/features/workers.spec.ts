@@ -91,13 +91,19 @@ describe('Scheduled workers', () => {
 
     it('the run a catalogue change triggers also deletes the retired namespaces before re-granting (E1 D2)', async () => {
         const keto = mock<KetoProvisioningService>();
-        const findMany = jest.fn().mockResolvedValueOnce([{ id: 't1' }]).mockResolvedValueOnce([]);
+        const findMany = jest
+            .fn()
+            .mockResolvedValueOnce([{ id: 't1' }])
+            .mockResolvedValueOnce([]);
         const users = jest.fn().mockResolvedValue([]);
 
-        await workerOf(KetoReconcilerWorker, { prisma: { tenant: { findMany }, user: { findMany: users } }, ketoProvisioning: keto })('reconcile-keto', {
-            tenantId: 'system',
-            catalogVersion: 'abc'
-        });
+        await workerOf(KetoReconcilerWorker, { prisma: { tenant: { findMany }, user: { findMany: users } }, ketoProvisioning: keto })(
+            'reconcile-keto',
+            {
+                tenantId: 'system',
+                catalogVersion: 'abc'
+            }
+        );
 
         expect(keto.retireNamespaces).toHaveBeenCalledTimes(1);
         expect(keto.grantTenant).toHaveBeenCalledWith('t1');

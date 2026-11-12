@@ -47,34 +47,36 @@ describe('Permission catalog (Product Spec v5.1 §4)', () => {
     });
 
     it('matches the spec Operator row (plus reading their own tenant)', () => {
-        expect([...ROLE_GRANTS[RoleEnum.OPERATOR]].sort()).toEqual([
-            'analytics:read',
-            'campaigns:activate',
-            'campaigns:complete',
-            'campaigns:pause',
-            'campaigns:read',
-            'campaigns:write',
-            'analytics:query',
-            'analytics:write',
-            'participants:block',
-            'participants:read',
-            'participants:review',
-            'participants:write',
-            'payouts:confirm',
-            'payouts:read',
-            'payouts:write',
-            'programs:read',
-            'referrals:read',
-            'referrals:reject',
-            'rewards:approve',
-            'rewards:read',
-            'rewards:reject',
-            'segments:read',
-            'segments:write',
-            'tenants:read',
-            'variants:read',
-            'variants:write'
-        ].sort());
+        expect([...ROLE_GRANTS[RoleEnum.OPERATOR]].sort()).toEqual(
+            [
+                'analytics:read',
+                'campaigns:activate',
+                'campaigns:complete',
+                'campaigns:pause',
+                'campaigns:read',
+                'campaigns:write',
+                'analytics:query',
+                'analytics:write',
+                'participants:block',
+                'participants:read',
+                'participants:review',
+                'participants:write',
+                'payouts:confirm',
+                'payouts:read',
+                'payouts:write',
+                'programs:read',
+                'referrals:read',
+                'referrals:reject',
+                'rewards:approve',
+                'rewards:read',
+                'rewards:reject',
+                'segments:read',
+                'segments:write',
+                'tenants:read',
+                'variants:read',
+                'variants:write'
+            ].sort()
+        );
         // Banning and cancelling a payout are the Owner's alone.
         expect(ROLE_GRANTS[RoleEnum.OPERATOR]).not.toContain('participants:ban');
         expect(ROLE_GRANTS[RoleEnum.OPERATOR]).not.toContain('payouts:cancel');
