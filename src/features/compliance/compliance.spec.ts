@@ -32,7 +32,7 @@ const NOW = new Date('2026-10-21T10:00:00Z');
 
 const logger = () => mock<AppLoggerService>();
 
-describe('DsrService — POST /v1/dsr and GET /v1/dsr/{id}', () => {
+describe('DsrService — POST /v1/data-subject-requests and GET /v1/data-subject-requests/{id}', () => {
     let prisma: MockProxy<DatabaseService>;
     let txEvents: MockProxy<TransactionEventEmitterService>;
     let bullJobs: MockProxy<BullJobsService>;
@@ -73,7 +73,7 @@ describe('DsrService — POST /v1/dsr and GET /v1/dsr/{id}', () => {
         expect(response.dueAt).toEqual(new Date(NOW.getTime() + DSR_DEADLINE_DAYS * 86_400_000));
     });
 
-    it('queues the fan-out for an erasure and publishes dsr.requested', async () => {
+    it('queues the fan-out for an erasure and publishes data_subject_request.requested', async () => {
         const response = await service.create({ requestType: DsrRequestType.ERASURE, subjectEmail: EMAIL }, 'u1');
 
         expect(response.status).toBe(DsrStatus.PENDING);

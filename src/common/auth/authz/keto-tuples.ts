@@ -27,6 +27,12 @@ export enum ServiceCapability {
     TENANT_STATUS_READ = 'tenant_status.read',
     TENANT_ENTITLEMENTS_READ = 'tenant_entitlements.read',
     TENANT_CONTACTS_READ = 'tenant_contacts.read',
+    /**
+     * R-PRT-02's effective invitation channel. campaign-service reads it to default a campaign's
+     * `invitations_enabled` and to refuse enabling what the tenant forbids — separate from
+     * `tenant_contacts.read` so the caller does not acquire operator addresses with it.
+     */
+    TENANT_INVITATION_CHANNEL_READ = 'tenant_invitation_channel.read',
     TENANT_VERIFICATION_WRITE = 'tenant_verification.write',
     TENANT_SUSPEND = 'tenant.suspend',
     USAGE_WRITE = 'usage.write',

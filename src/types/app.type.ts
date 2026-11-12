@@ -50,7 +50,7 @@ export type EventCategory =
     | 'connection'
     // Compliance (Product Spec R-CPL-01 names these four as the Event Model's compliance family)
     | 'consent'
-    | 'dsr'
+    | 'data_subject_request' // v5.1 name; was 'dsr'
     | 'erasure';
 
 /**

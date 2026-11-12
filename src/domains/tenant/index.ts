@@ -1,5 +1,19 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { IsString, IsOptional, IsEnum, IsDateString, IsEmail, IsInt, Min, Max, IsNotEmpty, IsObject, Length, MaxLength } from 'class-validator';
+import {
+    IsString,
+    IsOptional,
+    IsEnum,
+    IsDateString,
+    IsEmail,
+    IsInt,
+    Min,
+    Max,
+    IsNotEmpty,
+    IsObject,
+    Length,
+    MaxLength,
+    IsISO31661Alpha2
+} from 'class-validator';
 
 import { BaseResponseMapper } from '@common/helper';
 import { InvitationResponse } from '@domains/invitation';
@@ -81,8 +95,7 @@ export class UpdateTenantDto {
 
     @ApiPropertyOptional({ description: 'ISO 3166-1 alpha-2 billing country — the input to the invitation-channel default' })
     @IsOptional()
-    @IsString()
-    @Length(2, 2)
+    @IsISO31661Alpha2()
     billingCountry?: string;
 
     /**
@@ -469,6 +482,15 @@ export class WidgetTokenSecretDto {
 
     @ApiPropertyOptional()
     previousValidUntil?: Date;
+}
+
+/** R-PRT-02's tenant-level envelope as a service holding `tenant_invitation_channel.read` receives it. */
+export class TenantInvitationChannelDto {
+    @ApiProperty()
+    tenantId!: string;
+
+    @ApiProperty({ enum: InvitationChannel, enumName: 'InvitationChannel', description: "The Owner's choice, or the billing country's default" })
+    invitationChannel!: InvitationChannel;
 }
 
 /** The secret as the Owner reads or receives it after a rotation (US1.5.4 F2/F3). */

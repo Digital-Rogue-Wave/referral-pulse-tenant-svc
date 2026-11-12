@@ -871,6 +871,13 @@ serve. Either makes the table necessary and gives it a writer in the same change
 *Rejected:* build both now to match the table count (two unread tables, one of them a security
 hazard); build `sessions` only (same problem, half the surface).
 
+*Revisited 2026-11-11 (US1.2.4 F1, F2).* The trigger "revoke on role change" was met: a removed member kept their
+tenant claims through the credential-exchange cache. The answer is still no `sessions` table. Each cached exchange
+(`authn:exchange:<hash>`) is indexed under its user and its tenant (`authn:exchange:user:<id>`,
+`authn:exchange:tenant:<id>`), and `ExchangeCacheListener` drops them on `user.removed`, `user.role_changed` and
+`tenant.deleted`, so revocation takes effect on the next request. That is the one thing the index was for, with no
+table to keep in step with Ory. A cached entry never outlives the internal JWT it holds (`INTERNAL_JWT_TTL_SECONDS`).
+
 ## V5.9 T3 — what was done and what was left, with reasons
 
 Scoped down after reading the code. Of the four §3 items, only one had a consumer, and that one was

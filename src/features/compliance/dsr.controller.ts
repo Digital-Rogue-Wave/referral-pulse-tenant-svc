@@ -10,7 +10,8 @@ import { CreateDsrDto, DsrRequestResponse } from '@domains/compliance';
 import { DsrService } from './dsr.service';
 
 /**
- * Data-subject requests — API Contract §3.15's `POST /v1/dsr` and `GET /v1/dsr/{id}`. This service
+ * Data-subject requests — `POST /v1/data-subject-requests` and `GET /v1/data-subject-requests/{id}` (v5.1 renamed
+ * API Contract §3.15's `/v1/dsr`, with no alias period). This service
  * hosts them because Product Spec R-CPL-01 makes it compliance's one coordinating owner.
  *
  * Gated on `dsr:manage`. §3.15's table says `referrers:write` / `referrers:read` and its own revision
@@ -21,7 +22,7 @@ import { DsrService } from './dsr.service';
  */
 @ApiTags('Compliance')
 @ApiBearerAuth()
-@Controller({ path: 'dsr', version: '1' })
+@Controller({ path: 'data-subject-requests', version: '1' })
 export class DsrController {
     constructor(private readonly dsr: DsrService) {}
 
