@@ -12,6 +12,7 @@ import { AgnosticTenantController } from './agnostic/agnostic-tenant.controller'
 import { AdminTenantController } from './agnostic/admin-tenant.controller';
 import { InternalTenantVerificationController } from './internal-tenant-verification.controller';
 import { InternalWidgetSecretController } from './internal-widget-secret.controller';
+import { InternalInvitationChannelController } from './internal-invitation-channel.controller';
 
 // Services
 import { TenantService } from './tenant.service';
@@ -48,7 +49,8 @@ import { TenantUnlockProcessor } from './processors/tenant-unlock.processor';
         AgnosticTenantController,
         AdminTenantController,
         InternalTenantVerificationController,
-        InternalWidgetSecretController
+        InternalWidgetSecretController,
+        InternalInvitationChannelController
     ],
     providers: [
         // Core Services
