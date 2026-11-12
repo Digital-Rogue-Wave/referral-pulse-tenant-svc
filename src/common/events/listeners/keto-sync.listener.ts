@@ -5,7 +5,7 @@ import type { IKetoSideEffectPayload } from '@app/types';
 
 import { AppLoggerService } from '@common/logging/app-logger.service';
 import { SideEffectService } from '@common/side-effects/side-effect.service';
-import { UserRegisteredEvent, UserRemovedEvent, UserRoleChangedEvent } from '@domains/user';
+import { UserDisabledEvent, UserEnabledEvent, UserRegisteredEvent, UserRemovedEvent, UserRoleChangedEvent } from '@domains/user';
 import { TenantCreatedEvent, TenantDeletedEvent, TenantEvents } from '@domains/tenant/events/tenant.events';
 
 /**
@@ -45,6 +45,17 @@ export class KetoSyncListener {
     @OnEvent('user.removed', { async: true })
     async onUserRemoved(event: UserRemovedEvent): Promise<void> {
         await this.sync({ operation: 'remove_member', tenantId: event.tenantId, userId: event.aggregateId });
+    }
+
+    @OnEvent('user.disabled', { async: true })
+    async onUserDisabled(event: UserDisabledEvent): Promise<void> {
+        await this.sync({ operation: 'remove_member', tenantId: event.tenantId, userId: event.aggregateId });
+    }
+
+    /** `assign_role` re-reads `users`, so an enable racing a later disable still converges on the stored state. */
+    @OnEvent('user.enabled', { async: true })
+    async onUserEnabled(event: UserEnabledEvent): Promise<void> {
+        await this.sync({ operation: 'assign_role', tenantId: event.tenantId, userId: event.aggregateId, role: event.role });
     }
 
     private async sync(payload: IKetoSideEffectPayload): Promise<void> {

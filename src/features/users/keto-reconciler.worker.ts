@@ -113,9 +113,9 @@ export class KetoReconcilerWorker extends BaseWorkerService<ReconcileJobData> {
 
     private async reconcileTenant(tenantId: string): Promise<void> {
         await this.ketoProvisioning.grantTenant(tenantId);
-        const members = await this.prisma.user.findMany({ where: { tenantId }, select: { id: true, role: true, deletedAt: true } });
+        const members = await this.prisma.user.findMany({ where: { tenantId }, select: { id: true, role: true, deletedAt: true, disabledAt: true } });
         for (const member of members) {
-            if (member.deletedAt) {
+            if (member.deletedAt || member.disabledAt) {
                 await this.ketoProvisioning.removeMember(tenantId, member.id);
             } else {
                 await this.ketoProvisioning.assignRole(tenantId, member.id, member.role as RoleEnum);

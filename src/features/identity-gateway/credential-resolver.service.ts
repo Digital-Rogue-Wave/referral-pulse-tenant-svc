@@ -148,7 +148,8 @@ export class CredentialResolverService {
         const payload = await this.verifyHydraToken(token);
         const identityId = payload.sub;
         const user = await this.prisma.user.findFirst({
-            where: { kratosIdentityId: identityId, deletedAt: null },
+            // A disabled member (E1 D5) resolves like an identity with no membership: no tenant, no perms.
+            where: { kratosIdentityId: identityId, deletedAt: null, disabledAt: null },
             select: { id: true, tenantId: true, email: true }
         });
 

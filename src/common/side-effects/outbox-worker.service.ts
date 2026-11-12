@@ -188,8 +188,8 @@ export class OutboxWorkerService extends BaseWorkerService<IOutboxJobData> {
      * membership; a user removed meanwhile ends with none.
      */
     private async assignCurrentRole(tenantId: string, userId: string): Promise<void> {
-        const user = await this.prisma.user.findFirst({ where: { id: userId, tenantId }, select: { role: true, deletedAt: true } });
-        if (!user || user.deletedAt) {
+        const user = await this.prisma.user.findFirst({ where: { id: userId, tenantId }, select: { role: true, deletedAt: true, disabledAt: true } });
+        if (!user || user.deletedAt || user.disabledAt) {
             return this.ketoProvisioning.removeMember(tenantId, userId);
         }
         return this.ketoProvisioning.assignRole(tenantId, userId, user.role as RoleEnum);

@@ -2036,3 +2036,15 @@ Keto role names already were. Migration `20261112100000_lowercase_role_and_invit
 `roles.name`, `users.role`, `invitations.role/status` and the column defaults. Published events already
 lower-cased roles; old `audit_log` rows keep their upper-case text (append-only).
 
+## V5.25 Disable is reversible and separate from removal (2026-11-12, E1 decision D5, US1.2.3 F3)
+
+`POST /v1/users/{id}/disable` and `/enable` (`users:write`, live). Disable sets `status = disabled` and the new
+`disabled_at` (migration `20261112110000_user_disabled_at`), keeps the row and its role, and emits the in-process
+`user.disabled`: the Keto membership is removed (outbox), cached exchanges are dropped, Ory sessions end, and the
+token exchange treats a disabled member like an identity with no membership. Enable clears both and emits
+`user.enabled`, which re-assigns the stored role. Both are audit-logged (`audited-actions.ts` internal actions).
+The outbox worker and the reconciler treat `disabled_at` like `deleted_at` for Keto. `DELETE` stays the irreversible
+removal. Neither event is published: the v5.1 Event Model's identity list has no such event. Route names are not in
+the spec (to discuss). Nobody can disable themselves, so the Owner is never disabled (403); a non-Owner can't reach
+the Owner either (rank rule), so the Owner 409 is a guard only.
+

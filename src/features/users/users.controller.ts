@@ -61,6 +61,24 @@ export class UsersController {
         return this.usersService.updateRole(user, id, dto);
     }
 
+    @ApiOperation({ summary: 'Disable a member, reversibly: no sign-in to the tenant until enabled (Owner cannot be disabled)' })
+    @ApiOkResponse({ description: 'The member, now disabled', type: UserResponse })
+    @RequirePermission('users:write')
+    @HttpCode(HttpStatus.OK)
+    @Post(':id/disable')
+    async disable(@Param('id') id: string, @CurrentUser() user: IAuthenticatedUser): Promise<UserResponse> {
+        return this.usersService.disable(user, id);
+    }
+
+    @ApiOperation({ summary: 'Enable a disabled member: their role applies again' })
+    @ApiOkResponse({ description: 'The member, active again', type: UserResponse })
+    @RequirePermission('users:write')
+    @HttpCode(HttpStatus.OK)
+    @Post(':id/enable')
+    async enable(@Param('id') id: string, @CurrentUser() user: IAuthenticatedUser): Promise<UserResponse> {
+        return this.usersService.enable(user, id);
+    }
+
     @ApiOkResponse({ description: 'User removed from the tenant' })
     @RequirePermission('users:write')
     @HttpCode(HttpStatus.NO_CONTENT)

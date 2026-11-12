@@ -44,6 +44,9 @@ const INTERNAL_ACTIONS: Record<string, (event: EventWithPayload) => Pick<AuditEn
     'tenant-setting.updated': (e) => ({ action: 'tenant_setting.updated', targetType: 'tenant_setting', targetId: e.aggregateId }),
     'api-key.updated': (e) => ({ action: 'api_key.updated', targetType: 'api_key', targetId: e.aggregateId }),
     'invitation.resent': (e) => ({ action: 'invitation.resent', targetType: 'invitation', targetId: e.aggregateId }),
+    // E1 decision D5: disable and enable are operator actions, kept in-process (not on the bus).
+    'user.disabled': (e) => ({ action: 'user.disabled', targetType: 'user', targetId: e.aggregateId }),
+    'user.enabled': (e) => ({ action: 'user.enabled', targetType: 'user', targetId: e.aggregateId }),
     // US1.5.4 F2: every Owner read of the widget-token secret is on the trail.
     'tenant.widget_secret_revealed': (e) => ({ action: 'tenant.widget_secret_revealed', targetType: 'tenant', targetId: e.aggregateId }),
     // US1.8.2 F9: the two plan actions that are not published.

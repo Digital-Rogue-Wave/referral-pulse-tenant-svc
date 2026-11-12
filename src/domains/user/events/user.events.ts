@@ -54,6 +54,38 @@ export class UserLoggedInEvent extends BaseDomainEvent {
 }
 
 /**
+ * A member is disabled (E1 decision D5): kept in the tenant, but the Keto membership is revoked, cached
+ * exchanges are dropped and Ory sessions are ended until an enable. Not published: the v5.1 Event Model's
+ * identity list has no such event, so it stays in-process (Keto sync, cache, audit trail).
+ */
+export class UserDisabledEvent extends BaseDomainEvent {
+    readonly eventType = 'user.disabled' as const;
+
+    constructor(
+        public readonly aggregateId: string,
+        public readonly tenantId: string,
+        public readonly role: string,
+        public readonly userId?: string
+    ) {
+        super();
+    }
+}
+
+/** A disabled member is enabled again: the Keto membership for their stored role is restored. In-process only. */
+export class UserEnabledEvent extends BaseDomainEvent {
+    readonly eventType = 'user.enabled' as const;
+
+    constructor(
+        public readonly aggregateId: string,
+        public readonly tenantId: string,
+        public readonly role: string,
+        public readonly userId?: string
+    ) {
+        super();
+    }
+}
+
+/**
  * Emitted when an operator is removed from a tenant. Downstream caches keyed on the user must drop it;
  * the membership is revoked in Keto and the user's Ory sessions are ended.
  */

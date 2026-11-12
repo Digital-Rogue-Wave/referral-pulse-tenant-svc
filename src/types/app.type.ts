@@ -109,6 +109,8 @@ export type EventAction =
     | 'role_changed'
     | 'logged_in'
     | 'removed'
+    | 'disabled'
+    | 'enabled'
     | 'rotated'
     | 'invited'
     | 'anonymised'
@@ -347,6 +349,8 @@ export type UserEventType =
     | 'user.registered'
     | 'user.role_changed'
     | 'user.removed'
+    | 'user.disabled'
+    | 'user.enabled'
     | 'user.invited'
     | 'user.anonymised';
 
