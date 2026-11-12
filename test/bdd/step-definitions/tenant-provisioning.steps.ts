@@ -131,7 +131,7 @@ Then('the response holds a pending {string} invitation for {string}', function (
     assert.ok(invitation, `No owner_invitation in the response: ${JSON.stringify(this.response?.body)}`);
     assert.strictEqual(invitation['email'], email);
     assert.strictEqual(invitation['role'], role);
-    assert.strictEqual(invitation['status'], 'PENDING');
+    assert.strictEqual(invitation['status'], 'pending');
     assert.strictEqual(invitation['tenant_id'], newTenant().id);
 });
 
@@ -167,7 +167,7 @@ Then('the new tenant has exactly one pending {string} invitation for {string}', 
     assert.strictEqual(invitations.length, 1, `Expected one invitation, found ${invitations.length}`);
     assert.strictEqual(invitations[0]!.email, email);
     assert.strictEqual(invitations[0]!.role, role);
-    assert.strictEqual(invitations[0]!.status, 'PENDING');
+    assert.strictEqual(invitations[0]!.status, 'pending');
 });
 
 Then('{string} is queued in the outbox for the new tenant', async function (eventType: string) {

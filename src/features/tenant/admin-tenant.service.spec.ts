@@ -38,7 +38,7 @@ describe('AdminTenantService.create — tenant provisioning by a platform admin'
                     tenantId: params.tenantId,
                     email: params.email,
                     role: params.role,
-                    status: 'PENDING',
+                    status: 'pending',
                     tokenHash: 'hash',
                     expiresAt: now,
                     createdAt: now
@@ -64,7 +64,7 @@ describe('AdminTenantService.create — tenant provisioning by a platform admin'
             expect.objectContaining({ tenantId: inserted.id, userId: 'admin-1', verificationId: 'verif-1' })
         );
         expect(result.tenant).toMatchObject({ id: inserted.id, name: 'Acme', slug: 'acme' });
-        expect(result.ownerInvitation).toMatchObject({ email: 'owner@acme.com', role: RoleEnum.OWNER, status: 'PENDING' });
+        expect(result.ownerInvitation).toMatchObject({ email: 'owner@acme.com', role: RoleEnum.OWNER, status: 'pending' });
     });
 
     it('writes nothing when the slug is taken', async () => {

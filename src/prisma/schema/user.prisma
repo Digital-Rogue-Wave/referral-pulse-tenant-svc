@@ -10,7 +10,7 @@ model User {
   // SHA-256 of the lower-cased email — lets other services and logs reference an operator without the address.
   emailHash        String    @map("email_hash") @db.Char(64)
   name             String?   @db.VarChar(255)
-  role             String    @default("OPERATOR") @db.VarChar(50)
+  role             String    @default("operator") @db.VarChar(50)
   // One Ory identity belongs to exactly one tenant (DB Model §3 `users` UNIQUE(kratos_identity_id)).
   kratosIdentityId String    @unique @map("kratos_identity_id") @db.VarChar(64)
   lastLoginAt      DateTime? @map("last_login_at") @db.Timestamptz

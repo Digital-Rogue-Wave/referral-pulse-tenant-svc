@@ -69,7 +69,8 @@ describe('Analyst read-only (US1.3.3)', () => {
         }
     );
 
+    /** `analytics:query` is v5.1's plain-English analytics: read-only questions over the tenant's own data. */
     it('grants the Analyst reads only', () => {
-        expect([...analyst].filter((permission) => !permission.endsWith(':read'))).toEqual([]);
+        expect([...analyst].filter((permission) => !permission.endsWith(':read') && permission !== 'analytics:query')).toEqual([]);
     });
 });

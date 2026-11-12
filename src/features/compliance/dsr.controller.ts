@@ -14,11 +14,9 @@ import { DsrService } from './dsr.service';
  * API Contract §3.15's `/v1/dsr`, with no alias period). This service
  * hosts them because Product Spec R-CPL-01 makes it compliance's one coordinating owner.
  *
- * Gated on `dsr:manage`. §3.15's table says `referrers:write` / `referrers:read` and its own revision
- * line says "Owner-only — permission to update to `programs:write`", so the contract disagrees with
- * itself and neither candidate is about data-subject requests. All three resolve to Owner-only, so
- * effective access is identical; a separate permission is what later lets a compliance officer answer
- * DSRs without also being able to edit participants or programs. Ratified 2026-10-20 (NOTE.md §V5.16).
+ * Gated on `programs:write`, v5.1 §4's "Owner only (`programs:write`)" for this method. The service's
+ * own `dsr:manage` namespace (2026-10-20) was retired by E1 decision D16 to follow the catalogue;
+ * effective access is unchanged (Owner only).
  */
 @ApiTags('Compliance')
 @ApiBearerAuth()
@@ -32,7 +30,7 @@ export class DsrController {
     })
     @ApiBody({ type: CreateDsrDto })
     @ApiCreatedResponse({ description: 'Request recorded with its legal deadline', type: DsrRequestResponse })
-    @RequirePermission('dsr:manage')
+    @RequirePermission('programs:write')
     @HttpCode(HttpStatus.CREATED)
     @Post()
     async submit(@Body() dto: CreateDsrDto, @CurrentUser() user: IAuthenticatedUser): Promise<DsrRequestResponse> {
@@ -41,7 +39,7 @@ export class DsrController {
 
     @ApiOperation({ summary: 'Check a data-subject request and read its per-service receipts' })
     @ApiOkResponse({ type: DsrRequestResponse })
-    @RequirePermission('dsr:manage')
+    @RequirePermission('programs:write')
     @HttpCode(HttpStatus.OK)
     @Get(':id')
     async findOne(@Param('id') id: string): Promise<DsrRequestResponse> {

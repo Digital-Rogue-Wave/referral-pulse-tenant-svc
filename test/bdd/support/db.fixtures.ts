@@ -151,8 +151,8 @@ export async function seedPendingInvitation(params: { tenantId: string; email: s
     const tokenHash = sha256(params.token);
     await fixturesPrisma.invitation.upsert({
         where: { tokenHash },
-        update: { tenantId: params.tenantId, email: params.email, role: params.role, status: 'PENDING', expiresAt, deletedAt: null },
-        create: { tenantId: params.tenantId, email: params.email, role: params.role, status: 'PENDING', tokenHash, expiresAt }
+        update: { tenantId: params.tenantId, email: params.email, role: params.role, status: 'pending', expiresAt, deletedAt: null },
+        create: { tenantId: params.tenantId, email: params.email, role: params.role, status: 'pending', tokenHash, expiresAt }
     });
 }
 

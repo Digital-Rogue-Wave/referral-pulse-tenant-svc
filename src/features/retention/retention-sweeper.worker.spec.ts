@@ -70,8 +70,8 @@ describe('RetentionSweeperWorker', () => {
         expect(prisma.invitation.deleteMany).toHaveBeenCalledWith({
             where: {
                 OR: [
-                    { status: 'PENDING', expiresAt: { lt: cutoff } },
-                    { status: { not: 'PENDING' }, updatedAt: { lt: cutoff } }
+                    { status: 'pending', expiresAt: { lt: cutoff } },
+                    { status: { not: 'pending' }, updatedAt: { lt: cutoff } }
                 ]
             }
         });

@@ -287,8 +287,8 @@ async function seedDefaultTenant() {
 async function seedRoles() {
     const descriptions: Record<RoleEnum, string> = {
         [RoleEnum.OWNER]: 'Owner — full access, including billing, API keys and DSR responses',
-        [RoleEnum.OPERATOR]: 'Campaign Manager — campaigns, variants, segments, referrers; approve and reject rewards',
-        [RoleEnum.SUPPORT]: 'Support Agent — read referrers, referrals and rewards; adjust a reward and resend its email',
+        [RoleEnum.OPERATOR]: 'Campaign Manager — campaigns, variants, segments, participants; approve and reject rewards, run payouts',
+        [RoleEnum.SUPPORT]: 'Support Agent — read participants, referrals and rewards; note a participant, adjust a reward and resend its email',
         [RoleEnum.VIEWER]: 'Analyst — read-only'
     };
 

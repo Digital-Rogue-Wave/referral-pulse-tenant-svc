@@ -1996,3 +1996,43 @@ Decided with Ahmed while fixing US1.8.1 (user-stories-verification, E1 F1.8).
 > services — the three blockers and their dependency chain, the decisions already taken, the
 > ratifications, and the spec defects — lives in `referral-pulse-event-svc/NOTE.md` §11. This
 > service's own detail stays above.
+
+## V5.24 The v5.1 permission catalogue, and lower-case role values (2026-11-12, E1 decisions D2, D16, D3)
+
+**Catalogue.** `permission-catalog.ts` now holds Product Spec v5.1 section 4 verbatim: eleven namespaces
+(`programs` ... `api_keys`) and the four tenant-service resources the catalogue does not cover (`tenants`,
+`users`, `billing`, `audit`). Changes against the previous file:
+
+| what | before | v5.1 |
+|---|---|---|
+| participant namespace | `referrers` (decision T-2) | `participants`, relations `read write block review ban note`. **T-2 is superseded**: v5.1 says the Keto namespace is `participants` and forbids any form of "referrer". |
+| payouts | `read write confirm` | adds `cancel` (live) |
+| Operator | no payouts, no review | `participants:review`, `payouts:read write confirm` |
+| Analyst (`viewer`) | no payouts | `payouts:read` |
+| Support Agent | no payouts | `payouts:read` |
+| live set | ... `referrers:note`, `connections:manage` | adds `participants:ban`, `payouts:cancel`; `participants:note` |
+| data-subject requests | own `dsr:manage` | `programs:write`, the method table's "Owner only (programs:write)" (D16) |
+| connections | own `connections:manage` | `api_keys:manage`, live, the method table's permission (D16) |
+
+**Not in the catalogue table, chosen (to discuss with the lead):** `analytics:write` (Owner, Operator) for
+analytics-svc's write routes; `analytics:query`, v5.1's "dedicated permission" for plain-English analytics,
+granted to Owner, Operator and Analyst (read-only questions).
+
+**Re-provisioning existing tenants, with no manual step.** `grantTenant()` now makes a tenant's role grants
+exactly the catalogue's: it lists the tenant's tuples in every catalogue namespace and, in one atomic Keto
+patch, deletes any role grant no longer held and inserts every current one. `CATALOG_VERSION` is a hash of
+`ROLE_GRANTS`; the first worker start that sees a new version (Redis `SET NX` marker
+`keto:catalog-applied:{version}`) enqueues one immediate reconcile run, which also deletes every tuple of
+the retired namespaces `referrers`, `dsr`, `connections` (`retireNamespaces()`), then re-grants every
+tenant and member. The nightly run keeps converging grants.
+
+**Expand, then contract.** `deployment/ory/keto/namespaces/` gains `20-participants.json`; `07-referrers`,
+`18-dsr` and `19-connections` stay declared until the re-provisioning has run in every environment, then
+their files are deleted (retiring an undeclared namespace is skipped, not an error).
+
+**Lower-case values (D3).** `RoleEnum` (`owner operator support viewer`) and `InvitationStatusEnum`
+(`pending accepted expired revoked rejected`) are lower-case, API Contract section 1's rule for enum values;
+Keto role names already were. Migration `20261112100000_lowercase_role_and_invitation_values` lower-cases
+`roles.name`, `users.role`, `invitations.role/status` and the column defaults. Published events already
+lower-cased roles; old `audit_log` rows keep their upper-case text (append-only).
+

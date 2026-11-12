@@ -216,7 +216,7 @@ describe('Internal endpoints', () => {
     });
 
     describe('operator contacts', () => {
-        const row = { id: 'u1', tenantId: 't1', email: 'ada@acme.io', name: 'Ada', role: 'OWNER' };
+        const row = { id: 'u1', tenantId: 't1', email: 'ada@acme.io', name: 'Ada', role: 'owner' };
         const prisma = { user: { findFirst: jest.fn(), findMany: jest.fn() }, tenant: { findFirst: jest.fn() } };
         const controller = new OperatorContactController(prisma as unknown as DatabaseService);
 
@@ -238,7 +238,7 @@ describe('Internal endpoints', () => {
             prisma.user.findMany.mockResolvedValue([row]);
 
             await expect(controller.contactsOf('t1', { role: RoleEnum.OWNER })).resolves.toHaveLength(1);
-            expect(prisma.user.findMany.mock.calls[0]![0].where).toEqual({ tenantId: 't1', deletedAt: null, status: 'active', role: 'OWNER' });
+            expect(prisma.user.findMany.mock.calls[0]![0].where).toEqual({ tenantId: 't1', deletedAt: null, status: 'active', role: 'owner' });
         });
 
         it('gives the brand, and only well-formed locale, https app link and reply-to from the settings', async () => {

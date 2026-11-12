@@ -1,7 +1,7 @@
 export enum InvitationStatusEnum {
-    PENDING = 'PENDING',
-    ACCEPTED = 'ACCEPTED',
-    EXPIRED = 'EXPIRED',
-    REVOKED = 'REVOKED',
-    REJECTED = 'REJECTED'
+    PENDING = 'pending',
+    ACCEPTED = 'accepted',
+    EXPIRED = 'expired',
+    REVOKED = 'revoked',
+    REJECTED = 'rejected'
 }

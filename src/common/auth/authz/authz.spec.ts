@@ -7,17 +7,34 @@ import { KetoService, KetoTuplePatch } from '../keto.service';
 import { AuthorizationService } from './authorization.service';
 import { KetoProvisioningService } from './keto-provisioning.service';
 import { membershipTuple, roleObject, tenantGrantTuples, ServiceCapability } from './keto-tuples';
-import { ALL_PERMISSIONS, LIVE_CHECK_PERMISSIONS, PERMISSION_CATALOG, ROLE_GRANTS } from './permission-catalog';
+import { ALL_PERMISSIONS, LIVE_CHECK_PERMISSIONS, PERMISSION_CATALOG, RETIRED_NAMESPACES, ROLE_GRANTS } from './permission-catalog';
 
-describe('Permission catalog (API Contract §2)', () => {
-    it('covers every namespace the spec defines, with the spec relations', () => {
-        expect(PERMISSION_CATALOG.campaigns).toEqual(['read', 'write', 'activate', 'pause', 'complete']);
-        // v5 adds `adjust` and `resend_email` for the Support Agent.
-        expect(PERMISSION_CATALOG.rewards).toEqual(['read', 'approve', 'reject', 'clawback', 'adjust', 'resend_email']);
-        // v5 adds `note`, the support annotation. The namespace stays `referrers`: v5's own namespace
-        // table calls it `participants` but every other mention says `referrers` (NOTE.md T-2).
-        expect(PERMISSION_CATALOG.referrers).toEqual(['read', 'write', 'block', 'note']);
-        expect(PERMISSION_CATALOG.api_keys).toEqual(['manage']);
+describe('Permission catalog (Product Spec v5.1 §4)', () => {
+    it('holds the eleven v5.1 namespaces with their relations, plus the four tenant-service resources', () => {
+        expect(PERMISSION_CATALOG).toEqual({
+            programs: ['read', 'write', 'archive'],
+            campaigns: ['read', 'write', 'activate', 'pause', 'complete'],
+            variants: ['read', 'write'],
+            segments: ['read', 'write', 'delete'],
+            participants: ['read', 'write', 'block', 'review', 'ban', 'note'],
+            referrals: ['read', 'reject'],
+            rewards: ['read', 'approve', 'reject', 'clawback', 'adjust', 'resend_email'],
+            payouts: ['read', 'write', 'confirm', 'cancel'],
+            analytics: ['read', 'write', 'query'],
+            webhooks: ['read', 'write', 'delete'],
+            api_keys: ['manage'],
+            tenants: ['read', 'write', 'delete'],
+            users: ['read', 'write'],
+            billing: ['read', 'write'],
+            audit: ['read']
+        });
+    });
+
+    /** v5.1: no form of "referrer" anywhere; the Keto namespace is participants. */
+    it('has no referrers namespace, nor the retired dsr and connections ones', () => {
+        for (const retired of RETIRED_NAMESPACES) {
+            expect(Object.keys(PERMISSION_CATALOG)).not.toContain(retired);
+        }
     });
 
     it('gives the Owner every permission', () => {
@@ -26,7 +43,7 @@ describe('Permission catalog (API Contract §2)', () => {
 
     /** R-ACT-01: exactly four tenant roles. The retired `admin` grant must not come back. */
     it('grants nothing to any role outside the four', () => {
-        expect(Object.keys(ROLE_GRANTS).sort()).toEqual(['OPERATOR', 'OWNER', 'SUPPORT', 'VIEWER']);
+        expect(Object.keys(ROLE_GRANTS).sort()).toEqual(['operator', 'owner', 'support', 'viewer']);
     });
 
     it('matches the spec Operator row (plus reading their own tenant)', () => {
@@ -37,12 +54,18 @@ describe('Permission catalog (API Contract §2)', () => {
             'campaigns:pause',
             'campaigns:read',
             'campaigns:write',
+            'analytics:query',
+            'analytics:write',
+            'participants:block',
+            'participants:read',
+            'participants:review',
+            'participants:write',
+            'payouts:confirm',
+            'payouts:read',
+            'payouts:write',
             'programs:read',
             'referrals:read',
             'referrals:reject',
-            'referrers:block',
-            'referrers:read',
-            'referrers:write',
             'rewards:approve',
             'rewards:read',
             'rewards:reject',
@@ -51,16 +74,20 @@ describe('Permission catalog (API Contract §2)', () => {
             'tenants:read',
             'variants:read',
             'variants:write'
-        ]);
-        expect(ROLE_GRANTS[RoleEnum.OPERATOR]).not.toContain('payouts:confirm');
+        ].sort());
+        // Banning and cancelling a payout are the Owner's alone.
+        expect(ROLE_GRANTS[RoleEnum.OPERATOR]).not.toContain('participants:ban');
+        expect(ROLE_GRANTS[RoleEnum.OPERATOR]).not.toContain('payouts:cancel');
         // Approving a reward is the Operator's; adjusting one is the Support Agent's.
         expect(ROLE_GRANTS[RoleEnum.OPERATOR]).not.toContain('rewards:adjust');
     });
 
     it('matches the spec Viewer row (plus reading their own tenant)', () => {
         expect([...ROLE_GRANTS[RoleEnum.VIEWER]].sort()).toEqual([
+            'analytics:query',
             'analytics:read',
             'campaigns:read',
+            'payouts:read',
             'programs:read',
             'referrals:read',
             'rewards:read',
@@ -72,9 +99,10 @@ describe('Permission catalog (API Contract §2)', () => {
     it('matches the spec Support Agent row — read, plus three live-checked writes', () => {
         expect([...ROLE_GRANTS[RoleEnum.SUPPORT]].sort()).toEqual([
             'analytics:read',
+            'participants:note',
+            'participants:read',
+            'payouts:read',
             'referrals:read',
-            'referrers:note',
-            'referrers:read',
             'rewards:adjust',
             'rewards:read',
             'rewards:resend_email',
@@ -116,7 +144,10 @@ describe('Permission catalog (API Contract §2)', () => {
             // agent's access was revoked.
             'rewards:adjust',
             'rewards:resend_email',
-            'referrers:note'
+            'participants:note',
+            // v5.1 section 4: banning is terminal and cancelling stops money.
+            'participants:ban',
+            'payouts:cancel'
         ] as const) {
             expect(LIVE_CHECK_PERMISSIONS.has(permission)).toBe(true);
         }
@@ -237,8 +268,38 @@ describe('KetoProvisioningService', () => {
     });
 
     it('grants a new tenant its full role matrix', async () => {
+        keto.listTuples.mockResolvedValue([]);
         await provisioning.grantTenant('t1');
         expect(keto.patchTuples.mock.calls[0]![0]).toHaveLength(tenantGrantTuples('t1').length);
+    });
+
+    /** A permission taken from a role in the catalogue is taken from every existing tenant too (E1 D2). */
+    it('deletes, in the same batch, a role grant the catalogue no longer holds, and leaves direct tuples alone', async () => {
+        const stale = {
+            namespace: 'segments',
+            object: 't1',
+            relation: 'read',
+            subject_set: { namespace: 'role', object: 't1:viewer', relation: 'member' }
+        };
+        const kept = tenantGrantTuples('t1').find((tuple) => tuple.namespace === 'segments')!;
+        const directUser = { namespace: 'segments', object: 't1', relation: 'read', subject_id: 'user:u9' };
+        keto.listTuples.mockImplementation(async (query) => (query.namespace === 'segments' ? [stale, kept, directUser] : []));
+
+        await provisioning.grantTenant('t1');
+
+        const patches = keto.patchTuples.mock.calls[0]![0] as KetoTuplePatch[];
+        expect(patches.filter((p) => p.action === 'delete')).toEqual([{ action: 'delete', relation_tuple: stale }]);
+        expect(patches.filter((p) => p.action === 'insert')).toHaveLength(tenantGrantTuples('t1').length);
+    });
+
+    it('retires the referrers, dsr and connections namespaces, and survives one already gone from Keto', async () => {
+        keto.deleteTuples.mockRejectedValueOnce(new Error('unknown namespace')).mockResolvedValue(undefined);
+        await provisioning.retireNamespaces();
+        expect(keto.deleteTuples.mock.calls.map(([query]) => query)).toEqual([
+            { namespace: 'referrers' },
+            { namespace: 'dsr' },
+            { namespace: 'connections' }
+        ]);
     });
 });
 
@@ -249,6 +310,8 @@ describe('Keto namespace deployment config', () => {
         const dir = `${__dirname}/../../../../deployment/ory/keto/namespaces`;
         const declared = readdirSync(dir).map((file) => (JSON.parse(readFileSync(`${dir}/${file}`, 'utf8')) as { name: string }).name);
 
-        expect(declared.sort()).toEqual(['platform', 'role', 'services', ...Object.keys(PERMISSION_CATALOG)].sort());
+        // The retired namespaces stay declared until the v5.1 re-provisioning has deleted their tuples in
+        // every environment (expand, then contract); then their files go (NOTE.md V5.24).
+        expect(declared.sort()).toEqual(['platform', 'role', 'services', ...Object.keys(PERMISSION_CATALOG), ...RETIRED_NAMESPACES].sort());
     });
 });

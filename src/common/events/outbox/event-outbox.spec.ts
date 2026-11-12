@@ -19,7 +19,7 @@ import { isPublishedEvent, toPublishedEvents } from './published-events';
 
 describe('Published events registry', () => {
     it('publishes the Event Model v2.1 §4.12 identity events with their spec properties', () => {
-        const [registered] = toPublishedEvents('user.registered', new UserRegisteredEvent('u1', 't1', 'OWNER'));
+        const [registered] = toPublishedEvents('user.registered', new UserRegisteredEvent('u1', 't1', 'owner'));
         expect(registered).toMatchObject({
             eventType: 'user.registered',
             externalId: 'user.registered:u1',
@@ -99,7 +99,7 @@ describe('EventOutboxWriter', () => {
 
     it('writes publishable events with the transaction client, inside the transaction, as canonical v3 envelopes', async () => {
         const txCreateMany = jest.fn();
-        const event = new UserRegisteredEvent('u1', 't1', 'OPERATOR', 'actor-1');
+        const event = new UserRegisteredEvent('u1', 't1', 'operator', 'actor-1');
 
         await hook({ eventOutbox: { createMany: txCreateMany } } as unknown as Prisma.TransactionClient, [
             { event: 'user.registered', payload: event },
@@ -132,7 +132,7 @@ describe('EventOutboxWriter', () => {
     });
 
     it('does not write the same event again when it is emitted after commit', async () => {
-        const event = new UserRegisteredEvent('u1', 't1', 'OPERATOR');
+        const event = new UserRegisteredEvent('u1', 't1', 'operator');
         await hook({ eventOutbox: { createMany: jest.fn() } } as unknown as Prisma.TransactionClient, [{ event: 'user.registered', payload: event }]);
 
         await writer.onEmitted(event);
@@ -141,7 +141,7 @@ describe('EventOutboxWriter', () => {
     });
 
     it('records events emitted outside a transaction when they are emitted', async () => {
-        await writer.onEmitted(new UserRegisteredEvent('u2', 't1', 'VIEWER'));
+        await writer.onEmitted(new UserRegisteredEvent('u2', 't1', 'viewer'));
         expect(createMany).toHaveBeenCalledWith({ data: [expect.objectContaining({ externalId: 'user.registered:u2' })], skipDuplicates: true });
     });
 });

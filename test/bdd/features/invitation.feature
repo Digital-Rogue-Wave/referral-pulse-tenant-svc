@@ -12,7 +12,7 @@ Feature: Team Invitations
   Scenario: Create a pending invitation
     When I send a POST request to "/api/v1/invitations" with body:
       """
-      { "email": "newteammate@acme.com", "role": "OPERATOR" }
+      { "email": "newteammate@acme.com", "role": "operator" }
       """
     Then the response status should be 201
     And the response should contain a "email" field
