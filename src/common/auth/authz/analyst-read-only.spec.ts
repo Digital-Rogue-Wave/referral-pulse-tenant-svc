@@ -42,7 +42,7 @@ function mutatingRoutes(): { route: string; permissions: string[] }[] {
                 .map(({ name, handler }) => ({
                     route: `${controller.name}.${name}`,
                     permissions:
-                        ((Reflect.getMetadata(PERMISSIONS_KEY, handler) ?? Reflect.getMetadata(PERMISSIONS_KEY, controller)) as
+                        ((Reflect.getMetadata(PERMISSIONS_KEY, handler as object) ?? Reflect.getMetadata(PERMISSIONS_KEY, controller)) as
                             | string[]
                             | undefined) ?? []
                 }))
