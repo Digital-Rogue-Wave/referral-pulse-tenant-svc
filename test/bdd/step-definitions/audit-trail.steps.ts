@@ -9,6 +9,7 @@ import assert from 'assert';
 import { ulid } from 'ulid';
 
 import { ALL_PERMISSIONS } from '../../../src/common/auth/authz/permission-catalog';
+import { denyKetoFor } from '../support/nock.setup';
 import { fixturesPrisma, purgeAuditRows } from '../support/db.fixtures';
 import { makeActiveUserToken } from '../support/jwt.helper';
 import type { BddWorldInterface } from '../support/world';
@@ -34,7 +35,10 @@ async function refusal(attempt: () => Promise<unknown>): Promise<string> {
 
 Given('I am a member of that billing company without tenants:write', function (this: BddWorldInterface) {
     const perms = ALL_PERMISSIONS.filter((p) => p !== 'tenants:write');
-    this.currentToken = makeActiveUserToken(theCompany().tenantId, 'user-bdd-no-tenants-write', [...perms]);
+    // `tenants:write` is live-checked (E1 decision D8), so Keto must deny it too, not only the snapshot.
+    const userId = `user-bdd-no-tenants-write-${ulid()}`;
+    denyKetoFor(`user:${userId}`);
+    this.currentToken = makeActiveUserToken(theCompany().tenantId, userId, [...perms]);
 });
 
 Given('that company has an audit row', async function () {

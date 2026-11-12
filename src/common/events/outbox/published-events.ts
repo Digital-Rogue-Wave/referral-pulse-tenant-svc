@@ -94,7 +94,15 @@ const MAPPERS: Record<string, Mapper<never>> = {
                 tenant_id: e.tenantId,
                 changed_fields: Object.keys(e.changes).sort().join(','),
                 // Services applying the tenant's retention window need the new value, not only the field name.
-                ...(e.changes.retentionMonths ? { retention_months: Number(e.changes.retentionMonths.to) } : {})
+                ...(e.changes.retentionMonths ? { retention_months: Number(e.changes.retentionMonths.to) } : {}),
+                // Services enforcing R-PRT-02 and the payout verification gate keep a copy (E1 D10, D11).
+                ...(e.effectiveInvitationChannel ? { invitation_channel: e.effectiveInvitationChannel } : {}),
+                ...('verificationRequiredAbove' in e.changes
+                    ? {
+                          verification_required_above: (e.changes.verificationRequiredAbove!.to as number | null) ?? null,
+                          verification_required_above_currency: (e.changes.verificationRequiredAboveCurrency?.to as string | null | undefined) ?? null
+                      }
+                    : {})
             }
         }
     ],

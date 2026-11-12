@@ -133,6 +133,8 @@ export const LIVE_CHECK_PERMISSIONS: ReadonlySet<Permission> = new Set<Permissio
     'api_keys:manage',
     'users:write',
     'billing:write',
+    // The Owner settings include R-PRT-02's legal gate (E1 decision D8): a stale token must not flip it.
+    'tenants:write',
     'tenants:delete'
 ]);
 

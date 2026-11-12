@@ -31,7 +31,9 @@ export class TenantUpdatedEvent extends BaseDomainEvent {
         public readonly aggregateId: string,
         public readonly tenantId: string,
         public readonly changes: Record<string, { from: unknown; to: unknown }>,
-        public readonly userId?: string
+        public readonly userId?: string,
+        /** The invitation channel that now applies, when the change could move it (E1 D8/D10). */
+        public readonly effectiveInvitationChannel?: string
     ) {
         super();
     }

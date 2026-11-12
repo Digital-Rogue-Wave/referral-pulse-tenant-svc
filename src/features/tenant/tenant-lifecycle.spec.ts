@@ -1,4 +1,5 @@
 import { BadRequestException, HttpStatus, NotFoundException } from '@nestjs/common';
+import { InvitationChannel } from '@domains/tenant/tenant.types';
 import { ConfigService } from '@nestjs/config';
 import { mock, MockProxy } from 'jest-mock-extended';
 import moment from 'moment';
@@ -109,11 +110,35 @@ describe('TenantService — tenant lifecycle', () => {
 
     describe('updating', () => {
         it('records only what changed and announces it', async () => {
-            await service.update({ name: 'Acme GmbH', retentionMonths: 12 }, OWNER);
+            await service.update({ name: 'Acme GmbH', billingCountry: 'fr' }, OWNER);
 
-            expect(prisma.tenant.update).toHaveBeenCalledWith({ where: { id: 't1' }, data: { name: 'Acme GmbH', retentionMonths: 12 } });
+            expect(prisma.tenant.update).toHaveBeenCalledWith({ where: { id: 't1' }, data: { name: 'Acme GmbH', billingCountry: 'FR' } });
             const [, event] = events.emitAfterCommit.mock.calls[0]!;
-            expect(event).toMatchObject({ changes: { name: { from: 'Acme', to: 'Acme GmbH' }, retentionMonths: { from: 24, to: 12 } } });
+            expect(event).toMatchObject({ changes: { name: { from: 'Acme', to: 'Acme GmbH' }, billingCountry: { to: 'FR' } } });
+        });
+
+        describe('the Owner settings (PATCH /v1/tenant/settings, E1 decision D8)', () => {
+            it('records only the settings that changed, and announces the channel that now applies', async () => {
+                const settings = await service.updateSettings({ invitationChannel: InvitationChannel.FORBIDDEN, retentionMonths: 24 }, OWNER);
+
+                expect(prisma.tenant.update).toHaveBeenCalledWith({ where: { id: 't1' }, data: { invitationChannel: 'forbidden' } });
+                const [, event] = events.emitAfterCommit.mock.calls[0]!;
+                expect(event).toMatchObject({ changes: { invitationChannel: { to: 'forbidden' } }, effectiveInvitationChannel: 'forbidden' });
+                expect(settings).toMatchObject({ invitationChannel: 'forbidden', invitationChannelSource: 'explicit', retentionMonths: 24 });
+            });
+
+            it('stores the verification threshold with its currency, and clears both with null', async () => {
+                await service.updateSettings({ verificationRequiredAbove: 50_000, verificationRequiredAboveCurrency: 'eur' }, OWNER);
+                expect(prisma.tenant.update).toHaveBeenLastCalledWith({
+                    where: { id: 't1' },
+                    data: { verificationRequiredAbove: 50_000, verificationRequiredAboveCurrency: 'EUR' }
+                });
+            });
+
+            it('writes nothing when nothing changed', async () => {
+                await service.updateSettings({ retentionMonths: 24 }, OWNER);
+                expect(prisma.tenant.update).not.toHaveBeenCalled();
+            });
         });
 
         it('writes nothing when nothing changed', async () => {

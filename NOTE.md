@@ -2066,3 +2066,23 @@ re-reads `users`, so a retried or late effect stays harmless. Every membership e
 `replace` (a debounce: a burst ends in one run, two minutes after its last change). The nightly full reconcile
 stays as the safety net. The 2-minute delay is not in the spec (to discuss).
 
+## V5.28 The Owner settings route, the invitation-default lists and the verification threshold (2026-11-12, E1 decisions D8, D9, D11)
+
+**D8.** v5.1's `PATCH /v1/tenant/settings` (JSON, `tenants:write`, Owner only) and `GET` (`tenants:read`) in
+`tenant-settings.controller.ts`, for `invitation_channel` (null = back to the platform default), `retention_months`
+(6-36) and the payout verification threshold. The GET returns the effective channel and
+`invitation_channel_source: explicit | default`. `PUT /v1/tenants` keeps the profile only: the three settings are
+gone from `UpdateTenantDto`, so the global pipe refuses them as unknown fields. `tenants:write` joined the live set
+(not in the method table, which has no row for tenant settings; to discuss). One audited `tenant.updated` per
+change; its properties now carry `invitation_channel` (the value that applies, when the change could move it),
+`retention_months` and `verification_required_above` + `_currency`, so enforcing services keep a copy.
+
+**D9.** `config/legal/invitation-channel-defaults.ts`: `FORBIDDEN_BY_DEFAULT` (DE, NL, DK, SE, FI, NO, IS, v5.1) and
+`ANALYSED_ALLOWED` (FR, ES, IT, BE, AT, IE, PT, LU; for the legal team to confirm). The default is `allowed` only
+for an analysed country; any other country and an unknown one resolve to `forbidden` (not in the spec; to discuss).
+This changes the default of existing tenants with no country, or a country outside both lists, to `forbidden`.
+
+**D11 (tenant side).** `tenants.verification_required_above` (integer minor units) and `_currency` (ISO 4217),
+null = no threshold, with a check constraint (migration `20261112130000_tenant_verification_required_above`). Held
+by the tenant, as v5.1 says; reward-svc keeps a copy from `tenant.updated` (its side is D11's second half).
+

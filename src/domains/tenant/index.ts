@@ -12,7 +12,9 @@ import {
     IsObject,
     Length,
     MaxLength,
-    IsISO31661Alpha2
+    IsISO31661Alpha2,
+    ValidateIf,
+    IsISO4217CurrencyCode
 } from 'class-validator';
 
 import { BaseResponseMapper } from '@common/helper';
@@ -22,9 +24,17 @@ import { InvitationResponse } from '@domains/invitation';
 // Enums (canonical definition lives in tenant.types.ts)
 // ============================================================
 
-import { InvitationChannel, TenantStatus, VerificationRecordStatus, VerificationStatus, VerificationType } from './tenant.types';
+import {
+    InvitationChannel,
+    TenantStatus,
+    VerificationRecordStatus,
+    VerificationStatus,
+    VerificationType,
+    type InvitationChannelSource
+} from './tenant.types';
 export { InvitationChannel, TenantStatus, VerificationRecordStatus, VerificationStatus, VerificationType };
-export { defaultInvitationChannel, effectiveInvitationChannel } from './tenant.types';
+export { defaultInvitationChannel, effectiveInvitationChannel, invitationChannelSource } from './tenant.types';
+export type { InvitationChannelSource } from './tenant.types';
 
 // ============================================================
 // Props (shape of the Prisma model)
@@ -55,6 +65,8 @@ export interface TenantProps {
     invitationChannel?: string | null;
     dataRegion: string;
     retentionMonths: number;
+    verificationRequiredAbove?: number | null;
+    verificationRequiredAboveCurrency?: string | null;
     metadata?: unknown;
     createdAt: Date;
     updatedAt: Date;
@@ -86,6 +98,30 @@ export class UpdateTenantDto {
     @IsString()
     customDomain?: string;
 
+    @ApiPropertyOptional({ description: 'ISO 3166-1 alpha-2 billing country — the input to the invitation-channel default' })
+    @IsOptional()
+    @IsISO31661Alpha2()
+    billingCountry?: string;
+
+    // The Owner settings (invitation channel, retention, verification threshold) moved to
+    // PATCH /v1/tenant/settings (E1 decision D8); sent here they are refused as unknown fields.
+}
+
+/**
+ * `PATCH /v1/tenant/settings` (v5.1 API surface; E1 decision D8): the Owner settings, in JSON, through the
+ * global validation pipe. Every field is optional; `null` resets `invitation_channel` to the platform default
+ * and clears the verification threshold.
+ */
+export class UpdateTenantSettingsDto {
+    @ApiPropertyOptional({
+        enum: InvitationChannel,
+        nullable: true,
+        description: 'R-PRT-02: allowed | forbidden; null = back to the platform default'
+    })
+    @IsOptional()
+    @IsEnum(InvitationChannel)
+    invitationChannel?: InvitationChannel | null;
+
     @ApiPropertyOptional({ minimum: 6, maximum: 36, description: 'Raw-data retention window in months (API §8.3)' })
     @IsOptional()
     @IsInt()
@@ -93,19 +129,38 @@ export class UpdateTenantDto {
     @Max(36)
     retentionMonths?: number;
 
-    @ApiPropertyOptional({ description: 'ISO 3166-1 alpha-2 billing country — the input to the invitation-channel default' })
+    @ApiPropertyOptional({
+        nullable: true,
+        minimum: 0,
+        description: 'Monthly payout amount above which the participant must verify, in minor units; null = none'
+    })
     @IsOptional()
-    @IsISO31661Alpha2()
-    billingCountry?: string;
+    @IsInt()
+    @Min(0)
+    verificationRequiredAbove?: number | null;
 
-    /**
-     * R-PRT-02's legal envelope. Owner-only: the service refuses it from any other role, because a
-     * custom role flipping a jurisdiction gate is exactly what the rule exists to prevent.
-     */
-    @ApiPropertyOptional({ enum: InvitationChannel, description: 'Platform-sent invitations: allowed | forbidden (Owner only)' })
-    @IsOptional()
-    @IsEnum(InvitationChannel)
-    invitationChannel?: InvitationChannel;
+    @ApiPropertyOptional({ example: 'EUR', description: 'ISO 4217 currency of verification_required_above; required with it' })
+    @ValidateIf((dto: UpdateTenantSettingsDto) => dto.verificationRequiredAbove !== undefined && dto.verificationRequiredAbove !== null)
+    @IsISO4217CurrencyCode()
+    verificationRequiredAboveCurrency?: string;
+}
+
+/** `GET /v1/tenant/settings`: what applies, and whether the invitation channel is the Owner's or the default. */
+export class TenantSettingsResponse {
+    @ApiProperty({ enum: InvitationChannel, enumName: 'InvitationChannel' })
+    invitationChannel!: InvitationChannel;
+
+    @ApiProperty({ enum: ['explicit', 'default'] })
+    invitationChannelSource!: InvitationChannelSource;
+
+    @ApiProperty({ minimum: 6, maximum: 36 })
+    retentionMonths!: number;
+
+    @ApiPropertyOptional({ nullable: true, description: 'Minor units; null = no threshold' })
+    verificationRequiredAbove!: number | null;
+
+    @ApiPropertyOptional({ nullable: true })
+    verificationRequiredAboveCurrency!: string | null;
 }
 
 export class TransferOwnershipDto {

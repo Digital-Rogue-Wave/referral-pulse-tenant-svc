@@ -39,7 +39,12 @@ import {
     UpdateVerificationStatusDto,
     VerificationRecordStatus,
     VerificationStatus,
-    VerificationType
+    VerificationType,
+    UpdateTenantSettingsDto,
+    TenantSettingsResponse,
+    invitationChannelSource,
+    effectiveInvitationChannel,
+    type TenantProps
 } from '@domains/tenant';
 
 import {
@@ -394,26 +399,12 @@ export class TenantService {
             changes.customDomain = { from: tenant.customDomain, to: dto.customDomain };
         }
 
-        if (dto.retentionMonths !== undefined && dto.retentionMonths !== tenant.retentionMonths) {
-            updateData.retentionMonths = dto.retentionMonths;
-            changes.retentionMonths = { from: tenant.retentionMonths, to: dto.retentionMonths };
-        }
-
         if (dto.billingCountry !== undefined) {
             const country = dto.billingCountry.toUpperCase();
             if (country !== tenant.billingCountry) {
                 updateData.billingCountry = country;
                 changes.billingCountry = { from: tenant.billingCountry, to: country };
             }
-        }
-
-        // R-PRT-02 makes the invitation channel Owner-only. `tenants:write`, the relation gating this
-        // endpoint, is now held by the Owner alone — the `admin` role that also held it is retired
-        // (R-ACT-01), so the guard is the enforcement and the in-service re-check that used to back
-        // it up is gone (NOTE.md §V5.21).
-        if (dto.invitationChannel !== undefined && dto.invitationChannel !== tenant.invitationChannel) {
-            updateData.invitationChannel = dto.invitationChannel;
-            changes.invitationChannel = { from: tenant.invitationChannel, to: dto.invitationChannel };
         }
 
         if (file) {
@@ -434,12 +425,59 @@ export class TenantService {
 
         const updated = await this.applyChange(tenantId, updateData, (row) => [
             TenantEvents.UPDATED,
-            new TenantUpdatedEvent(row.id, row.id, changes, user.userId)
+            new TenantUpdatedEvent(row.id, row.id, changes, user.userId, changes.billingCountry ? effectiveInvitationChannel(row) : undefined)
         ]);
 
         this.logger.log(`Tenant updated: ${tenantId}`, { tenantId, changes: Object.keys(changes) });
 
         return tenantResponseMapper.toResponse(updated);
+    }
+
+    // =========================================================
+    // Owner settings — PATCH /v1/tenant/settings (E1 decision D8)
+    // =========================================================
+
+    async getSettings(): Promise<TenantSettingsResponse> {
+        return toTenantSettings(await this.findOneOrFail(this.tenantContext.getTenantId()!));
+    }
+
+    /**
+     * The three Owner settings in one audited change: the invitation channel (null = back to the platform
+     * default), the raw-data retention window and the payout verification threshold (null = none).
+     * `tenant.updated` carries the new values, so the services that enforce them keep a copy.
+     */
+    async updateSettings(dto: UpdateTenantSettingsDto, user: IAuthenticatedUser): Promise<TenantSettingsResponse> {
+        const tenantId = this.tenantContext.getTenantId()!;
+        const tenant = await this.findOneOrFail(tenantId);
+        const changes: Record<string, { from: unknown; to: unknown }> = {};
+        const set = (
+            field: 'invitationChannel' | 'retentionMonths' | 'verificationRequiredAbove' | 'verificationRequiredAboveCurrency',
+            to: unknown
+        ): void => {
+            if (to !== undefined && to !== (tenant[field] ?? null)) {
+                changes[field] = { from: tenant[field] ?? null, to };
+            }
+        };
+        set('invitationChannel', dto.invitationChannel);
+        set('retentionMonths', dto.retentionMonths);
+        if (dto.verificationRequiredAbove !== undefined) {
+            const currency = dto.verificationRequiredAbove === null ? null : dto.verificationRequiredAboveCurrency!.toUpperCase();
+            set('verificationRequiredAbove', dto.verificationRequiredAbove);
+            set('verificationRequiredAboveCurrency', currency);
+            if (changes.verificationRequiredAboveCurrency && !changes.verificationRequiredAbove) {
+                changes.verificationRequiredAbove = { from: tenant.verificationRequiredAbove ?? null, to: dto.verificationRequiredAbove };
+            }
+        }
+        if (Object.keys(changes).length === 0) {
+            return toTenantSettings(tenant);
+        }
+        const updateData = Object.fromEntries(Object.entries(changes).map(([field, change]) => [field, change.to]));
+        const updated = await this.applyChange(tenantId, updateData, (row) => [
+            TenantEvents.UPDATED,
+            new TenantUpdatedEvent(row.id, row.id, changes, user.userId, changes.invitationChannel ? effectiveInvitationChannel(row) : undefined)
+        ]);
+        this.logger.log(`Tenant settings updated: ${tenantId}`, { tenantId, changes: Object.keys(changes) });
+        return toTenantSettings(updated);
     }
 
     /**
@@ -717,4 +755,14 @@ export class TenantService {
 
         return base.length >= 3 ? base : fallback.toLowerCase().slice(0, 32);
     }
+}
+
+function toTenantSettings(tenant: TenantProps): TenantSettingsResponse {
+    return Object.assign(new TenantSettingsResponse(), {
+        invitationChannel: effectiveInvitationChannel(tenant),
+        invitationChannelSource: invitationChannelSource(tenant),
+        retentionMonths: tenant.retentionMonths,
+        verificationRequiredAbove: tenant.verificationRequiredAbove ?? null,
+        verificationRequiredAboveCurrency: tenant.verificationRequiredAboveCurrency ?? null
+    });
 }

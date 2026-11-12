@@ -1,3 +1,5 @@
+import { ANALYSED_ALLOWED, FORBIDDEN_BY_DEFAULT } from '@config/legal/invitation-channel-defaults';
+
 /**
  * Tenant lifecycle status (DB Model §3 `tenants.status`). `locked` is this service's additive value for the
  * self-service lock; `closed` is terminal (the tenant was deleted and its PII purged).
@@ -50,22 +52,27 @@ export enum InvitationChannel {
 }
 
 /**
- * The jurisdiction whose law makes platform-sent tell-a-friend email unlawful by default: under
- * BGH 2013 (Empfehlungs-E-Mail) such mail is unsolicited advertising attributable to the company.
- * R-PRT-02 names Germany specifically; the same channel is lawful elsewhere in the EU under
- * legitimate interest with minimisation.
+ * What the platform does when the Owner has made no choice: `allowed` only for a country the legal team has
+ * analysed and cleared, `forbidden` for every other country and for an unknown one (E1 decision D9; the
+ * lists live in `config/legal/invitation-channel-defaults.ts`). Kept as a function rather than a column
+ * default so that correcting a tenant's billing country re-derives the right answer, and so "not chosen"
+ * stays distinguishable from "chosen allowed".
  */
-const FORBIDDEN_BY_DEFAULT_COUNTRIES: readonly string[] = ['DE'];
+export const defaultInvitationChannel = (billingCountry: string | null | undefined): InvitationChannel => {
+    const country = billingCountry?.toUpperCase();
+    if (!country || FORBIDDEN_BY_DEFAULT.includes(country)) {
+        return InvitationChannel.FORBIDDEN;
+    }
+    return ANALYSED_ALLOWED.includes(country) ? InvitationChannel.ALLOWED : InvitationChannel.FORBIDDEN;
+};
 
-/**
- * What the platform does when the Owner has made no choice. Kept as a function rather than a column
- * default so that correcting a tenant's billing country re-derives the right answer, and so "not
- * chosen" stays distinguishable from "chosen allowed".
- */
-export const defaultInvitationChannel = (billingCountry: string | null | undefined): InvitationChannel =>
-    billingCountry && FORBIDDEN_BY_DEFAULT_COUNTRIES.includes(billingCountry.toUpperCase()) ? InvitationChannel.FORBIDDEN : InvitationChannel.ALLOWED;
+/** Whether the effective channel is the Owner's own choice or the platform default. */
+export type InvitationChannelSource = 'explicit' | 'default';
 
 /** The value every other service must honour: the Owner's choice, or the platform default. */
+export const invitationChannelSource = (tenant: { invitationChannel?: string | null }): InvitationChannelSource =>
+    tenant.invitationChannel === InvitationChannel.ALLOWED || tenant.invitationChannel === InvitationChannel.FORBIDDEN ? 'explicit' : 'default';
+
 export const effectiveInvitationChannel = (tenant: { invitationChannel?: string | null; billingCountry?: string | null }): InvitationChannel =>
     tenant.invitationChannel === InvitationChannel.ALLOWED || tenant.invitationChannel === InvitationChannel.FORBIDDEN
         ? tenant.invitationChannel
