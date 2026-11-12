@@ -41,8 +41,8 @@ export class DsrService {
     }
 
     /**
-     * Records a request and starts it. An erasure is queued for fan-out; `access` and `portability`
-     * rest at `accepted` — they are recorded, dated and answerable, but no v5 document specifies what
+     * Records a request, `pending`, and starts it. An erasure is queued for fan-out; `access` and
+     * `portability` stay `pending` — recorded, dated and answerable, but no v5 document specifies what
      * the other six services return for them, and inventing six collect contracts would be worse than
      * saying so (NOTE.md §V5.16).
      */
@@ -61,7 +61,7 @@ export class DsrService {
                     tenantId,
                     ...subject,
                     requestType: dto.requestType,
-                    status: isErasure ? DsrStatus.PENDING : DsrStatus.ACCEPTED,
+                    status: DsrStatus.PENDING,
                     requestedBy: actorUserId,
                     dueAt: dsrDueAt(new Date())
                 }

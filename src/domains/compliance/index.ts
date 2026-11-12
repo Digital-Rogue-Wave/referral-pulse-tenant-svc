@@ -15,17 +15,14 @@ export enum DsrRequestType {
 }
 
 /**
- * R-CPL-02 names the request types but not the lifecycle, so these are this service's.
- *
- * `accepted` is the resting state of an `access` or `portability` request: it is recorded, dated and
- * answerable, but the collect-and-package contract for the other six services does not exist in the v5
- * suite, so nothing is fanned out. Erasure is the one type that runs end to end today — the only one
- * R-CPL-02 specifies a fan-out for. Recorded in NOTE.md §V5.16.
+ * The values the `dsr_requests_status_check` constraint allows. Every request starts `pending`; an
+ * erasure moves on through the fan-out. `access` and `portability` stay `pending` until a collect
+ * contract exists for the other six services (R-CPL-02 specifies a fan-out for erasure only) — NOTE.md
+ * §V5.16, revisited 2026-11-12 (E1 decision D4).
  */
 export enum DsrStatus {
     PENDING = 'pending',
     IN_PROGRESS = 'in_progress',
-    ACCEPTED = 'accepted',
     COMPLETED = 'completed',
     FAILED = 'failed'
 }

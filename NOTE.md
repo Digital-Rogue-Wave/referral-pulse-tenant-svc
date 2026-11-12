@@ -1386,6 +1386,9 @@ subscription, the SQS consumer and the 404-to-pending path have no live run behi
 13. **R-CPL-02 specifies a fan-out for erasure only.** `access` and `portability` are named as DSR
     types in the same sentence and then never given a collect contract, a response format or a
     per-service shape. Implemented as §V5.16 D5-8 — recorded, dated, and resting at `accepted`.
+    **Revisited 2026-11-12 (E1 decision D4):** `accepted` was never in `dsr_requests_status_check`
+    (`pending, in_progress, completed, failed`), so `access` and `portability` answered 500. They now
+    rest at `pending`, the constraint's own first value — no migration, no value the DB Model lacks.
 14. **No v5 document specifies the erasure handler every service is required to implement.** R-CPL-01
     says "every other service implements its own erasure handler and returns a receipt" and R-CPL-02
     lists what each one erases, but no path, no request body and no receipt shape appear anywhere.

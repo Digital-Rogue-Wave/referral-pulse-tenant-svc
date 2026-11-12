@@ -88,7 +88,7 @@ describe('DsrService — POST /v1/data-subject-requests and GET /v1/data-subject
     it('accepts an access request without fanning anything out', async () => {
         const response = await service.create({ requestType: DsrRequestType.ACCESS, subjectEmail: EMAIL }, 'u1');
 
-        expect(response.status).toBe(DsrStatus.ACCEPTED);
+        expect(response.status).toBe(DsrStatus.PENDING);
         expect(bullJobs.addJob).not.toHaveBeenCalled();
         expect(txEvents.emitAfterCommit).toHaveBeenCalledWith(ComplianceEvents.DSR_REQUESTED, expect.anything());
     });
