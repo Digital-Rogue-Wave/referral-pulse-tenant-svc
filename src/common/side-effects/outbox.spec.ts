@@ -142,7 +142,7 @@ describe('Outbox sweeper', () => {
             data: { status: 'pending' }
         });
         expect(bullJobs.addJob).toHaveBeenCalledWith(
-            'outbox-processor',
+            'keto-outbox',
             'process-keto',
             expect.objectContaining({ sideEffectId: 'se-9' }),
             expect.objectContaining({ attempts: 8 })
@@ -153,11 +153,13 @@ describe('Outbox sweeper', () => {
 
 describe('KetoSyncListener', () => {
     let sideEffects: MockProxy<SideEffectService>;
+    let bullJobs: MockProxy<BullJobsService>;
     let listener: KetoSyncListener;
 
     beforeEach(() => {
         sideEffects = mock<SideEffectService>();
-        listener = new KetoSyncListener(sideEffects, mock<AppLoggerService>());
+        bullJobs = mock<BullJobsService>();
+        listener = new KetoSyncListener(sideEffects, bullJobs, mock<AppLoggerService>());
     });
 
     it('queues the tenant grant matrix when a tenant is created and revokes it when deleted', async () => {
@@ -176,6 +178,20 @@ describe('KetoSyncListener', () => {
             { operation: 'assign_role', tenantId: 't1', userId: 'u1', role: RoleEnum.OPERATOR },
             { operation: 'remove_member', tenantId: 't1', userId: 'u1' }
         ]);
+    });
+
+    /** E1 decision D7 (US1.3.1 F3): a burst of changes ends in one reconcile of the tenant, two minutes after the last one. */
+    it('schedules one debounced tenant reconcile per membership change, and none for tenant grants', async () => {
+        await listener.onTenantCreated(new TenantCreatedEvent('t1', 't1', 'Acme', 'acme', 'kratos-1', new Date(), new Date()));
+        await listener.onUserRoleChanged(new UserRoleChangedEvent('u1', 't1', RoleEnum.OWNER, RoleEnum.OPERATOR));
+
+        expect(bullJobs.addJob).toHaveBeenCalledTimes(1);
+        expect(bullJobs.addJob).toHaveBeenCalledWith(
+            'keto-reconciler',
+            'reconcile-tenant',
+            { tenantId: 't1' },
+            { delay: 120_000, deduplication: { id: 'reconcile-tenant:t1', ttl: 120_000, extend: true, replace: true } }
+        );
     });
 
     it('does not throw into the event bus when the outbox write fails — the reconciler repairs it', async () => {

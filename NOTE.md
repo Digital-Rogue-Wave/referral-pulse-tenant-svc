@@ -2056,3 +2056,13 @@ revoked before were marked deleted at the same instant; the migration makes them
 `GET /v1/api-keys` lists live keys by default and `?status=revoked|all` on request; `GET /{id}` answers for a
 revoked key; revoking, rotating or renaming a revoked key is `409`. Validation already refused `revoked_at`.
 
+## V5.27 Keto effects in order, and a tenant reconcile after role changes (2026-11-12, E1 decision D7, US1.3.1 F2/F3)
+
+Keto membership effects leave the shared `outbox-processor` queue for their own `keto-outbox` queue, consumed by
+`KetoOutboxWorkerService` (same processing as the outbox worker) at concurrency 1 per pod and BullMQ global
+concurrency 1 across pods, so a user's successive role changes apply strictly in order. `assign_role` still
+re-reads `users`, so a retried or late effect stays harmless. Every membership effect also schedules one
+`reconcile-tenant` job on `keto-reconciler`, delayed two minutes and deduplicated per tenant with `extend` +
+`replace` (a debounce: a burst ends in one run, two minutes after its last change). The nightly full reconcile
+stays as the safety net. The 2-minute delay is not in the spec (to discuss).
+

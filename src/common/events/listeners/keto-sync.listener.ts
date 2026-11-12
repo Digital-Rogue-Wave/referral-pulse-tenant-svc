@@ -3,6 +3,8 @@ import { OnEvent } from '@nestjs/event-emitter';
 
 import type { IKetoSideEffectPayload } from '@app/types';
 
+import { KETO_RECONCILER_QUEUE, RECONCILE_TENANT_DELAY_MS, RECONCILE_TENANT_JOB } from '@common/auth/authz/keto-tuples';
+import { BullJobsService } from '@common/bulljobs';
 import { AppLoggerService } from '@common/logging/app-logger.service';
 import { SideEffectService } from '@common/side-effects/side-effect.service';
 import { UserDisabledEvent, UserEnabledEvent, UserRegisteredEvent, UserRemovedEvent, UserRoleChangedEvent } from '@domains/user';
@@ -17,6 +19,7 @@ import { TenantCreatedEvent, TenantDeletedEvent, TenantEvents } from '@domains/t
 export class KetoSyncListener {
     constructor(
         private readonly sideEffects: SideEffectService,
+        private readonly bullJobs: BullJobsService,
         private readonly logger: AppLoggerService
     ) {
         this.logger.setContext(KetoSyncListener.name);
@@ -61,6 +64,9 @@ export class KetoSyncListener {
     private async sync(payload: IKetoSideEffectPayload): Promise<void> {
         try {
             await this.sideEffects.createKetoSideEffect(payload);
+            if (payload.userId) {
+                await this.scheduleTenantReconcile(payload.tenantId);
+            }
         } catch (error) {
             // The reconciler restores the state; this is logged so the gap is visible until then.
             this.logger.error('Could not queue Keto sync — the reconciler will repair it', error instanceof Error ? error.stack : undefined, {
@@ -69,5 +75,29 @@ export class KetoSyncListener {
                 userId: payload.userId
             });
         }
+    }
+
+    /**
+     * One reconcile of the tenant two minutes after its last membership change (E1 decision D7, US1.3.1 F3):
+     * a burst of changes resets the delay instead of queuing a run per change, and the run repairs any drift
+     * the ordered effects left. Best effort: the nightly run covers a failure to schedule.
+     */
+    private async scheduleTenantReconcile(tenantId: string): Promise<void> {
+        await this.bullJobs
+            .addJob(
+                KETO_RECONCILER_QUEUE,
+                RECONCILE_TENANT_JOB,
+                { tenantId },
+                {
+                    delay: RECONCILE_TENANT_DELAY_MS,
+                    deduplication: { id: `reconcile-tenant:${tenantId}`, ttl: RECONCILE_TENANT_DELAY_MS, extend: true, replace: true }
+                }
+            )
+            .catch((error: unknown) =>
+                this.logger.warn('Could not schedule the tenant Keto reconcile — the nightly run covers it', {
+                    tenantId,
+                    reason: error instanceof Error ? error.message : 'unknown'
+                })
+            );
     }
 }

@@ -33,8 +33,9 @@ describe('SideEffectService — critical side effects', () => {
         expect(tx.sideEffectOutbox.create).toHaveBeenCalledWith({
             data: expect.objectContaining({ tenantId: 't1', effectType: 'keto', status: 'pending' })
         });
+        // Keto effects run on their own ordered queue (E1 decision D7).
         expect(bullJobs.addJob).toHaveBeenCalledWith(
-            'outbox-processor',
+            'keto-outbox',
             'process-keto',
             expect.objectContaining({ sideEffectId: 'se-1' }),
             expect.objectContaining({ jobId: 'se-1' })

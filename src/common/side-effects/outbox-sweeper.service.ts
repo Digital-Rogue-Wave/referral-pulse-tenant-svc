@@ -13,9 +13,10 @@ import { TracingService } from '@common/monitoring/tracing.service';
 import type { AllConfigType } from '@config/config.type';
 import { DatabaseService } from '@app/database/database.service';
 
+import { outboxQueueFor } from './side-effect-outbox.type';
+
 const SWEEPER_QUEUE = 'outbox-sweeper';
 const SWEEP_JOB = 'sweep-stale-outbox';
-const OUTBOX_QUEUE = 'outbox-processor';
 /** A pending row older than this lost its enqueue (the enqueue is best-effort after the insert). */
 const STALE_PENDING_MS = 60_000;
 /** A row stuck in `processing` this long belongs to a worker that died mid-job. */
@@ -82,7 +83,7 @@ export class OutboxSweeperService extends BaseWorkerService<IBaseJobData> {
                 eventType: row.eventType,
                 tenantId: row.tenantId
             };
-            await this.bullJobs.addJob(OUTBOX_QUEUE, `process-${row.effectType}`, jobData, {
+            await this.bullJobs.addJob(outboxQueueFor(row.effectType), `process-${row.effectType}`, jobData, {
                 jobId: `${row.id}-sweep-${now}`,
                 attempts: Math.max(1, row.maxRetries - row.retryCount),
                 backoff: { type: 'exponential', delay: 5000 },

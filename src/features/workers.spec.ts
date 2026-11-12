@@ -89,6 +89,24 @@ describe('Scheduled workers', () => {
         expect(keto.retireNamespaces).not.toHaveBeenCalled();
     });
 
+    it('a tenant reconcile job re-grants that one tenant and its members only (E1 D7)', async () => {
+        const keto = mock<KetoProvisioningService>();
+        const findMany = jest.fn();
+        const users = jest.fn().mockResolvedValue([{ id: 'u1', role: 'viewer', deletedAt: null, disabledAt: null }]);
+
+        await expect(
+            workerOf(KetoReconcilerWorker, { prisma: { tenant: { findMany }, user: { findMany: users } }, ketoProvisioning: keto })(
+                'reconcile-tenant',
+                {
+                    tenantId: 't7'
+                }
+            )
+        ).resolves.toEqual({ success: true, data: { tenants: 1 } });
+        expect(keto.grantTenant).toHaveBeenCalledWith('t7');
+        expect(keto.assignRole).toHaveBeenCalledWith('t7', 'u1', 'viewer');
+        expect(findMany).not.toHaveBeenCalled();
+    });
+
     it('the run a catalogue change triggers also deletes the retired namespaces before re-granting (E1 D2)', async () => {
         const keto = mock<KetoProvisioningService>();
         const findMany = jest

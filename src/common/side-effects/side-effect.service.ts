@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { ulid } from 'ulid';
 import { Prisma, SideEffectOutbox as SideEffectOutboxModel } from '@prisma-gen/generated/client';
+import { outboxQueueFor } from './side-effect-outbox.type';
 
 import { TenantContextService } from '@app/common/tenant-aware/tenant-context.service';
 import type {
@@ -96,8 +97,6 @@ export interface ISideEffectOptions {
  */
 @Injectable()
 export class SideEffectService {
-    private static readonly OUTBOX_QUEUE_NAME = 'outbox-processor';
-
     constructor(
         private readonly prisma: DatabaseService,
         private readonly tenantContext: TenantContextService,
@@ -235,7 +234,7 @@ export class SideEffectService {
             // Calculate delay if scheduled for the future
             const delay = scheduledAt ? Math.max(0, scheduledAt.getTime() - Date.now()) : 0;
 
-            await this.bullJobsService.addJob(SideEffectService.OUTBOX_QUEUE_NAME, `process-${sideEffect.effectType}`, jobData, {
+            await this.bullJobsService.addJob(outboxQueueFor(sideEffect.effectType), `process-${sideEffect.effectType}`, jobData, {
                 jobId: sideEffect.id,
                 delay,
                 attempts: sideEffect.maxRetries,

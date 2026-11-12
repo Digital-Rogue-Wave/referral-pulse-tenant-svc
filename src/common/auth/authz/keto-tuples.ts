@@ -22,6 +22,13 @@ export const KETO_PLATFORM_ADMIN_RELATION = 'admin';
 export const KETO_SERVICES_NAMESPACE = 'services';
 export const KETO_SERVICE_CALL_RELATION = 'call';
 
+/** The Keto reconciler's queue and its jobs: the nightly full run, and one tenant's run after its role changes. */
+export const KETO_RECONCILER_QUEUE = 'keto-reconciler';
+export const RECONCILE_ALL_JOB = 'reconcile-keto';
+export const RECONCILE_TENANT_JOB = 'reconcile-tenant';
+/** A tenant is reconciled this long after its last role change (debounced, E1 decision D7, US1.3.1 F3). */
+export const RECONCILE_TENANT_DELAY_MS = 2 * 60 * 1000;
+
 /** Capabilities another service (client-credentials token) can be granted on tenant-service's internal API. */
 export enum ServiceCapability {
     TENANT_STATUS_READ = 'tenant_status.read',

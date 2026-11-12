@@ -920,6 +920,17 @@ export interface IJobOptions {
     jobId?: string;
 
     /**
+     * BullMQ deduplication. With `extend` and `replace`, a job added again while the first is still
+     * delayed replaces it and restarts its delay — a debounce.
+     */
+    deduplication?: {
+        id: string;
+        ttl?: number;
+        extend?: boolean;
+        replace?: boolean;
+    };
+
+    /**
      * Remove job on completion
      */
     removeOnComplete?: boolean | number;

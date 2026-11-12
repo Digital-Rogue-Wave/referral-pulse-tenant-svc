@@ -1,6 +1,7 @@
 import { Module, DynamicModule, Global } from '@nestjs/common';
 
 import { OutboxSweeperService } from './outbox-sweeper.service';
+import { KetoOutboxWorkerService } from './keto-outbox-worker.service';
 import { OutboxWorkerService } from './outbox-worker.service';
 import { SideEffectService } from './side-effect.service';
 import { BullJobsModule, BullJobsService } from '../bulljobs';
@@ -26,7 +27,7 @@ export interface SideEffectsModuleOptions {
 @Global()
 @Module({
     imports: [BullJobsModule, LoggingModule, TenantAwareModule],
-    providers: [BullJobsService, SideEffectService, OutboxWorkerService, OutboxSweeperService],
+    providers: [BullJobsService, SideEffectService, OutboxWorkerService, KetoOutboxWorkerService, OutboxSweeperService],
     exports: [SideEffectService]
 })
 export class SideEffectsModule {

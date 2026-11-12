@@ -6,6 +6,7 @@ import { TenantContextService } from '@app/common/tenant-aware/tenant-context.se
 import type { IBaseJobData, IJobResult } from '@app/types';
 
 import { KetoProvisioningService } from '@common/auth/authz/keto-provisioning.service';
+import { KETO_RECONCILER_QUEUE as RECONCILER_QUEUE, RECONCILE_ALL_JOB as RECONCILE_JOB, RECONCILE_TENANT_JOB } from '@common/auth/authz/keto-tuples';
 import { CATALOG_VERSION } from '@common/auth/authz/permission-catalog';
 import { BaseWorkerService, BullJobsConnectionFactory, BullJobsService } from '@common/bulljobs';
 import { RoleEnum } from '@common/enums/role.enum';
@@ -18,8 +19,6 @@ import { TracingService } from '@common/monitoring/tracing.service';
 import type { AllConfigType } from '@config/config.type';
 import { DatabaseService } from '@app/database/database.service';
 
-const RECONCILER_QUEUE = 'keto-reconciler';
-const RECONCILE_JOB = 'reconcile-keto';
 const TENANT_PAGE = 100;
 /** Deleted tenants are re-revoked for this long, which bounds the sweep while covering any missed revocation. */
 const REVOKE_LOOKBACK_DAYS = 30;
@@ -77,6 +76,10 @@ export class KetoReconcilerWorker extends BaseWorkerService<ReconcileJobData> {
     }
 
     protected async processJob(job: Job<ReconcileJobData>): Promise<IJobResult> {
+        if (job.name === RECONCILE_TENANT_JOB) {
+            await this.reconcileTenant(job.data.tenantId);
+            return { success: true, data: { tenants: 1 } };
+        }
         if (job.data?.catalogVersion) {
             await this.ketoProvisioning.retireNamespaces();
         }
