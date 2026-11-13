@@ -159,6 +159,25 @@ describe('Published events — the wire contract of every tenant-service event',
         expect(draft!.properties).toMatchObject({ tenant_id: T, invitation_channel: 'forbidden' });
     });
 
+    it('tells consumers the whole verification threshold when only its amount changed, currency included (E1 D11)', () => {
+        const event = new TenantUpdatedEvent(T, T, { verificationRequiredAbove: { from: 25_000, to: 100_000 } }, 'u1', undefined, {
+            amount: 100_000,
+            currency: 'EUR'
+        });
+
+        const [draft] = toPublishedEvents(event.eventType, event);
+
+        expect(draft!.properties).toMatchObject({ verification_required_above: 100_000, verification_required_above_currency: 'EUR' });
+    });
+
+    it('leaves the threshold out when an update did not touch it, so consumers keep their copy', () => {
+        const event = EVENTS.find((e) => e.eventType === 'tenant.updated')!;
+
+        const [draft] = toPublishedEvents(event.eventType, event);
+
+        expect(draft!.properties).not.toHaveProperty('verification_required_above');
+    });
+
     it('tells consumers which tenant a revoked key belonged to, as api_key.created does (US1.4.2 F2)', () => {
         const event = EVENTS.find((e) => e.eventType === 'api-key.deleted')!;
 

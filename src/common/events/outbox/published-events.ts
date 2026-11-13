@@ -99,10 +99,10 @@ const MAPPERS: Record<string, Mapper<never>> = {
                 ...(e.changes.retentionMonths ? { retention_months: Number(e.changes.retentionMonths.to) } : {}),
                 // Services enforcing R-PRT-02 and the payout verification gate keep a copy (E1 D10, D11).
                 ...(e.effectiveInvitationChannel ? { invitation_channel: e.effectiveInvitationChannel } : {}),
-                ...('verificationRequiredAbove' in e.changes
+                ...(e.verificationThreshold
                     ? {
-                          verification_required_above: (e.changes.verificationRequiredAbove!.to as number | null) ?? null,
-                          verification_required_above_currency: (e.changes.verificationRequiredAboveCurrency?.to as string | null | undefined) ?? null
+                          verification_required_above: e.verificationThreshold.amount,
+                          verification_required_above_currency: e.verificationThreshold.currency
                       }
                     : {})
             }

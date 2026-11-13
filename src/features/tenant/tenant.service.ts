@@ -475,7 +475,16 @@ export class TenantService {
         const updateData = Object.fromEntries(Object.entries(changes).map(([field, change]) => [field, change.to]));
         const updated = await this.applyChange(tenantId, updateData, (row) => [
             TenantEvents.UPDATED,
-            new TenantUpdatedEvent(row.id, row.id, changes, user.userId, changes.invitationChannel ? effectiveInvitationChannel(row) : undefined)
+            new TenantUpdatedEvent(
+                row.id,
+                row.id,
+                changes,
+                user.userId,
+                changes.invitationChannel ? effectiveInvitationChannel(row) : undefined,
+                changes.verificationRequiredAbove || changes.verificationRequiredAboveCurrency
+                    ? { amount: row.verificationRequiredAbove, currency: row.verificationRequiredAboveCurrency }
+                    : undefined
+            )
         ]);
         this.logger.log(`Tenant settings updated: ${tenantId}`, { tenantId, changes: Object.keys(changes) });
         return toTenantSettings(updated);

@@ -35,7 +35,12 @@ export class TenantUpdatedEvent extends BaseDomainEvent {
         public readonly changes: Record<string, { from: unknown; to: unknown }>,
         public readonly userId?: string,
         /** The invitation channel that now applies, when the change could move it (E1 D8/D10). */
-        public readonly effectiveInvitationChannel?: string
+        public readonly effectiveInvitationChannel?: string,
+        /**
+         * The payout verification threshold that now applies, when the change touched it (E1 D11). Sent whole:
+         * `changes` drops an unchanged currency, and reward-service needs both to keep its copy.
+         */
+        public readonly verificationThreshold?: { amount: number | null; currency: string | null }
     ) {
         super();
     }
