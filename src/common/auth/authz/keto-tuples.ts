@@ -99,10 +99,13 @@ function grantTuple(tenantId: string, role: RoleEnum, permission: Permission): K
 /**
  * Narrow service relations written for every tenant (API Contract §2, E1 decision D18): v5.1 §4 grants
  * `payouts:confirm` to `service:payout-worker` ("confirm disburses (also granted to service:payout-worker)").
+ * R-AI-02: the AI's autonomous incentive path runs as `service:ai-optimizer` holding only `variants:write`; campaign-svc
+ * holds every such write to the campaign's optimisation bounds (R-AI-04).
  * Per tenant, never a wildcard object, so a worker acting for one tenant cannot touch another.
  */
 export const SERVICE_GRANTS: Readonly<Record<string, readonly Permission[]>> = {
-    'payout-worker': ['payouts:confirm']
+    'payout-worker': ['payouts:confirm'],
+    'ai-optimizer': ['variants:write']
 };
 
 function serviceGrantTuple(tenantId: string, clientId: string, permission: Permission): KetoRelationTuple {

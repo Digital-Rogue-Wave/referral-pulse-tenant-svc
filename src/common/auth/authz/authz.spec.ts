@@ -184,7 +184,8 @@ describe('Keto tuples', () => {
     /** v5.1 §4 / API §2: "payouts:tenant_acme#confirm@service:payout-worker", per tenant, never a wildcard (E1 D18). */
     it('writes the narrow service relations for that tenant only', () => {
         expect(tenantGrantTuples('t1').filter((tuple) => tuple.subject_id)).toEqual([
-            { namespace: 'payouts', object: 't1', relation: 'confirm', subject_id: 'service:payout-worker' }
+            { namespace: 'payouts', object: 't1', relation: 'confirm', subject_id: 'service:payout-worker' },
+            { namespace: 'variants', object: 't1', relation: 'write', subject_id: 'service:ai-optimizer' }
         ]);
     });
 });
