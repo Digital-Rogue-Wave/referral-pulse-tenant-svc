@@ -19,9 +19,10 @@ import { PERMISSIONS_KEY, PLATFORM_ADMIN_KEY, SERVICE_CAPABILITIES_KEY } from '.
  *
  * - API-key principals never reach this service: keys are gated to ingestion/SDK, and tenant-service
  *   exposes neither.
- * - Service (client-credentials) principals pass only routes marked `@AllowServices`, and only with a
- *   live Keto grant for one of the listed capabilities. Humans never pass a route that only lists
- *   service capabilities.
+ * - Service (client-credentials) principals pass a route marked `@AllowServices` with a live Keto grant for
+ *   one of the listed capabilities, or a route's own permission when Keto holds that narrow relation for the
+ *   service on the tenant it acts for (API §2 "payouts:tenant_acme#confirm@service:payout-worker"; E1 D18).
+ *   Humans never pass a route that only lists service capabilities.
  * - Human principals: `@PlatformAdmin` routes need a live platform grant; `@RequirePermission` routes are
  *   authorized from the JWT `perms` snapshot, except LIVE_CHECK_PERMISSIONS, which re-check Keto.
  * - The tenant is always the one in the verified token — never a header or a route param.
@@ -51,8 +52,9 @@ export class PermissionGuard implements CanActivate {
         }
 
         const capabilities = this.reflector.getAllAndOverride<ServiceCapability[]>(SERVICE_CAPABILITIES_KEY, targets) ?? [];
+        const permissions = this.reflector.getAllAndOverride<Permission[]>(PERMISSIONS_KEY, targets) ?? [];
         if (user.isServiceToken) {
-            return this.authorizeService(user, capabilities);
+            return this.authorizeService(user, capabilities, permissions);
         }
 
         if (this.reflector.getAllAndOverride<boolean>(PLATFORM_ADMIN_KEY, targets)) {
@@ -60,7 +62,6 @@ export class PermissionGuard implements CanActivate {
             return true;
         }
 
-        const permissions = this.reflector.getAllAndOverride<Permission[]>(PERMISSIONS_KEY, targets) ?? [];
         // A route that names service capabilities and nothing for humans is service-to-service only; without
         // this, a dashboard token would sail through for lack of a human permission to check.
         if (capabilities.length > 0 && permissions.length === 0) {
@@ -72,10 +73,18 @@ export class PermissionGuard implements CanActivate {
         return true;
     }
 
-    private async authorizeService(user: IAuthenticatedUser, capabilities: ServiceCapability[]): Promise<boolean> {
+    private async authorizeService(user: IAuthenticatedUser, capabilities: ServiceCapability[], permissions: Permission[]): Promise<boolean> {
         const clientId = user.clientId ?? user.userId;
         for (const capability of capabilities) {
             if (await this.authorization.serviceHas(clientId, capability)) {
+                return true;
+            }
+        }
+        if (user.tenantId && permissions.length > 0) {
+            const held = await Promise.all(
+                permissions.map((permission) => this.authorization.serviceHasPermission(clientId, user.tenantId, permission))
+            );
+            if (held.every(Boolean)) {
                 return true;
             }
         }

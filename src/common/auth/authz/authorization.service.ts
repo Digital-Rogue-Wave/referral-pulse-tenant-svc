@@ -44,6 +44,15 @@ export class AuthorizationService {
     }
 
     /**
+     * A narrow service relation on one tenant (API Contract §2 "payouts:tenant_acme#confirm@service:payout-worker"):
+     * the service may perform this permission for this tenant only. Always live.
+     */
+    async serviceHasPermission(clientId: string, tenantId: string, permission: Permission): Promise<boolean> {
+        const { namespace, relation } = splitPermission(permission);
+        return this.decide(namespace, tenantId, relation, serviceSubject(clientId));
+    }
+
+    /**
      * The `perms` snapshot for the internal JWT (API §2): every catalog permission the user holds in
      * their tenant. Checks run in parallel and share the decision cache, so a warm token re-mint costs
      * Redis round-trips only.

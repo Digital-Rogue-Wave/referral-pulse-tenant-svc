@@ -6,7 +6,14 @@ import { TenantContextService } from '@app/common/tenant-aware/tenant-context.se
 import type { IBaseJobData, IJobResult } from '@app/types';
 
 import { KetoProvisioningService } from '@common/auth/authz/keto-provisioning.service';
-import { KETO_RECONCILER_QUEUE as RECONCILER_QUEUE, RECONCILE_ALL_JOB as RECONCILE_JOB, RECONCILE_TENANT_JOB } from '@common/auth/authz/keto-tuples';
+import {
+    KETO_RECONCILER_QUEUE as RECONCILER_QUEUE,
+    RECONCILE_ALL_JOB as RECONCILE_JOB,
+    RECONCILE_TENANT_JOB,
+    SERVICE_GRANTS
+} from '@common/auth/authz/keto-tuples';
+import { createHash } from 'crypto';
+
 import { CATALOG_VERSION } from '@common/auth/authz/permission-catalog';
 import { BaseWorkerService, BullJobsConnectionFactory, BullJobsService } from '@common/bulljobs';
 import { RoleEnum } from '@common/enums/role.enum';
@@ -25,6 +32,8 @@ const REVOKE_LOOKBACK_DAYS = 30;
 /** Marks a catalogue version as applied; long enough that a version is never re-applied by expiry in practice. */
 const CATALOG_MARKER_TTL_SECONDS = 400 * 24 * 60 * 60;
 const catalogMarkerKey = (version: string): string => `keto:catalog-applied:${version}`;
+/** Role grants and per-tenant service relations together: a change to either re-provisions every tenant once. */
+const GRANTS_VERSION = `${CATALOG_VERSION}.${createHash('sha256').update(JSON.stringify(SERVICE_GRANTS)).digest('hex').slice(0, 8)}`;
 
 interface ReconcileJobData extends IBaseJobData {
     /** Set on the one run a catalogue change triggers: it also deletes the retired namespaces' tuples. */
@@ -68,10 +77,10 @@ export class KetoReconcilerWorker extends BaseWorkerService<ReconcileJobData> {
 
     /** Several worker pods may start together; the NX marker lets exactly one enqueue the re-provisioning. */
     private async applyCatalogOnce(): Promise<void> {
-        const first = await this.redis.setNx(catalogMarkerKey(CATALOG_VERSION), new Date().toISOString(), CATALOG_MARKER_TTL_SECONDS);
+        const first = await this.redis.setNx(catalogMarkerKey(GRANTS_VERSION), new Date().toISOString(), CATALOG_MARKER_TTL_SECONDS);
         if (first) {
-            this.logger.log('Permission catalogue changed — re-provisioning Keto for every tenant', { catalogVersion: CATALOG_VERSION });
-            await this.bullJobs.addJob(RECONCILER_QUEUE, RECONCILE_JOB, { tenantId: 'system', catalogVersion: CATALOG_VERSION });
+            this.logger.log('Permission catalogue changed — re-provisioning Keto for every tenant', { catalogVersion: GRANTS_VERSION });
+            await this.bullJobs.addJob(RECONCILER_QUEUE, RECONCILE_JOB, { tenantId: 'system', catalogVersion: GRANTS_VERSION });
         }
     }
 

@@ -169,7 +169,7 @@ describe('Keto tuples', () => {
     });
 
     it('writes one grant per role permission, each pointing at that tenant’s role members', () => {
-        const tuples = tenantGrantTuples('t1');
+        const tuples = tenantGrantTuples('t1').filter((tuple) => tuple.subject_set);
         const expected = Object.values(ROLE_GRANTS).reduce((sum, grants) => sum + grants.length, 0);
         expect(tuples).toHaveLength(expected);
         expect(tuples).toContainEqual({
@@ -179,6 +179,13 @@ describe('Keto tuples', () => {
             subject_set: { namespace: 'role', object: 't1:operator', relation: 'member' }
         });
         expect(tuples.every((t) => t.object === 't1')).toBe(true);
+    });
+
+    /** v5.1 §4 / API §2: "payouts:tenant_acme#confirm@service:payout-worker", per tenant, never a wildcard (E1 D18). */
+    it('writes the narrow service relations for that tenant only', () => {
+        expect(tenantGrantTuples('t1').filter((tuple) => tuple.subject_id)).toEqual([
+            { namespace: 'payouts', object: 't1', relation: 'confirm', subject_id: 'service:payout-worker' }
+        ]);
     });
 });
 

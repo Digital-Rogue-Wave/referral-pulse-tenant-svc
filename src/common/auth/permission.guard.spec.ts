@@ -61,6 +61,21 @@ describe('PermissionGuard — deny-by-default authorization (API Contract §2)',
             expect(authorization.serviceHas).toHaveBeenCalledWith('workflow-svc', ServiceCapability.USAGE_WRITE);
         });
 
+        /** API §2: "payouts:tenant_acme#confirm@service:payout-worker" — a narrow relation on the tenant it acts for (E1 D18). */
+        it("then a route's own permission admits it when Keto holds that relation for the service on its tenant", async () => {
+            const worker: IAuthenticatedUser = { ...service, tenantId: 'tenant-1', clientId: 'payout-worker' };
+            authorization.serviceHasPermission.mockResolvedValue(true);
+            expect(await run(worker, { [PERMISSIONS_KEY]: ['payouts:confirm'] })).toBe(true);
+            expect(authorization.serviceHasPermission).toHaveBeenCalledWith('payout-worker', 'tenant-1', 'payouts:confirm');
+            authorization.serviceHasPermission.mockResolvedValue(false);
+            expectDenied(await run(worker, { [PERMISSIONS_KEY]: ['payouts:confirm'] }));
+        });
+
+        it('then a service that names no tenant cannot use a tenant relation', async () => {
+            authorization.serviceHasPermission.mockResolvedValue(true);
+            expectDenied(await run(service, { [PERMISSIONS_KEY]: ['payouts:confirm'] }));
+        });
+
         it('then it is refused when Keto has no grant for its client', async () => {
             authorization.serviceHas.mockResolvedValue(false);
             expectDenied(await run(service, { [SERVICE_CAPABILITIES_KEY]: [ServiceCapability.USAGE_WRITE] }));
