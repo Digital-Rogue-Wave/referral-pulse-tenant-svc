@@ -45,7 +45,7 @@ const HASH = 'a'.repeat(64);
 
 /** One representative of every published in-process event. */
 const EVENTS: BaseDomainEvent[] = [
-    new TenantCreatedEvent(T, T, 'Acme', 'acme', 'k1', NOW, NOW, 'u1', { dataRegion: 'eu-central-1', retentionMonths: 24 }),
+    new TenantCreatedEvent(T, T, 'Acme', 'acme', 'k1', NOW, NOW, 'u1', { dataRegion: 'eu-central-1', retentionMonths: 24 }, 'forbidden'),
     new TenantUpdatedEvent(T, T, { retentionMonths: { from: 24, to: 12 } }, 'u1'),
     new TenantSuspendedEvent(T, T, 'fraud', NOW),
     new TenantUnsuspendedEvent(T, T, NOW),
@@ -149,6 +149,14 @@ describe('Published events — the wire contract of every tenant-service event',
             properties: expect.objectContaining({ data_subject_request_id: 'dsr1', request_type: 'erasure' })
         });
         expect(draft!.properties).not.toHaveProperty('dsr_id');
+    });
+
+    it("tells consumers a new tenant's effective invitation channel, so they can keep a copy (E1 D10)", () => {
+        const event = EVENTS.find((e) => e.eventType === 'tenant.created')!;
+
+        const [draft] = toPublishedEvents(event.eventType, event);
+
+        expect(draft!.properties).toMatchObject({ tenant_id: T, invitation_channel: 'forbidden' });
     });
 
     it('tells consumers which tenant a revoked key belonged to, as api_key.created does (US1.4.2 F2)', () => {

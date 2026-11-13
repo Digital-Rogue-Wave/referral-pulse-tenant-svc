@@ -284,7 +284,8 @@ export class TenantService {
                 {
                     dataRegion: created.dataRegion,
                     retentionMonths: created.retentionMonths
-                }
+                },
+                effectiveInvitationChannel(created)
             )
         );
         return { tenant: created, verificationId: verification.id };

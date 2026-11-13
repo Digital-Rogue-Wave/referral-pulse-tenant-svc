@@ -81,7 +81,9 @@ const MAPPERS: Record<string, Mapper<never>> = {
                 trial_started_at: iso(e.trialStartedAt),
                 trial_ends_at: iso(e.trialEndsAt),
                 data_region: e.residency?.dataRegion ?? null,
-                retention_months: e.residency?.retentionMonths ?? null
+                retention_months: e.residency?.retentionMonths ?? null,
+                // R-PRT-02's effective channel: event-ingestion keeps a copy for the widget (E1 D10).
+                invitation_channel: e.invitationChannel ?? null
             }
         }
     ],

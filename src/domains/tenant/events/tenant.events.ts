@@ -18,7 +18,9 @@ export class TenantCreatedEvent extends BaseDomainEvent {
         public readonly trialEndsAt: Date,
         public readonly userId?: string,
         /** Residency and raw-data retention (API §8.3) — services holding event data apply them. */
-        public readonly residency?: { dataRegion: string; retentionMonths: number }
+        public readonly residency?: { dataRegion: string; retentionMonths: number },
+        /** R-PRT-02's effective channel at creation, for the services that keep a copy (E1 D10). */
+        public readonly invitationChannel?: string
     ) {
         super();
     }
