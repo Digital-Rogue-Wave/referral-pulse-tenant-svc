@@ -505,7 +505,8 @@ describe('ConsentConsumer — reading consent off the bus', () => {
     beforeEach(() => {
         consent = mock<ConsentService>();
         consent.record.mockResolvedValue('recorded');
-        consumer = new ConsentConsumer(consent, new JsonService(), logger());
+        // A message that is not a KYB result (E1 D15) falls through to the consent registry.
+        consumer = new ConsentConsumer(consent, { handle: jest.fn().mockResolvedValue(false) } as never, new JsonService(), logger());
     });
 
     const deliver = (body: unknown) => consumer.handle({ Body: JSON.stringify(body) });

@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 
 import { UsersModule } from '@app/features/users/users.module';
+import { VerificationModule } from '@app/features/verification/verification.module';
 import { ServiceTokenProvider } from '@common/clients/service-token.provider';
 
 import { ConsentConsumer } from './consent.consumer';
@@ -19,7 +20,7 @@ import { ErasureClient } from './erasure.client';
  * service's own, so the fan-out calls the handler directly rather than over HTTP to itself.
  */
 @Module({
-    imports: [UsersModule],
+    imports: [UsersModule, VerificationModule],
     controllers: [DsrController],
     providers: [DsrService, DsrFanOutService, DsrFanOutWorker, ErasureClient, ServiceTokenProvider, ConsentService, ConsentConsumer],
     exports: [DsrService]

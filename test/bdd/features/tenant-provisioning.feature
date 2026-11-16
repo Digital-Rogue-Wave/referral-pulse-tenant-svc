@@ -14,7 +14,8 @@ Feature: Tenant provisioning by a Super Admin (US1.1.1)
     Given I am signed in as a Super Admin
     When I create the tenant "Acme Provisioned" for the owner "owner-prov@acme.com"
     Then the response status should be 201
-    And the response holds an active tenant "Acme Provisioned" whose verification is "pending"
+    # E1 D15: a new tenant is unverified until its Owner opens a KYB session.
+    And the response holds an active tenant "Acme Provisioned" whose verification is "unverified"
     And the response holds a pending "owner" invitation for "owner-prov@acme.com"
     And the response carries neither the widget token secret nor the invitation token hash
     And the new tenant has no members yet

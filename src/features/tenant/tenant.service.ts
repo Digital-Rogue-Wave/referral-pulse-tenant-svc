@@ -59,7 +59,6 @@ import {
     TenantDeletionCancelledEvent,
     TenantOwnershipTransferredEvent,
     TenantDomainVerifiedEvent,
-    TenantVerificationRequestedEvent,
     TenantVerificationStatusChangedEvent,
     TenantEvents
 } from '@domains/tenant/events/tenant.events';
@@ -69,6 +68,25 @@ const TRIAL_PERIOD_DAYS = 14;
 
 /** Default days until deletion after scheduling */
 const DEFAULT_DELETION_DAYS = 30;
+
+/** E1 D15: where each verification state may go. A decided verification is final; resubmission opens a new one. */
+const VERIFICATION_TRANSITIONS: Readonly<Record<VerificationRecordStatus, readonly VerificationRecordStatus[]>> = {
+    [VerificationRecordStatus.PENDING]: [
+        VerificationRecordStatus.PENDING,
+        VerificationRecordStatus.IN_REVIEW,
+        VerificationRecordStatus.VERIFIED,
+        VerificationRecordStatus.REJECTED
+    ],
+    [VerificationRecordStatus.IN_REVIEW]: [VerificationRecordStatus.IN_REVIEW, VerificationRecordStatus.VERIFIED, VerificationRecordStatus.REJECTED],
+    [VerificationRecordStatus.VERIFIED]: [],
+    [VerificationRecordStatus.REJECTED]: []
+};
+
+function assertVerificationTransition(from: VerificationRecordStatus, to: VerificationRecordStatus): void {
+    if (!VERIFICATION_TRANSITIONS[from]?.includes(to)) {
+        throw new BaseException('state_conflict', `A verification that is ${from} cannot become ${to}`, HttpStatus.CONFLICT);
+    }
+}
 
 /** A company verification's state as the tenant shows it: an open one (pending or in review) is `pending`. */
 const toTenantVerificationStatus = (status: VerificationRecordStatus): VerificationStatus =>
@@ -192,7 +210,7 @@ export class TenantService {
         const imageId = options.file ? await this.uploadLogo(id, options.file) : undefined;
 
         const { tenant, ownerUser } = await this.prisma.$transaction(async (tx) => {
-            const { tenant: created, verificationId } = await this.insertTenant(tx, {
+            const { tenant: created } = await this.insertTenant(tx, {
                 id,
                 name: data.name,
                 slug,
@@ -200,10 +218,6 @@ export class TenantService {
                 ownerIdentityId: owner.identityId
             });
             const createdOwner = await this.usersService.createOwner(tx, created.id, owner);
-            this.txEventEmitter.emitAfterCommit(
-                TenantEvents.VERIFICATION_REQUESTED,
-                new TenantVerificationRequestedEvent(created.id, created.id, created.name, createdOwner.id, verificationId)
-            );
             return { tenant: created, ownerUser: createdOwner };
         });
 
@@ -239,13 +253,14 @@ export class TenantService {
     }
 
     /**
-     * Writes the tenant row and its company verification inside the caller's transaction and queues
-     * `tenant.created`. The caller adds the Owner (self-onboarding) or the Owner's invitation (platform admin).
+     * Writes the tenant row inside the caller's transaction and queues `tenant.created`. The caller adds the Owner
+     * (self-onboarding) or the Owner's invitation (platform admin). A new tenant is `unverified` with no verification
+     * row: company verification starts when the Owner opens a KYB session (`POST /v1/verification`, E1 D15).
      */
     async insertTenant(
         tx: Prisma.TransactionClient,
         params: { id: string; name: string; slug: string; imageId?: string; ownerIdentityId: string | null; actingUserId?: string }
-    ): Promise<{ tenant: Tenant; verificationId: string }> {
+    ): Promise<{ tenant: Tenant }> {
         const trialStartedAt = this.dateService.nowMoment().toDate();
         const trialEndsAt = this.dateService.nowMoment().add(TRIAL_PERIOD_DAYS, 'days').toDate();
         const created = await tx.tenant.create({
@@ -255,7 +270,7 @@ export class TenantService {
                 slug: params.slug,
                 imageId: params.imageId ?? null,
                 status: TenantStatus.ACTIVE,
-                verificationStatus: VerificationStatus.PENDING,
+                verificationStatus: VerificationStatus.UNVERIFIED,
                 paymentStatus: 'active',
                 trialStartedAt,
                 trialEndsAt,
@@ -267,8 +282,6 @@ export class TenantService {
                 widgetTokenSecret: this.widgetSecretVault.generate().sealed
             }
         });
-        // Company verification at signup: the workflow service runs the account_verification workflow.
-        const verification = await tx.tenantVerification.create({ data: { tenantId: created.id, verificationType: VerificationType.COMPANY } });
         // Emitted before the owner's user.registered so the tenant's Keto grants are queued first.
         this.txEventEmitter.emitAfterCommit(
             TenantEvents.CREATED,
@@ -288,7 +301,7 @@ export class TenantService {
                 effectiveInvitationChannel(created)
             )
         );
-        return { tenant: created, verificationId: verification.id };
+        return { tenant: created };
     }
 
     /** Self-service tenant creation by a signed-in identity that has no tenant yet. */
@@ -313,18 +326,19 @@ export class TenantService {
     }
 
     /**
-     * Apply a company-verification decision (called by the workflow service's
-     * account_verification workflow via the internal endpoint). Updates verification_status
-     * and emits tenant.verification_status_changed.
-     */
-    /**
-     * Records the account_verification workflow's report in `tenant_verifications` and, for a company
-     * verification, moves `tenants.verification_status` with it — both in one transaction.
+     * Records a verification report — the KYB provider's result, a Super Admin's decision, or the internal route's — in
+     * `tenant_verifications` and, for a company verification, moves `tenants.verification_status` with it, in one
+     * transaction. A verification moves `pending → in_review → verified | rejected` (`pending` may also be decided
+     * directly); a decided one never moves again — a rejected company resubmits, which opens a new row (E1 D15). Any other
+     * move is a 409, and a rejection needs a reason.
      */
     async applyVerificationReport(tenantId: string, dto: UpdateVerificationStatusDto): Promise<TenantResponse> {
         const existing = await this.prisma.tenant.findUnique({ where: { id: tenantId } });
         if (!existing) {
             throw new NotFoundException(`Tenant with ID ${tenantId} not found`);
+        }
+        if (dto.status === VerificationRecordStatus.REJECTED && !dto.reason?.trim()) {
+            throw new BaseException('missing_required_field', 'A rejection needs a reason', HttpStatus.BAD_REQUEST, 'reason');
         }
         const type = dto.verificationType ?? VerificationType.COMPANY;
         const decided = dto.status === VerificationRecordStatus.VERIFIED || dto.status === VerificationRecordStatus.REJECTED;
@@ -332,6 +346,11 @@ export class TenantService {
 
         const updated = await this.prisma.$transaction(async (tx) => {
             const record = await this.openVerification(tx, tenantId, type, dto.verificationId);
+            if (record) {
+                assertVerificationTransition(record.status as VerificationRecordStatus, dto.status);
+            } else if (type === VerificationType.COMPANY) {
+                throw new BaseException('state_conflict', 'No company verification is in progress', HttpStatus.CONFLICT);
+            }
             const data = {
                 status: dto.status,
                 reason: dto.reason ?? null,

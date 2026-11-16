@@ -307,6 +307,11 @@ envVars:
   # tuple like the rest of the fleet, so the token has to carry this as well as the grant.
   SERVICE_AUTH_SCOPE: "dsr.erase"
   SERVICE_NOTIFICATIONS_URL: "http://referral-pulse-notification-svc.default.svc.cluster.local:5005"
+  # Company verification (E1 D15): the KYB provider, its verification level (set in the Sumsub dashboard) and link life.
+  KYB_PROVIDER: "sumsub"
+  SUMSUB_BASE_URL: "https://api.sumsub.com"
+  SUMSUB_LEVEL_NAME: ""
+  KYB_LINK_TTL_SECONDS: "1800"
 
 # -------- Secret (sensitive env) --------
 secretVars:
@@ -327,6 +332,9 @@ secretVars:
   # This service's own Hydra client secret, for the erasure fan-out's outbound calls. Its client id and
   # token URL are in envVars; this half is not.
   SERVICE_AUTH_CLIENT_SECRET: ""
+  # Sumsub API credentials (E1 D15). Opening a verification session fails loudly without them.
+  SUMSUB_APP_TOKEN: ""
+  SUMSUB_SECRET_KEY: ""
   CH_PASSWORD: "sa"
   REDIS_USERNAME: "appuser"
   REDIS_PASSWORD: "super-secret"

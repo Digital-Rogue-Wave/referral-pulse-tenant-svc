@@ -1,5 +1,6 @@
 import type { AppConfig } from './app.config';
 import type { AuthConfig } from './auth.config';
+import type { KybConfig } from './kyb.config';
 import type { AwsConfig } from './aws.config';
 import type { BillingConfig } from './billing.config';
 import type { ConnectionConfig } from './connection.config';
@@ -26,6 +27,7 @@ export interface AllConfigType {
     aws: AwsConfig;
     redis: RedisConfig;
     auth: AuthConfig;
+    kyb: KybConfig;
     tracing: TracingConfig;
     http: HttpConfig;
     resilience: ResilienceConfig;

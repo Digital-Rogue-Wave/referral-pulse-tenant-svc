@@ -78,17 +78,14 @@ describe('TenantService.create — tenant onboarding', () => {
             expect(tx.tenant.create).toHaveBeenCalledWith({ data: expect.objectContaining({ name: 'Acme', status: 'active' }) });
             expect(users.createOwner).toHaveBeenCalledWith(tx, tenant.id, owner);
             expect(events.emitAfterCommit).toHaveBeenCalledWith('tenant.created', expect.objectContaining({ tenantId: tenant.id }));
-            expect(events.emitAfterCommit).toHaveBeenCalledWith(
-                'tenant.verification_requested',
-                expect.objectContaining({ tenantId: tenant.id, verificationId: 'verif-1' })
-            );
+            expect(events.emitAfterCommit).not.toHaveBeenCalledWith('tenant.verification_requested', expect.anything());
         });
 
-        it('then its company verification is opened in the same transaction and the tenant shows as pending', async () => {
-            const tenant = await service.create({ name: 'Acme' }, owner, { onExisting: 'conflict' });
+        it('then the tenant starts unverified, with no verification until the Owner opens one (E1 D15)', async () => {
+            await service.create({ name: 'Acme' }, owner, { onExisting: 'conflict' });
 
-            expect(tx.tenantVerification.create).toHaveBeenCalledWith({ data: { tenantId: tenant.id, verificationType: 'company' } });
-            expect(tx.tenant.create).toHaveBeenCalledWith({ data: expect.objectContaining({ verificationStatus: 'pending' }) });
+            expect(tx.tenantVerification.create).not.toHaveBeenCalled();
+            expect(tx.tenant.create).toHaveBeenCalledWith({ data: expect.objectContaining({ verificationStatus: 'unverified' }) });
         });
 
         it('then a taken slug is refused with 409 before anything is written', async () => {

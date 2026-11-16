@@ -15,6 +15,7 @@ import { HealthModule } from '@app/health/health.module';
 import { ApiKeyModule } from '@app/features/api-key/api-key.module';
 import { AuditLogModule } from '@app/features/audit-log/audit-log.module';
 import { BreakGlassModule } from '@app/features/break-glass/break-glass.module';
+import { VerificationModule } from '@app/features/verification/verification.module';
 import { BillingModule } from '@app/features/billing/billing.module';
 import { ComplianceModule } from '@app/features/compliance/compliance.module';
 
@@ -63,6 +64,7 @@ import { WireCaseInterceptor } from '@common/http-contract/wire-case.interceptor
         ApiKeyModule,
         AuditLogModule,
         BreakGlassModule,
+        VerificationModule,
         BillingModule,
         ComplianceModule,
         ConnectionModule,

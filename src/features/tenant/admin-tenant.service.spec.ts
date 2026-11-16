@@ -59,10 +59,8 @@ describe('AdminTenantService.create — tenant provisioning by a platform admin'
             role: RoleEnum.OWNER,
             actingUserId: 'admin-1'
         });
-        expect(events.emitAfterCommit).toHaveBeenCalledWith(
-            'tenant.verification_requested',
-            expect.objectContaining({ tenantId: inserted.id, userId: 'admin-1', verificationId: 'verif-1' })
-        );
+        // E1 D15: verification starts when the Owner opens a KYB session, not at creation.
+        expect(events.emitAfterCommit).not.toHaveBeenCalledWith('tenant.verification_requested', expect.anything());
         expect(result.tenant).toMatchObject({ id: inserted.id, name: 'Acme', slug: 'acme' });
         expect(result.ownerInvitation).toMatchObject({ email: 'owner@acme.com', role: RoleEnum.OWNER, status: 'pending' });
     });
