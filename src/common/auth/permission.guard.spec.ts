@@ -47,6 +47,54 @@ describe('PermissionGuard — deny-by-default authorization (API Contract §2)',
         expect(await run(undefined, { [IS_PUBLIC_KEY]: true })).toBe(true);
     });
 
+    /** Product Spec R-ACT-02 (E1 D17): Super Admins are ReferralAI staff, never tenant subjects. */
+    describe('given a platform-console principal (ReferralAI staff)', () => {
+        const staff: IAuthenticatedUser = { userId: 'staff:id-1', tenantId: '', identityId: 'id-1', source: 'platform', perms: [] };
+
+        it('then a platform-admin route admits it once Keto confirms the grant on the staff identity', async () => {
+            authorization.isPlatformAdmin.mockResolvedValue(true);
+            expect(await run(staff, { [PLATFORM_ADMIN_KEY]: true })).toBe(true);
+            expect(authorization.isPlatformAdmin).toHaveBeenCalledWith('id-1');
+        });
+
+        it('then without the grant it is refused', async () => {
+            authorization.isPlatformAdmin.mockResolvedValue(false);
+            expectDenied(await run(staff, { [PLATFORM_ADMIN_KEY]: true }));
+        });
+
+        it('then a tenant route is refused: it holds no tenant', async () => {
+            expectDenied(await run(staff, { [PERMISSIONS_KEY]: ['tenants:read'] }));
+        });
+    });
+
+    describe('given a break-glass principal (E1 D17)', () => {
+        const breakGlass: IAuthenticatedUser = {
+            userId: '',
+            tenantId: 'tenant-1',
+            identityId: 'id-1',
+            source: 'break_glass',
+            perms: ['tenants:read', 'rewards:read']
+        };
+
+        it('then a read in its snapshot is allowed', async () => {
+            expect(await run(breakGlass, { [PERMISSIONS_KEY]: ['rewards:read'] })).toBe(true);
+        });
+
+        it('then anything outside the snapshot is refused', async () => {
+            expectDenied(await run(breakGlass, { [PERMISSIONS_KEY]: ['tenants:write'] }));
+        });
+
+        it('then a live-checked permission is refused even if the snapshot carried it, without asking Keto', async () => {
+            expectDenied(await run({ ...breakGlass, perms: ['api_keys:manage'] }, { [PERMISSIONS_KEY]: ['api_keys:manage'] }));
+            expect(authorization.userHas).not.toHaveBeenCalled();
+        });
+
+        it('then a platform-admin route is refused: break-glass is tenant access, not platform power', async () => {
+            authorization.isPlatformAdmin.mockResolvedValue(true);
+            expectDenied(await run(breakGlass, { [PLATFORM_ADMIN_KEY]: true }));
+        });
+    });
+
     describe('given an API-key principal', () => {
         it('then every tenant-service route is refused — keys are limited to ingestion and the SDK', async () => {
             expectDenied(await run(apiKey, {}));
@@ -108,12 +156,10 @@ describe('PermissionGuard — deny-by-default authorization (API Contract §2)',
             expect(await run(human(), { [PERMISSIONS_KEY]: ['users:write'] })).toBe(true);
         });
 
-        it('then a platform-admin route needs a live platform grant, whatever the tenant role', async () => {
-            authorization.isPlatformAdmin.mockResolvedValue(false);
-            expectDenied(await run(human(['tenants:write', 'tenants:delete']), { [PLATFORM_ADMIN_KEY]: true }));
-
+        it('then a platform-admin route is refused, whatever the tenant role and whatever Keto holds (E1 D17)', async () => {
             authorization.isPlatformAdmin.mockResolvedValue(true);
-            expect(await run(human(), { [PLATFORM_ADMIN_KEY]: true })).toBe(true);
+            expectDenied(await run(human(['tenants:write', 'tenants:delete']), { [PLATFORM_ADMIN_KEY]: true }));
+            expect(authorization.isPlatformAdmin).not.toHaveBeenCalled();
         });
 
         it('then a route that lists only service capabilities is refused — it is service-to-service', async () => {

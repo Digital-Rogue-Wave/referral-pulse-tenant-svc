@@ -10,7 +10,7 @@ import { After, Before, Given, Then, When } from '@cucumber/cucumber';
 import assert from 'assert';
 import { createHash, randomUUID } from 'crypto';
 
-import { BDD_OWNER, makeActiveUserToken, makeInviteeToken } from '../support/jwt.helper';
+import { BDD_OWNER, BDD_STAFF_IDENTITY, makeActiveUserToken, makeInviteeToken, makePlatformToken } from '../support/jwt.helper';
 import { denyKetoFor, stubKratosIdentity } from '../support/nock.setup';
 import { fixturesPrisma, purgeAuditRows } from '../support/db.fixtures';
 import type { BddWorldInterface } from '../support/world';
@@ -67,8 +67,9 @@ async function postTenant(world: BddWorldInterface, body: Record<string, string>
 
 // ─── Given ───────────────────────────────────────────────────────────────────
 
+// E1 D17: a Super Admin signs in through the platform console and is never a tenant user.
 Given('I am signed in as a Super Admin', function (this: BddWorldInterface) {
-    this.currentToken = makeActiveUserToken(ADMIN_TENANT_ID, BDD_OWNER.userId);
+    this.currentToken = makePlatformToken();
 });
 
 Given('I am signed in as a tenant Owner without the platform grant', function (this: BddWorldInterface) {
@@ -178,7 +179,7 @@ Then('{string} is queued in the outbox for the new tenant', async function (even
 Then('the creation of the new tenant is audit-logged with the Super Admin as actor', async function () {
     const rows = await fixturesPrisma.auditLog.findMany({ where: { tenantId: newTenant().id, action: 'tenant.created' } });
     assert.strictEqual(rows.length, 1, `Expected one tenant.created audit row, found ${rows.length}`);
-    assert.strictEqual(rows[0]!.actorUserId, BDD_OWNER.userId);
+    assert.strictEqual(rows[0]!.actorUserId, `staff:${BDD_STAFF_IDENTITY}`);
 });
 
 Then('{string} is the {string} of the new tenant', async function (email: string, role: string) {

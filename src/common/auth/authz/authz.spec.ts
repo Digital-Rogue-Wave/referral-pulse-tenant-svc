@@ -235,9 +235,10 @@ describe('AuthorizationService', () => {
 
     it('checks platform admins and service capabilities on their own namespaces', async () => {
         keto.check.mockResolvedValue(true);
-        await service.isPlatformAdmin('u9');
+        await service.isPlatformAdmin('kratos-9');
         await service.serviceHas('workflow-svc', ServiceCapability.TENANT_STATUS_READ);
-        expect(keto.check).toHaveBeenCalledWith('platform', 'referralai', 'admin', 'user:u9');
+        // E1 D17: the subject is the staff identity, never a tenant user.
+        expect(keto.check).toHaveBeenCalledWith('platform', 'referralai', 'admin', 'staff:kratos-9');
         expect(keto.check).toHaveBeenCalledWith('services', 'tenant_status.read', 'call', 'service:workflow-svc');
     });
 });

@@ -35,8 +35,12 @@ export class AuthorizationService {
         return this.decide(namespace, tenantId, relation, userSubject(userId));
     }
 
-    async isPlatformAdmin(userId: string): Promise<boolean> {
-        return this.decide(KETO_PLATFORM_NAMESPACE, KETO_PLATFORM_OBJECT, KETO_PLATFORM_ADMIN_RELATION, userSubject(userId));
+    /**
+     * `platform:referralai#admin@staff:{kratos identity id}` (E1 D17). Staff are not tenant users, so the subject is their
+     * identity, never a `user:` ULID: no tenant tuple can ever stand for a Super Admin.
+     */
+    async isPlatformAdmin(staffIdentityId: string): Promise<boolean> {
+        return this.decide(KETO_PLATFORM_NAMESPACE, KETO_PLATFORM_OBJECT, KETO_PLATFORM_ADMIN_RELATION, `staff:${staffIdentityId}`);
     }
 
     async serviceHas(clientId: string, capability: ServiceCapability): Promise<boolean> {

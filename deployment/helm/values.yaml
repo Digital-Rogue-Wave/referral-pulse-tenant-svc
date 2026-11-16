@@ -278,6 +278,8 @@ envVars:
   # Must match Hydra's own urls.self.issuer exactly, including the trailing slash.
   AUTH_ISSUER: "http://hydra-public.ory.svc.cluster.local:4444/"
   AUTH_AUDIENCE: "frontend-tenant"
+  # The Hydra client ReferralAI staff sign in through: its tokens become platform tokens, never tenant ones (E1 D17).
+  AUTH_PLATFORM_CONSOLE_CLIENT_ID: "platform-console"
   # This service's own JWKS, served at /.well-known/jwks.json outside the API prefix.
   AUTH_INTERNAL_JWKS_URI: "http://referral-pulse-tenant-svc.default.svc.cluster.local:8080/.well-known/jwks.json"
   AUTH_INTERNAL_ISSUER: "referralai-tenant-svc"

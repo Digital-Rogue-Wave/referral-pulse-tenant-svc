@@ -19,7 +19,12 @@ const schema = z.object({
     algorithms: z.string().transform((val) => val.split(',').map((s) => s.trim())),
     clockTolerance: z.coerce.number().int().min(0),
     cacheEnabled: z.preprocess((val) => val === 'true', z.boolean()),
-    cacheTtl: z.coerce.number().int().positive()
+    cacheTtl: z.coerce.number().int().positive(),
+    /**
+     * The Hydra client ReferralAI staff sign in through (E1 D17). Its tokens carry this audience and are exchanged for a
+     * platform token with no tenant, never for a tenant membership.
+     */
+    platformConsoleClientId: z.string().min(1).default('platform-console')
 });
 
 export type AuthConfig = z.infer<typeof schema>;
@@ -35,7 +40,8 @@ export default registerAs('auth', (): AuthConfig => {
         algorithms: process.env.AUTH_ALGORITHMS,
         clockTolerance: process.env.AUTH_CLOCK_TOLERANCE,
         cacheEnabled: process.env.AUTH_CACHE_ENABLED,
-        cacheTtl: process.env.AUTH_CACHE_TTL
+        cacheTtl: process.env.AUTH_CACHE_TTL,
+        platformConsoleClientId: process.env.AUTH_PLATFORM_CONSOLE_CLIENT_ID || undefined
     });
 
     if (!result.success) {

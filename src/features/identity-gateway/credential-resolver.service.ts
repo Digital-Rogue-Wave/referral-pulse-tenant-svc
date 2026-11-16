@@ -12,6 +12,7 @@ import { BaseException } from '@common/exceptions/base.exceptions';
 import { RedisService } from '@common/redis/redis.service';
 import { DatabaseService } from '@app/database/database.service';
 import { ApiKeyService } from '@app/features/api-key/api-key.service';
+import { BREAK_GLASS_PERMISSIONS, BreakGlassService } from '@app/features/break-glass/break-glass.service';
 import { ApiKeyType } from '@domains/api-key';
 import { TenantStatus } from '@domains/tenant/tenant.types';
 
@@ -21,9 +22,18 @@ import { InternalTokenService, IssuedToken } from './internal-token.service';
 
 /** API-key exchanges are re-resolved at least this often so a revocation lands within a minute. */
 const API_KEY_EXCHANGE_TTL_SECONDS = 60;
+/** A break-glass token outlives its request by a minute at most, so reads stay on the gateway, where they are audited. */
+const BREAK_GLASS_TOKEN_TTL_SECONDS = 60;
 
 export interface ResolvedCredential extends IssuedToken {
     claims: IInternalTokenClaims;
+}
+
+/** What the gateway forwards about the request being authorized (Traefik forwardAuth `X-Forwarded-*`). */
+export interface ExchangeContext {
+    breakGlassTenantId?: string;
+    method?: string;
+    uri?: string;
 }
 
 /**
@@ -55,6 +65,7 @@ function tenantExchangesKey(tenantId: string): string {
 export class CredentialResolverService {
     private readonly hydraJwks: JwksClient;
     private readonly hydra: { issuer: string; audience: string; algorithms: jwt.Algorithm[]; clockTolerance: number };
+    private readonly platformConsoleClientId: string;
 
     constructor(
         configService: ConfigService<AllConfigType>,
@@ -62,9 +73,11 @@ export class CredentialResolverService {
         private readonly redis: RedisService,
         private readonly apiKeys: ApiKeyService,
         private readonly authorization: AuthorizationService,
-        private readonly internalTokens: InternalTokenService
+        private readonly internalTokens: InternalTokenService,
+        private readonly breakGlass: BreakGlassService
     ) {
         const auth = configService.getOrThrow('auth', { infer: true });
+        this.platformConsoleClientId = auth.platformConsoleClientId;
         this.hydraJwks = new JwksClient({ jwksUri: auth.jwksUri, cache: true, rateLimit: true });
         this.hydra = {
             issuer: auth.issuer,
@@ -74,10 +87,14 @@ export class CredentialResolverService {
         };
     }
 
-    async resolve(credential: string): Promise<ResolvedCredential> {
+    async resolve(credential: string, context: ExchangeContext = {}): Promise<ResolvedCredential> {
         // API keys are resolved through their own cache, which revocation and rotation clear immediately.
         if (this.isApiKey(credential)) {
             return this.resolveApiKey(credential);
+        }
+        // Never cached: each request must see whether its break-glass window is still open, and each one is audited.
+        if (this.isPlatformConsoleToken(credential)) {
+            return this.resolvePlatformToken(credential, context);
         }
 
         const cacheKey = `authn:exchange:${createHash('sha256').update(credential).digest('hex')}`;
@@ -117,6 +134,52 @@ export class CredentialResolverService {
         const keys = await this.redis.takeSet(indexKey);
         await Promise.all(keys.map((key) => this.redis.del(key, false)));
         return keys.length;
+    }
+
+    /** Routing only: the token is fully verified, with the platform audience, before anything is trusted. */
+    private isPlatformConsoleToken(credential: string): boolean {
+        const claims = jwt.decode(credential) as { client_id?: string } | null;
+        return Boolean(claims?.client_id) && claims?.client_id === this.platformConsoleClientId;
+    }
+
+    /**
+     * ReferralAI staff (Product Spec R-ACT-02, E1 D17). A platform-console token never resolves to a tenant membership:
+     * it becomes a platform token with no tenant, usable only on `@PlatformAdmin` routes. With `X-Break-Glass-Tenant`
+     * and an open window on that tenant, it becomes instead a read-only token for that tenant, valid one minute at most
+     * (never past the window), and the request is written to the tenant's audit log.
+     */
+    private async resolvePlatformToken(token: string, context: ExchangeContext): Promise<ResolvedCredential> {
+        const payload = await this.verifyHydraToken(token, this.platformConsoleClientId);
+        if (payload.client_id !== this.platformConsoleClientId) {
+            throw this.unauthenticated('expired_token', 'Invalid or expired token');
+        }
+        const identityId = payload.sub;
+        const base: IInternalTokenClaims = {
+            tenant_id: null,
+            user_id: null,
+            identity_id: identityId,
+            email: payload.email ?? null,
+            source: 'platform',
+            key_type: null,
+            key_id: null,
+            perms: []
+        };
+        if (!context.breakGlassTenantId) {
+            return { ...this.internalTokens.issue(`staff:${identityId}`, base, new Date(payload.exp * 1000)), claims: base };
+        }
+
+        const grant = await this.breakGlass.activeGrant(identityId, context.breakGlassTenantId);
+        if (!grant) {
+            throw new BaseException('authorization_error', 'No open break-glass window on this tenant', HttpStatus.FORBIDDEN);
+        }
+        await this.assertTenantOpen(grant.tenantId);
+        await this.breakGlass.recordRead(grant, context);
+
+        const claims: IInternalTokenClaims = { ...base, tenant_id: grant.tenantId, source: 'break_glass', perms: [...BREAK_GLASS_PERMISSIONS] };
+        const notAfter = new Date(
+            Math.min(payload.exp * 1000, new Date(grant.expiresAt).getTime(), Date.now() + BREAK_GLASS_TOKEN_TTL_SECONDS * 1000)
+        );
+        return { ...this.internalTokens.issue(`staff:${identityId}`, claims, notAfter), claims };
     }
 
     private isApiKey(credential: string): boolean {
@@ -180,13 +243,13 @@ export class CredentialResolverService {
         }
     }
 
-    private async verifyHydraToken(token: string): Promise<IJwtPayload> {
+    private async verifyHydraToken(token: string, audience: string = this.hydra.audience): Promise<IJwtPayload> {
         try {
             const kid = jwt.decode(token, { complete: true })?.header.kid;
             const signingKey = await this.hydraJwks.getSigningKey(kid);
             const decoded = jwt.verify(token, signingKey.getPublicKey(), {
                 issuer: this.hydra.issuer,
-                audience: this.hydra.audience,
+                audience,
                 algorithms: this.hydra.algorithms,
                 clockTolerance: this.hydra.clockTolerance
             });

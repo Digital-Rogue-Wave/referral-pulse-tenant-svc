@@ -17,6 +17,8 @@ import { ApiKeyService } from '@app/features/api-key/api-key.service';
 import { ApiKeyType } from '@domains/api-key';
 import { TenantStatus } from '@domains/tenant/tenant.types';
 
+import { BreakGlassService } from '@app/features/break-glass/break-glass.service';
+
 import { CredentialResolverService } from './credential-resolver.service';
 import { IdentityGatewayController } from './identity-gateway.controller';
 import { InternalTokenService } from './internal-token.service';
@@ -44,7 +46,8 @@ const configWith = (overrides: Record<string, unknown> = {}): ConfigService =>
                     issuer: 'http://hydra.test/',
                     audience: 'dashboard',
                     algorithms: ['RS256', 'ES256'],
-                    clockTolerance: 0
+                    clockTolerance: 0,
+                    platformConsoleClientId: 'platform-console'
                 },
                 ...overrides
             })[key]
@@ -122,6 +125,7 @@ describe('CredentialResolverService', () => {
     let resolver: CredentialResolverService;
     let findUser: jest.Mock;
     let findTenant: jest.Mock;
+    let breakGlass: MockProxy<BreakGlassService>;
 
     beforeEach(() => {
         prisma = mock<DatabaseService>();
@@ -133,7 +137,17 @@ describe('CredentialResolverService', () => {
         (prisma as unknown as { user: unknown }).user = { findFirst: findUser };
         (prisma as unknown as { tenant: unknown }).tenant = { findUnique: findTenant };
         redis.get.mockResolvedValue(undefined);
-        resolver = new CredentialResolverService(configWith(), prisma, redis, apiKeys, authorization, new InternalTokenService(configWith()));
+        breakGlass = mock<BreakGlassService>();
+        breakGlass.activeGrant.mockResolvedValue(null);
+        resolver = new CredentialResolverService(
+            configWith(),
+            prisma,
+            redis,
+            apiKeys,
+            authorization,
+            new InternalTokenService(configWith()),
+            breakGlass
+        );
     });
 
     const stubHydra = (payload: Record<string, unknown>): void => {
@@ -165,6 +179,99 @@ describe('CredentialResolverService', () => {
             findTenant.mockResolvedValue({ status: TenantStatus.CLOSED, deletedAt: new Date() });
             const error = await resolver.resolve('rai_live_abc').catch((e: BaseException) => e);
             expect((error as BaseException).getStatus()).toBe(HttpStatus.UNAUTHORIZED);
+        });
+    });
+
+    /** Product Spec R-ACT-02 (E1 D17): staff sign in through the platform-console client and are never tenant subjects. */
+    describe('given a platform-console token (ReferralAI staff)', () => {
+        /** A real unsigned JWT body is enough for routing; verification itself is stubbed. */
+        const consoleToken = jwt.sign({ client_id: 'platform-console' }, 'routing-only');
+        const GRANT = {
+            grantId: 'g1',
+            staffIdentityId: 'staff-1',
+            tenantId: 't1',
+            reason: 'incident INC-42',
+            openedAt: new Date().toISOString(),
+            expiresAt: new Date(Date.now() + 3_600_000).toISOString()
+        };
+
+        beforeEach(() => stubHydra({ sub: 'staff-1', client_id: 'platform-console', email: 'ops@referralai.io' }));
+
+        it('then it mints a platform token with no tenant, no user and no permissions, and never looks up a membership', async () => {
+            const payload = verify((await resolver.resolve(consoleToken)).token);
+
+            expect(payload).toMatchObject({ source: 'platform', tenant_id: null, user_id: null, identity_id: 'staff-1', perms: [] });
+            expect(payload.sub).toBe('staff:staff-1');
+            expect(findUser).not.toHaveBeenCalled();
+        });
+
+        it('then it is verified against the platform-console audience, not the dashboard one', async () => {
+            const verifySpy = resolver as unknown as { verifyHydraToken: jest.Mock };
+
+            await resolver.resolve(consoleToken);
+
+            expect(verifySpy.verifyHydraToken).toHaveBeenCalledWith(consoleToken, 'platform-console');
+        });
+
+        it('then it is never cached, so a closed window or an audited read is seen on every request', async () => {
+            await resolver.resolve(consoleToken);
+
+            expect(redis.get).not.toHaveBeenCalled();
+            expect(redis.set).not.toHaveBeenCalled();
+        });
+
+        it('then a token claiming the console client but issued to another is refused', async () => {
+            stubHydra({ sub: 'staff-1', client_id: 'frontend-tenant' });
+
+            const error = await resolver.resolve(consoleToken).catch((e: BaseException) => e);
+
+            expect((error as BaseException).getStatus()).toBe(HttpStatus.UNAUTHORIZED);
+        });
+
+        describe('when the console asks for break-glass access to a tenant', () => {
+            it('then with no open window it is refused (403)', async () => {
+                const error = await resolver.resolve(consoleToken, { breakGlassTenantId: 't1' }).catch((e: BaseException) => e);
+
+                expect((error as BaseException).getStatus()).toBe(HttpStatus.FORBIDDEN);
+                expect(breakGlass.recordRead).not.toHaveBeenCalled();
+            });
+
+            it('then inside an open window it mints a read-only token for that tenant, valid one minute at most', async () => {
+                breakGlass.activeGrant.mockResolvedValue(GRANT);
+
+                const payload = verify((await resolver.resolve(consoleToken, { breakGlassTenantId: 't1' })).token);
+
+                expect(breakGlass.activeGrant).toHaveBeenCalledWith('staff-1', 't1');
+                expect(payload).toMatchObject({ source: 'break_glass', tenant_id: 't1', user_id: null, identity_id: 'staff-1' });
+                expect(payload.perms.length).toBeGreaterThan(0);
+                expect(payload.perms.every((permission: string) => permission.endsWith(':read'))).toBe(true);
+                expect(payload.exp! - payload.iat!).toBeLessThanOrEqual(60);
+            });
+
+            it('then the request is written to the audit log with the forwarded method and path', async () => {
+                breakGlass.activeGrant.mockResolvedValue(GRANT);
+
+                await resolver.resolve(consoleToken, { breakGlassTenantId: 't1', method: 'GET', uri: '/api/v1/campaigns' });
+
+                expect(breakGlass.recordRead).toHaveBeenCalledWith(GRANT, expect.objectContaining({ method: 'GET', uri: '/api/v1/campaigns' }));
+            });
+
+            it('then the token never outlives the window', async () => {
+                breakGlass.activeGrant.mockResolvedValue({ ...GRANT, expiresAt: new Date(Date.now() + 20_000).toISOString() });
+
+                const payload = verify((await resolver.resolve(consoleToken, { breakGlassTenantId: 't1' })).token);
+
+                expect(payload.exp! - payload.iat!).toBeLessThanOrEqual(20);
+            });
+
+            it('then a closed tenant authenticates nobody, break-glass included', async () => {
+                breakGlass.activeGrant.mockResolvedValue(GRANT);
+                findTenant.mockResolvedValue({ status: TenantStatus.CLOSED, deletedAt: new Date() });
+
+                const error = await resolver.resolve(consoleToken, { breakGlassTenantId: 't1' }).catch((e: BaseException) => e);
+
+                expect((error as BaseException).getStatus()).toBe(HttpStatus.UNAUTHORIZED);
+            });
         });
     });
 
@@ -289,8 +396,19 @@ describe('IdentityGatewayController', () => {
 
             const body = await call({ authorization: 'Bearer hydra.jwt' }, 'gateway');
 
-            expect(credentials.resolve).toHaveBeenCalledWith('hydra.jwt');
+            expect(credentials.resolve).toHaveBeenCalledWith('hydra.jwt', expect.any(Object));
             expect(body.token).toBe('internal.jwt');
+        });
+
+        it('then it forwards the break-glass tenant and the original method and path (E1 D17)', async () => {
+            credentials.resolve.mockResolvedValue({ token: 'internal.jwt', expiresAt: new Date(), claims: claims() });
+
+            await call(
+                { authorization: 'Bearer hydra.jwt', 'x-break-glass-tenant': 't1', 'x-forwarded-method': 'GET', 'x-forwarded-uri': '/api/v1/users' },
+                'gateway'
+            );
+
+            expect(credentials.resolve).toHaveBeenCalledWith('hydra.jwt', { breakGlassTenantId: 't1', method: 'GET', uri: '/api/v1/users' });
         });
 
         it('then it returns the internal JWT in the Authorization header for Traefik forwardAuth', async () => {
@@ -315,7 +433,7 @@ describe('IdentityGatewayController', () => {
 
             await call({ 'x-api-key': 'rai_live_abc', authorization: 'Bearer the.service.token' }, 'service');
 
-            expect(credentials.resolve).toHaveBeenCalledWith('rai_live_abc');
+            expect(credentials.resolve).toHaveBeenCalledWith('rai_live_abc', expect.any(Object));
         });
 
         /**

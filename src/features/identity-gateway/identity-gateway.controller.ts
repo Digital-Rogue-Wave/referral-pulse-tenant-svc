@@ -8,6 +8,7 @@ import type { IInternalTokenClaims } from '@app/types';
 import { Public } from '@common/auth/public.decorator';
 import { BaseException } from '@common/exceptions/base.exceptions';
 import { RawWire } from '@common/http-contract/wire-case.interceptor';
+import { BREAK_GLASS_TENANT_HEADER } from '@domains/break-glass';
 
 import { CredentialResolverService } from './credential-resolver.service';
 import { InternalTokenService, PublicJwk } from './internal-token.service';
@@ -53,7 +54,13 @@ export class IdentityGatewayController {
         @Req() request: Request & { tokenExchangeCaller?: TokenExchangeCaller },
         @Res({ passthrough: true }) response: Response
     ): Promise<ValidateTokenResponse> {
-        const resolved = await this.credentials.resolve(this.extractCredential(headers, request.tokenExchangeCaller));
+        // Traefik forwardAuth passes the original request's headers plus X-Forwarded-Method / X-Forwarded-Uri: what a
+        // break-glass request is audited with (E1 D17).
+        const resolved = await this.credentials.resolve(this.extractCredential(headers, request.tokenExchangeCaller), {
+            breakGlassTenantId: headers[BREAK_GLASS_TENANT_HEADER],
+            method: headers['x-forwarded-method'],
+            uri: headers['x-forwarded-uri']
+        });
         response.setHeader('Authorization', `Bearer ${resolved.token}`);
         return { token: resolved.token, expires_at: resolved.expiresAt.toISOString(), claims: resolved.claims };
     }
