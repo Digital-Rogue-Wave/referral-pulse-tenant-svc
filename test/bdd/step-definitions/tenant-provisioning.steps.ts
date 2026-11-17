@@ -10,7 +10,7 @@ import { After, Before, Given, Then, When } from '@cucumber/cucumber';
 import assert from 'assert';
 import { createHash, randomUUID } from 'crypto';
 
-import { BDD_OWNER, BDD_STAFF_IDENTITY, makeActiveUserToken, makeInviteeToken, makePlatformToken } from '../support/jwt.helper';
+import { BDD_STAFF_IDENTITY, makeActiveUserToken, makeInviteeToken, makePlatformToken } from '../support/jwt.helper';
 import { denyKetoFor, stubKratosIdentity } from '../support/nock.setup';
 import { fixturesPrisma, purgeAuditRows } from '../support/db.fixtures';
 import type { BddWorldInterface } from '../support/world';

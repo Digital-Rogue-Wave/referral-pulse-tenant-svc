@@ -59,7 +59,13 @@ Then(
     function (this: BddWorldInterface, channel: string, source: string, retention: number, amount: number, currency: string) {
         const body = this.response.body as Settings;
         assert.deepStrictEqual(
-            [body.invitation_channel, body.invitation_channel_source, body.retention_months, body.verification_required_above, body.verification_required_above_currency],
+            [
+                body.invitation_channel,
+                body.invitation_channel_source,
+                body.retention_months,
+                body.verification_required_above,
+                body.verification_required_above_currency
+            ],
             [channel, source, retention, amount, currency]
         );
     }
