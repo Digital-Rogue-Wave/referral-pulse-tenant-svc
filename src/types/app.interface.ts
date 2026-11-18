@@ -373,7 +373,8 @@ export interface IJwtPayload {
 }
 
 /** Where a principal's credential came from (API Contract §2 internal JWT `source`). */
-export type PrincipalSource = 'dashboard' | 'api_key' | 'client_credentials';
+/** `platform`: ReferralAI staff from the platform console; `break_glass`: staff's time-boxed read access to one tenant (E1 D17). */
+export type PrincipalSource = 'dashboard' | 'api_key' | 'client_credentials' | 'platform' | 'break_glass';
 
 /**
  * Claims of the internal JWT minted by /internal/validate-token (API §2 "OAuth2 JWT", Architecture §13.1).
@@ -918,6 +919,17 @@ export interface IJobOptions {
      * Job ID for idempotency
      */
     jobId?: string;
+
+    /**
+     * BullMQ deduplication. With `extend` and `replace`, a job added again while the first is still
+     * delayed replaces it and restarts its delay — a debounce.
+     */
+    deduplication?: {
+        id: string;
+        ttl?: number;
+        extend?: boolean;
+        replace?: boolean;
+    };
 
     /**
      * Remove job on completion

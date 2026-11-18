@@ -108,15 +108,51 @@ describe('TenantService.applyVerificationReport', () => {
         expect(events.emitAfterCommit).not.toHaveBeenCalled();
     });
 
-    it('opens a new verification when none is open, e.g. a re-verification decided by the workflow', async () => {
+    it('refuses a company report when no verification is open: verification starts with the Owner (E1 D15)', async () => {
         tx.tenantVerification.findFirst!.mockResolvedValue(null);
 
-        await service.applyVerificationReport('t1', { status: VerificationRecordStatus.REJECTED, reason: 'registry mismatch' });
+        const error = await service
+            .applyVerificationReport('t1', { status: VerificationRecordStatus.REJECTED, reason: 'registry mismatch' })
+            .catch((e: BaseException) => e);
 
-        expect(tx.tenantVerification.create).toHaveBeenCalledWith({
-            data: expect.objectContaining({ tenantId: 't1', verificationType: 'company', status: 'rejected', reason: 'registry mismatch' })
+        expect((error as BaseException).getStatus()).toBe(HttpStatus.CONFLICT);
+        expect(tx.tenantVerification.create).not.toHaveBeenCalled();
+    });
+
+    describe('the verification lifecycle (E1 D15)', () => {
+        it.each([
+            [VerificationRecordStatus.PENDING, VerificationRecordStatus.IN_REVIEW],
+            [VerificationRecordStatus.PENDING, VerificationRecordStatus.VERIFIED],
+            [VerificationRecordStatus.IN_REVIEW, VerificationRecordStatus.VERIFIED],
+            [VerificationRecordStatus.IN_REVIEW, VerificationRecordStatus.REJECTED]
+        ])('then %s → %s is allowed', async (from, to) => {
+            tx.tenantVerification.findFirst!.mockResolvedValue({ id: 'v1', status: from } as never);
+
+            await service.applyVerificationReport('t1', { status: to, reason: 'documents do not match' });
+
+            expect(tx.tenantVerification.update).toHaveBeenCalledWith(expect.objectContaining({ where: { id: 'v1' } }));
         });
-        expect(tx.tenant.update).toHaveBeenCalledWith({ where: { id: 't1' }, data: { verificationStatus: 'rejected' } });
+
+        it.each([
+            [VerificationRecordStatus.VERIFIED, VerificationRecordStatus.REJECTED],
+            [VerificationRecordStatus.REJECTED, VerificationRecordStatus.VERIFIED],
+            [VerificationRecordStatus.IN_REVIEW, VerificationRecordStatus.PENDING]
+        ])('then %s → %s is a 409: a decided verification is final, resubmission opens a new one', async (from, to) => {
+            tx.tenantVerification.findFirst!.mockResolvedValue({ id: 'v1', status: from } as never);
+
+            const error = await service
+                .applyVerificationReport('t1', { status: to, verificationId: 'v1', reason: 'x-reason' })
+                .catch((e: BaseException) => e);
+
+            expect((error as BaseException).getStatus()).toBe(HttpStatus.CONFLICT);
+            expect(tx.tenantVerification.update).not.toHaveBeenCalled();
+        });
+
+        it('then a rejection without a reason is a 400', async () => {
+            const error = await service.applyVerificationReport('t1', { status: VerificationRecordStatus.REJECTED }).catch((e: BaseException) => e);
+
+            expect((error as BaseException).getStatus()).toBe(HttpStatus.BAD_REQUEST);
+        });
     });
 
     it('records a tax or payout verification without touching the tenant status', async () => {

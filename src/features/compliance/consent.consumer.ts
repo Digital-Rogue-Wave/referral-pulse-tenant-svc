@@ -8,6 +8,8 @@ import { hashEmail } from '@common/helper/hashing';
 import { JsonService } from '@common/helper/json.service';
 import { AppLoggerService } from '@common/logging/app-logger.service';
 
+import { KybResultHandler } from '@app/features/verification/kyb-result.handler';
+
 import { ConsentService, type ConsentSignal } from './consent.service';
 
 /**
@@ -41,6 +43,7 @@ interface IngestionEvent {
 export class ConsentConsumer {
     constructor(
         private readonly consent: ConsentService,
+        private readonly kybResults: KybResultHandler,
         private readonly json: JsonService,
         private readonly logger: AppLoggerService
     ) {
@@ -49,6 +52,10 @@ export class ConsentConsumer {
 
     @SqsMessageHandler(TENANT_SVC_FIFO, false)
     async handle(message: Message): Promise<void> {
+        // One queue, one handler per queue: the KYB provider's result (E1 D15) is the other message this service acts on.
+        if (await this.kybResults.handle(message)) {
+            return;
+        }
         const signal = this.toSignal(message);
         if (!signal) {
             return;

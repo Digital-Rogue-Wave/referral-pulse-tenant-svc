@@ -20,6 +20,8 @@ import { TracingService } from '@common/monitoring/tracing.service';
 import type { AllConfigType } from '@config/config.type';
 import { DatabaseService } from '@app/database/database.service';
 
+import { OUTBOX_QUEUE } from './side-effect-outbox.type';
+
 /**
  * BullMQ Worker for processing side effects from the outbox
  *
@@ -34,6 +36,9 @@ import { DatabaseService } from '@app/database/database.service';
  */
 @Injectable()
 export class OutboxWorkerService extends BaseWorkerService<IOutboxJobData> {
+    /** The queue this worker consumes; a subclass names its own (KetoOutboxWorkerService). */
+    static readonly QUEUE_NAME: string = OUTBOX_QUEUE;
+
     constructor(
         connectionFactory: BullJobsConnectionFactory,
         configService: ConfigService<AllConfigType>,
@@ -47,7 +52,16 @@ export class OutboxWorkerService extends BaseWorkerService<IOutboxJobData> {
         private readonly snsPublisher: SnsPublisherService,
         private readonly ketoProvisioning: KetoProvisioningService
     ) {
-        super('outbox-processor', connectionFactory, configService, logger, metricsService, tracingService, tenantContext, dateService);
+        super(
+            (new.target as typeof OutboxWorkerService).QUEUE_NAME,
+            connectionFactory,
+            configService,
+            logger,
+            metricsService,
+            tracingService,
+            tenantContext,
+            dateService
+        );
     }
 
     /**
@@ -188,8 +202,8 @@ export class OutboxWorkerService extends BaseWorkerService<IOutboxJobData> {
      * membership; a user removed meanwhile ends with none.
      */
     private async assignCurrentRole(tenantId: string, userId: string): Promise<void> {
-        const user = await this.prisma.user.findFirst({ where: { id: userId, tenantId }, select: { role: true, deletedAt: true } });
-        if (!user || user.deletedAt) {
+        const user = await this.prisma.user.findFirst({ where: { id: userId, tenantId }, select: { role: true, deletedAt: true, disabledAt: true } });
+        if (!user || user.deletedAt || user.disabledAt) {
             return this.ketoProvisioning.removeMember(tenantId, userId);
         }
         return this.ketoProvisioning.assignRole(tenantId, userId, user.role as RoleEnum);

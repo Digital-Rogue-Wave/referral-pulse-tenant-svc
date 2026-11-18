@@ -88,7 +88,7 @@ describe('DsrService — POST /v1/data-subject-requests and GET /v1/data-subject
     it('accepts an access request without fanning anything out', async () => {
         const response = await service.create({ requestType: DsrRequestType.ACCESS, subjectEmail: EMAIL }, 'u1');
 
-        expect(response.status).toBe(DsrStatus.ACCEPTED);
+        expect(response.status).toBe(DsrStatus.PENDING);
         expect(bullJobs.addJob).not.toHaveBeenCalled();
         expect(txEvents.emitAfterCommit).toHaveBeenCalledWith(ComplianceEvents.DSR_REQUESTED, expect.anything());
     });
@@ -505,7 +505,8 @@ describe('ConsentConsumer — reading consent off the bus', () => {
     beforeEach(() => {
         consent = mock<ConsentService>();
         consent.record.mockResolvedValue('recorded');
-        consumer = new ConsentConsumer(consent, new JsonService(), logger());
+        // A message that is not a KYB result (E1 D15) falls through to the consent registry.
+        consumer = new ConsentConsumer(consent, { handle: jest.fn().mockResolvedValue(false) } as never, new JsonService(), logger());
     });
 
     const deliver = (body: unknown) => consumer.handle({ Body: JSON.stringify(body) });

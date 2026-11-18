@@ -71,8 +71,8 @@ describe('Scheduled workers', () => {
             .mockResolvedValueOnce([{ id: 't1' }])
             .mockResolvedValueOnce([{ id: 't-gone' }]);
         const users = jest.fn().mockResolvedValue([
-            { id: 'u1', role: 'OWNER', deletedAt: null },
-            { id: 'u2', role: 'VIEWER', deletedAt: new Date() }
+            { id: 'u1', role: 'owner', deletedAt: null },
+            { id: 'u2', role: 'viewer', deletedAt: new Date() }
         ]);
 
         await expect(
@@ -82,9 +82,49 @@ describe('Scheduled workers', () => {
             data: { tenants: 1, revoked: 1 }
         });
         expect(keto.grantTenant).toHaveBeenCalledWith('t1');
-        expect(keto.assignRole).toHaveBeenCalledWith('t1', 'u1', 'OWNER');
+        expect(keto.assignRole).toHaveBeenCalledWith('t1', 'u1', 'owner');
         expect(keto.removeMember).toHaveBeenCalledWith('t1', 'u2');
         expect(keto.revokeTenant).toHaveBeenCalledWith('t-gone');
+        // A nightly run leaves the retired namespaces alone; only a catalogue change retires them.
+        expect(keto.retireNamespaces).not.toHaveBeenCalled();
+    });
+
+    it('a tenant reconcile job re-grants that one tenant and its members only (E1 D7)', async () => {
+        const keto = mock<KetoProvisioningService>();
+        const findMany = jest.fn();
+        const users = jest.fn().mockResolvedValue([{ id: 'u1', role: 'viewer', deletedAt: null, disabledAt: null }]);
+
+        await expect(
+            workerOf(KetoReconcilerWorker, { prisma: { tenant: { findMany }, user: { findMany: users } }, ketoProvisioning: keto })(
+                'reconcile-tenant',
+                {
+                    tenantId: 't7'
+                }
+            )
+        ).resolves.toEqual({ success: true, data: { tenants: 1 } });
+        expect(keto.grantTenant).toHaveBeenCalledWith('t7');
+        expect(keto.assignRole).toHaveBeenCalledWith('t7', 'u1', 'viewer');
+        expect(findMany).not.toHaveBeenCalled();
+    });
+
+    it('the run a catalogue change triggers also deletes the retired namespaces before re-granting (E1 D2)', async () => {
+        const keto = mock<KetoProvisioningService>();
+        const findMany = jest
+            .fn()
+            .mockResolvedValueOnce([{ id: 't1' }])
+            .mockResolvedValueOnce([]);
+        const users = jest.fn().mockResolvedValue([]);
+
+        await workerOf(KetoReconcilerWorker, { prisma: { tenant: { findMany }, user: { findMany: users } }, ketoProvisioning: keto })(
+            'reconcile-keto',
+            {
+                tenantId: 'system',
+                catalogVersion: 'abc'
+            }
+        );
+
+        expect(keto.retireNamespaces).toHaveBeenCalledTimes(1);
+        expect(keto.grantTenant).toHaveBeenCalledWith('t1');
     });
 
     describe('the DSR fan-out worker', () => {

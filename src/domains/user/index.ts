@@ -17,6 +17,8 @@ export interface UserProps {
     role: string;
     kratosIdentityId: string;
     lastLoginAt?: Date | null;
+    status: string;
+    disabledAt?: Date | null;
     createdAt: Date;
     updatedAt: Date;
     deletedAt?: Date | null;
@@ -68,6 +70,12 @@ export class UserResponse {
 
     @ApiPropertyOptional()
     lastLoginAt?: Date | null;
+
+    @ApiProperty({ enum: ['active', 'disabled'], description: 'A disabled member keeps the membership but cannot sign in to the tenant' })
+    status!: string;
+
+    @ApiPropertyOptional({ description: 'When the member was disabled; null while active' })
+    disabledAt?: Date | null;
 
     @ApiProperty()
     createdAt!: Date;

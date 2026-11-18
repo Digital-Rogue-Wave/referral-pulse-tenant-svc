@@ -41,7 +41,7 @@ BeforeAll(async function () {
     setupNock();
     await bootstrapTestApp();
     // Every "valid JWT for tenant default-tenant" acts as this Owner.
-    await ensureMember({ tenantId: DEFAULT_TENANT_ID, ...BDD_OWNER, role: 'OWNER' });
+    await ensureMember({ tenantId: DEFAULT_TENANT_ID, ...BDD_OWNER, role: 'owner' });
     // Fixed Idempotency-Keys in scenarios must start each run unused.
     await clearIdempotencyKeys(DEFAULT_TENANT_ID);
 });
@@ -67,7 +67,7 @@ const INVITEE_KRATOS_ID = 'kratos-invitee-bdd';
 Before({ tags: '@needs-pending-invitation' }, async function () {
     stubKratosIdentity(INVITEE_KRATOS_ID, INVITEE_EMAIL);
     await cleanupInvitationFlow({ tenantId: DEFAULT_TENANT_ID, token: INVITE_TOKEN, kratosIdentityId: INVITEE_KRATOS_ID });
-    await seedPendingInvitation({ tenantId: DEFAULT_TENANT_ID, email: INVITEE_EMAIL, token: INVITE_TOKEN, role: 'OPERATOR' });
+    await seedPendingInvitation({ tenantId: DEFAULT_TENANT_ID, email: INVITEE_EMAIL, token: INVITE_TOKEN, role: 'operator' });
 });
 
 After({ tags: '@needs-pending-invitation' }, async function () {

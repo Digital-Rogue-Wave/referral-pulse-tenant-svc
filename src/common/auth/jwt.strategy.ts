@@ -77,9 +77,14 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
         };
     }
 
+    /**
+     * A platform principal (E1 D17) has no tenant user; `staff:{identity}` stands in as its actor, so a Super Admin's
+     * action reads as theirs in events and the audit log. It is not a tenant subject: the guard never checks it in Keto.
+     */
     private buildInternalPrincipal(payload: InternalPayload): IAuthenticatedUser {
+        const staffActor = payload.source === 'platform' && payload.identity_id ? `staff:${payload.identity_id}` : '';
         return {
-            userId: payload.user_id ?? '',
+            userId: payload.user_id ?? staffActor,
             tenantId: payload.tenant_id ?? '',
             identityId: payload.identity_id ?? undefined,
             email: payload.email ?? undefined,

@@ -84,7 +84,7 @@ describe('Request context', () => {
         it('scopes every read and write to the tenant and hides soft-deleted rows', async () => {
             await inRequest(async () => {
                 await scoped.create({ data: { name: 'x' } });
-                await scoped.findMany({ where: { role: 'ADMIN' } });
+                await scoped.findMany({ where: { role: 'admin' } });
                 await scoped.findUnique({ where: { id: '1' } });
                 await scoped.findFirst({ where: { id: '1' } }, { includeSoftDeleted: true });
                 await scoped.findFirstOrThrow({});
@@ -95,7 +95,7 @@ describe('Request context', () => {
             });
 
             expect(delegate.create).toHaveBeenCalledWith({ data: { name: 'x', tenantId: 't1' } });
-            expect(delegate.findMany).toHaveBeenCalledWith({ where: { role: 'ADMIN', tenantId: 't1', deletedAt: null } });
+            expect(delegate.findMany).toHaveBeenCalledWith({ where: { role: 'admin', tenantId: 't1', deletedAt: null } });
             expect(delegate.findFirst).toHaveBeenCalledWith({ where: { id: '1', tenantId: 't1' } });
             expect(delegate.update).toHaveBeenCalledWith({ where: { id: '1', tenantId: 't1' }, data: { deletedAt: expect.any(Date) } });
             expect(delegate.delete).toHaveBeenCalledWith({ where: { id: '1', tenantId: 't1' } });

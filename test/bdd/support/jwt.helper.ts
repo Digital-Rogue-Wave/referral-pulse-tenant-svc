@@ -58,15 +58,18 @@ interface InternalClaims {
     identity_id: string | null;
     email: string | null;
     perms: string[];
+    source?: 'dashboard' | 'platform';
 }
 
 function signInternal(claims: InternalClaims, expiresInSeconds = 3600): string {
+    const subject =
+        claims.source === 'platform' ? `staff:${claims.identity_id}` : claims.user_id ? `user:${claims.user_id}` : `identity:${claims.identity_id}`;
     return jwt.sign({ source: 'dashboard', key_type: null, key_id: null, ...claims }, internalKey.privateKey, {
         algorithm: 'ES256',
         keyid: INTERNAL_KID,
         issuer: INTERNAL_ISSUER,
         audience: INTERNAL_AUDIENCE,
-        subject: claims.user_id ? `user:${claims.user_id}` : `identity:${claims.identity_id}`,
+        subject,
         expiresIn: expiresInSeconds
     });
 }
@@ -77,6 +80,17 @@ function signInternal(claims: InternalClaims, expiresInSeconds = 3600): string {
  */
 export function makeActiveUserToken(tenantId: string, userId: string = BDD_OWNER.userId, perms: string[] = [...ALL_PERMISSIONS]): string {
     return signInternal({ tenant_id: tenantId, user_id: userId, identity_id: BDD_OWNER.kratosIdentityId, email: null, perms });
+}
+
+/** BDD's ReferralAI staff identity (E1 D17): never a tenant user. */
+export const BDD_STAFF_IDENTITY = 'kratos-bdd-staff';
+
+/**
+ * What the gateway mints for a platform-console sign-in (Product Spec R-ACT-02, E1 D17): no tenant, no user, no perms.
+ * Platform routes still need the live Keto grant on `staff:{identity}` (nock answers allowed by default).
+ */
+export function makePlatformToken(identityId: string = BDD_STAFF_IDENTITY): string {
+    return signInternal({ tenant_id: null, user_id: null, identity_id: identityId, email: null, perms: [], source: 'platform' });
 }
 
 /** An Ory identity with no membership yet (an invitee): no tenant, no permissions — tenant-optional routes only. */

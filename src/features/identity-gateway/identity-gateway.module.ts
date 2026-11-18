@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 
 import { ApiKeyModule } from '@app/features/api-key/api-key.module';
+import { BreakGlassModule } from '@app/features/break-glass/break-glass.module';
 
 import { CredentialResolverService } from './credential-resolver.service';
 import { ExchangeCacheListener } from './exchange-cache.listener';
@@ -13,7 +14,7 @@ import { TokenExchangeCallerGuard } from './token-exchange-caller.guard';
  * internal JWT out, plus the JWKS that verifies it.
  */
 @Module({
-    imports: [ApiKeyModule],
+    imports: [ApiKeyModule, BreakGlassModule],
     controllers: [IdentityGatewayController],
     providers: [CredentialResolverService, InternalTokenService, TokenExchangeCallerGuard, ExchangeCacheListener]
 })

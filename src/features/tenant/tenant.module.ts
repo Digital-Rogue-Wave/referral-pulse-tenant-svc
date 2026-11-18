@@ -1,4 +1,5 @@
 import { Module } from '@nestjs/common';
+import { TenantSettingsController } from './aware/tenant-settings.controller';
 
 // Modules
 import { FilesModule } from '../files/files.module';
@@ -50,7 +51,8 @@ import { TenantUnlockProcessor } from './processors/tenant-unlock.processor';
         AdminTenantController,
         InternalTenantVerificationController,
         InternalWidgetSecretController,
-        InternalInvitationChannelController
+        InternalInvitationChannelController,
+        TenantSettingsController
     ],
     providers: [
         // Core Services

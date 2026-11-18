@@ -26,6 +26,11 @@ export class ExchangeCacheListener {
         await this.forget(event.aggregateId, 'user.removed');
     }
 
+    @OnEvent('user.disabled', { async: true })
+    async onUserDisabled(event: { aggregateId: string }): Promise<void> {
+        await this.forget(event.aggregateId, 'user.disabled');
+    }
+
     @OnEvent('user.role_changed', { async: true })
     async onUserRoleChanged(event: UserRoleChangedEvent): Promise<void> {
         await this.forget(event.aggregateId, 'user.role_changed');

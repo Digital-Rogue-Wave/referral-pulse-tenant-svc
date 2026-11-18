@@ -19,11 +19,13 @@ import { PERMISSIONS_KEY, PLATFORM_ADMIN_KEY, SERVICE_CAPABILITIES_KEY } from '.
  *
  * - API-key principals never reach this service: keys are gated to ingestion/SDK, and tenant-service
  *   exposes neither.
- * - Service (client-credentials) principals pass only routes marked `@AllowServices`, and only with a
- *   live Keto grant for one of the listed capabilities. Humans never pass a route that only lists
- *   service capabilities.
- * - Human principals: `@PlatformAdmin` routes need a live platform grant; `@RequirePermission` routes are
- *   authorized from the JWT `perms` snapshot, except LIVE_CHECK_PERMISSIONS, which re-check Keto.
+ * - Service (client-credentials) principals pass a route marked `@AllowServices` with a live Keto grant for
+ *   one of the listed capabilities, or a route's own permission when Keto holds that narrow relation for the
+ *   service on the tenant it acts for (API §2 "payouts:tenant_acme#confirm@service:payout-worker"; E1 D18).
+ *   Humans never pass a route that only lists service capabilities.
+ * - Human principals: `@PlatformAdmin` routes need a platform-console token and a live platform grant;
+ *   `@RequirePermission` routes are authorized from the JWT `perms` snapshot, except LIVE_CHECK_PERMISSIONS, which
+ *   re-check Keto. A break-glass token (E1 D17) carries a read-only snapshot and passes no live check.
  * - The tenant is always the one in the verified token — never a header or a route param.
  */
 @Injectable()
@@ -51,8 +53,9 @@ export class PermissionGuard implements CanActivate {
         }
 
         const capabilities = this.reflector.getAllAndOverride<ServiceCapability[]>(SERVICE_CAPABILITIES_KEY, targets) ?? [];
+        const permissions = this.reflector.getAllAndOverride<Permission[]>(PERMISSIONS_KEY, targets) ?? [];
         if (user.isServiceToken) {
-            return this.authorizeService(user, capabilities);
+            return this.authorizeService(user, capabilities, permissions);
         }
 
         if (this.reflector.getAllAndOverride<boolean>(PLATFORM_ADMIN_KEY, targets)) {
@@ -60,7 +63,6 @@ export class PermissionGuard implements CanActivate {
             return true;
         }
 
-        const permissions = this.reflector.getAllAndOverride<Permission[]>(PERMISSIONS_KEY, targets) ?? [];
         // A route that names service capabilities and nothing for humans is service-to-service only; without
         // this, a dashboard token would sail through for lack of a human permission to check.
         if (capabilities.length > 0 && permissions.length === 0) {
@@ -72,10 +74,18 @@ export class PermissionGuard implements CanActivate {
         return true;
     }
 
-    private async authorizeService(user: IAuthenticatedUser, capabilities: ServiceCapability[]): Promise<boolean> {
+    private async authorizeService(user: IAuthenticatedUser, capabilities: ServiceCapability[], permissions: Permission[]): Promise<boolean> {
         const clientId = user.clientId ?? user.userId;
         for (const capability of capabilities) {
             if (await this.authorization.serviceHas(clientId, capability)) {
+                return true;
+            }
+        }
+        if (user.tenantId && permissions.length > 0) {
+            const held = await Promise.all(
+                permissions.map((permission) => this.authorization.serviceHasPermission(clientId, user.tenantId, permission))
+            );
+            if (held.every(Boolean)) {
                 return true;
             }
         }
@@ -83,20 +93,30 @@ export class PermissionGuard implements CanActivate {
         throw this.denied('This service is not authorized to call this endpoint');
     }
 
+    /**
+     * Super Admins are ReferralAI staff, never tenant subjects (Product Spec R-ACT-02, E1 D17): only a platform-console
+     * token (`source: platform`, no tenant) can pass, and only with the live grant `platform:referralai#admin` on the
+     * staff identity. A tenant user's token never reaches a platform route, whatever Keto holds for them.
+     */
     private async authorizePlatformAdmin(user: IAuthenticatedUser): Promise<void> {
-        if (user.userId && (await this.authorization.isPlatformAdmin(user.userId))) {
+        if (user.source === 'platform' && user.identityId && (await this.authorization.isPlatformAdmin(user.identityId))) {
             return;
         }
-        this.logger.warn('Platform-admin route denied', { userId: user.userId });
+        this.logger.warn('Platform-admin route denied', { userId: user.userId, identityId: user.identityId });
         throw this.denied('Platform administrator access required');
     }
 
+    /**
+     * A break-glass principal (E1 D17) has a tenant and a read-only `perms` snapshot but no user: it is not a tenant
+     * subject, so it passes only snapshot permissions and never a live-checked one.
+     */
     private async authorizePermission(user: IAuthenticatedUser, permission: Permission): Promise<void> {
-        if (!user.userId || !user.tenantId) {
+        const isBreakGlass = user.source === 'break_glass';
+        if (!user.tenantId || (!user.userId && !isBreakGlass)) {
             throw this.denied(`Missing permission: ${permission}`);
         }
         const allowed = LIVE_CHECK_PERMISSIONS.has(permission)
-            ? await this.authorization.userHas(user.userId, user.tenantId, permission)
+            ? !isBreakGlass && (await this.authorization.userHas(user.userId, user.tenantId, permission))
             : (user.perms ?? []).includes(permission);
         if (!allowed) {
             this.logger.warn('Permission denied', { userId: user.userId, tenantId: user.tenantId, permission });

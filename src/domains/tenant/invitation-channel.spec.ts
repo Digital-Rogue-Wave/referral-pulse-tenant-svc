@@ -1,4 +1,4 @@
-import { InvitationChannel, defaultInvitationChannel, effectiveInvitationChannel } from './tenant.types';
+import { InvitationChannel, defaultInvitationChannel, effectiveInvitationChannel, invitationChannelSource } from './tenant.types';
 
 /**
  * R-PRT-02 — the tenant level of the invitation setting carries the *jurisdiction*. Platform-sent
@@ -13,18 +13,21 @@ describe('Invitation channel (R-PRT-02)', () => {
             expect(effectiveInvitationChannel({ billingCountry: country, invitationChannel: null })).toBe(InvitationChannel.FORBIDDEN);
         });
 
-        it.each(['FR', 'ES', 'NL'])('then a tenant in %s defaults to allowed', (country) => {
-            expect(effectiveInvitationChannel({ billingCountry: country, invitationChannel: null })).toBe(InvitationChannel.ALLOWED);
+        /** v5.1 R-PRT-02 adds the Netherlands and the Nordics to Germany. */
+        it.each(['NL', 'DK', 'SE', 'FI', 'NO', 'IS'])('then a tenant in %s defaults to forbidden', (country) => {
+            expect(effectiveInvitationChannel({ billingCountry: country, invitationChannel: null })).toBe(InvitationChannel.FORBIDDEN);
         });
 
-        /**
-         * The country is not known at provisioning. Defaulting to `forbidden` for everyone would
-         * switch the feature off for the whole platform until each tenant is corrected; the rule
-         * names Germany, not "unknown".
-         */
-        it('then an unknown billing country defaults to allowed', () => {
-            expect(effectiveInvitationChannel({ billingCountry: null, invitationChannel: null })).toBe(InvitationChannel.ALLOWED);
-            expect(effectiveInvitationChannel({})).toBe(InvitationChannel.ALLOWED);
+        it.each(['FR', 'ES', 'IT', 'BE', 'AT', 'IE', 'PT', 'LU'])(
+            'then a tenant in %s, a country legal has analysed, defaults to allowed',
+            (country) => {
+                expect(effectiveInvitationChannel({ billingCountry: country, invitationChannel: null })).toBe(InvitationChannel.ALLOWED);
+            }
+        );
+
+        /** E1 decision D9: a country nobody has analysed, or none at all, resolves to the lawful side. */
+        it.each(['PL', 'US', null, undefined])('then a country not analysed (%s) defaults to forbidden', (country) => {
+            expect(effectiveInvitationChannel({ billingCountry: country, invitationChannel: null })).toBe(InvitationChannel.FORBIDDEN);
         });
     });
 
@@ -42,6 +45,12 @@ describe('Invitation channel (R-PRT-02)', () => {
         it('then a value that is not one of the two falls back to the default', () => {
             expect(effectiveInvitationChannel({ billingCountry: 'DE', invitationChannel: 'maybe' })).toBe(InvitationChannel.FORBIDDEN);
             expect(effectiveInvitationChannel({ billingCountry: 'FR', invitationChannel: '' })).toBe(InvitationChannel.ALLOWED);
+        });
+
+        it('then the source reads explicit for a choice and default otherwise', () => {
+            expect(invitationChannelSource({ invitationChannel: InvitationChannel.FORBIDDEN })).toBe('explicit');
+            expect(invitationChannelSource({ invitationChannel: null })).toBe('default');
+            expect(invitationChannelSource({ invitationChannel: 'maybe' })).toBe('default');
         });
     });
 });

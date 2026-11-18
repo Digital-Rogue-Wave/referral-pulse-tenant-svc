@@ -45,7 +45,7 @@ const HASH = 'a'.repeat(64);
 
 /** One representative of every published in-process event. */
 const EVENTS: BaseDomainEvent[] = [
-    new TenantCreatedEvent(T, T, 'Acme', 'acme', 'k1', NOW, NOW, 'u1', { dataRegion: 'eu-central-1', retentionMonths: 24 }),
+    new TenantCreatedEvent(T, T, 'Acme', 'acme', 'k1', NOW, NOW, 'u1', { dataRegion: 'eu-central-1', retentionMonths: 24 }, 'forbidden'),
     new TenantUpdatedEvent(T, T, { retentionMonths: { from: 24, to: 12 } }, 'u1'),
     new TenantSuspendedEvent(T, T, 'fraud', NOW),
     new TenantUnsuspendedEvent(T, T, NOW),
@@ -59,10 +59,10 @@ const EVENTS: BaseDomainEvent[] = [
     new TenantVerificationRequestedEvent(T, T, 'Acme', 'u1', 'v1'),
     new TenantVerificationStatusChangedEvent(T, T, 'pending', 'verified', undefined, 'system'),
     new TenantWidgetSecretRotatedEvent(T, T, new Date('2026-11-09T11:00:00Z'), 'u1'),
-    new UserRegisteredEvent('u1', T, 'OWNER'),
-    new UserRoleChangedEvent('u2', T, 'VIEWER', 'ADMIN', 'u1'),
-    new UserRemovedEvent('u2', T, 'OPERATOR', 'u1'),
-    new UserInvitedEvent('inv1', T, 'OPERATOR', 'u1'),
+    new UserRegisteredEvent('u1', T, 'owner'),
+    new UserRoleChangedEvent('u2', T, 'viewer', 'admin', 'u1'),
+    new UserRemovedEvent('u2', T, 'operator', 'u1'),
+    new UserInvitedEvent('inv1', T, 'operator', 'u1'),
     new UserLoggedInEvent('u1', T, 'password', 'u1'),
     new UserAnonymisedEvent('u2', T, 'dsr1'),
     new ApiKeyCreatedEvent(
@@ -149,6 +149,33 @@ describe('Published events — the wire contract of every tenant-service event',
             properties: expect.objectContaining({ data_subject_request_id: 'dsr1', request_type: 'erasure' })
         });
         expect(draft!.properties).not.toHaveProperty('dsr_id');
+    });
+
+    it("tells consumers a new tenant's effective invitation channel, so they can keep a copy (E1 D10)", () => {
+        const event = EVENTS.find((e) => e.eventType === 'tenant.created')!;
+
+        const [draft] = toPublishedEvents(event.eventType, event);
+
+        expect(draft!.properties).toMatchObject({ tenant_id: T, invitation_channel: 'forbidden' });
+    });
+
+    it('tells consumers the whole verification threshold when only its amount changed, currency included (E1 D11)', () => {
+        const event = new TenantUpdatedEvent(T, T, { verificationRequiredAbove: { from: 25_000, to: 100_000 } }, 'u1', undefined, {
+            amount: 100_000,
+            currency: 'EUR'
+        });
+
+        const [draft] = toPublishedEvents(event.eventType, event);
+
+        expect(draft!.properties).toMatchObject({ verification_required_above: 100_000, verification_required_above_currency: 'EUR' });
+    });
+
+    it('leaves the threshold out when an update did not touch it, so consumers keep their copy', () => {
+        const event = EVENTS.find((e) => e.eventType === 'tenant.updated')!;
+
+        const [draft] = toPublishedEvents(event.eventType, event);
+
+        expect(draft!.properties).not.toHaveProperty('verification_required_above');
     });
 
     it('tells consumers which tenant a revoked key belonged to, as api_key.created does (US1.4.2 F2)', () => {

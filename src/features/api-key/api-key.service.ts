@@ -24,7 +24,8 @@ import {
     ApiKeyUpdatedEvent,
     ApiKeyDeletedEvent,
     ApiKeyRotatedEvent,
-    ApiKeyType
+    ApiKeyType,
+    ApiKeyListQueryDto
 } from '@domains/api-key';
 import { PlanLimitService } from '@app/features/billing/plan-limit.service';
 
@@ -108,19 +109,23 @@ export class ApiKeyService {
         return apiKeyResponseMapper.toResponseWithRawKey(saved, rawKey);
     }
 
-    async findAll(query: ListQueryDto): Promise<CursorPage<ApiKeyResponse>> {
-        return cursorPage(this.prisma.apiKey, this.tenantAware.withTenantFilter({ deletedAt: null }), query, (row) =>
+    /** Live keys by default; `status=revoked` or `all` shows who revoked what, when and why (E1 decision D6). */
+    async findAll(query: ApiKeyListQueryDto): Promise<CursorPage<ApiKeyResponse>> {
+        const { status = 'active', ...page } = query;
+        const revoked = { active: { revokedAt: null }, revoked: { revokedAt: { not: null } }, all: {} }[status];
+        return cursorPage(this.prisma.apiKey, this.tenantAware.withTenantFilter({ deletedAt: null, ...revoked }), page, (row) =>
             apiKeyResponseMapper.toResponse(row as ApiKeyProps)
         );
     }
 
+    /** Answers for revoked keys too: a revocation is the key's soft delete, not its disappearance. */
     async findById(id: string): Promise<ApiKeyResponse> {
         return apiKeyResponseMapper.toResponse(await this.findLive(id));
     }
 
     /** Renames a key. */
     async update(id: string, userId: string, dto: UpdateApiKeyDto): Promise<ApiKeyResponse> {
-        const existing = await this.findLive(id);
+        const existing = await this.findActive(id);
         // In a transaction, so the audit row commits with the rename (US1.9.1 F8).
         return this.prisma.$transaction(async (tx) => {
             const updated = (await tx.apiKey.update({ where: { id }, data: { label: dto.label } })) as ApiKeyProps;
@@ -153,10 +158,7 @@ export class ApiKeyService {
      * its cache entry is dropped — and `api_key.rotated` tells downstream caches to drop it too.
      */
     async rotate(id: string, userId: string): Promise<ApiKeyWithRawKeyResponse> {
-        const existing = await this.findLive(id);
-        if (existing.revokedAt) {
-            throw new BaseException('state_conflict', 'A revoked API key cannot be rotated', HttpStatus.CONFLICT);
-        }
+        const existing = await this.findActive(id);
 
         const { saved, rawKey } = await this.withFreshKey(existing.keyType as ApiKeyType, (secret) =>
             this.prisma.$transaction(async (tx) => {
@@ -184,12 +186,15 @@ export class ApiKeyService {
         return apiKeyResponseMapper.toResponseWithRawKey(saved, rawKey);
     }
 
-    /** Revokes a key — immediate and irreversible (API §2); the reason travels on `api_key.revoked`. */
+    /**
+     * Revokes a key — immediate and irreversible (API §2); the reason travels on `api_key.revoked`. The row
+     * stays, with who and why, as the key's soft delete (E1 decision D6); a second revocation is a 409.
+     */
     async delete(id: string, userId: string, reason?: string): Promise<void> {
-        const existing = await this.findLive(id);
+        const existing = await this.findActive(id);
         const revokedAt = new Date();
         await this.prisma.$transaction(async (tx) => {
-            await tx.apiKey.update({ where: { id }, data: { revokedAt, deletedAt: revokedAt } });
+            await tx.apiKey.update({ where: { id }, data: { revokedAt, revokedBy: userId, revocationReason: reason ?? null } });
             this.txEventEmitter.emitAfterCommit(
                 'api-key.deleted',
                 new ApiKeyDeletedEvent(
@@ -254,6 +259,15 @@ export class ApiKeyService {
 
     private async forget(key: ApiKeyProps): Promise<void> {
         await this.redis.del(this.cacheKey(key.keyPrefix, key.keyHash), false);
+    }
+
+    /** A key that can still be changed: not revoked (a revoked key answers 409, it still exists). */
+    private async findActive(id: string): Promise<ApiKeyProps> {
+        const key = await this.findLive(id);
+        if (key.revokedAt) {
+            throw new BaseException('state_conflict', 'This API key is revoked; a revoked key cannot be changed', HttpStatus.CONFLICT);
+        }
+        return key;
     }
 
     private async findLive(id: string): Promise<ApiKeyProps> {

@@ -13,7 +13,7 @@ const HASH = hashEmail('ada@acme.io');
 const member = (overrides: Record<string, unknown> = {}) => ({
     id: '01J0000000000000000000000A',
     tenantId: 't1',
-    role: 'ADMIN',
+    role: 'admin',
     email: 'Ada@acme.io',
     kratosIdentityId: 'k-ada',
     deletedAt: null,
@@ -85,7 +85,7 @@ describe('OperatorErasureService — identity step of a data-subject erasure', (
     });
 
     it('refuses to erase the Owner of an open tenant, which would leave it ownerless', async () => {
-        (prisma.user.findMany as jest.Mock).mockResolvedValue([member({ role: 'OWNER' })]);
+        (prisma.user.findMany as jest.Mock).mockResolvedValue([member({ role: 'owner' })]);
         (prisma.tenant.count as jest.Mock).mockResolvedValue(1);
 
         const receipt = await service.erase({ dsrId: 'dsr_1', subjectEmailHash: HASH }, NOW);

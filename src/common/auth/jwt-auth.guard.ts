@@ -5,6 +5,8 @@ import { AuthGuard } from '@nestjs/passport';
 import { IS_PUBLIC_KEY, ALLOW_NO_TENANT_KEY } from '@app/types';
 import type { IAuthenticatedUser } from '@app/types';
 
+import { PLATFORM_ADMIN_KEY } from './require-permission.decorator';
+
 /**
  * JWT Authentication Guard.
  * Validates JWT tokens using the JwtStrategy.
@@ -30,11 +32,14 @@ export class JwtAuthGuard extends AuthGuard('jwt') {
         }
 
         // Tenant is required on every human route unless explicitly opted out (@AllowNoTenant, e.g.
-        // invitation accept). Service tokens are tenant-optional by design (system/cross-tenant callers).
-        const allowNoTenant = this.reflector.getAllAndOverride<boolean>(ALLOW_NO_TENANT_KEY, [context.getHandler(), context.getClass()]);
+        // invitation accept). Service tokens are tenant-optional by design (system/cross-tenant callers), and so is a
+        // Super Admin's platform token on a platform route (E1 D17): staff never hold a tenant.
+        const targets = [context.getHandler(), context.getClass()];
+        const allowNoTenant = this.reflector.getAllAndOverride<boolean>(ALLOW_NO_TENANT_KEY, targets);
         if (!allowNoTenant) {
             const user = context.switchToHttp().getRequest<{ user?: IAuthenticatedUser }>().user;
-            if (user && !user.isServiceToken && !user.tenantId) {
+            const isPlatformCall = user?.source === 'platform' && this.reflector.getAllAndOverride<boolean>(PLATFORM_ADMIN_KEY, targets) === true;
+            if (user && !user.isServiceToken && !user.tenantId && !isPlatformCall) {
                 throw new UnauthorizedException('Tenant context required');
             }
         }

@@ -5,6 +5,7 @@ import billingConfig from './billing.config';
 import connectionConfig from './connection.config';
 import databaseConfig from './database.config';
 import httpConfig from './http.config';
+import kybConfig from './kyb.config';
 import oryConfig from './ory.config';
 import redisConfig from './redis.config';
 import resilienceConfig from './resilience.config';
@@ -30,6 +31,7 @@ export type { BillingConfig } from './billing.config';
 export type { StripeConfig } from './stripe.config';
 export type { TokenIssuerConfig } from './token-issuer.config';
 export type { ConnectionConfig } from './connection.config';
+export type { KybConfig } from './kyb.config';
 
 export const configLoaders = [
     appConfig,
@@ -46,7 +48,8 @@ export const configLoaders = [
     billingConfig,
     stripeConfig,
     tokenIssuerConfig,
-    connectionConfig
+    connectionConfig,
+    kybConfig
 ];
 
 export {
@@ -64,5 +67,6 @@ export {
     billingConfig,
     stripeConfig,
     tokenIssuerConfig,
-    connectionConfig
+    connectionConfig,
+    kybConfig
 };

@@ -42,6 +42,11 @@ model Tenant {
   widgetTokenSecretPreviousUntil DateTime? @map("widget_token_secret_previous_until") @db.Timestamptz
   dataRegion               String    @default("eu-central-1") @map("data_region") @db.VarChar(32)
   retentionMonths          Int       @default(24) @map("retention_months") @db.SmallInt
+  /// R-RWD payout gate (v5.1: "no threshold unless the Owner sets one"): a participant's payouts for a month
+  /// above this amount wait for their identity verification. Integer minor units in the given currency;
+  /// null = no threshold. Owner setting, edited through PATCH /v1/tenant/settings (E1 decision D11).
+  verificationRequiredAbove         Int?    @map("verification_required_above")
+  verificationRequiredAboveCurrency String? @map("verification_required_above_currency") @db.Char(3)
   metadata                 Json?
 
   createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz

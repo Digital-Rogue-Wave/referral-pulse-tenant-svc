@@ -15,11 +15,13 @@ import type { IAuthenticatedUser } from '@app/types';
 import {
     AddUserDto,
     UpdateUserRoleDto,
+    UserDisabledEvent,
+    UserEnabledEvent,
     UserProps,
-    UserResponse,
-    userResponseMapper,
     UserRegisteredEvent,
     UserRemovedEvent,
+    UserResponse,
+    userResponseMapper,
     UserRoleChangedEvent
 } from '@domains/user';
 
@@ -170,6 +172,41 @@ export class UsersService {
     }
 
     /**
+     * Disables a member, reversibly (E1 decision D5): the row stays, `status = disabled` and `disabled_at`
+     * are set, and the event revokes the Keto membership and drops cached exchanges; Ory sessions end now.
+     * Disabling a member already disabled answers with them unchanged.
+     */
+    async disable(actor: IAuthenticatedUser, id: string): Promise<UserResponse> {
+        const target = await this.assertManageable(actor, id, 'Transfer ownership before disabling the Owner');
+        if (target.disabledAt) {
+            return userResponseMapper.toResponse(target);
+        }
+        const updated = await this.prisma.$transaction(async (tx) => {
+            const saved = (await tx.user.update({ where: { id }, data: { status: 'disabled', disabledAt: new Date() } })) as UserProps;
+            this.txEventEmitter.emitAfterCommit('user.disabled', new UserDisabledEvent(id, saved.tenantId, saved.role, actor.userId));
+            return saved;
+        });
+        await this.endSessions(target, 'disabled');
+        this.logger.log('User disabled', { userId: id, disabledBy: actor.userId });
+        return userResponseMapper.toResponse(updated);
+    }
+
+    /** Enables a disabled member: their stored role's Keto membership is restored. An active member is answered unchanged. */
+    async enable(actor: IAuthenticatedUser, id: string): Promise<UserResponse> {
+        const target = await this.assertManageable(actor, id, 'The Owner is never disabled');
+        if (!target.disabledAt) {
+            return userResponseMapper.toResponse(target);
+        }
+        const updated = await this.prisma.$transaction(async (tx) => {
+            const saved = (await tx.user.update({ where: { id }, data: { status: 'active', disabledAt: null } })) as UserProps;
+            this.txEventEmitter.emitAfterCommit('user.enabled', new UserEnabledEvent(id, saved.tenantId, saved.role, actor.userId));
+            return saved;
+        });
+        this.logger.log('User enabled', { userId: id, enabledBy: actor.userId });
+        return userResponseMapper.toResponse(updated);
+    }
+
+    /**
      * The Owner hands the tenant to another member. The new Owner is promoted and the previous Owner
      * becomes a Campaign Manager, atomically — a tenant always has exactly one Owner.
      *
@@ -273,6 +310,26 @@ export class UsersService {
         );
         this.logger.log('Member provisioned', { userId: saved.id, tenantId: saved.tenantId, role: input.role });
         return saved;
+    }
+
+    /** The same rules as a removal: never yourself, never a rank at or above your own, never the Owner. */
+    private async assertManageable(actor: IAuthenticatedUser, id: string, ownerMessage: string): Promise<UserProps> {
+        const actorRole = await this.roleOf(actor);
+        const target = await this.findMember(id);
+        RoleGrantPolicy.assertCanManage(actorRole, actor.userId, { id: target.id, role: target.role as RoleEnum });
+        if (target.role === RoleEnum.OWNER) {
+            throw new BaseException('state_conflict', ownerMessage, HttpStatus.CONFLICT);
+        }
+        return target;
+    }
+
+    private async endSessions(target: UserProps, reason: string): Promise<void> {
+        await this.kratos.revokeSessions(target.kratosIdentityId).catch((error: unknown) => {
+            this.logger.warn(`Could not revoke the ${reason} user’s Ory sessions`, {
+                userId: target.id,
+                reason: error instanceof Error ? error.message : 'unknown'
+            });
+        });
     }
 
     private async findMember(id: string): Promise<UserProps> {

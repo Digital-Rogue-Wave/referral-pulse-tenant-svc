@@ -18,7 +18,9 @@ export class TenantCreatedEvent extends BaseDomainEvent {
         public readonly trialEndsAt: Date,
         public readonly userId?: string,
         /** Residency and raw-data retention (API §8.3) — services holding event data apply them. */
-        public readonly residency?: { dataRegion: string; retentionMonths: number }
+        public readonly residency?: { dataRegion: string; retentionMonths: number },
+        /** R-PRT-02's effective channel at creation, for the services that keep a copy (E1 D10). */
+        public readonly invitationChannel?: string
     ) {
         super();
     }
@@ -31,7 +33,14 @@ export class TenantUpdatedEvent extends BaseDomainEvent {
         public readonly aggregateId: string,
         public readonly tenantId: string,
         public readonly changes: Record<string, { from: unknown; to: unknown }>,
-        public readonly userId?: string
+        public readonly userId?: string,
+        /** The invitation channel that now applies, when the change could move it (E1 D8/D10). */
+        public readonly effectiveInvitationChannel?: string,
+        /**
+         * The payout verification threshold that now applies, when the change touched it (E1 D11). Sent whole:
+         * `changes` drops an unchanged currency, and reward-service needs both to keep its copy.
+         */
+        public readonly verificationThreshold?: { amount: number | null; currency: string | null }
     ) {
         super();
     }

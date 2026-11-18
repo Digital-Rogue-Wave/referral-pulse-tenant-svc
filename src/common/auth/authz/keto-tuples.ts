@@ -22,6 +22,13 @@ export const KETO_PLATFORM_ADMIN_RELATION = 'admin';
 export const KETO_SERVICES_NAMESPACE = 'services';
 export const KETO_SERVICE_CALL_RELATION = 'call';
 
+/** The Keto reconciler's queue and its jobs: the nightly full run, and one tenant's run after its role changes. */
+export const KETO_RECONCILER_QUEUE = 'keto-reconciler';
+export const RECONCILE_ALL_JOB = 'reconcile-keto';
+export const RECONCILE_TENANT_JOB = 'reconcile-tenant';
+/** A tenant is reconciled this long after its last role change (debounced, E1 decision D7, US1.3.1 F3). */
+export const RECONCILE_TENANT_DELAY_MS = 2 * 60 * 1000;
+
 /** Capabilities another service (client-credentials token) can be granted on tenant-service's internal API. */
 export enum ServiceCapability {
     TENANT_STATUS_READ = 'tenant_status.read',
@@ -89,7 +96,30 @@ function grantTuple(tenantId: string, role: RoleEnum, permission: Permission): K
     };
 }
 
-/** Every role→permission grant for one tenant. Written once when the tenant is created (and by the reconciler). */
+/**
+ * Narrow service relations written for every tenant (API Contract §2, E1 decision D18): v5.1 §4 grants
+ * `payouts:confirm` to `service:payout-worker` ("confirm disburses (also granted to service:payout-worker)").
+ * R-AI-02: the AI's autonomous incentive path runs as `service:ai-optimizer` holding only `variants:write`; campaign-svc
+ * holds every such write to the campaign's optimisation bounds (R-AI-04).
+ * Per tenant, never a wildcard object, so a worker acting for one tenant cannot touch another.
+ */
+export const SERVICE_GRANTS: Readonly<Record<string, readonly Permission[]>> = {
+    'payout-worker': ['payouts:confirm'],
+    'ai-optimizer': ['variants:write']
+};
+
+function serviceGrantTuple(tenantId: string, clientId: string, permission: Permission): KetoRelationTuple {
+    const { namespace, relation } = splitPermission(permission);
+    return { namespace, object: tenantId, relation, subject_id: serviceSubject(clientId) };
+}
+
+/** Every role→permission grant and service relation for one tenant. Written when the tenant is created (and by the reconciler). */
 export function tenantGrantTuples(tenantId: string): KetoRelationTuple[] {
-    return (Object.keys(ROLE_GRANTS) as RoleEnum[]).flatMap((role) => ROLE_GRANTS[role].map((permission) => grantTuple(tenantId, role, permission)));
+    const roleGrants = (Object.keys(ROLE_GRANTS) as RoleEnum[]).flatMap((role) =>
+        ROLE_GRANTS[role].map((permission) => grantTuple(tenantId, role, permission))
+    );
+    const serviceGrants = Object.entries(SERVICE_GRANTS).flatMap(([clientId, permissions]) =>
+        permissions.map((permission) => serviceGrantTuple(tenantId, clientId, permission))
+    );
+    return [...roleGrants, ...serviceGrants];
 }

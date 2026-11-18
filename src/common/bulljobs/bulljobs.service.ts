@@ -102,6 +102,11 @@ export class BullJobsService implements OnModuleDestroy {
         return job;
     }
 
+    /** Caps how many jobs of a queue run at once across every worker pod (BullMQ global concurrency). */
+    async setGlobalConcurrency(queueName: string, concurrency: number): Promise<void> {
+        await this.getQueue(queueName).setGlobalConcurrency(concurrency);
+    }
+
     /**
      * Add a delayed job (scheduled for future execution)
      */

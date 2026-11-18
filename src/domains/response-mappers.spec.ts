@@ -44,8 +44,8 @@ describe('response mappers — explicit field lists', () => {
             id: 'i1',
             tenantId: 't1',
             email: 'owner@acme.com',
-            role: 'OWNER',
-            status: 'PENDING',
+            role: 'owner',
+            status: 'pending',
             tokenHash: 'a'.repeat(64),
             expiresAt: now,
             createdAt: now,
@@ -56,11 +56,11 @@ describe('response mappers — explicit field lists', () => {
             id: 'i1',
             tenantId: 't1',
             email: 'owner@acme.com',
-            role: 'OWNER',
-            status: 'PENDING',
+            role: 'owner',
+            status: 'pending',
             expiresAt: now,
             createdAt: now
         });
-        expect(publicInvitationResponseMapper.toResponse(row)).toEqual({ email: 'owner@acme.com', role: 'OWNER', status: 'PENDING', expiresAt: now });
+        expect(publicInvitationResponseMapper.toResponse(row)).toEqual({ email: 'owner@acme.com', role: 'owner', status: 'pending', expiresAt: now });
     });
 });

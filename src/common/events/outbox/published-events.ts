@@ -81,7 +81,9 @@ const MAPPERS: Record<string, Mapper<never>> = {
                 trial_started_at: iso(e.trialStartedAt),
                 trial_ends_at: iso(e.trialEndsAt),
                 data_region: e.residency?.dataRegion ?? null,
-                retention_months: e.residency?.retentionMonths ?? null
+                retention_months: e.residency?.retentionMonths ?? null,
+                // R-PRT-02's effective channel: event-ingestion keeps a copy for the widget (E1 D10).
+                invitation_channel: e.invitationChannel ?? null
             }
         }
     ],
@@ -94,7 +96,15 @@ const MAPPERS: Record<string, Mapper<never>> = {
                 tenant_id: e.tenantId,
                 changed_fields: Object.keys(e.changes).sort().join(','),
                 // Services applying the tenant's retention window need the new value, not only the field name.
-                ...(e.changes.retentionMonths ? { retention_months: Number(e.changes.retentionMonths.to) } : {})
+                ...(e.changes.retentionMonths ? { retention_months: Number(e.changes.retentionMonths.to) } : {}),
+                // Services enforcing R-PRT-02 and the payout verification gate keep a copy (E1 D10, D11).
+                ...(e.effectiveInvitationChannel ? { invitation_channel: e.effectiveInvitationChannel } : {}),
+                ...(e.verificationThreshold
+                    ? {
+                          verification_required_above: e.verificationThreshold.amount,
+                          verification_required_above_currency: e.verificationThreshold.currency
+                      }
+                    : {})
             }
         }
     ],

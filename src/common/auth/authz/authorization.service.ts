@@ -35,12 +35,25 @@ export class AuthorizationService {
         return this.decide(namespace, tenantId, relation, userSubject(userId));
     }
 
-    async isPlatformAdmin(userId: string): Promise<boolean> {
-        return this.decide(KETO_PLATFORM_NAMESPACE, KETO_PLATFORM_OBJECT, KETO_PLATFORM_ADMIN_RELATION, userSubject(userId));
+    /**
+     * `platform:referralai#admin@staff:{kratos identity id}` (E1 D17). Staff are not tenant users, so the subject is their
+     * identity, never a `user:` ULID: no tenant tuple can ever stand for a Super Admin.
+     */
+    async isPlatformAdmin(staffIdentityId: string): Promise<boolean> {
+        return this.decide(KETO_PLATFORM_NAMESPACE, KETO_PLATFORM_OBJECT, KETO_PLATFORM_ADMIN_RELATION, `staff:${staffIdentityId}`);
     }
 
     async serviceHas(clientId: string, capability: ServiceCapability): Promise<boolean> {
         return this.decide(KETO_SERVICES_NAMESPACE, capability, KETO_SERVICE_CALL_RELATION, serviceSubject(clientId));
+    }
+
+    /**
+     * A narrow service relation on one tenant (API Contract §2 "payouts:tenant_acme#confirm@service:payout-worker"):
+     * the service may perform this permission for this tenant only. Always live.
+     */
+    async serviceHasPermission(clientId: string, tenantId: string, permission: Permission): Promise<boolean> {
+        const { namespace, relation } = splitPermission(permission);
+        return this.decide(namespace, tenantId, relation, serviceSubject(clientId));
     }
 
     /**

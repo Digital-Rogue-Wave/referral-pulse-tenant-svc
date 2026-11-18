@@ -1386,6 +1386,9 @@ subscription, the SQS consumer and the 404-to-pending path have no live run behi
 13. **R-CPL-02 specifies a fan-out for erasure only.** `access` and `portability` are named as DSR
     types in the same sentence and then never given a collect contract, a response format or a
     per-service shape. Implemented as §V5.16 D5-8 — recorded, dated, and resting at `accepted`.
+    **Revisited 2026-11-12 (E1 decision D4):** `accepted` was never in `dsr_requests_status_check`
+    (`pending, in_progress, completed, failed`), so `access` and `portability` answered 500. They now
+    rest at `pending`, the constraint's own first value — no migration, no value the DB Model lacks.
 14. **No v5 document specifies the erasure handler every service is required to implement.** R-CPL-01
     says "every other service implements its own erasure handler and returns a receipt" and R-CPL-02
     lists what each one erases, but no path, no request body and no receipt shape appear anywhere.
@@ -1993,3 +1996,93 @@ Decided with Ahmed while fixing US1.8.1 (user-stories-verification, E1 F1.8).
 > services — the three blockers and their dependency chain, the decisions already taken, the
 > ratifications, and the spec defects — lives in `referral-pulse-event-svc/NOTE.md` §11. This
 > service's own detail stays above.
+
+## V5.24 The v5.1 permission catalogue, and lower-case role values (2026-11-12, E1 decisions D2, D16, D3)
+
+**Catalogue.** `permission-catalog.ts` now holds Product Spec v5.1 section 4 verbatim: eleven namespaces
+(`programs` ... `api_keys`) and the four tenant-service resources the catalogue does not cover (`tenants`,
+`users`, `billing`, `audit`). Changes against the previous file:
+
+| what | before | v5.1 |
+|---|---|---|
+| participant namespace | `referrers` (decision T-2) | `participants`, relations `read write block review ban note`. **T-2 is superseded**: v5.1 says the Keto namespace is `participants` and forbids any form of "referrer". |
+| payouts | `read write confirm` | adds `cancel` (live) |
+| Operator | no payouts, no review | `participants:review`, `payouts:read write confirm` |
+| Analyst (`viewer`) | no payouts | `payouts:read` |
+| Support Agent | no payouts | `payouts:read` |
+| live set | ... `referrers:note`, `connections:manage` | adds `participants:ban`, `payouts:cancel`; `participants:note` |
+| data-subject requests | own `dsr:manage` | `programs:write`, the method table's "Owner only (programs:write)" (D16) |
+| connections | own `connections:manage` | `api_keys:manage`, live, the method table's permission (D16) |
+
+**Not in the catalogue table, chosen (to discuss with the lead):** `analytics:write` (Owner, Operator) for
+analytics-svc's write routes; `analytics:query`, v5.1's "dedicated permission" for plain-English analytics,
+granted to Owner, Operator and Analyst (read-only questions).
+
+**Re-provisioning existing tenants, with no manual step.** `grantTenant()` now makes a tenant's role grants
+exactly the catalogue's: it lists the tenant's tuples in every catalogue namespace and, in one atomic Keto
+patch, deletes any role grant no longer held and inserts every current one. `CATALOG_VERSION` is a hash of
+`ROLE_GRANTS`; the first worker start that sees a new version (Redis `SET NX` marker
+`keto:catalog-applied:{version}`) enqueues one immediate reconcile run, which also deletes every tuple of
+the retired namespaces `referrers`, `dsr`, `connections` (`retireNamespaces()`), then re-grants every
+tenant and member. The nightly run keeps converging grants.
+
+**Expand, then contract.** `deployment/ory/keto/namespaces/` gains `20-participants.json`; `07-referrers`,
+`18-dsr` and `19-connections` stay declared until the re-provisioning has run in every environment, then
+their files are deleted (retiring an undeclared namespace is skipped, not an error).
+
+**Lower-case values (D3).** `RoleEnum` (`owner operator support viewer`) and `InvitationStatusEnum`
+(`pending accepted expired revoked rejected`) are lower-case, API Contract section 1's rule for enum values;
+Keto role names already were. Migration `20261112100000_lowercase_role_and_invitation_values` lower-cases
+`roles.name`, `users.role`, `invitations.role/status` and the column defaults. Published events already
+lower-cased roles; old `audit_log` rows keep their upper-case text (append-only).
+
+## V5.25 Disable is reversible and separate from removal (2026-11-12, E1 decision D5, US1.2.3 F3)
+
+`POST /v1/users/{id}/disable` and `/enable` (`users:write`, live). Disable sets `status = disabled` and the new
+`disabled_at` (migration `20261112110000_user_disabled_at`), keeps the row and its role, and emits the in-process
+`user.disabled`: the Keto membership is removed (outbox), cached exchanges are dropped, Ory sessions end, and the
+token exchange treats a disabled member like an identity with no membership. Enable clears both and emits
+`user.enabled`, which re-assigns the stored role. Both are audit-logged (`audited-actions.ts` internal actions).
+The outbox worker and the reconciler treat `disabled_at` like `deleted_at` for Keto. `DELETE` stays the irreversible
+removal. Neither event is published: the v5.1 Event Model's identity list has no such event. Route names are not in
+the spec (to discuss). Nobody can disable themselves, so the Owner is never disabled (403); a non-Owner can't reach
+the Owner either (rank rule), so the Owner 409 is a guard only.
+
+## V5.26 A revoked API key stays visible (2026-11-12, E1 decision D6, US1.4.2 F1)
+
+Revocation is the key's soft delete: `DELETE /v1/api-keys/{id}` sets `revoked_at`, `revoked_by` and
+`revocation_reason` (migration `20261112120000_api_key_revocation_kept`) and no longer sets `deleted_at`. Keys
+revoked before were marked deleted at the same instant; the migration makes them visible again as revoked.
+`GET /v1/api-keys` lists live keys by default and `?status=revoked|all` on request; `GET /{id}` answers for a
+revoked key; revoking, rotating or renaming a revoked key is `409`. Validation already refused `revoked_at`.
+
+## V5.27 Keto effects in order, and a tenant reconcile after role changes (2026-11-12, E1 decision D7, US1.3.1 F2/F3)
+
+Keto membership effects leave the shared `outbox-processor` queue for their own `keto-outbox` queue, consumed by
+`KetoOutboxWorkerService` (same processing as the outbox worker) at concurrency 1 per pod and BullMQ global
+concurrency 1 across pods, so a user's successive role changes apply strictly in order. `assign_role` still
+re-reads `users`, so a retried or late effect stays harmless. Every membership effect also schedules one
+`reconcile-tenant` job on `keto-reconciler`, delayed two minutes and deduplicated per tenant with `extend` +
+`replace` (a debounce: a burst ends in one run, two minutes after its last change). The nightly full reconcile
+stays as the safety net. The 2-minute delay is not in the spec (to discuss).
+
+## V5.28 The Owner settings route, the invitation-default lists and the verification threshold (2026-11-12, E1 decisions D8, D9, D11)
+
+**D8.** v5.1's `PATCH /v1/tenant/settings` (JSON, `tenants:write`, Owner only) and `GET` (`tenants:read`) in
+`tenant-settings.controller.ts`, for `invitation_channel` (null = back to the platform default), `retention_months`
+(6-36) and the payout verification threshold. The GET returns the effective channel and
+`invitation_channel_source: explicit | default`. `PUT /v1/tenants` keeps the profile only: the three settings are
+gone from `UpdateTenantDto`, so the global pipe refuses them as unknown fields. `tenants:write` joined the live set
+(not in the method table, which has no row for tenant settings; to discuss). One audited `tenant.updated` per
+change; its properties now carry `invitation_channel` (the value that applies, when the change could move it),
+`retention_months` and `verification_required_above` + `_currency`, so enforcing services keep a copy.
+
+**D9.** `config/legal/invitation-channel-defaults.ts`: `FORBIDDEN_BY_DEFAULT` (DE, NL, DK, SE, FI, NO, IS, v5.1) and
+`ANALYSED_ALLOWED` (FR, ES, IT, BE, AT, IE, PT, LU; for the legal team to confirm). The default is `allowed` only
+for an analysed country; any other country and an unknown one resolve to `forbidden` (not in the spec; to discuss).
+This changes the default of existing tenants with no country, or a country outside both lists, to `forbidden`.
+
+**D11 (tenant side).** `tenants.verification_required_above` (integer minor units) and `_currency` (ISO 4217),
+null = no threshold, with a check constraint (migration `20261112130000_tenant_verification_required_above`). Held
+by the tenant, as v5.1 says; reward-svc keeps a copy from `tenant.updated` (its side is D11's second half).
+

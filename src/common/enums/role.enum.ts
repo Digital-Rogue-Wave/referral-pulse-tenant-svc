@@ -11,12 +11,15 @@
  * T-1 because ownership transfer demoted the outgoing Owner to it; that path now demotes to
  * `OPERATOR` and the role is gone (NOTE.md §V5.21). The fifth role R-ACT-01 names is platform-side
  * Super Admin, which is a Keto relation (`KETO_PLATFORM_ADMIN_RELATION`), not a tenant membership.
+ *
+ * Values are lower-case, the API Contract §1 rule for enum values, and match the Keto role names
+ * (E1 decision D3; migration `20261112100000_lowercase_role_and_invitation_values`).
  */
 export enum RoleEnum {
-    OWNER = 'OWNER',
-    OPERATOR = 'OPERATOR',
-    SUPPORT = 'SUPPORT',
-    VIEWER = 'VIEWER'
+    OWNER = 'owner',
+    OPERATOR = 'operator',
+    SUPPORT = 'support',
+    VIEWER = 'viewer'
 }
 
 /** The four v5 standard roles. `roles.tenant_id` is null for exactly these (DB Model §3). */

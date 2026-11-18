@@ -7,7 +7,6 @@ import { AppLoggerService } from '@common/logging/app-logger.service';
 import { RoleEnum } from '@common/enums/role.enum';
 import { invitationResponseMapper } from '@domains/invitation';
 import { AdminCreateTenantDto, AdminTenantCreatedResponse, tenantResponseMapper } from '@domains/tenant';
-import { TenantEvents, TenantVerificationRequestedEvent } from '@domains/tenant/events/tenant.events';
 
 import { InvitationService } from '../invitation/invitation.service';
 import { TenantService } from './tenant.service';
@@ -41,10 +40,6 @@ export class AdminTenantService {
                 role: RoleEnum.OWNER,
                 actingUserId: adminUserId
             });
-            this.txEventEmitter.emitAfterCommit(
-                TenantEvents.VERIFICATION_REQUESTED,
-                new TenantVerificationRequestedEvent(id, id, inserted.tenant.name, adminUserId, inserted.verificationId)
-            );
             return { tenant: inserted.tenant, invitation: ownerInvitation };
         });
 

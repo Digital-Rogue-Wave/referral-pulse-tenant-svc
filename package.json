@@ -6,6 +6,7 @@
     "private": true,
     "license": "MIT",
     "scripts": {
+        "check:authz-kit": "node scripts/check-authz-kit.mjs",
         "preinstall": "npx only-allow pnpm",
         "prebuild": "rimraf dist",
         "build": "nest build",

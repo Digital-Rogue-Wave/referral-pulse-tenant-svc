@@ -15,10 +15,9 @@ import { ConnectionService } from './connection.service';
  * what Event Ingestion verifies provider callbacks against; the callbacks themselves are received by
  * that service, never here.
  *
- * Gated on `connections:manage`, not the `api_keys:manage` §6.5 names. Both resolve to Owner-only, so
- * effective access is identical — but a provider connection is not an API key, and keeping them
- * separate is what later lets an operator manage connections without being handed the power to mint
- * platform credentials. Ratified 2026-10-20; §6.5 is being corrected to match.
+ * Gated on `api_keys:manage`, live — v5.1 §4's permission for the Connection routes. The service's own
+ * `connections:manage` namespace (2026-10-20) was retired by E1 decision D16 to follow the catalogue;
+ * effective access is unchanged (Owner only).
  */
 @ApiTags('Connections')
 @ApiBearerAuth()
@@ -28,7 +27,7 @@ export class ConnectionController {
 
     @ApiBody({ type: CreateConnectionDto })
     @ApiCreatedResponse({ description: 'Connection created; post provider callbacks to `receiver_url`', type: ConnectionResponse })
-    @RequirePermission('connections:manage')
+    @RequirePermission('api_keys:manage')
     @HttpCode(HttpStatus.CREATED)
     @Post()
     async create(@Body() dto: CreateConnectionDto, @CurrentUser() user: IAuthenticatedUser): Promise<ConnectionResponse> {
@@ -36,7 +35,7 @@ export class ConnectionController {
     }
 
     @ApiOkResponse({ description: 'A page of connections, newest first', type: CursorPage })
-    @RequirePermission('connections:manage')
+    @RequirePermission('api_keys:manage')
     @HttpCode(HttpStatus.OK)
     @Get()
     async findAll(@Query() query: ListQueryDto): Promise<CursorPage<ConnectionResponse>> {
@@ -44,7 +43,7 @@ export class ConnectionController {
     }
 
     @ApiOkResponse({ description: 'Connection revoked; its callbacks are refused from now on' })
-    @RequirePermission('connections:manage')
+    @RequirePermission('api_keys:manage')
     @HttpCode(HttpStatus.NO_CONTENT)
     @Delete(':id')
     async revoke(@Param('id') id: string, @CurrentUser() user: IAuthenticatedUser): Promise<void> {
