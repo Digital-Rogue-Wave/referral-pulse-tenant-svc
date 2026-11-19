@@ -40,6 +40,14 @@ export enum ServiceCapability {
     DSR_ERASE = 'dsr.erase',
     /** Event Ingestion reading a provider connection and its secret to verify a callback (Architecture §2.1/§2.4). */
     PROVIDER_CONNECTION_READ = 'provider_connection.read',
+    /** Event Ingestion reporting a connection's first verified callback, which activates it (v5.2 US1.5.2). */
+    CONNECTION_STATUS_WRITE = 'connection_status.write',
+    /**
+     * Reward- and notification-service reading a connection's outbound credential for one provider call
+     * (v5.2 API §3.16 `GET /internal/connections/{id}/credential`, audited). Separate from `provider_connection.read`
+     * so Event Ingestion never holds an outbound credential (US1.5.4 AC1).
+     */
+    CONNECTION_CREDENTIAL_READ = 'connection_credential.read',
     /**
      * The email-tracking token key. Notification-service signs `/t/o` and `/t/c` tokens with it and
      * Event Ingestion verifies them, so both hold this capability — separate from

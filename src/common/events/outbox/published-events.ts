@@ -1,7 +1,7 @@
 import type { BaseDomainEvent } from '@domains/common/events';
 import type { ApiKeyCreatedEvent, ApiKeyDeletedEvent, ApiKeyRotatedEvent } from '@domains/api-key';
 import type { ComplianceAuditLoggedEvent, ConsentRecordedEvent, DsrRequestedEvent, ErasureCompletedEvent } from '@domains/compliance';
-import type { ConnectionCreatedEvent, ConnectionRevokedEvent } from '@domains/connection';
+import type { ConnectionCreatedEvent, ConnectionRevokedEvent, ConnectionRotatedEvent, ConnectionVerifiedEvent } from '@domains/connection';
 import type {
     SubscriptionCancelledEvent,
     SubscriptionChangedEvent,
@@ -267,39 +267,25 @@ const MAPPERS: Record<string, Mapper<never>> = {
         }
     ],
 
-    // ── Provider connections (Product Spec §12 lists `connection.created|revoked` here) ──
-    // Event Ingestion caches connection config and drops its entry on these, so the names are a cache
-    // invalidation contract, not only an audit trail. The secret is never in the payload.
+    // ── Connections (v5.2 Event Model §5.11: connection.created · verified · rotated · revoked) ──
+    // Event Ingestion drops its cached signing secret on each, and reward-service keeps its payout-Connection replica
+    // (gate 2) from them. Credentials never travel on the bus.
     'connection.created': (e: ConnectionCreatedEvent) => [
-        {
-            eventType: 'connection.created',
-            externalId: `connection.created:${e.payload.connectionId}`,
-            object: { type: 'connection', id: e.payload.connectionId },
-            properties: {
-                connection_id: e.payload.connectionId,
-                tenant_id: e.tenantId,
-                provider: e.payload.provider,
-                connection_type: e.payload.connectionType,
-                // US1.5.1 F9: reward-svc keeps a copy of active connections from these two events (Payout gate 2).
-                status: 'active',
-                created_by: e.payload.createdBy
-            }
-        }
+        connectionDraft('connection.created', e.payload.connectionId, e, { created_by: e.payload.createdBy })
+    ],
+    'connection.verified': (e: ConnectionVerifiedEvent) => [
+        connectionDraft('connection.verified', e.payload.connectionId, e, { verified_at: iso(e.payload.verifiedAt), source: e.payload.source })
+    ],
+    // A connection rotates many times, so its key is the event's own id.
+    'connection.rotated': (e: ConnectionRotatedEvent) => [
+        connectionDraft('connection.rotated', e.eventId, e, {
+            rotated_at: iso(e.payload.rotatedAt),
+            old_secret_valid_until: iso(e.payload.oldSecretValidUntil),
+            rotated_by: e.payload.rotatedBy
+        })
     ],
     'connection.revoked': (e: ConnectionRevokedEvent) => [
-        {
-            eventType: 'connection.revoked',
-            externalId: `connection.revoked:${e.payload.connectionId}`,
-            object: { type: 'connection', id: e.payload.connectionId },
-            properties: {
-                connection_id: e.payload.connectionId,
-                tenant_id: e.tenantId,
-                provider: e.payload.provider,
-                connection_type: e.payload.connectionType,
-                status: 'revoked',
-                revoked_by: e.payload.revokedBy
-            }
-        }
+        connectionDraft('connection.revoked', e.payload.connectionId, e, { revoked_by: e.payload.revokedBy })
     ],
 
     // ── Billing (this service's extension) ──
@@ -486,6 +472,25 @@ const MAPPERS: Record<string, Mapper<never>> = {
         }
     ]
 };
+
+type ConnectionEvent = ConnectionCreatedEvent | ConnectionVerifiedEvent | ConnectionRotatedEvent | ConnectionRevokedEvent;
+
+/** Every connection event carries the same facts (v5.2 Event Model §5.11): id, provider, direction, status. */
+function connectionDraft(eventType: string, key: string, e: ConnectionEvent, extra: FlatProperties): PublishedEventDraft {
+    return {
+        eventType,
+        externalId: `${eventType}:${key}`,
+        object: { type: 'connection', id: e.payload.connectionId },
+        properties: {
+            connection_id: e.payload.connectionId,
+            tenant_id: e.tenantId,
+            provider: e.payload.provider,
+            direction: e.payload.direction,
+            status: e.payload.status,
+            ...extra
+        }
+    };
+}
 
 function subscriptionDraft(eventType: string, e: SubscriptionCreatedEvent | SubscriptionChangedEvent): PublishedEventDraft {
     return {

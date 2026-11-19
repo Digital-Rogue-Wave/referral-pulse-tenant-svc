@@ -1,7 +1,7 @@
 @connection-create
-Feature: The Owner creates a provider connection and gets its receiver URL (US1.5.1)
+Feature: The Owner creates a Connection and gets its inbound URL (US1.5.1, v5.2 API 3.16)
   As an Owner
-  I want to register a provider's signing secret and get the URL to paste into its console
+  I want to register a provider's credentials and get the URL to paste into its console
   So that the provider's callbacks reach my company, verified with my own secret
 
   Background:
@@ -9,30 +9,43 @@ Feature: The Owner creates a provider connection and gets its receiver URL (US1.
     And a company has signed itself up for billing
     And I am that billing company's Owner
 
-  Scenario: A connection names its real provider, and its type follows from it (F7, F5)
-    When I connect "tremendous" with no connection type
+  Scenario: A billing provider is inbound, pending verification, with an absolute inbound URL
+    When I connect "stripe" with its credentials
     Then the response status should be 201
-    And the connection is a "gift_card" connection
-    And its receiver URL is absolute and ends with its own path (F4)
+    And the connection is "inbound" and "pending_verification"
+    And its inbound URL is absolute and ends with its own path
+    And no credential is in the response
 
-  Scenario: The old category names are refused (F7)
-    When I connect "gift_card" with no connection type
+  Scenario: Zapier is outbound only: no credentials, no inbound URL
+    When I connect "zapier" with its credentials
+    Then the response status should be 201
+    And the connection is "outbound" and "pending_verification"
+    And it has no inbound URL
+
+  Scenario: The provider matrix fixes the direction
+    When I connect "paddle" as an "outbound" connection
     Then the response status should be 400
-    When I connect "crm" with no connection type
+    And the error names the field "direction"
+
+  Scenario: A payout provider needs its outbound credential
+    When I connect "wise" without credentials
+    Then the response status should be 400
+    And the error names the field "credentials.api_key"
+
+  Scenario: The old category names are refused
+    When I connect "crm" with its credentials
     Then the response status should be 400
 
-  Scenario: A provider can't be paired with another type (F5)
-    When I connect "paddle" as a "crm" connection
-    Then the response status should be 400
-    And the error names the field "connection_type"
-
-  Scenario: The Owner lists the company's connections (F2)
+  Scenario: The Owner lists and retrieves the company's connections
     Given I connected "stripe" and "hubspot"
     When I send a GET request to "/api/v1/connections" with that token
     Then the response status should be 200
-    And the list holds a "billing" "stripe" connection and a "crm" "hubspot" connection
+    And the list holds an "inbound" "stripe" connection and a "both" "hubspot" connection
+    When I retrieve the last connection
+    Then the response status should be 200
+    And no credential is in the response
 
-  Scenario: The permission is re-checked live in Keto, not read from the token (F3)
+  Scenario: The permission is re-checked live in Keto, not read from the token
     Given I am a member of that company whose Keto access to connections was removed
-    When I connect "stripe" with no connection type
+    When I connect "stripe" with its credentials
     Then the response status should be 403

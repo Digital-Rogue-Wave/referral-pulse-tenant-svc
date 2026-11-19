@@ -16,7 +16,7 @@ import {
 } from '@domains/billing';
 import { ComplianceAuditLoggedEvent, ConsentRecordedEvent, DsrRequestedEvent, ErasureCompletedEvent } from '@domains/compliance';
 import type { BaseDomainEvent } from '@domains/common/events';
-import { ConnectionCreatedEvent, ConnectionRevokedEvent } from '@domains/connection';
+import { ConnectionCreatedEvent, ConnectionRevokedEvent, ConnectionRotatedEvent, ConnectionVerifiedEvent } from '@domains/connection';
 import {
     TenantCreatedEvent,
     TenantDeletedEvent,
@@ -91,8 +91,33 @@ const EVENTS: BaseDomainEvent[] = [
     new PaymentRefundedEvent('b1', T, 'evt5', 'ch1', 4900, 'eur', true),
     new UsageThresholdCrossedEvent(T, T, 'email_sends', 80, 80, 100, 80, '2026-09', ISO),
     new UsageMonthlySummaryEvent(T, T, 'email_sends', '2026-08', 90, 100, '2026-08-31', ISO),
-    new ConnectionCreatedEvent('c1', T, { connectionId: 'c1', provider: 'stripe', connectionType: 'billing', createdBy: 'u1' }, 'u1'),
-    new ConnectionRevokedEvent('c1', T, { connectionId: 'c1', provider: 'stripe', connectionType: 'billing', revokedBy: 'u1' }, 'u1'),
+    new ConnectionCreatedEvent(
+        'c1',
+        T,
+        { connectionId: 'c1', provider: 'stripe', direction: 'inbound', status: 'pending_verification', createdBy: 'u1' },
+        'u1'
+    ),
+    new ConnectionVerifiedEvent(
+        'c1',
+        T,
+        { connectionId: 'c1', provider: 'stripe', direction: 'inbound', status: 'active', verifiedAt: new Date(ISO), source: 'callback' },
+        'service:ingestion-svc'
+    ),
+    new ConnectionRotatedEvent(
+        'c1',
+        T,
+        {
+            connectionId: 'c1',
+            provider: 'stripe',
+            direction: 'inbound',
+            status: 'active',
+            rotatedAt: new Date(ISO),
+            oldSecretValidUntil: new Date(ISO),
+            rotatedBy: 'u1'
+        },
+        'u1'
+    ),
+    new ConnectionRevokedEvent('c1', T, { connectionId: 'c1', provider: 'stripe', direction: 'inbound', status: 'revoked', revokedBy: 'u1' }, 'u1'),
     new ConsentRecordedEvent('cs1', T, {
         subjectEmailHash: HASH,
         subjectExternalId: 'cust-9',
@@ -174,6 +199,16 @@ describe('Published events — the wire contract of every tenant-service event',
         const [draft] = toPublishedEvents(event.eventType, event);
 
         expect(draft).toMatchObject({ eventType: 'api_key.revoked', properties: expect.objectContaining({ tenant_id: T }) });
+    });
+
+    it('gives every connection event its direction and status, and the rotation its 24-hour end (v5.2 Event Model §5.11)', () => {
+        const rotated = EVENTS.find((e) => e.eventType === 'connection.rotated')!;
+
+        const [draft] = toPublishedEvents(rotated.eventType, rotated);
+
+        expect(draft!.properties).toMatchObject({ connection_id: 'c1', direction: 'inbound', status: 'active', old_secret_valid_until: ISO });
+        expect(draft!.externalId).toBe(`connection.rotated:${rotated.eventId}`);
+        expect(JSON.stringify(draft)).not.toMatch(/secret"/);
     });
 
     it('covers every mapper in the registry', () => {

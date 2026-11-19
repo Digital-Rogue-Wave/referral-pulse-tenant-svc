@@ -319,12 +319,14 @@ secretVars:
   # are not. Supply them per environment (or via a secret store) - billing fails closed without them.
   STRIPE_SECRET_KEY: ""
   STRIPE_WEBHOOK_SECRET: ""
-  # Encrypts provider_connections.signing_secret at rest (AES-256-GCM, 64 hex chars). Without it this
+  # Encrypts the connections secret and credential columns at rest (AES-256-GCM, 64 hex chars). Without it this
   # service boots but refuses to create or resolve a provider connection, rather than storing a secret
   # nothing can read back.
   PROVIDER_SECRET_ENCRYPTION_KEY: ""
   # US1.5.1 F4: public origin of Event Ingestion's /inbound receivers, so receiver_url is absolute.
   INBOUND_PUBLIC_BASE_URL: "https://api.example.com"
+  # CONNECTION_TEST_BASE_URL is for local and test runs only (sends every connection test probe to a stub);
+  # leave it unset here so the probes reach the providers' own APIs.
   # Signs and verifies the /t/o and /t/c email-tracking tokens (64 hex chars). Notification signs with
   # it, ingestion verifies with it, and both read it from this service — so it is one value per
   # environment, and changing it invalidates the tokens in mail already sent.

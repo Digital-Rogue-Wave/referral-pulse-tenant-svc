@@ -3,7 +3,7 @@ import { Reflector } from '@nestjs/core';
 
 import { ServiceCapability } from '@common/auth/authz/keto-tuples';
 import { PERMISSIONS_KEY, PLATFORM_ADMIN_KEY, SERVICE_CAPABILITIES_KEY } from '@common/auth/require-permission.decorator';
-import { ConnectionProvider, ConnectionType } from '@domains/connection';
+import { ConnectionProvider } from '@domains/connection';
 
 import { ConnectionService } from './connection.service';
 import { InternalConnectionController } from './internal-connection.controller';
@@ -14,10 +14,12 @@ const resolved = {
     connectionId: CONNECTION_ID,
     tenantId: '01HQZX000000000000000TEN',
     provider: ConnectionProvider.STRIPE,
-    connectionType: ConnectionType.BILLING,
+    direction: 'inbound',
+    status: 'active',
     signingSecret: 'whsec_live_abcdefghijklmnop',
-    config: {},
-    enabled: true
+    previousSigningSecret: null,
+    previousSecretValidUntil: null,
+    config: {}
 };
 
 /**
@@ -27,9 +29,12 @@ const resolved = {
  */
 describe('Resolving a connection for the inbound receiver', () => {
     const findForReceiver = jest.fn();
-    const controller = new InternalConnectionController({ findForReceiver } as unknown as ConnectionService);
+    const credentialFor = jest.fn();
+    const markVerifiedByCallback = jest.fn();
+    const controller = new InternalConnectionController({ findForReceiver, credentialFor, markVerifiedByCallback } as unknown as ConnectionService);
+    const caller = { clientId: 'payout-worker', userId: 'payout-worker' } as never;
 
-    beforeEach(() => findForReceiver.mockReset());
+    beforeEach(() => jest.resetAllMocks());
 
     describe('given a live connection', () => {
         it('then the secret and the tenant it belongs to come back', async () => {
@@ -66,6 +71,31 @@ describe('Resolving a connection for the inbound receiver', () => {
         it('then no dashboard permission opens it, because no human needs a decrypted secret', () => {
             expect(metadata(PERMISSIONS_KEY)).toBeUndefined();
             expect(metadata(PLATFORM_ADMIN_KEY)).toBeUndefined();
+        });
+    });
+
+    describe('given the v5.2 credential and verified routes', () => {
+        const reflector = new Reflector();
+        const capabilities = (method: keyof InternalConnectionController): unknown =>
+            reflector.get(SERVICE_CAPABILITIES_KEY, InternalConnectionController.prototype[method]);
+
+        it('then each route has its own capability, so ingestion never holds an outbound credential', () => {
+            expect(capabilities('credential')).toEqual([ServiceCapability.CONNECTION_CREDENTIAL_READ]);
+            expect(capabilities('verified')).toEqual([ServiceCapability.CONNECTION_STATUS_WRITE]);
+        });
+
+        it('then the credential read is made under the calling client, and an unknown connection is a 404', async () => {
+            credentialFor.mockResolvedValueOnce({ connectionId: CONNECTION_ID, credentials: { apiKey: 'k' } });
+            await expect(controller.credential(CONNECTION_ID, caller)).resolves.toMatchObject({ credentials: { apiKey: 'k' } });
+            expect(credentialFor).toHaveBeenCalledWith(CONNECTION_ID, 'payout-worker');
+
+            credentialFor.mockResolvedValueOnce(null);
+            await expect(controller.credential(CONNECTION_ID, caller)).rejects.toBeInstanceOf(NotFoundException);
+        });
+
+        it('then a verified report for an unknown connection is a 404', async () => {
+            markVerifiedByCallback.mockResolvedValue(null);
+            await expect(controller.verified(CONNECTION_ID, caller)).rejects.toBeInstanceOf(NotFoundException);
         });
     });
 });

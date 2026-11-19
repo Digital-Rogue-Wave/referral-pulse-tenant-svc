@@ -121,6 +121,8 @@ export type EventAction =
     | 'verification_status_changed'
     | 'widget_secret_revealed'
     | 'widget_secret_rotated'
+    | 'verified'
+    | 'credential_read'
     // Compliance
     | 'recorded'
     | 'requested'
