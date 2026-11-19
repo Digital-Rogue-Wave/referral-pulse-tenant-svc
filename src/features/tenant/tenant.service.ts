@@ -42,8 +42,6 @@ import {
     VerificationType,
     UpdateTenantSettingsDto,
     TenantSettingsResponse,
-    invitationChannelSource,
-    effectiveInvitationChannel,
     type TenantProps
 } from '@domains/tenant';
 
@@ -297,8 +295,7 @@ export class TenantService {
                 {
                     dataRegion: created.dataRegion,
                     retentionMonths: created.retentionMonths
-                },
-                effectiveInvitationChannel(created)
+                }
             )
         );
         return { tenant: created };
@@ -445,7 +442,7 @@ export class TenantService {
 
         const updated = await this.applyChange(tenantId, updateData, (row) => [
             TenantEvents.UPDATED,
-            new TenantUpdatedEvent(row.id, row.id, changes, user.userId, changes.billingCountry ? effectiveInvitationChannel(row) : undefined)
+            new TenantUpdatedEvent(row.id, row.id, changes, user.userId)
         ]);
 
         this.logger.log(`Tenant updated: ${tenantId}`, { tenantId, changes: Object.keys(changes) });
@@ -462,23 +459,19 @@ export class TenantService {
     }
 
     /**
-     * The three Owner settings in one audited change: the invitation channel (null = back to the platform
-     * default), the raw-data retention window and the payout verification threshold (null = none).
+     * The Owner settings in one audited change: the raw-data retention window and the payout verification
+     * threshold (null = none).
      * `tenant.updated` carries the new values, so the services that enforce them keep a copy.
      */
     async updateSettings(dto: UpdateTenantSettingsDto, user: IAuthenticatedUser): Promise<TenantSettingsResponse> {
         const tenantId = this.tenantContext.getTenantId()!;
         const tenant = await this.findOneOrFail(tenantId);
         const changes: Record<string, { from: unknown; to: unknown }> = {};
-        const set = (
-            field: 'invitationChannel' | 'retentionMonths' | 'verificationRequiredAbove' | 'verificationRequiredAboveCurrency',
-            to: unknown
-        ): void => {
+        const set = (field: 'retentionMonths' | 'verificationRequiredAbove' | 'verificationRequiredAboveCurrency', to: unknown): void => {
             if (to !== undefined && to !== (tenant[field] ?? null)) {
                 changes[field] = { from: tenant[field] ?? null, to };
             }
         };
-        set('invitationChannel', dto.invitationChannel);
         set('retentionMonths', dto.retentionMonths);
         if (dto.verificationRequiredAbove !== undefined) {
             const currency = dto.verificationRequiredAbove === null ? null : dto.verificationRequiredAboveCurrency!.toUpperCase();
@@ -499,7 +492,6 @@ export class TenantService {
                 row.id,
                 changes,
                 user.userId,
-                changes.invitationChannel ? effectiveInvitationChannel(row) : undefined,
                 changes.verificationRequiredAbove || changes.verificationRequiredAboveCurrency
                     ? { amount: row.verificationRequiredAbove, currency: row.verificationRequiredAboveCurrency }
                     : undefined
@@ -788,8 +780,6 @@ export class TenantService {
 
 function toTenantSettings(tenant: TenantProps): TenantSettingsResponse {
     return Object.assign(new TenantSettingsResponse(), {
-        invitationChannel: effectiveInvitationChannel(tenant),
-        invitationChannelSource: invitationChannelSource(tenant),
         retentionMonths: tenant.retentionMonths,
         verificationRequiredAbove: tenant.verificationRequiredAbove ?? null,
         verificationRequiredAboveCurrency: tenant.verificationRequiredAboveCurrency ?? null

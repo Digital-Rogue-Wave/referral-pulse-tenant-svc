@@ -151,16 +151,17 @@ describe('Published events — the wire contract of every tenant-service event',
         expect(draft!.properties).not.toHaveProperty('dsr_id');
     });
 
-    it("tells consumers a new tenant's effective invitation channel, so they can keep a copy (E1 D10)", () => {
+    it('carries no invitation channel: v5.2 has no invitation setting (Appendix A #79)', () => {
         const event = EVENTS.find((e) => e.eventType === 'tenant.created')!;
 
         const [draft] = toPublishedEvents(event.eventType, event);
 
-        expect(draft!.properties).toMatchObject({ tenant_id: T, invitation_channel: 'forbidden' });
+        expect(draft!.properties).toMatchObject({ tenant_id: T });
+        expect(draft!.properties).not.toHaveProperty('invitation_channel');
     });
 
     it('tells consumers the whole verification threshold when only its amount changed, currency included (E1 D11)', () => {
-        const event = new TenantUpdatedEvent(T, T, { verificationRequiredAbove: { from: 25_000, to: 100_000 } }, 'u1', undefined, {
+        const event = new TenantUpdatedEvent(T, T, { verificationRequiredAbove: { from: 25_000, to: 100_000 } }, 'u1', {
             amount: 100_000,
             currency: 'EUR'
         });

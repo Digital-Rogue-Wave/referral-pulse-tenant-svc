@@ -1,5 +1,4 @@
 import { BadRequestException, HttpStatus, NotFoundException } from '@nestjs/common';
-import { InvitationChannel } from '@domains/tenant/tenant.types';
 import { ConfigService } from '@nestjs/config';
 import { mock, MockProxy } from 'jest-mock-extended';
 import moment from 'moment';
@@ -118,13 +117,13 @@ describe('TenantService — tenant lifecycle', () => {
         });
 
         describe('the Owner settings (PATCH /v1/tenant/settings, E1 decision D8)', () => {
-            it('records only the settings that changed, and announces the channel that now applies', async () => {
-                const settings = await service.updateSettings({ invitationChannel: InvitationChannel.FORBIDDEN, retentionMonths: 24 }, OWNER);
+            it('records only the settings that changed, and announces them', async () => {
+                const settings = await service.updateSettings({ retentionMonths: 12 }, OWNER);
 
-                expect(prisma.tenant.update).toHaveBeenCalledWith({ where: { id: 't1' }, data: { invitationChannel: 'forbidden' } });
+                expect(prisma.tenant.update).toHaveBeenCalledWith({ where: { id: 't1' }, data: { retentionMonths: 12 } });
                 const [, event] = events.emitAfterCommit.mock.calls[0]!;
-                expect(event).toMatchObject({ changes: { invitationChannel: { to: 'forbidden' } }, effectiveInvitationChannel: 'forbidden' });
-                expect(settings).toMatchObject({ invitationChannel: 'forbidden', invitationChannelSource: 'explicit', retentionMonths: 24 });
+                expect(event).toMatchObject({ changes: { retentionMonths: { to: 12 } } });
+                expect(settings).not.toHaveProperty('invitationChannel');
             });
 
             it('stores the verification threshold with its currency, and clears both with null', async () => {

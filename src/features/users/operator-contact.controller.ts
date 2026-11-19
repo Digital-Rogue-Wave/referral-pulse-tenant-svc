@@ -6,7 +6,6 @@ import { ServiceCapability } from '@common/auth/authz/keto-tuples';
 import { AllowServices } from '@common/auth/require-permission.decorator';
 import { DatabaseService } from '@app/database/database.service';
 import { ContactQueryDto, OperatorContactResponse, TenantCommunicationProfileResponse } from '@domains/user/contact.dto';
-import { effectiveInvitationChannel } from '@domains/tenant/tenant.types';
 
 type ContactRow = { id: string; tenantId: string; email: string; name: string | null; role: string };
 
@@ -63,8 +62,6 @@ export class OperatorContactController {
                 id: true,
                 name: true,
                 status: true,
-                invitationChannel: true,
-                billingCountry: true,
                 setting: { select: { general: true } }
             }
         });
@@ -78,11 +75,7 @@ export class OperatorContactController {
             status: tenant.status,
             locale: canonicalLocale(general.locale),
             appUrl: httpsUrl(general.appUrl),
-            replyTo: typeof general.supportEmail === 'string' && isEmail(general.supportEmail) ? general.supportEmail : null,
-            // R-PRT-02's effective value, resolved here so no caller re-derives the jurisdiction
-            // default. Referral Workflow checks it before creating an Invitation, and widget-config
-            // uses it to decide whether "invite by email" is among the share tools (R-SDK-03).
-            invitationChannel: effectiveInvitationChannel(tenant)
+            replyTo: typeof general.supportEmail === 'string' && isEmail(general.supportEmail) ? general.supportEmail : null
         };
     }
 }

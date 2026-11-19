@@ -30,7 +30,6 @@ model Tenant {
   /// choice"** and resolves to the platform default from `billingCountry` — which is what lets a
   /// later correction of the billing country re-derive the right answer, and what distinguishes it
   /// from an Owner who deliberately chose `allowed`.
-  invitationChannel        String?   @map("invitation_channel") @db.VarChar(20)
   /// The shared secret the tenant's backend signs widget identity tokens with, and Event Ingestion
   /// verifies them with (API Contract §4.1). 32 random bytes as hex, stored AES-256-GCM encrypted
   /// (`WidgetSecretVault`); a 64-hex value is a not-yet-encrypted legacy row, sealed on first read.

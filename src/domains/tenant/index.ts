@@ -24,17 +24,8 @@ import { InvitationResponse } from '@domains/invitation';
 // Enums (canonical definition lives in tenant.types.ts)
 // ============================================================
 
-import {
-    InvitationChannel,
-    TenantStatus,
-    VerificationRecordStatus,
-    VerificationStatus,
-    VerificationType,
-    type InvitationChannelSource
-} from './tenant.types';
-export { InvitationChannel, TenantStatus, VerificationRecordStatus, VerificationStatus, VerificationType };
-export { defaultInvitationChannel, effectiveInvitationChannel, invitationChannelSource } from './tenant.types';
-export type { InvitationChannelSource } from './tenant.types';
+import { TenantStatus, VerificationRecordStatus, VerificationStatus, VerificationType } from './tenant.types';
+export { TenantStatus, VerificationRecordStatus, VerificationStatus, VerificationType };
 
 // ============================================================
 // Props (shape of the Prisma model)
@@ -62,7 +53,6 @@ export interface TenantProps {
     domainVerificationStatus?: string | null;
     domainVerificationToken?: string | null;
     billingCountry?: string | null;
-    invitationChannel?: string | null;
     dataRegion: string;
     retentionMonths: number;
     verificationRequiredAbove?: number | null;
@@ -103,25 +93,16 @@ export class UpdateTenantDto {
     @IsISO31661Alpha2()
     billingCountry?: string;
 
-    // The Owner settings (invitation channel, retention, verification threshold) moved to
+    // The Owner settings (retention, verification threshold) moved to
     // PATCH /v1/tenant/settings (E1 decision D8); sent here they are refused as unknown fields.
 }
 
 /**
  * `PATCH /v1/tenant/settings` (v5.1 API surface; E1 decision D8): the Owner settings, in JSON, through the
- * global validation pipe. Every field is optional; `null` resets `invitation_channel` to the platform default
- * and clears the verification threshold.
+ * global validation pipe. Every field is optional; `null` clears the verification threshold. There is no
+ * invitation setting: v5.2 R-PRT-02 — the platform never emails an invitee (Appendix A #79).
  */
 export class UpdateTenantSettingsDto {
-    @ApiPropertyOptional({
-        enum: InvitationChannel,
-        nullable: true,
-        description: 'R-PRT-02: allowed | forbidden; null = back to the platform default'
-    })
-    @IsOptional()
-    @IsEnum(InvitationChannel)
-    invitationChannel?: InvitationChannel | null;
-
     @ApiPropertyOptional({ minimum: 6, maximum: 36, description: 'Raw-data retention window in months (API §8.3)' })
     @IsOptional()
     @IsInt()
@@ -145,14 +126,8 @@ export class UpdateTenantSettingsDto {
     verificationRequiredAboveCurrency?: string;
 }
 
-/** `GET /v1/tenant/settings`: what applies, and whether the invitation channel is the Owner's or the default. */
+/** `GET /v1/tenant/settings`: the Owner settings that apply. */
 export class TenantSettingsResponse {
-    @ApiProperty({ enum: InvitationChannel, enumName: 'InvitationChannel' })
-    invitationChannel!: InvitationChannel;
-
-    @ApiProperty({ enum: ['explicit', 'default'] })
-    invitationChannelSource!: InvitationChannelSource;
-
     @ApiProperty({ minimum: 6, maximum: 36 })
     retentionMonths!: number;
 
@@ -382,9 +357,6 @@ export class TenantResponse {
     @ApiPropertyOptional({ description: 'ISO 3166-1 alpha-2 billing country' })
     billingCountry?: string | null;
 
-    @ApiPropertyOptional({ description: 'R-PRT-02 setting; null = no explicit choice (the platform default applies)' })
-    invitationChannel?: string | null;
-
     @ApiProperty({ example: 'eu-central-1' })
     dataRegion!: string;
 
@@ -501,7 +473,6 @@ class TenantResponseMapper extends BaseResponseMapper<TenantProps, TenantRespons
             domainVerificationStatus: entity.domainVerificationStatus ?? null,
             domainVerificationToken: entity.domainVerificationToken ?? null,
             billingCountry: entity.billingCountry ?? null,
-            invitationChannel: entity.invitationChannel ?? null,
             dataRegion: entity.dataRegion,
             retentionMonths: entity.retentionMonths,
             metadata: entity.metadata ?? null,
@@ -537,15 +508,6 @@ export class WidgetTokenSecretDto {
 
     @ApiPropertyOptional()
     previousValidUntil?: Date;
-}
-
-/** R-PRT-02's tenant-level envelope as a service holding `tenant_invitation_channel.read` receives it. */
-export class TenantInvitationChannelDto {
-    @ApiProperty()
-    tenantId!: string;
-
-    @ApiProperty({ enum: InvitationChannel, enumName: 'InvitationChannel', description: "The Owner's choice, or the billing country's default" })
-    invitationChannel!: InvitationChannel;
 }
 
 /** The secret as the Owner reads or receives it after a rotation (US1.5.4 F2/F3). */
