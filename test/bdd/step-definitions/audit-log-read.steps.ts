@@ -43,8 +43,8 @@ Given('another company has an audit entry {string}', async function (action: str
     await fixturesPrisma.auditLog.create({ data: { id: ulid(), tenantId: OTHER_TENANT, actorUserId: 'system', action, occurredAt: new Date() } });
 });
 
-Given('I am a member of that billing company without audit:read', function (this: BddWorldInterface) {
-    const perms = ALL_PERMISSIONS.filter((p) => p !== 'audit:read');
+Given('I am a member of that billing company without tenant:read', function (this: BddWorldInterface) {
+    const perms = ALL_PERMISSIONS.filter((p) => p !== 'tenant:read');
     this.currentToken = makeActiveUserToken(theCompany().tenantId, 'user-bdd-no-audit-read', [...perms]);
 });
 

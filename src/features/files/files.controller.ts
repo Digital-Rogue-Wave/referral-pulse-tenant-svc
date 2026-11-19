@@ -33,7 +33,7 @@ import { FILE_UPLOAD_OPTIONS } from './file-upload.policy';
 export class FilesController {
     constructor(private readonly filesService: FilesService) {}
 
-    @RequirePermission('tenants:write')
+    @RequirePermission('tenant:settings')
     @Post('upload')
     @ApiBearerAuth()
     @ApiConsumes('multipart/form-data')
@@ -55,7 +55,7 @@ export class FilesController {
         return this.filesService.uploadFile(file);
     }
 
-    @RequirePermission('tenants:write')
+    @RequirePermission('tenant:settings')
     @Post('upload-multiple')
     @ApiConsumes('multipart/form-data')
     @ApiBody({
@@ -79,7 +79,7 @@ export class FilesController {
         return this.filesService.uploadMultipleFiles(files);
     }
 
-    @RequirePermission('tenants:write')
+    @RequirePermission('tenant:settings')
     @Get('presigned/:type')
     @ApiBearerAuth()
     @ApiOkResponse({ type: PresignedUrlResponseDto })
@@ -87,7 +87,7 @@ export class FilesController {
         return this.filesService.getPresignedUrl(type, size);
     }
 
-    @RequirePermission('tenants:read')
+    @RequirePermission('tenant:read')
     @Get(':id')
     @ApiOkResponse({ type: FileDto })
     @HttpCode(HttpStatus.OK)
@@ -101,7 +101,7 @@ export class FilesController {
      * @param id
      * @param file {Express.Multer.File | Express.MulterS3.File} file to update
      */
-    @RequirePermission('tenants:write')
+    @RequirePermission('tenant:settings')
     @Put(':id')
     @ApiConsumes('multipart/form-data')
     @ApiBody({
@@ -127,7 +127,7 @@ export class FilesController {
      * @returns {Promise<File>} deleted file
      * @param id file id
      */
-    @RequirePermission('tenants:write')
+    @RequirePermission('tenant:settings')
     @Delete(':id')
     @ApiOkResponse({ type: FileDto })
     @HttpCode(HttpStatus.OK)

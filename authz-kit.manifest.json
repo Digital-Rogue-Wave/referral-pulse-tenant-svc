@@ -2,7 +2,7 @@
   "source": "referral-pulse-tenant-svc",
   "files": {
     "src/common/enums/role.enum.ts": "1fcb8f93af1f7b1e57481fb1096db0b660c3ef83ccd58d4aaad991be471b43c3",
-    "src/common/auth/authz/permission-catalog.ts": "797113c37a8df25933101c165eba53ed1076a45021430c2831819039a503b50b",
+    "src/common/auth/authz/permission-catalog.ts": "01d8093bbdbad1f7cef73f0ebe2613996322e97a366d77eef080df145b786872",
     "src/common/auth/authz/authorization.service.ts": "e589feb9b320cc3427af853a9d9a7143cb2713fc55b0dab9c168ccc3c685618e",
     "src/common/auth/permission.guard.ts": "8875772e22bb45cab076b02d80da3b56fe7411777135d6499dec02ecc8a5713e",
     "src/common/auth/require-permission.decorator.ts": "2843ca3baa646e0d86c9b824cc3ef4556eb0116d2d971ab92ea9c3fcb8121fc6"

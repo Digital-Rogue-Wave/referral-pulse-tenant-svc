@@ -33,7 +33,7 @@ export class BillingController {
     }
 
     @ApiOkResponse({ type: SubscriptionStatusDto })
-    @RequirePermission('billing:read')
+    @RequirePermission('tenant:billing')
     @HttpCode(HttpStatus.OK)
     @Get('plan')
     async getCurrentSubscription(): Promise<SubscriptionStatusDto> {
@@ -41,7 +41,7 @@ export class BillingController {
     }
 
     @ApiOkResponse({ type: SubscriptionCheckoutResponseDto })
-    @RequirePermission('billing:write')
+    @RequirePermission('tenant:billing')
     @HttpCode(HttpStatus.OK)
     @Post('subscription/checkout')
     async subscriptionCheckout(@Body() dto: SubscriptionCheckoutDto): Promise<SubscriptionCheckoutResponseDto> {
@@ -49,7 +49,7 @@ export class BillingController {
     }
 
     @ApiOkResponse({ type: SubscriptionUpgradePreviewResponseDto })
-    @RequirePermission('billing:read')
+    @RequirePermission('tenant:billing')
     @HttpCode(HttpStatus.OK)
     @Post('subscription/upgrade/preview')
     async previewSubscriptionUpgrade(@Body() dto: SubscriptionUpgradeRequestDto): Promise<SubscriptionUpgradePreviewResponseDto> {
@@ -58,7 +58,7 @@ export class BillingController {
 
     /** 202: Stripe took the upgrade; the plan changes when its webhook arrives (US1.8.2 F10). */
     @ApiAcceptedResponse({ type: SubscriptionStatusDto })
-    @RequirePermission('billing:write')
+    @RequirePermission('tenant:billing')
     @HttpCode(HttpStatus.ACCEPTED)
     @Post('subscription/upgrade')
     async upgradeSubscription(@Body() dto: SubscriptionUpgradeRequestDto): Promise<SubscriptionStatusDto> {
@@ -66,7 +66,7 @@ export class BillingController {
     }
 
     @ApiOkResponse({ type: SubscriptionStatusDto })
-    @RequirePermission('billing:write')
+    @RequirePermission('tenant:billing')
     @HttpCode(HttpStatus.OK)
     @Post('subscription/downgrade')
     async downgradeSubscription(@Body() dto: SubscriptionDowngradeRequestDto): Promise<SubscriptionStatusDto> {
@@ -74,7 +74,7 @@ export class BillingController {
     }
 
     @ApiOkResponse({ type: SubscriptionStatusDto })
-    @RequirePermission('billing:write')
+    @RequirePermission('tenant:billing')
     @HttpCode(HttpStatus.OK)
     @Post('subscription/downgrade/cancel')
     async cancelPendingDowngrade(): Promise<SubscriptionStatusDto> {
@@ -82,7 +82,7 @@ export class BillingController {
     }
 
     @ApiOkResponse({ type: SubscriptionStatusDto })
-    @RequirePermission('billing:write')
+    @RequirePermission('tenant:billing')
     @HttpCode(HttpStatus.OK)
     @Post('subscription/cancel')
     async cancelSubscription(@Body() dto: SubscriptionCancelRequestDto): Promise<SubscriptionStatusDto> {
@@ -90,7 +90,7 @@ export class BillingController {
     }
 
     @ApiOkResponse({ type: SubscriptionStatusDto })
-    @RequirePermission('billing:write')
+    @RequirePermission('tenant:billing')
     @HttpCode(HttpStatus.OK)
     @Post('subscription/reactivate')
     async reactivateSubscription(): Promise<SubscriptionStatusDto> {
@@ -98,7 +98,7 @@ export class BillingController {
     }
 
     @ApiOkResponse({ description: 'A page of invoices, newest first', type: CursorPage })
-    @RequirePermission('billing:read')
+    @RequirePermission('tenant:billing')
     @HttpCode(HttpStatus.OK)
     @Get('invoices')
     async listInvoices(@Query() query: ListQueryDto): Promise<CursorPage<InvoiceDto>> {
@@ -106,7 +106,7 @@ export class BillingController {
     }
 
     @ApiOkResponse({ description: 'One-time URL of the Stripe Customer Portal' })
-    @RequirePermission('billing:write')
+    @RequirePermission('tenant:billing')
     @HttpCode(HttpStatus.OK)
     @Post('portal-session')
     async createPortalSession(): Promise<{ url: string }> {
@@ -114,7 +114,7 @@ export class BillingController {
     }
 
     @ApiOkResponse({ type: UpcomingInvoiceDto })
-    @RequirePermission('billing:read')
+    @RequirePermission('tenant:billing')
     @HttpCode(HttpStatus.OK)
     @Get('invoices/upcoming')
     async getUpcomingInvoice(): Promise<UpcomingInvoiceDto> {
@@ -122,7 +122,7 @@ export class BillingController {
     }
 
     @ApiOkResponse({ type: UsageSummaryDto })
-    @RequirePermission('billing:read')
+    @RequirePermission('tenant:billing')
     @HttpCode(HttpStatus.OK)
     @Get('usage')
     async getUsageSummary(): Promise<UsageSummaryDto> {

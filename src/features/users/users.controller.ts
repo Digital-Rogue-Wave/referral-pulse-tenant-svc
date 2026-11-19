@@ -29,7 +29,7 @@ export class UsersController {
 
     @ApiBody({ type: AddUserDto })
     @ApiCreatedResponse({ description: 'User added to the tenant', type: UserResponse })
-    @RequirePermission('users:write')
+    @RequirePermission('users:manage')
     @HttpCode(HttpStatus.CREATED)
     @Post()
     async add(@Body() dto: AddUserDto, @CurrentUser() user: IAuthenticatedUser): Promise<UserResponse> {
@@ -54,7 +54,7 @@ export class UsersController {
 
     @ApiBody({ type: UpdateUserRoleDto })
     @ApiOkResponse({ description: 'User role updated', type: UserResponse })
-    @RequirePermission('users:write')
+    @RequirePermission('users:manage')
     @HttpCode(HttpStatus.OK)
     @Put(':id/roles')
     async updateRole(@Param('id') id: string, @Body() dto: UpdateUserRoleDto, @CurrentUser() user: IAuthenticatedUser): Promise<UserResponse> {
@@ -63,7 +63,7 @@ export class UsersController {
 
     @ApiOperation({ summary: 'Disable a member, reversibly: no sign-in to the tenant until enabled (Owner cannot be disabled)' })
     @ApiOkResponse({ description: 'The member, now disabled', type: UserResponse })
-    @RequirePermission('users:write')
+    @RequirePermission('users:manage')
     @HttpCode(HttpStatus.OK)
     @Post(':id/disable')
     async disable(@Param('id') id: string, @CurrentUser() user: IAuthenticatedUser): Promise<UserResponse> {
@@ -72,7 +72,7 @@ export class UsersController {
 
     @ApiOperation({ summary: 'Enable a disabled member: their role applies again' })
     @ApiOkResponse({ description: 'The member, active again', type: UserResponse })
-    @RequirePermission('users:write')
+    @RequirePermission('users:manage')
     @HttpCode(HttpStatus.OK)
     @Post(':id/enable')
     async enable(@Param('id') id: string, @CurrentUser() user: IAuthenticatedUser): Promise<UserResponse> {
@@ -80,7 +80,7 @@ export class UsersController {
     }
 
     @ApiOkResponse({ description: 'User removed from the tenant' })
-    @RequirePermission('users:write')
+    @RequirePermission('users:manage')
     @HttpCode(HttpStatus.NO_CONTENT)
     @Delete(':id')
     async remove(@Param('id') id: string, @CurrentUser() user: IAuthenticatedUser): Promise<void> {

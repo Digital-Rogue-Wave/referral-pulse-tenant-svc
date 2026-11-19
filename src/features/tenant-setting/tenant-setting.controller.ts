@@ -18,7 +18,7 @@ export class TenantSettingController {
     constructor(private readonly tenantSettingService: TenantSettingService) {}
 
     @ApiOkResponse({ description: 'Current tenant settings', type: TenantSettingResponse })
-    @RequirePermission('tenants:read')
+    @RequirePermission('tenant:read')
     @HttpCode(HttpStatus.OK)
     @Get('current')
     async findCurrent(): Promise<TenantSettingResponse | null> {
@@ -27,7 +27,7 @@ export class TenantSettingController {
 
     @ApiBody({ type: UpdateTenantSettingDto })
     @ApiOkResponse({ description: 'Tenant settings saved', type: TenantSettingResponse })
-    @RequirePermission('tenants:write')
+    @RequirePermission('tenant:settings')
     @HttpCode(HttpStatus.OK)
     @Put()
     async upsert(@Body() dto: UpdateTenantSettingDto): Promise<TenantSettingResponse> {

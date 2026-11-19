@@ -38,6 +38,6 @@ Feature: The Owner consults the audit trail (US1.9.2)
     And there is exactly 0 audit entries
 
   Scenario: Only the Owner may read it
-    Given I am a member of that billing company without audit:read
+    Given I am a member of that billing company without tenant:read
     When I send a GET request to "/api/v1/audit-log" with that token
     Then the response status should be 403

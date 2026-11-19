@@ -24,7 +24,7 @@ Feature: Every sensitive action writes an append-only audit record (US1.9.1)
     And that row is by the Owner, from currency "EUR" to "USD", with the response's request id
 
   Scenario: A refused change leaves no audit row
-    Given I am a member of that billing company without tenants:write
+    Given I am a member of that billing company without tenant:settings
     When I send a PUT request to "/api/v1/tenant-settings" with body:
       """
       { "currencyCode": "USD" }

@@ -25,7 +25,7 @@ export class InvitationController {
 
     @ApiBody({ type: CreateInvitationDto })
     @ApiCreatedResponse({ description: 'Invitation created and email queued', type: InvitationResponse })
-    @RequirePermission('users:write')
+    @RequirePermission('users:manage')
     @HttpCode(HttpStatus.CREATED)
     @Post()
     async create(@Body() dto: CreateInvitationDto, @CurrentUser() user: IAuthenticatedUser): Promise<InvitationResponse> {
@@ -41,7 +41,7 @@ export class InvitationController {
     }
 
     @ApiOkResponse({ description: 'Invitation re-issued with a fresh token', type: InvitationResponse })
-    @RequirePermission('users:write')
+    @RequirePermission('users:manage')
     @HttpCode(HttpStatus.OK)
     @Post(':id/resend')
     async resend(@Param('id') id: string, @CurrentUser() user: IAuthenticatedUser): Promise<InvitationResponse> {
@@ -49,7 +49,7 @@ export class InvitationController {
     }
 
     @ApiOkResponse({ description: 'Invitation revoked' })
-    @RequirePermission('users:write')
+    @RequirePermission('users:manage')
     @HttpCode(HttpStatus.NO_CONTENT)
     @Delete(':id')
     async revoke(@Param('id') id: string, @CurrentUser() user: IAuthenticatedUser): Promise<void> {

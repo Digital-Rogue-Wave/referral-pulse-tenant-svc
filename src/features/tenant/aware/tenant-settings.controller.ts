@@ -11,7 +11,7 @@ import { TenantService } from '../tenant.service';
 /**
  * The Owner settings — v5.1's `PATCH /v1/tenant/settings` (E1 decision D8): invitation channel (R-PRT-02),
  * raw-data retention (6–36 months) and the payout verification threshold. JSON through the global
- * validation pipe; `tenants:write` is Owner-only and live-checked; every change is one audited
+ * validation pipe; `tenant:settings` is Owner-only and live-checked; every change is one audited
  * `tenant.updated`.
  */
 @ApiTags('Tenant settings')
@@ -22,7 +22,7 @@ export class TenantSettingsController {
 
     @ApiOperation({ summary: 'The Owner settings that apply, and whether the invitation channel is explicit or the platform default' })
     @ApiOkResponse({ type: TenantSettingsResponse })
-    @RequirePermission('tenants:read')
+    @RequirePermission('tenant:read')
     @HttpCode(HttpStatus.OK)
     @Get()
     async get(): Promise<TenantSettingsResponse> {
@@ -31,7 +31,7 @@ export class TenantSettingsController {
 
     @ApiOperation({ summary: 'Change the Owner settings (Owner only)' })
     @ApiOkResponse({ type: TenantSettingsResponse })
-    @RequirePermission('tenants:write')
+    @RequirePermission('tenant:settings')
     @HttpCode(HttpStatus.OK)
     @Patch()
     async update(@Body() dto: UpdateTenantSettingsDto, @CurrentUser() user: IAuthenticatedUser): Promise<TenantSettingsResponse> {

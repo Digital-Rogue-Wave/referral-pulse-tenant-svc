@@ -63,7 +63,7 @@ describe('PermissionGuard — deny-by-default authorization (API Contract §2)',
         });
 
         it('then a tenant route is refused: it holds no tenant', async () => {
-            expectDenied(await run(staff, { [PERMISSIONS_KEY]: ['tenants:read'] }));
+            expectDenied(await run(staff, { [PERMISSIONS_KEY]: ['tenant:read'] }));
         });
     });
 
@@ -73,7 +73,7 @@ describe('PermissionGuard — deny-by-default authorization (API Contract §2)',
             tenantId: 'tenant-1',
             identityId: 'id-1',
             source: 'break_glass',
-            perms: ['tenants:read', 'rewards:read']
+            perms: ['tenant:read', 'rewards:read']
         };
 
         it('then a read in its snapshot is allowed', async () => {
@@ -81,7 +81,7 @@ describe('PermissionGuard — deny-by-default authorization (API Contract §2)',
         });
 
         it('then anything outside the snapshot is refused', async () => {
-            expectDenied(await run(breakGlass, { [PERMISSIONS_KEY]: ['tenants:write'] }));
+            expectDenied(await run(breakGlass, { [PERMISSIONS_KEY]: ['tenant:settings'] }));
         });
 
         it('then a live-checked permission is refused even if the snapshot carried it, without asking Keto', async () => {
@@ -98,7 +98,7 @@ describe('PermissionGuard — deny-by-default authorization (API Contract §2)',
     describe('given an API-key principal', () => {
         it('then every tenant-service route is refused — keys are limited to ingestion and the SDK', async () => {
             expectDenied(await run(apiKey, {}));
-            expectDenied(await run(apiKey, { [PERMISSIONS_KEY]: ['tenants:read'] }));
+            expectDenied(await run(apiKey, { [PERMISSIONS_KEY]: ['tenant:read'] }));
         });
     });
 
@@ -130,19 +130,19 @@ describe('PermissionGuard — deny-by-default authorization (API Contract §2)',
         });
 
         it('then it is refused on any route that does not list service capabilities', async () => {
-            expectDenied(await run(service, { [PERMISSIONS_KEY]: ['tenants:read'] }));
+            expectDenied(await run(service, { [PERMISSIONS_KEY]: ['tenant:read'] }));
             expect(authorization.serviceHas).not.toHaveBeenCalled();
         });
     });
 
     describe('given a dashboard user', () => {
         it('then a coarse permission is authorized from the JWT snapshot without calling Keto', async () => {
-            expect(await run(human(['tenants:read']), { [PERMISSIONS_KEY]: ['tenants:read'] })).toBe(true);
+            expect(await run(human(['tenant:read']), { [PERMISSIONS_KEY]: ['tenant:read'] })).toBe(true);
             expect(authorization.userHas).not.toHaveBeenCalled();
         });
 
         it('then a coarse permission missing from the snapshot is refused', async () => {
-            expectDenied(await run(human(['tenants:read']), { [PERMISSIONS_KEY]: ['tenants:write'] }));
+            expectDenied(await run(human(['tenant:read']), { [PERMISSIONS_KEY]: ['tenant:settings'] }));
         });
 
         it('then a high-risk permission is re-checked against Keto even when the snapshot carries it', async () => {
@@ -153,21 +153,21 @@ describe('PermissionGuard — deny-by-default authorization (API Contract §2)',
 
         it('then a high-risk permission Keto grants is allowed', async () => {
             authorization.userHas.mockResolvedValue(true);
-            expect(await run(human(), { [PERMISSIONS_KEY]: ['users:write'] })).toBe(true);
+            expect(await run(human(), { [PERMISSIONS_KEY]: ['users:manage'] })).toBe(true);
         });
 
         it('then a platform-admin route is refused, whatever the tenant role and whatever Keto holds (E1 D17)', async () => {
             authorization.isPlatformAdmin.mockResolvedValue(true);
-            expectDenied(await run(human(['tenants:write', 'tenants:delete']), { [PLATFORM_ADMIN_KEY]: true }));
+            expectDenied(await run(human(['tenant:settings', 'tenant:settings']), { [PLATFORM_ADMIN_KEY]: true }));
             expect(authorization.isPlatformAdmin).not.toHaveBeenCalled();
         });
 
         it('then a route that lists only service capabilities is refused — it is service-to-service', async () => {
-            expectDenied(await run(human(['tenants:write']), { [SERVICE_CAPABILITIES_KEY]: [ServiceCapability.USAGE_WRITE] }));
+            expectDenied(await run(human(['tenant:settings']), { [SERVICE_CAPABILITIES_KEY]: [ServiceCapability.USAGE_WRITE] }));
         });
 
         it('then a principal without a tenant cannot pass a tenant-scoped permission', async () => {
-            expectDenied(await run({ ...human(['tenants:read']), tenantId: '' }, { [PERMISSIONS_KEY]: ['tenants:read'] }));
+            expectDenied(await run({ ...human(['tenant:read']), tenantId: '' }, { [PERMISSIONS_KEY]: ['tenant:read'] }));
         });
 
         it('then an authenticated route with no permission metadata is allowed (e.g. /users/me)', async () => {

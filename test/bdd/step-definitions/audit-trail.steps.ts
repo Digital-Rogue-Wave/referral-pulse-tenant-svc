@@ -33,9 +33,9 @@ async function refusal(attempt: () => Promise<unknown>): Promise<string> {
 
 // ─── Given ───────────────────────────────────────────────────────────────────
 
-Given('I am a member of that billing company without tenants:write', function (this: BddWorldInterface) {
-    const perms = ALL_PERMISSIONS.filter((p) => p !== 'tenants:write');
-    // `tenants:write` is live-checked (E1 decision D8), so Keto must deny it too, not only the snapshot.
+Given('I am a member of that billing company without tenant:settings', function (this: BddWorldInterface) {
+    const perms = ALL_PERMISSIONS.filter((p) => p !== 'tenant:settings');
+    // `tenant:settings` is live-checked (v5.2 §4), so Keto must deny it too, not only the snapshot.
     const userId = `user-bdd-no-tenants-write-${ulid()}`;
     denyKetoFor(`user:${userId}`);
     this.currentToken = makeActiveUserToken(theCompany().tenantId, userId, [...perms]);

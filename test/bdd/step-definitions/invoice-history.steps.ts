@@ -6,8 +6,10 @@
 
 import { Before, Given, Then } from '@cucumber/cucumber';
 import assert from 'assert';
+import { ulid } from 'ulid';
 
 import { ALL_PERMISSIONS } from '../../../src/common/auth/authz/permission-catalog';
+import { denyKetoFor } from '../support/nock.setup';
 import { makeActiveUserToken } from '../support/jwt.helper';
 import { stripeInvoices } from '../support/stripe.fake';
 import type { BddWorldInterface } from '../support/world';
@@ -52,9 +54,12 @@ Given("Stripe's next invoice for that company is {int} cents in euros", function
     stripeInvoices.upcoming = { object: 'invoice', amount_due: cents, currency: 'eur', next_payment_attempt: null };
 });
 
-Given('I am a member of that billing company without billing:read', function (this: BddWorldInterface) {
-    const perms = ALL_PERMISSIONS.filter((p) => p !== 'billing:read');
-    this.currentToken = makeActiveUserToken(theCompany().tenantId, 'user-bdd-no-billing-read', [...perms]);
+Given('I am a member of that billing company without tenant:billing', function (this: BddWorldInterface) {
+    const perms = ALL_PERMISSIONS.filter((p) => p !== 'tenant:billing');
+    // `tenant:billing` is live-checked, so Keto must deny it too, not only the snapshot.
+    const userId = `user-bdd-no-billing-${ulid()}`;
+    denyKetoFor(`user:${userId}`);
+    this.currentToken = makeActiveUserToken(theCompany().tenantId, userId, [...perms]);
 });
 
 // ─── Then ────────────────────────────────────────────────────────────────────

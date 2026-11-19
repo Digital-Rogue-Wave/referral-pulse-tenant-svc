@@ -36,7 +36,7 @@ Feature: The Owner views the invoice history (US1.8.3)
     Then the response status should be 200
     And the upcoming invoice is due 990 in "eur"
 
-  Scenario: A member without billing:read cannot see the invoices
-    Given I am a member of that billing company without billing:read
+  Scenario: A member without tenant:billing cannot see the invoices
+    Given I am a member of that billing company without tenant:billing
     When I send a GET request to "/api/v1/billing/invoices" with that token
     Then the response status should be 403
