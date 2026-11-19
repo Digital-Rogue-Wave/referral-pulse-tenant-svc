@@ -227,6 +227,7 @@ export class TenantWidgetSecretRotatedEvent extends BaseDomainEvent {
     constructor(
         public readonly aggregateId: string,
         public readonly tenantId: string,
+        public readonly kid: string,
         public readonly previousValidUntil: Date,
         public readonly userId: string
     ) {

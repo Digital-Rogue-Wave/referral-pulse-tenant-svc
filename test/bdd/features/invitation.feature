@@ -18,6 +18,21 @@ Feature: Team Invitations
     And the response should contain a "email" field
     And the response should contain a "status" field
 
+  @needs-clean-invitations
+  Scenario: Invite a user through the v5.2 route (API §3.17, US1.2.3)
+    When I send a POST request to "/api/v1/users/invite" with body:
+      """
+      { "email": "newteammate@acme.com", "role": "operator" }
+      """
+    Then the response status should be 201
+    And the response should contain a "email" field
+    And the response should contain a "status" field
+
+  @public-endpoint
+  Scenario: Inviting a user requires authentication
+    When I send a POST request to "/api/v1/users/invite" without any token
+    Then the response status should be 401
+
   Scenario: List invitations is paginated
     When I send a GET request to "/api/v1/invitations" with that token
     Then the response status should be 200

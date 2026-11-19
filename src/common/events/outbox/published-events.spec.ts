@@ -45,7 +45,7 @@ const HASH = 'a'.repeat(64);
 
 /** One representative of every published in-process event. */
 const EVENTS: BaseDomainEvent[] = [
-    new TenantCreatedEvent(T, T, 'Acme', 'acme', 'k1', NOW, NOW, 'u1', { dataRegion: 'eu-central-1', retentionMonths: 24 }, 'forbidden'),
+    new TenantCreatedEvent(T, T, 'Acme', 'acme', 'k1', NOW, NOW, 'u1', { dataRegion: 'eu-central-1', retentionMonths: 24 }),
     new TenantUpdatedEvent(T, T, { retentionMonths: { from: 24, to: 12 } }, 'u1'),
     new TenantSuspendedEvent(T, T, 'fraud', NOW),
     new TenantUnsuspendedEvent(T, T, NOW),
@@ -58,7 +58,7 @@ const EVENTS: BaseDomainEvent[] = [
     new TenantDomainVerifiedEvent(T, T, 'refer.acme.io', NOW),
     new TenantVerificationRequestedEvent(T, T, 'Acme', 'u1', 'v1'),
     new TenantVerificationStatusChangedEvent(T, T, 'pending', 'verified', undefined, 'system'),
-    new TenantWidgetSecretRotatedEvent(T, T, new Date('2026-11-09T11:00:00Z'), 'u1'),
+    new TenantWidgetSecretRotatedEvent(T, T, 'kid-2', new Date('2026-11-09T11:00:00Z'), 'u1'),
     new UserRegisteredEvent('u1', T, 'owner'),
     new UserRoleChangedEvent('u2', T, 'viewer', 'admin', 'u1'),
     new UserRemovedEvent('u2', T, 'operator', 'u1'),

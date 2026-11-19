@@ -63,3 +63,24 @@ Then('{string} in the outbox carries retention {int} and no retired setting', as
         []
     );
 });
+
+Then(
+    'the tenant record reads plan {string}, verification {string}, retention {int} and region {string}',
+    function (this: BddWorldInterface, plan: string, verification: string, retention: number, region: string) {
+        const body = this.response?.body as Record<string, unknown>;
+        assert.deepStrictEqual(Object.keys(body).sort(), [
+            'billing_country',
+            'data_region',
+            'id',
+            'name',
+            'plan',
+            'retention_months',
+            'slug',
+            'verification_status'
+        ]);
+        assert.deepStrictEqual(
+            [body['plan'], body['verification_status'], body['retention_months'], body['data_region']],
+            [plan, verification, retention, region]
+        );
+    }
+);

@@ -85,7 +85,7 @@ describe('TenantService — tenant lifecycle', () => {
             mock<KratosService>(),
             users,
             config as never,
-            { generate: () => ({ raw: 'a'.repeat(64), sealed: 'sealed-secret' }) } as unknown as WidgetSecretVault
+            { mint: (createdAt: Date) => ({ raw: 'a'.repeat(64), stored: { kid: 'kid-1', secret_encrypted: 'sealed-secret', created_at: createdAt } }), toColumn: () => [] } as unknown as WidgetSecretVault
         );
     });
 

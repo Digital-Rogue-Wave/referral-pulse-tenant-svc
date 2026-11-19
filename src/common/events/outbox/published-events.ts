@@ -179,7 +179,7 @@ const MAPPERS: Record<string, Mapper<never>> = {
             eventType: 'tenant.widget_secret_rotated',
             externalId: `tenant.widget_secret_rotated:${e.eventId}`,
             object: tenantObject(e),
-            properties: { tenant_id: e.tenantId, previous_valid_until: iso(e.previousValidUntil) }
+            properties: { tenant_id: e.tenantId, kid: e.kid, previous_valid_until: iso(e.previousValidUntil) }
         }
     ],
     'tenant.verification_status_changed': (e: TenantVerificationStatusChangedEvent) => [

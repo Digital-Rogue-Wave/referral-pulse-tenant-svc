@@ -20,6 +20,7 @@ import { DnsVerificationService } from '../dns/dns-verification.service';
 import { FilesService } from '../files/files.service';
 import { UsersService, MemberIdentity } from '../users/users.service';
 import { WidgetSecretVault } from './widget-secret.vault';
+import { BillingPlanEnum } from '@common/enums/billing.enum';
 
 import {
     CreateTenantDto,
@@ -42,6 +43,7 @@ import {
     VerificationType,
     UpdateTenantSettingsDto,
     TenantSettingsResponse,
+    TenantRecordResponse,
     type TenantProps
 } from '@domains/tenant';
 
@@ -145,6 +147,29 @@ export class TenantService {
         const tenantId = this.tenantContext.getTenantId()!;
         const tenant = await this.findOneOrFail(tenantId);
         return tenantResponseMapper.toResponse(tenant) as TenantProfileResponse;
+    }
+
+    /** `GET /v1/tenant` (v5.2 API §3.17): the tenant record, with the plan from its billing row (Free until it has one). */
+    async getRecord(): Promise<TenantRecordResponse> {
+        const tenantId = this.tenantContext.getTenantId()!;
+        const tenant = await this.prisma.tenant.findFirst({
+            where: { id: tenantId, deletedAt: null },
+            select: {
+                id: true,
+                name: true,
+                slug: true,
+                verificationStatus: true,
+                billingCountry: true,
+                retentionMonths: true,
+                dataRegion: true,
+                billing: { select: { plan: true } }
+            }
+        });
+        if (!tenant) {
+            throw new NotFoundException(`Tenant ${tenantId} not found`);
+        }
+        const { billing, ...record } = tenant;
+        return { ...record, plan: billing?.plan ?? BillingPlanEnum.FREE };
     }
 
     /**
@@ -276,8 +301,8 @@ export class TenantService {
                 // Ingestion verifies them with (API Contract §4.1). Set here rather than as a
                 // column default so rotation has one home in application code, and set at
                 // creation because ingestion fails closed: a tenant without one has a widget
-                // that silently never renders (NOTE.md §V5.22). Sealed at rest (US1.5.4 F5).
-                widgetTokenSecret: this.widgetSecretVault.generate().sealed
+                // that silently never renders (NOTE.md §V5.22). Sealed at rest (US1.5.4 F5); one `kid` (v5.2 US1.5.5).
+                widgetSigningSecrets: this.widgetSecretVault.toColumn([this.widgetSecretVault.mint(new Date()).stored])
             }
         });
         // Emitted before the owner's user.registered so the tenant's Keto grants are queued first.

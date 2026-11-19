@@ -12,9 +12,7 @@ import {
     IsObject,
     Length,
     MaxLength,
-    IsISO31661Alpha2,
-    ValidateIf,
-    IsISO4217CurrencyCode
+    IsISO31661Alpha2
 } from 'class-validator';
 
 import { BaseResponseMapper } from '@common/helper';
@@ -424,8 +422,8 @@ class TenantResponseMapper extends BaseResponseMapper<TenantProps, TenantRespons
     }
 
     /**
-     * Explicit field list, as for API keys (NOTE.md K6): `widget_token_secret` is never part of a response
-     * (it goes only to a service holding `widget_secret.read`), and a new column stays private until listed here.
+     * Explicit field list, as for API keys (NOTE.md K6): `widget_signing_secrets` is never part of a response
+     * (only the widget-secret routes serve it), and a new column stays private until listed here.
      */
     override toResponse(entity: TenantProps): TenantResponse {
         return Object.assign(new TenantResponse(), {
@@ -471,29 +469,55 @@ export class AdminTenantCreatedResponse {
     ownerInvitation!: InvitationResponse;
 }
 
-/**
- * API Contract §4.1's "shared secret" for widget identity tokens, as a service holding `widget_secret.read`
- * receives it (see `internal-widget-secret.controller.ts`). Within an hour of a rotation the replaced
- * secret comes too, so tokens signed just before the switch still verify.
- */
-export class WidgetTokenSecretDto {
-    @ApiProperty({ description: '32 bytes as 64 hex characters' })
+/** One active widget signing secret (v5.2 API §3.17, US1.5.5). */
+export class WidgetSigningSecretResponse {
+    @ApiProperty({ description: 'Put it in the widget token header: it selects this secret' })
+    kid!: string;
+
+    @ApiProperty({ description: '32 bytes as 64 hex characters: sign the widget token (HS256, 1-hour expiry) with it' })
     secret!: string;
 
-    @ApiPropertyOptional({ description: 'The replaced secret, still accepted until previous_valid_until' })
-    previousSecret?: string;
+    @ApiProperty()
+    createdAt!: Date;
 
-    @ApiPropertyOptional()
-    previousValidUntil?: Date;
+    @ApiProperty({ type: Date, nullable: true, description: 'Null for the newest secret; the previous one verifies until 7 days after a rotation' })
+    expiresAt!: Date | null;
 }
 
-/** The secret as the Owner reads or receives it after a rotation (US1.5.4 F2/F3). */
-export class WidgetSecretResponse {
-    @ApiProperty({ description: '32 bytes as 64 hex characters: sign the widget user JWT (HS256, 1-hour expiry) with it' })
-    secret!: string;
+/**
+ * `GET /v1/tenant/widget-secret` and its rotation (Owner), and Event Ingestion's service read: the one or two
+ * active secrets, newest first. Shown in full: they are the client backend's signing material.
+ */
+export class WidgetSigningSecretsResponse {
+    @ApiProperty({ type: () => [WidgetSigningSecretResponse] })
+    secrets!: WidgetSigningSecretResponse[];
+}
 
-    @ApiPropertyOptional({ description: 'Set after a rotation: until then, tokens signed with the previous secret still work' })
-    previousValidUntil?: Date | null;
+/** `GET /v1/tenant` (v5.2 API §3.17, US1.7.3): the tenant record. */
+export class TenantRecordResponse {
+    @ApiProperty()
+    id!: string;
+
+    @ApiProperty()
+    name!: string;
+
+    @ApiProperty()
+    slug!: string;
+
+    @ApiProperty({ description: 'The platform plan (Stripe Billing is the store of record)' })
+    plan!: string;
+
+    @ApiProperty({ enum: ['unverified', 'pending_review', 'verified', 'rejected'] })
+    verificationStatus!: string;
+
+    @ApiProperty({ type: String, nullable: true, description: 'ISO 3166-1 alpha-2' })
+    billingCountry!: string | null;
+
+    @ApiProperty({ minimum: 6, maximum: 36 })
+    retentionMonths!: number;
+
+    @ApiProperty()
+    dataRegion!: string;
 }
 
 // Re-export events for convenience

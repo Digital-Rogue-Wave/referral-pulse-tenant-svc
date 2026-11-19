@@ -15,6 +15,11 @@ Feature: The Owner settings route (US1.7.3 F6; E1 decision D8; v5.2 Appendix A #
     Then the response status should be 200
     And the settings read retention 24 and carry no invitation channel nor verification threshold
 
+  Scenario: The Owner reads the tenant record (v5.2 API §3.17, US1.7.3)
+    When I send a GET request to "/api/v1/tenant" with that token
+    Then the response status should be 200
+    And the tenant record reads plan "Free", verification "unverified", retention 24 and region "eu-central-1"
+
   Scenario: The Owner's choice is stored, announced and audited
     When I change the Owner settings to:
       """

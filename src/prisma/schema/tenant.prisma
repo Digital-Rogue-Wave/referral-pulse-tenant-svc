@@ -21,29 +21,16 @@ model Tenant {
   domainVerificationStatus String    @default("unverified") @map("domain_verification_status") @db.VarChar(50)
   domainVerificationToken  String?   @map("domain_verification_token") @db.VarChar(255)
   // DB Model §3: EU-first residency and the tenant's own raw-data retention window (API §8.3, 6–36 months).
-  /// ISO 3166-1 alpha-2 of the tenant's billing country. The input to R-PRT-02's platform default:
-  /// platform-sent invitations are forbidden by default for German tenants (BGH 2013,
-  /// Empfehlungs-E-Mail) and allowed elsewhere. Nullable because the country is not known at
-  /// provisioning; until it is, the default resolves to `allowed`.
+  /// ISO 3166-1 alpha-2 of the tenant's billing country. Nullable because the country is not known at provisioning.
   billingCountry           String?   @map("billing_country") @db.Char(2)
-  /// R-PRT-02's legal envelope: `allowed` | `forbidden`, Owner-only. **Null means "no explicit
-  /// choice"** and resolves to the platform default from `billingCountry` — which is what lets a
-  /// later correction of the billing country re-derive the right answer, and what distinguishes it
-  /// from an Owner who deliberately chose `allowed`.
-  /// The shared secret the tenant's backend signs widget identity tokens with, and Event Ingestion
-  /// verifies them with (API Contract §4.1). 32 random bytes as hex, stored AES-256-GCM encrypted
-  /// (`WidgetSecretVault`); a 64-hex value is a not-yet-encrypted legacy row, sealed on first read.
-  /// Read by the Owner through `GET /v1/tenants/widget-secret` and by services holding `widget_secret.read`.
-  widgetTokenSecret        String?   @map("widget_token_secret") @db.Text
-  /// After a rotation, the replaced secret (encrypted) stays valid until `widgetTokenSecretPreviousUntil`,
-  /// so a client's backend can switch without a broken widget (one hour, the longest a token lives).
-  widgetTokenSecretPrevious      String?   @map("widget_token_secret_previous") @db.Text
-  widgetTokenSecretPreviousUntil DateTime? @map("widget_token_secret_previous_until") @db.Timestamptz
+  /// DB Model v5.2 §3: the secrets the tenant's backend signs widget tokens with and Event Ingestion verifies
+  /// them with (API §4.1). One or two entries `{kid, secret_encrypted, created_at}`, newest first, each secret
+  /// AES-256-GCM sealed (`WidgetSecretVault`; a 64-hex value is a legacy plain row, sealed on first read).
+  /// After a rotation the previous entry verifies for 7 days (API §3.17). The `[]` default only serves rows
+  /// created outside `TenantService` (seed, fixtures): no secret means no widget (503 to every reader).
+  widgetSigningSecrets     Json      @default("[]") @map("widget_signing_secrets")
   dataRegion               String    @default("eu-central-1") @map("data_region") @db.VarChar(32)
   retentionMonths          Int       @default(24) @map("retention_months") @db.SmallInt
-  /// R-RWD payout gate (v5.1: "no threshold unless the Owner sets one"): a participant's payouts for a month
-  /// above this amount wait for their identity verification. Integer minor units in the given currency;
-  /// null = no threshold. Owner setting, edited through PATCH /v1/tenant/settings (E1 decision D11).
   metadata                 Json?
 
   createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz

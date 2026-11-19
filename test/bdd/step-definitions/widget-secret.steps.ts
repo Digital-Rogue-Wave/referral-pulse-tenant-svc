@@ -1,5 +1,5 @@
 /**
- * The widget-token secret (US1.5.4): the Owner's read and rotation, and what Event Ingestion receives.
+ * The widget signing secrets (US1.5.4, v5.2 US1.5.5): the Owner's read and rotation with kids, and what Event Ingestion receives.
  *
  * Each scenario signs a fresh company up through the Ory sign-up hook (so the secret is created the real way,
  * sealed) and removes it afterwards; their slugs start with `bdd-ws-`.
@@ -19,6 +19,8 @@ const HEX_SECRET = /^[0-9a-f]{64}$/;
 
 let company: { tenantId: string; ownerUserId: string } | null = null;
 let secretBefore: string | null = null;
+
+type Secret = { kid: string; secret: string; created_at: string; expires_at: string | null };
 
 async function removeCompanies(): Promise<void> {
     const tenants = await fixturesPrisma.tenant.findMany({ where: { slug: { startsWith: SLUG_PREFIX } }, select: { id: true } });
@@ -55,8 +57,12 @@ async function serviceRead(world: BddWorldInterface): Promise<Record<string, unk
     return response.body as Record<string, unknown>;
 }
 
+function responseSecrets(world: BddWorldInterface): Secret[] {
+    return (world.response?.body as { secrets: Secret[] }).secrets;
+}
+
 function responseSecret(world: BddWorldInterface): string {
-    return String((world.response?.body as { secret?: unknown }).secret);
+    return responseSecrets(world)[0]!.secret;
 }
 
 // ─── Given ───────────────────────────────────────────────────────────────────
@@ -85,48 +91,52 @@ Given('I am a member of that company without api_keys:manage', function (this: B
 });
 
 Given('I have read the current secret', async function (this: BddWorldInterface) {
-    secretBefore = String((await serviceRead(this))['secret']);
+    secretBefore = ((await serviceRead(this))['secrets'] as Secret[])[0]!.secret;
 });
 
 // ─── Then ────────────────────────────────────────────────────────────────────
 
-Then('the response holds a 64-character hex secret', function (this: BddWorldInterface) {
-    assert.match(responseSecret(this), HEX_SECRET);
+Then(/^the response holds (\d+) secrets?, a kid and a 64-character hex secret each$/, function (this: BddWorldInterface, count: string) {
+    const secrets = responseSecrets(this);
+    assert.strictEqual(secrets.length, Number(count), JSON.stringify(secrets.map((s) => s.kid)));
+    for (const secret of secrets) {
+        assert.match(secret.kid, /^[0-9a-f]{16}$/);
+        assert.match(secret.secret, HEX_SECRET);
+    }
+    assert.strictEqual(secrets[0]!.expires_at, null, 'The newest secret has no end');
 });
 
-Then('it is the secret Event Ingestion receives', async function (this: BddWorldInterface) {
-    assert.strictEqual((await serviceRead(this))['secret'], responseSecret(this));
+Then('it is what Event Ingestion receives', async function (this: BddWorldInterface) {
+    assert.deepStrictEqual((await serviceRead(this))['secrets'], responseSecrets(this));
 });
 
 Then('the database does not hold it in plain text', async function (this: BddWorldInterface) {
-    const row = await fixturesPrisma.tenant.findUniqueOrThrow({ where: { id: theCompany().tenantId }, select: { widgetTokenSecret: true } });
-    assert.ok(row.widgetTokenSecret, 'No stored secret');
-    assert.notStrictEqual(row.widgetTokenSecret, responseSecret(this));
-    assert.doesNotMatch(row.widgetTokenSecret, HEX_SECRET);
+    const row = await fixturesPrisma.tenant.findUniqueOrThrow({ where: { id: theCompany().tenantId }, select: { widgetSigningSecrets: true } });
+    const stored = JSON.stringify(row.widgetSigningSecrets);
+    assert.ok(stored.includes(responseSecrets(this)[0]!.kid), 'No stored entry for that kid');
+    assert.ok(!stored.includes(responseSecret(this)), 'The secret is stored in plain text');
 });
 
-Then('the read is audit-logged with the Owner as actor', async function () {
-    const rows = await fixturesPrisma.auditLog.findMany({ where: { tenantId: theCompany().tenantId, action: 'tenant.widget_secret_revealed' } });
-    assert.strictEqual(rows.length, 1, `Expected one audit row, found ${rows.length}`);
+Then(/^the (read|rotation) is audit-logged with the Owner as actor$/, async function (kind: string) {
+    const action = kind === 'read' ? 'tenant.widget_secret_revealed' : 'tenant.widget_secret_rotated';
+    const rows = await fixturesPrisma.auditLog.findMany({ where: { tenantId: theCompany().tenantId, action } });
+    assert.strictEqual(rows.length, 1, `Expected one ${action} audit row, found ${rows.length}`);
     assert.strictEqual(rows[0]!.actorUserId, theCompany().ownerUserId);
 });
 
-Then('it differs from the secret before the rotation', function (this: BddWorldInterface) {
+Then('the newest is new and the previous one is the secret before the rotation, valid until 7 days from now', function (this: BddWorldInterface) {
     assert.ok(secretBefore, 'The secret before the rotation was not read');
-    assert.notStrictEqual(responseSecret(this), secretBefore);
+    const [newest, previous] = responseSecrets(this);
+    assert.notStrictEqual(newest!.secret, secretBefore);
+    assert.strictEqual(previous!.secret, secretBefore);
+    const daysLeft = (new Date(String(previous!.expires_at)).getTime() - Date.now()) / 86_400_000;
+    assert.ok(daysLeft > 6.99 && daysLeft <= 7, `The previous secret ends in ${daysLeft.toFixed(3)} days`);
 });
 
-Then('Event Ingestion receives the new secret and the previous one until about an hour from now', async function (this: BddWorldInterface) {
-    const body = await serviceRead(this);
-    assert.strictEqual(body['secret'], responseSecret(this));
-    assert.strictEqual(body['previous_secret'], secretBefore);
-    const minutesLeft = (new Date(String(body['previous_valid_until'])).getTime() - Date.now()) / 60_000;
-    assert.ok(minutesLeft > 58 && minutesLeft <= 60, `previous_valid_until is ${minutesLeft.toFixed(1)} min away`);
-});
-
-Then('{string} is queued for that company without the secret', async function (this: BddWorldInterface, eventType: string) {
+Then('{string} is queued for that company with the new kid and without a secret', async function (this: BddWorldInterface, eventType: string) {
     const rows = await fixturesPrisma.eventOutbox.findMany({ where: { tenantId: theCompany().tenantId, eventType } });
     assert.strictEqual(rows.length, 1, `Expected one ${eventType} outbox row, found ${rows.length}`);
     const payload = JSON.stringify(rows[0]!.payload);
+    assert.ok(payload.includes(responseSecrets(this)[0]!.kid), 'The new kid is not in the event');
     assert.ok(!payload.includes(responseSecret(this)) && !payload.includes(String(secretBefore)), 'A secret is in the event');
 });

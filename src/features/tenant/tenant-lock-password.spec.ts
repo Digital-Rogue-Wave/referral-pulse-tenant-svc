@@ -71,7 +71,7 @@ describe('TenantService — password confirmation on destructive actions', () =>
                 { provide: KratosService, useValue: kratos },
                 { provide: ConfigService, useValue: mock<ConfigService>() },
                 { provide: UsersService, useValue: mock<UsersService>() },
-                { provide: WidgetSecretVault, useValue: { generate: () => ({ raw: 'a'.repeat(64), sealed: 'sealed-secret' }) } }
+                { provide: WidgetSecretVault, useValue: { mint: (createdAt: Date) => ({ raw: 'a'.repeat(64), stored: { kid: 'kid-1', secret_encrypted: 'sealed-secret', created_at: createdAt } }), toColumn: () => [] } }
             ]
         }).compile();
 

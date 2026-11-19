@@ -3,7 +3,7 @@ import { ApiBearerAuth, ApiOkResponse, ApiOperation, ApiTags } from '@nestjs/swa
 
 import { ServiceCapability } from '@common/auth/authz/keto-tuples';
 import { AllowServices } from '@common/auth/require-permission.decorator';
-import { WidgetTokenSecretDto } from '@domains/tenant';
+import { WidgetSigningSecretsResponse } from '@domains/tenant';
 
 import { WidgetSecretService } from './widget-secret.service';
 
@@ -18,8 +18,8 @@ import { WidgetSecretService } from './widget-secret.service';
  * lives in neither.
  *
  * Service tokens only, under its own capability. The Owner reads the same secret through the tenant-scoped
- * `GET /v1/tenants/widget-secret` (Owner only, audited); this route serves any tenant, so it stays
- * service-only. Within an hour of a rotation the previous secret comes too (US1.5.4 F3).
+ * `GET /v1/tenant/widget-secret` (Owner only, audited); this route serves any tenant, so it stays
+ * service-only. Like the Owner's read, it returns the one or two active secrets with their `kid` (v5.2 US1.5.5).
  *
  * `tenantId` comes from the path rather than the caller's token because the caller is ingestion,
  * whose service token carries no tenant — the same shape as the other internal per-tenant reads.
@@ -31,11 +31,11 @@ export class InternalWidgetSecretController {
     constructor(private readonly widgetSecrets: WidgetSecretService) {}
 
     @ApiOperation({ summary: 'The secret a tenant’s widget identity tokens are signed and verified with' })
-    @ApiOkResponse({ type: WidgetTokenSecretDto })
+    @ApiOkResponse({ type: WidgetSigningSecretsResponse })
     @AllowServices(ServiceCapability.WIDGET_SECRET_READ)
     @HttpCode(HttpStatus.OK)
     @Get(':tenantId/widget-token-secret')
-    async widgetTokenSecret(@Param('tenantId') tenantId: string): Promise<WidgetTokenSecretDto> {
+    async widgetTokenSecret(@Param('tenantId') tenantId: string): Promise<WidgetSigningSecretsResponse> {
         return await this.widgetSecrets.forService(tenantId);
     }
 }
