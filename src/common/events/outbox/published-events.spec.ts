@@ -160,18 +160,7 @@ describe('Published events — the wire contract of every tenant-service event',
         expect(draft!.properties).not.toHaveProperty('invitation_channel');
     });
 
-    it('tells consumers the whole verification threshold when only its amount changed, currency included (E1 D11)', () => {
-        const event = new TenantUpdatedEvent(T, T, { verificationRequiredAbove: { from: 25_000, to: 100_000 } }, 'u1', {
-            amount: 100_000,
-            currency: 'EUR'
-        });
-
-        const [draft] = toPublishedEvents(event.eventType, event);
-
-        expect(draft!.properties).toMatchObject({ verification_required_above: 100_000, verification_required_above_currency: 'EUR' });
-    });
-
-    it('leaves the threshold out when an update did not touch it, so consumers keep their copy', () => {
+    it('carries no verification threshold: v5.2 moved it to the Program (API §3.1)', () => {
         const event = EVENTS.find((e) => e.eventType === 'tenant.updated')!;
 
         const [draft] = toPublishedEvents(event.eventType, event);

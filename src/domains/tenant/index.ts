@@ -55,8 +55,6 @@ export interface TenantProps {
     billingCountry?: string | null;
     dataRegion: string;
     retentionMonths: number;
-    verificationRequiredAbove?: number | null;
-    verificationRequiredAboveCurrency?: string | null;
     metadata?: unknown;
     createdAt: Date;
     updatedAt: Date;
@@ -99,8 +97,8 @@ export class UpdateTenantDto {
 
 /**
  * `PATCH /v1/tenant/settings` (v5.1 API surface; E1 decision D8): the Owner settings, in JSON, through the
- * global validation pipe. Every field is optional; `null` clears the verification threshold. There is no
- * invitation setting: v5.2 R-PRT-02 — the platform never emails an invitee (Appendix A #79).
+ * global validation pipe. Every field is optional. There is no invitation setting (v5.2 R-PRT-02, Appendix A #79),
+ * and the payout verification threshold is a Program setting in campaign-service (v5.2 API §3.1).
  */
 export class UpdateTenantSettingsDto {
     @ApiPropertyOptional({ minimum: 6, maximum: 36, description: 'Raw-data retention window in months (API §8.3)' })
@@ -109,33 +107,12 @@ export class UpdateTenantSettingsDto {
     @Min(6)
     @Max(36)
     retentionMonths?: number;
-
-    @ApiPropertyOptional({
-        nullable: true,
-        minimum: 0,
-        description: 'Monthly payout amount above which the participant must verify, in minor units; null = none'
-    })
-    @IsOptional()
-    @IsInt()
-    @Min(0)
-    verificationRequiredAbove?: number | null;
-
-    @ApiPropertyOptional({ example: 'EUR', description: 'ISO 4217 currency of verification_required_above; required with it' })
-    @ValidateIf((dto: UpdateTenantSettingsDto) => dto.verificationRequiredAbove !== undefined && dto.verificationRequiredAbove !== null)
-    @IsISO4217CurrencyCode()
-    verificationRequiredAboveCurrency?: string;
 }
 
 /** `GET /v1/tenant/settings`: the Owner settings that apply. */
 export class TenantSettingsResponse {
     @ApiProperty({ minimum: 6, maximum: 36 })
     retentionMonths!: number;
-
-    @ApiPropertyOptional({ nullable: true, description: 'Minor units; null = no threshold' })
-    verificationRequiredAbove!: number | null;
-
-    @ApiPropertyOptional({ nullable: true })
-    verificationRequiredAboveCurrency!: string | null;
 }
 
 export class TransferOwnershipDto {

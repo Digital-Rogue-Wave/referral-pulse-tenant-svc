@@ -126,13 +126,6 @@ describe('TenantService — tenant lifecycle', () => {
                 expect(settings).not.toHaveProperty('invitationChannel');
             });
 
-            it('stores the verification threshold with its currency, and clears both with null', async () => {
-                await service.updateSettings({ verificationRequiredAbove: 50_000, verificationRequiredAboveCurrency: 'eur' }, OWNER);
-                expect(prisma.tenant.update).toHaveBeenLastCalledWith({
-                    where: { id: 't1' },
-                    data: { verificationRequiredAbove: 50_000, verificationRequiredAboveCurrency: 'EUR' }
-                });
-            });
 
             it('writes nothing when nothing changed', async () => {
                 await service.updateSettings({ retentionMonths: 24 }, OWNER);

@@ -459,43 +459,26 @@ export class TenantService {
     }
 
     /**
-     * The Owner settings in one audited change: the raw-data retention window and the payout verification
-     * threshold (null = none).
-     * `tenant.updated` carries the new values, so the services that enforce them keep a copy.
+     * The Owner settings in one audited change: the raw-data retention window. `tenant.updated` carries the new value,
+     * so the services that apply it keep a copy. The payout verification threshold is a Program setting (v5.2 API §3.1).
      */
     async updateSettings(dto: UpdateTenantSettingsDto, user: IAuthenticatedUser): Promise<TenantSettingsResponse> {
         const tenantId = this.tenantContext.getTenantId()!;
         const tenant = await this.findOneOrFail(tenantId);
         const changes: Record<string, { from: unknown; to: unknown }> = {};
-        const set = (field: 'retentionMonths' | 'verificationRequiredAbove' | 'verificationRequiredAboveCurrency', to: unknown): void => {
+        const set = (field: 'retentionMonths', to: unknown): void => {
             if (to !== undefined && to !== (tenant[field] ?? null)) {
                 changes[field] = { from: tenant[field] ?? null, to };
             }
         };
         set('retentionMonths', dto.retentionMonths);
-        if (dto.verificationRequiredAbove !== undefined) {
-            const currency = dto.verificationRequiredAbove === null ? null : dto.verificationRequiredAboveCurrency!.toUpperCase();
-            set('verificationRequiredAbove', dto.verificationRequiredAbove);
-            set('verificationRequiredAboveCurrency', currency);
-            if (changes.verificationRequiredAboveCurrency && !changes.verificationRequiredAbove) {
-                changes.verificationRequiredAbove = { from: tenant.verificationRequiredAbove ?? null, to: dto.verificationRequiredAbove };
-            }
-        }
         if (Object.keys(changes).length === 0) {
             return toTenantSettings(tenant);
         }
         const updateData = Object.fromEntries(Object.entries(changes).map(([field, change]) => [field, change.to]));
         const updated = await this.applyChange(tenantId, updateData, (row) => [
             TenantEvents.UPDATED,
-            new TenantUpdatedEvent(
-                row.id,
-                row.id,
-                changes,
-                user.userId,
-                changes.verificationRequiredAbove || changes.verificationRequiredAboveCurrency
-                    ? { amount: row.verificationRequiredAbove, currency: row.verificationRequiredAboveCurrency }
-                    : undefined
-            )
+            new TenantUpdatedEvent(row.id, row.id, changes, user.userId)
         ]);
         this.logger.log(`Tenant settings updated: ${tenantId}`, { tenantId, changes: Object.keys(changes) });
         return toTenantSettings(updated);
@@ -780,8 +763,6 @@ export class TenantService {
 
 function toTenantSettings(tenant: TenantProps): TenantSettingsResponse {
     return Object.assign(new TenantSettingsResponse(), {
-        retentionMonths: tenant.retentionMonths,
-        verificationRequiredAbove: tenant.verificationRequiredAbove ?? null,
-        verificationRequiredAboveCurrency: tenant.verificationRequiredAboveCurrency ?? null
+        retentionMonths: tenant.retentionMonths
     });
 }

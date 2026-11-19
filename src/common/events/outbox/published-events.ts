@@ -94,14 +94,7 @@ const MAPPERS: Record<string, Mapper<never>> = {
                 tenant_id: e.tenantId,
                 changed_fields: Object.keys(e.changes).sort().join(','),
                 // Services applying the tenant's retention window need the new value, not only the field name.
-                ...(e.changes.retentionMonths ? { retention_months: Number(e.changes.retentionMonths.to) } : {}),
-                // reward-service keeps a copy of the payout verification threshold (E1 D11).
-                ...(e.verificationThreshold
-                    ? {
-                          verification_required_above: e.verificationThreshold.amount,
-                          verification_required_above_currency: e.verificationThreshold.currency
-                      }
-                    : {})
+                ...(e.changes.retentionMonths ? { retention_months: Number(e.changes.retentionMonths.to) } : {})
             }
         }
     ],

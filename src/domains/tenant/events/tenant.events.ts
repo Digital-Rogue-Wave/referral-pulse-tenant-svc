@@ -31,12 +31,7 @@ export class TenantUpdatedEvent extends BaseDomainEvent {
         public readonly aggregateId: string,
         public readonly tenantId: string,
         public readonly changes: Record<string, { from: unknown; to: unknown }>,
-        public readonly userId?: string,
-        /**
-         * The payout verification threshold that now applies, when the change touched it (E1 D11). Sent whole:
-         * `changes` drops an unchanged currency, and reward-service needs both to keep its copy.
-         */
-        public readonly verificationThreshold?: { amount: number | null; currency: string | null }
+        public readonly userId?: string
     ) {
         super();
     }
