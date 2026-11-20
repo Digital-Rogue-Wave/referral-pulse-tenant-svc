@@ -5,7 +5,8 @@ import { z } from 'zod';
 const schema = z.object({
     address: z.string().default('localhost:7233'),
     namespace: z.string().default('default'),
-    taskQueue: z.string().default('referral-task-queue')
+    /** tenant-service's own queue (account_verification): never another service's, whose tasks its worker would take. */
+    taskQueue: z.string().default('tenant-task-queue')
 });
 
 export type TemporalConfig = z.infer<typeof schema>;

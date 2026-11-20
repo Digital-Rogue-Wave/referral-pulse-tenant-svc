@@ -34,7 +34,6 @@ export enum ServiceCapability {
     TENANT_STATUS_READ = 'tenant_status.read',
     TENANT_ENTITLEMENTS_READ = 'tenant_entitlements.read',
     TENANT_CONTACTS_READ = 'tenant_contacts.read',
-    TENANT_VERIFICATION_WRITE = 'tenant_verification.write',
     TENANT_SUSPEND = 'tenant.suspend',
     USAGE_WRITE = 'usage.write',
     DSR_ERASE = 'dsr.erase',

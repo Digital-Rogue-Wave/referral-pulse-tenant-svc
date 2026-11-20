@@ -37,10 +37,7 @@ import {
     DeletionScheduledResponse,
     tenantResponseMapper,
     TenantStatus,
-    UpdateVerificationStatusDto,
-    VerificationRecordStatus,
     VerificationStatus,
-    VerificationType,
     UpdateTenantSettingsDto,
     TenantSettingsResponse,
     TenantRecordResponse,
@@ -59,7 +56,6 @@ import {
     TenantDeletionCancelledEvent,
     TenantOwnershipTransferredEvent,
     TenantDomainVerifiedEvent,
-    TenantVerificationStatusChangedEvent,
     TenantEvents
 } from '@domains/tenant/events/tenant.events';
 
@@ -68,33 +64,6 @@ const TRIAL_PERIOD_DAYS = 14;
 
 /** Default days until deletion after scheduling */
 const DEFAULT_DELETION_DAYS = 30;
-
-/** E1 D15: where each verification state may go. A decided verification is final; resubmission opens a new one. */
-const VERIFICATION_TRANSITIONS: Readonly<Record<VerificationRecordStatus, readonly VerificationRecordStatus[]>> = {
-    [VerificationRecordStatus.PENDING]: [
-        VerificationRecordStatus.PENDING,
-        VerificationRecordStatus.IN_REVIEW,
-        VerificationRecordStatus.VERIFIED,
-        VerificationRecordStatus.REJECTED
-    ],
-    [VerificationRecordStatus.IN_REVIEW]: [VerificationRecordStatus.IN_REVIEW, VerificationRecordStatus.VERIFIED, VerificationRecordStatus.REJECTED],
-    [VerificationRecordStatus.VERIFIED]: [],
-    [VerificationRecordStatus.REJECTED]: []
-};
-
-function assertVerificationTransition(from: VerificationRecordStatus, to: VerificationRecordStatus): void {
-    if (!VERIFICATION_TRANSITIONS[from]?.includes(to)) {
-        throw new BaseException('state_conflict', `A verification that is ${from} cannot become ${to}`, HttpStatus.CONFLICT);
-    }
-}
-
-/** A company verification's state as the tenant shows it: an open one (pending or in review) is `pending`. */
-const toTenantVerificationStatus = (status: VerificationRecordStatus): VerificationStatus =>
-    status === VerificationRecordStatus.VERIFIED
-        ? VerificationStatus.VERIFIED
-        : status === VerificationRecordStatus.REJECTED
-          ? VerificationStatus.REJECTED
-          : VerificationStatus.PENDING;
 
 @Injectable()
 export class TenantService {
@@ -345,73 +314,6 @@ export class TenantService {
             this.logger.warn('Failed to upload tenant logo, continuing without image', { error: err instanceof Error ? err.message : String(err) });
             return undefined;
         }
-    }
-
-    /**
-     * Records a verification report — the KYB provider's result, a Super Admin's decision, or the internal route's — in
-     * `tenant_verifications` and, for a company verification, moves `tenants.verification_status` with it, in one
-     * transaction. A verification moves `pending → in_review → verified | rejected` (`pending` may also be decided
-     * directly); a decided one never moves again — a rejected company resubmits, which opens a new row (E1 D15). Any other
-     * move is a 409, and a rejection needs a reason.
-     */
-    async applyVerificationReport(tenantId: string, dto: UpdateVerificationStatusDto): Promise<TenantResponse> {
-        const existing = await this.prisma.tenant.findUnique({ where: { id: tenantId } });
-        if (!existing) {
-            throw new NotFoundException(`Tenant with ID ${tenantId} not found`);
-        }
-        if (dto.status === VerificationRecordStatus.REJECTED && !dto.reason?.trim()) {
-            throw new BaseException('missing_required_field', 'A rejection needs a reason', HttpStatus.BAD_REQUEST, 'reason');
-        }
-        const type = dto.verificationType ?? VerificationType.COMPANY;
-        const decided = dto.status === VerificationRecordStatus.VERIFIED || dto.status === VerificationRecordStatus.REJECTED;
-        const tenantStatus = type === VerificationType.COMPANY ? toTenantVerificationStatus(dto.status) : existing.verificationStatus;
-
-        const updated = await this.prisma.$transaction(async (tx) => {
-            const record = await this.openVerification(tx, tenantId, type, dto.verificationId);
-            if (record) {
-                assertVerificationTransition(record.status as VerificationRecordStatus, dto.status);
-            } else if (type === VerificationType.COMPANY) {
-                throw new BaseException('state_conflict', 'No company verification is in progress', HttpStatus.CONFLICT);
-            }
-            const data = {
-                status: dto.status,
-                reason: dto.reason ?? null,
-                reviewedBy: dto.reviewedBy ?? null,
-                reviewedAt: decided ? new Date() : null,
-                ...(dto.temporalWorkflowId ? { temporalWorkflowId: dto.temporalWorkflowId } : {}),
-                ...(dto.temporalRunId ? { temporalRunId: dto.temporalRunId } : {}),
-                ...(dto.evidence ? { evidence: dto.evidence as Prisma.InputJsonValue } : {})
-            };
-            await (record
-                ? tx.tenantVerification.update({ where: { id: record.id }, data })
-                : tx.tenantVerification.create({ data: { tenantId, verificationType: type, ...data } }));
-            if (tenantStatus === existing.verificationStatus) {
-                return existing;
-            }
-            this.txEventEmitter.emitAfterCommit(
-                TenantEvents.VERIFICATION_STATUS_CHANGED,
-                new TenantVerificationStatusChangedEvent(tenantId, tenantId, existing.verificationStatus, tenantStatus, dto.reason, dto.reviewedBy)
-            );
-            return tx.tenant.update({ where: { id: tenantId }, data: { verificationStatus: tenantStatus } });
-        });
-
-        this.logger.log('Tenant verification report applied', { tenantId, verificationType: type, status: dto.status });
-        return tenantResponseMapper.toResponse(updated);
-    }
-
-    /** The verification a report is about: the named one, else the latest still open of that type. */
-    private async openVerification(tx: Prisma.TransactionClient, tenantId: string, type: VerificationType, verificationId?: string) {
-        if (verificationId) {
-            const named = await tx.tenantVerification.findFirst({ where: { id: verificationId, tenantId } });
-            if (!named) {
-                throw new BaseException('resource_not_found', `Verification ${verificationId} not found`, HttpStatus.NOT_FOUND, 'verification_id');
-            }
-            return named;
-        }
-        return tx.tenantVerification.findFirst({
-            where: { tenantId, verificationType: type, status: { in: [VerificationRecordStatus.PENDING, VerificationRecordStatus.IN_REVIEW] } },
-            orderBy: { createdAt: 'desc' }
-        });
     }
 
     // =========================================================

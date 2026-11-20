@@ -11,13 +11,12 @@ export enum TenantStatus {
 }
 
 /**
- * Company (client account) verification status.
- * Owned by this service per referralai_system_architecture_v1.md §Company Verification;
- * transitions are driven by the workflow service's `account_verification` Temporal workflow.
+ * Company verification status (v5.2 DB Model §3 `tenants.verification_status`): `unverified` until the KYB provider
+ * calls back, `pending_review` until a Super Admin decides, then `verified` or `rejected`.
  */
 export enum VerificationStatus {
     UNVERIFIED = 'unverified',
-    PENDING = 'pending',
+    PENDING_REVIEW = 'pending_review',
     VERIFIED = 'verified',
     REJECTED = 'rejected'
 }
@@ -29,10 +28,9 @@ export enum VerificationType {
     PAYOUT_PROVIDER = 'payout_provider'
 }
 
-/** A verification's own state; `pending` and `in_review` both show the tenant as `pending`. */
+/** A verification's own state (v5.2 DB Model §3 `tenant_verifications.status`): the tenant's values once started. */
 export enum VerificationRecordStatus {
-    PENDING = 'pending',
-    IN_REVIEW = 'in_review',
+    PENDING_REVIEW = 'pending_review',
     VERIFIED = 'verified',
     REJECTED = 'rejected'
 }

@@ -27,8 +27,7 @@ import type {
     TenantSuspendedEvent,
     TenantUnlockedEvent,
     TenantUpdatedEvent,
-    TenantVerificationRequestedEvent,
-    TenantVerificationStatusChangedEvent,
+    TenantVerifiedEvent,
     TenantWidgetSecretRotatedEvent
 } from '@domains/tenant/events/tenant.events';
 import type {
@@ -165,14 +164,6 @@ const MAPPERS: Record<string, Mapper<never>> = {
             properties: { tenant_id: e.tenantId, domain: e.domain, verified_at: iso(e.verifiedAt) }
         }
     ],
-    'tenant.verification_requested': (e: TenantVerificationRequestedEvent) => [
-        {
-            eventType: 'tenant.verification_requested',
-            externalId: `tenant.verification_requested:${e.verificationId ?? e.eventId}`,
-            object: tenantObject(e),
-            properties: { tenant_id: e.tenantId, verification_id: e.verificationId ?? null, verification_type: 'company' }
-        }
-    ],
     // US1.5.4 F3: Event Ingestion drops its cached secret on this. No secret travels, only the grace end.
     'tenant.widget_secret_rotated': (e: TenantWidgetSecretRotatedEvent) => [
         {
@@ -182,12 +173,21 @@ const MAPPERS: Record<string, Mapper<never>> = {
             properties: { tenant_id: e.tenantId, kid: e.kid, previous_valid_until: iso(e.previousValidUntil) }
         }
     ],
-    'tenant.verification_status_changed': (e: TenantVerificationStatusChangedEvent) => [
+    // v5.2 Event Model §5.11: the four spec fields, plus the previous status and the reason (additive: the audit trail
+    // reads before / after from previous_, and the Owner's notice shows a rejection reason).
+    'tenant.verified': (e: TenantVerifiedEvent) => [
         {
-            eventType: 'tenant.verification_status_changed',
-            externalId: `tenant.verification_status_changed:${e.eventId}`,
+            eventType: 'tenant.verified',
+            externalId: `tenant.verified:${e.eventId}`,
             object: tenantObject(e),
-            properties: { tenant_id: e.tenantId, previous_status: e.previousStatus, new_status: e.newStatus, reason: e.reason ?? null }
+            properties: {
+                tenant_id: e.tenantId,
+                verification_status: e.verificationStatus,
+                previous_status: e.previousStatus,
+                decided_by: e.decidedBy,
+                decided_at: iso(e.decidedAt),
+                reason: e.reason
+            }
         }
     ],
 

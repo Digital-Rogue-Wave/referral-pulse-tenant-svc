@@ -4,263 +4,321 @@ import { HttpStatus } from '@nestjs/common';
 import type { ConfigService } from '@nestjs/config';
 import { mock, MockProxy } from 'jest-mock-extended';
 
-import type { BullJobsService } from '@common/bulljobs';
 import type { TransactionEventEmitterService } from '@common/events/transaction-event-emitter.service';
 import type { BaseException } from '@common/exceptions/base.exceptions';
 import type { HttpClientService } from '@common/http/http-client.service';
 import { JsonService } from '@common/helper/json.service';
 import type { AppLoggerService } from '@common/logging/app-logger.service';
+import type { MetricsService } from '@common/monitoring/metrics.service';
 import type { DatabaseService } from '@app/database/database.service';
-import type { TenantService } from '@app/features/tenant/tenant.service';
 
+import { AccountVerificationActivities } from './account-verification.activities';
+import type { AccountVerificationGateway } from './account-verification.gateway';
 import { AdminVerificationService } from './admin-verification.service';
-import { CompanyVerificationService, VERIFICATION_ESCALATION_QUEUE } from './company-verification.service';
+import { CompanyVerificationService, ProviderVerificationResult } from './company-verification.service';
 import { FakeKybProvider } from './fake-kyb.provider';
 import { KybResultHandler } from './kyb-result.handler';
 import { SumsubKybProvider } from './sumsub-kyb.provider';
+import { TenantVerificationStatus } from './tenant-verification-status';
 
 const TENANT = '01TENANT00000000000000000T';
+const VERIFICATION = '01VERIF000000000000000000V';
 
-/** Product Spec R-INT-02 (E1 D15): company verification through a KYB provider. */
-describe('Company verification', () => {
-    let prisma: {
-        tenant: { findUniqueOrThrow: jest.Mock; update: jest.Mock };
-        tenantVerification: { findFirst: jest.Mock; create: jest.Mock };
-        auditLog: { create: jest.Mock };
-        $transaction: jest.Mock;
+type Emitted = { name: string; event: Record<string, unknown> };
+
+/** A Prisma double whose transaction runs the callback on the same delegates, plus the events it emitted. */
+function world(tenantStatus = 'unverified') {
+    const emitted: Emitted[] = [];
+    const tenant = {
+        findUniqueOrThrow: jest.fn().mockResolvedValue({ name: 'Acme', verificationStatus: tenantStatus }),
+        findUnique: jest.fn().mockResolvedValue({ id: TENANT }),
+        update: jest.fn().mockResolvedValue({})
     };
-    let tenants: MockProxy<TenantService>;
-    let events: MockProxy<TransactionEventEmitterService>;
-    let bullJobs: MockProxy<BullJobsService>;
+    const tenantVerification = {
+        findFirst: jest.fn().mockResolvedValue(null),
+        findMany: jest.fn().mockResolvedValue([]),
+        create: jest.fn().mockResolvedValue({}),
+        update: jest.fn().mockResolvedValue({})
+    };
+    const auditLog = { create: jest.fn().mockResolvedValue({}), findFirst: jest.fn().mockResolvedValue(null) };
+    const prisma = {
+        tenant,
+        tenantVerification,
+        auditLog,
+        $transaction: (fn: (tx: unknown) => unknown) => fn({ tenant, tenantVerification, auditLog })
+    };
+    const events = { emitAfterCommit: (name: string, event: Record<string, unknown>) => emitted.push({ name, event }) };
+    const statusWriter = new TenantVerificationStatus(events as unknown as TransactionEventEmitterService);
+    const workflows = mock<AccountVerificationGateway>();
+    workflows.start.mockResolvedValue({ workflowId: `account-verification-${VERIFICATION}`, runId: 'run-1' });
+    const counter = { add: jest.fn() };
+    const metrics = { createCounter: jest.fn().mockReturnValue(counter) } as unknown as MetricsService;
+    return { prisma, tenant, tenantVerification, auditLog, emitted, statusWriter, workflows, events, metrics, counter };
+}
+
+const result = (overrides: Partial<ProviderVerificationResult> = {}): ProviderVerificationResult => ({
+    tenantId: TENANT,
+    verificationId: VERIFICATION,
+    provider: 'sumsub',
+    outcome: 'verified',
+    reason: null,
+    retryAllowed: false,
+    providerReference: 'app-1',
+    labels: [],
+    ...overrides
+});
+
+describe('Company verification (v5.2 API §3.17, US1.6.4, US1.6.1)', () => {
+    let w: ReturnType<typeof world>;
+    let redis: { get: jest.Mock; set: jest.Mock; del: jest.Mock };
     let service: CompanyVerificationService;
 
-    beforeEach(() => {
-        prisma = {
-            tenant: { findUniqueOrThrow: jest.fn().mockResolvedValue({ name: 'Acme', verificationStatus: 'unverified' }), update: jest.fn() },
-            tenantVerification: { findFirst: jest.fn().mockResolvedValue(null), create: jest.fn() },
-            auditLog: { create: jest.fn() },
-            $transaction: jest.fn()
-        };
-        prisma.$transaction.mockImplementation((run: (tx: unknown) => unknown) => run(prisma));
-        tenants = mock<TenantService>();
-        events = mock<TransactionEventEmitterService>();
-        bullJobs = mock<BullJobsService>();
+    const build = (tenantStatus = 'unverified') => {
+        w = world(tenantStatus);
+        redis = { get: jest.fn().mockResolvedValue(null), set: jest.fn().mockResolvedValue('OK'), del: jest.fn().mockResolvedValue(1) };
         service = new CompanyVerificationService(
-            prisma as unknown as DatabaseService,
-            tenants,
-            events,
-            bullJobs,
+            w.prisma as unknown as DatabaseService,
+            w.statusWriter,
+            w.workflows,
+            w.events as unknown as TransactionEventEmitterService,
+            { getClient: () => redis } as never,
+            w.metrics,
+            { getOrThrow: () => ({ linkTtlSeconds: 1800 }) } as unknown as ConfigService<never>,
             new FakeKybProvider(),
             mock<AppLoggerService>()
         );
-    });
+    };
 
     describe('given an unverified company whose Owner opens a session', () => {
-        it('then a verification starts, the tenant becomes pending and the provider link is returned', async () => {
+        it('then the provider link comes back and nothing changes until the provider calls back', async () => {
+            build();
+
             const session = await service.open(TENANT, 'user-1');
 
-            expect(session).toMatchObject({ status: 'pending', provider: 'fake' });
+            expect(session).toMatchObject({ status: 'unverified', provider: 'fake' });
             expect(session.providerUrl).toContain(encodeURIComponent(`${TENANT}:${session.verificationId}`));
-            expect(prisma.tenantVerification.create).toHaveBeenCalledWith({
-                data: expect.objectContaining({ id: session.verificationId, tenantId: TENANT, verificationType: 'company' })
+            expect(w.tenant.update).not.toHaveBeenCalled();
+            expect(w.tenantVerification.create).not.toHaveBeenCalled();
+            expect(w.emitted.map((e) => e.name)).toEqual(['tenant.verification_requested']);
+            expect(redis.set).toHaveBeenCalledWith(`tenant:kyb-session:${TENANT}`, session.verificationId, 'EX', 1800);
+        });
+
+        it('then a second click reuses the same applicant while the link lives', async () => {
+            build();
+            redis.get.mockResolvedValue(VERIFICATION);
+
+            await expect(service.open(TENANT, 'user-1')).resolves.toMatchObject({ verificationId: VERIFICATION });
+            expect(redis.set).not.toHaveBeenCalled();
+        });
+    });
+
+    it.each(['verified', 'pending_review'])('refuses a session for a company that is %s (409)', async (status) => {
+        build(status);
+
+        await expect(service.open(TENANT, 'user-1')).rejects.toMatchObject({ status: HttpStatus.CONFLICT } as Partial<BaseException>);
+    });
+
+    it('lets a rejected company resubmit; its status stays rejected until the provider calls back', async () => {
+        build('rejected');
+
+        await expect(service.open(TENANT, 'user-1')).resolves.toMatchObject({ status: 'rejected' });
+        expect(w.tenant.update).not.toHaveBeenCalled();
+    });
+
+    describe("given the provider's first callback", () => {
+        it('then the case opens in pending_review with evidence references, tenant.verified is emitted and the workflow starts', async () => {
+            build();
+
+            await service.applyProviderResult(result());
+
+            expect(w.tenantVerification.create).toHaveBeenCalledWith({
+                data: expect.objectContaining({
+                    id: VERIFICATION,
+                    status: 'pending_review',
+                    evidence: { provider: 'sumsub', result: expect.objectContaining({ outcome: 'verified', reference: 'app-1' }) }
+                })
             });
-            expect(prisma.tenant.update).toHaveBeenCalledWith({ where: { id: TENANT }, data: { verificationStatus: 'pending' } });
-            expect(events.emitAfterCommit).toHaveBeenCalledWith(
-                'tenant.verification_requested',
-                expect.objectContaining({ verificationId: session.verificationId })
-            );
-            expect(events.emitAfterCommit).toHaveBeenCalledWith(
-                'tenant.verification_status_changed',
-                expect.objectContaining({ previousStatus: 'unverified', newStatus: 'pending' })
-            );
-        });
-
-        it('then a Super Admin escalation is scheduled seven days out', async () => {
-            const session = await service.open(TENANT, 'user-1');
-
-            expect(bullJobs.addDelayedJob).toHaveBeenCalledWith(
-                VERIFICATION_ESCALATION_QUEUE,
-                'escalate',
-                { tenantId: TENANT, verificationId: session.verificationId },
-                7 * 86_400_000,
-                { jobId: `verification-escalation-${session.verificationId}` }
-            );
-        });
-    });
-
-    describe('given a verification already open', () => {
-        it('then the Owner gets a fresh link to the same case and nothing new starts', async () => {
-            prisma.tenant.findUniqueOrThrow.mockResolvedValue({ name: 'Acme', verificationStatus: 'pending' });
-            prisma.tenantVerification.findFirst.mockResolvedValue({ id: 'v-open', status: 'pending' });
-
-            const session = await service.open(TENANT, 'user-1');
-
-            expect(session.verificationId).toBe('v-open');
-            expect(prisma.tenantVerification.create).not.toHaveBeenCalled();
-            expect(bullJobs.addDelayedJob).not.toHaveBeenCalled();
-        });
-    });
-
-    describe('given a rejected company', () => {
-        it('then it may resubmit: a new verification starts and the tenant is pending again', async () => {
-            prisma.tenant.findUniqueOrThrow.mockResolvedValue({ name: 'Acme', verificationStatus: 'rejected' });
-
-            await service.open(TENANT, 'user-1');
-
-            expect(prisma.tenantVerification.create).toHaveBeenCalled();
-            expect(events.emitAfterCommit).toHaveBeenCalledWith(
-                'tenant.verification_status_changed',
-                expect.objectContaining({ previousStatus: 'rejected', newStatus: 'pending' })
-            );
-        });
-    });
-
-    it('refuses a session for a company already verified (409)', async () => {
-        prisma.tenant.findUniqueOrThrow.mockResolvedValue({ name: 'Acme', verificationStatus: 'verified' });
-
-        const error = await service.open(TENANT, 'user-1').catch((e: BaseException) => e);
-
-        expect((error as BaseException).getStatus()).toBe(HttpStatus.CONFLICT);
-    });
-
-    describe("given the provider's result", () => {
-        const result = {
-            tenantId: TENANT,
-            verificationId: 'v1',
-            provider: 'sumsub',
-            outcome: 'rejected' as const,
-            reason: 'bad document',
-            retryAllowed: true,
-            providerReference: 'app-1',
-            labels: ['BAD_PROOF']
-        };
-
-        it('then it is applied to that exact verification, with the provider as reviewer and its result kept', async () => {
-            prisma.tenantVerification.findFirst.mockResolvedValue({ id: 'v1', status: 'pending', evidence: { provider: 'sumsub' } });
-
-            await service.applyProviderResult(result);
-
-            expect(tenants.applyVerificationReport).toHaveBeenCalledWith(TENANT, {
-                verificationId: 'v1',
-                verificationType: 'company',
-                status: 'rejected',
-                reason: 'bad document',
-                reviewedBy: 'provider:sumsub',
-                evidence: { provider: 'sumsub', result: { outcome: 'rejected', reference: 'app-1', labels: ['BAD_PROOF'], retry_allowed: true } }
+            expect(w.tenant.update).toHaveBeenCalledWith({ where: { id: TENANT }, data: { verificationStatus: 'pending_review' } });
+            expect(w.emitted[0]).toMatchObject({
+                name: 'tenant.verified',
+                event: { previousStatus: 'unverified', verificationStatus: 'pending_review', decidedBy: 'provider:sumsub' }
             });
+            expect(w.workflows.start).toHaveBeenCalledWith({ tenantId: TENANT, verificationId: VERIFICATION });
+            expect(w.tenantVerification.update).toHaveBeenCalledWith({
+                where: { id: VERIFICATION },
+                data: { temporalWorkflowId: `account-verification-${VERIFICATION}`, temporalRunId: 'run-1' }
+            });
+            expect(redis.del).toHaveBeenCalledWith(`tenant:kyb-session:${TENANT}`);
         });
 
-        it('then a result for a verification already decided is ignored: the decision stands', async () => {
-            prisma.tenantVerification.findFirst.mockResolvedValue({ id: 'v1', status: 'verified', evidence: null });
+        it('then a provider rejection still goes to a Super Admin: the provider never decides', async () => {
+            build();
 
-            await service.applyProviderResult(result);
+            await service.applyProviderResult(result({ outcome: 'rejected', reason: 'documents unreadable' }));
 
-            expect(tenants.applyVerificationReport).not.toHaveBeenCalled();
+            expect(w.tenant.update).toHaveBeenCalledWith({ where: { id: TENANT }, data: { verificationStatus: 'pending_review' } });
         });
 
-        it('then a result for an unknown verification is ignored', async () => {
-            await service.applyProviderResult(result);
+        it('then Temporal being down leaves the case under review and counts the failure', async () => {
+            build();
+            w.workflows.start.mockRejectedValue(new Error('connect ECONNREFUSED'));
 
-            expect(tenants.applyVerificationReport).not.toHaveBeenCalled();
+            await expect(service.applyProviderResult(result())).resolves.toBeUndefined();
+            expect(w.tenant.update).toHaveBeenCalled();
+            expect(w.counter.add).toHaveBeenCalledWith(1);
         });
     });
 
-    describe('given seven days have passed', () => {
-        it('then a still-pending verification goes to in_review and the escalation is audited', async () => {
-            prisma.tenantVerification.findFirst.mockResolvedValue({ id: 'v1', status: 'pending' });
+    describe('given a later callback', () => {
+        it('then a case still under review gets fresh evidence, no second event and no second workflow', async () => {
+            build('pending_review');
+            w.tenantVerification.findFirst.mockResolvedValue({ id: VERIFICATION, status: 'pending_review', evidence: {}, temporalWorkflowId: 'wf' });
 
-            await service.escalate({ tenantId: TENANT, verificationId: 'v1' });
+            await service.applyProviderResult(result({ outcome: 'in_review' }));
 
-            expect(tenants.applyVerificationReport).toHaveBeenCalledWith(
-                TENANT,
-                expect.objectContaining({ verificationId: 'v1', status: 'in_review' })
-            );
-            expect(prisma.auditLog.create).toHaveBeenCalledWith({
-                data: expect.objectContaining({ action: 'tenant_verification.escalated', targetId: 'v1' })
+            expect(w.tenantVerification.update).toHaveBeenCalledWith({
+                where: { id: VERIFICATION },
+                data: { evidence: expect.objectContaining({ result: expect.objectContaining({ outcome: 'in_review' }) }) }
             });
+            expect(w.emitted).toHaveLength(0);
+            expect(w.workflows.start).not.toHaveBeenCalled();
         });
 
-        it('then a decided verification is left alone', async () => {
-            prisma.tenantVerification.findFirst.mockResolvedValue({ id: 'v1', status: 'verified' });
+        it('then a case a Super Admin decided is final', async () => {
+            build('verified');
+            w.tenantVerification.findFirst.mockResolvedValue({ id: VERIFICATION, status: 'verified' });
 
-            await service.escalate({ tenantId: TENANT, verificationId: 'v1' });
+            await service.applyProviderResult(result({ outcome: 'rejected' }));
 
-            expect(prisma.auditLog.create).not.toHaveBeenCalled();
+            expect(w.tenantVerification.update).not.toHaveBeenCalled();
+            expect(w.emitted).toHaveLength(0);
         });
     });
 });
 
-describe('Super Admin review of company verifications (US1.6.2, E1 D15)', () => {
-    const row = {
-        id: 'v1',
+describe('Super Admin review (US1.6.2)', () => {
+    let w: ReturnType<typeof world>;
+    let service: AdminVerificationService;
+    const row = (overrides: Record<string, unknown> = {}) => ({
+        id: VERIFICATION,
         tenantId: TENANT,
-        status: 'in_review',
+        status: 'pending_review',
         reason: null,
-        createdAt: new Date(),
+        createdAt: new Date('2026-11-20T09:00:00Z'),
         reviewedAt: null,
         reviewedBy: null,
         evidence: { provider: 'sumsub' },
-        tenant: { name: 'Acme' }
-    };
-    let findFirst: jest.Mock;
-    let findMany: jest.Mock;
-    let audit: jest.Mock;
-    let tenants: MockProxy<TenantService>;
-    let service: AdminVerificationService;
+        temporalWorkflowId: `account-verification-${VERIFICATION}`,
+        tenant: { name: 'Acme' },
+        ...overrides
+    });
 
     beforeEach(() => {
-        findFirst = jest.fn().mockResolvedValue(row);
-        findMany = jest.fn().mockResolvedValue([row]);
-        audit = jest.fn();
-        tenants = mock<TenantService>();
-        service = new AdminVerificationService(
-            { tenantVerification: { findFirst, findMany }, auditLog: { create: audit } } as unknown as DatabaseService,
-            tenants
+        w = world('pending_review');
+        service = new AdminVerificationService(w.prisma as unknown as DatabaseService, w.statusWriter, w.workflows, mock<AppLoggerService>());
+    });
+
+    it('lists the cases under review by default', async () => {
+        await service.list();
+
+        expect(w.tenantVerification.findMany).toHaveBeenCalledWith(
+            expect.objectContaining({ where: { verificationType: 'company', status: 'pending_review' } })
         );
     });
 
-    it("lists what the provider couldn't settle by default", async () => {
-        await expect(service.list()).resolves.toEqual([expect.objectContaining({ id: 'v1', tenantName: 'Acme', status: 'in_review' })]);
-        expect(findMany).toHaveBeenCalledWith(expect.objectContaining({ where: { verificationType: 'company', status: 'in_review' } }));
-    });
+    it("writes an audit row on the tenant for every read of a case's evidence", async () => {
+        w.tenantVerification.findFirst.mockResolvedValue(row());
 
-    it("writes an audit row on the tenant for every read of a verification's evidence", async () => {
-        const detail = await service.detail('v1', 'staff:id-1');
+        await service.detail(VERIFICATION, 'staff:ops-1');
 
-        expect(detail.evidence).toEqual({ provider: 'sumsub' });
-        expect(audit).toHaveBeenCalledWith({
+        expect(w.auditLog.create).toHaveBeenCalledWith({
             data: expect.objectContaining({
                 tenantId: TENANT,
-                actorUserId: 'staff:id-1',
+                actorUserId: 'staff:ops-1',
                 action: 'tenant_verification.evidence_read',
-                targetId: 'v1'
+                targetId: VERIFICATION
             })
         });
     });
 
-    it('approves and rejects through the one report path, with the staff member as reviewer', async () => {
-        await service.approve('v1', 'staff:id-1');
-        await service.reject('v1', 'staff:id-1', 'registry extract expired');
+    it('verifies with a reason: the case, the tenant and tenant.verified name the staff member, then the workflow is signalled', async () => {
+        w.tenantVerification.findFirst.mockResolvedValue(row());
 
-        expect(tenants.applyVerificationReport).toHaveBeenNthCalledWith(
-            1,
-            TENANT,
-            expect.objectContaining({ verificationId: 'v1', status: 'verified', reviewedBy: 'staff:id-1' })
-        );
-        expect(tenants.applyVerificationReport).toHaveBeenNthCalledWith(
-            2,
-            TENANT,
-            expect.objectContaining({ verificationId: 'v1', status: 'rejected', reason: 'registry extract expired', reviewedBy: 'staff:id-1' })
-        );
+        await service.approve(VERIFICATION, 'staff:ops-1', 'Registry extract matches');
+
+        expect(w.tenantVerification.update).toHaveBeenCalledWith({
+            where: { id: VERIFICATION },
+            data: expect.objectContaining({ status: 'verified', reason: 'Registry extract matches', reviewedBy: 'staff:ops-1' })
+        });
+        expect(w.tenant.update).toHaveBeenCalledWith({ where: { id: TENANT }, data: { verificationStatus: 'verified' } });
+        expect(w.emitted[0]).toMatchObject({
+            name: 'tenant.verified',
+            event: { verificationStatus: 'verified', decidedBy: 'staff:ops-1', userId: 'staff:ops-1', reason: 'Registry extract matches' }
+        });
+        expect(w.workflows.signalDecided).toHaveBeenCalledWith(`account-verification-${VERIFICATION}`, 'verified');
+    });
+
+    it('rejects with a reason the Owner will see', async () => {
+        w.tenantVerification.findFirst.mockResolvedValue(row());
+
+        await service.reject(VERIFICATION, 'staff:ops-1', 'Company not found in the registry');
+
+        expect(w.emitted[0]).toMatchObject({ event: { verificationStatus: 'rejected', reason: 'Company not found in the registry' } });
+    });
+
+    it('keeps the decision when Temporal cannot be signalled', async () => {
+        w.tenantVerification.findFirst.mockResolvedValue(row());
+        w.workflows.signalDecided.mockRejectedValue(new Error('unavailable'));
+
+        await expect(service.approve(VERIFICATION, 'staff:ops-1', 'ok')).resolves.toMatchObject({ id: VERIFICATION });
+        expect(w.tenant.update).toHaveBeenCalled();
+    });
+
+    it('refuses to decide a case already decided (409)', async () => {
+        w.tenantVerification.findFirst.mockResolvedValue(row({ status: 'rejected' }));
+
+        await expect(service.approve(VERIFICATION, 'staff:ops-1', 'ok')).rejects.toMatchObject({
+            status: HttpStatus.CONFLICT
+        } as Partial<BaseException>);
+        expect(w.emitted).toHaveLength(0);
     });
 
     it('answers 404 for an unknown verification, and audits nothing', async () => {
-        findFirst.mockResolvedValue(null);
+        await expect(service.detail('nope', 'staff:ops-1')).rejects.toMatchObject({ status: HttpStatus.NOT_FOUND } as Partial<BaseException>);
+        expect(w.auditLog.create).not.toHaveBeenCalled();
+    });
+});
 
-        const error = await service.detail('nope', 'staff:id-1').catch((e: BaseException) => e);
+describe('The 7-day review SLA (US1.6.1 AC3)', () => {
+    const build = (status: string | null, alreadyReported = false) => {
+        const w = world();
+        w.tenantVerification.findFirst.mockResolvedValue(status ? { status } : null);
+        w.auditLog.findFirst.mockResolvedValue(alreadyReported ? { id: 'a1' } : null);
+        const logger = mock<AppLoggerService>();
+        return { w, logger, activities: new AccountVerificationActivities(w.prisma as unknown as DatabaseService, w.metrics, logger) };
+    };
 
-        expect((error as BaseException).getStatus()).toBe(HttpStatus.NOT_FOUND);
-        expect(audit).not.toHaveBeenCalled();
+    it('raises the alert for a case still under review: error log, metric and one audit row', async () => {
+        const { w, logger, activities } = build('pending_review');
+
+        await activities.reportSlaBreach({ tenantId: TENANT, verificationId: VERIFICATION });
+
+        expect(w.metrics.createCounter).toHaveBeenCalledWith('kyb_review_sla_breached_total');
+        expect(logger.error).toHaveBeenCalled();
+        expect(w.auditLog.create).toHaveBeenCalledWith({
+            data: expect.objectContaining({ action: 'tenant_verification.sla_breached', actorUserId: 'system' })
+        });
+    });
+
+    it.each([
+        ['verified', false],
+        ['pending_review', true]
+    ])('stays silent for a %s case (already reported: %s)', async (status, reported) => {
+        const { w, activities } = build(status, reported);
+
+        await activities.reportSlaBreach({ tenantId: TENANT, verificationId: VERIFICATION });
+
+        expect(w.auditLog.create).not.toHaveBeenCalled();
     });
 });
 

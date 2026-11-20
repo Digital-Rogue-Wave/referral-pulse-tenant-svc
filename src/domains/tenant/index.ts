@@ -1,19 +1,5 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import {
-    IsString,
-    IsOptional,
-    IsEnum,
-    IsDateString,
-    IsEmail,
-    IsInt,
-    Min,
-    Max,
-    IsNotEmpty,
-    IsObject,
-    Length,
-    MaxLength,
-    IsISO31661Alpha2
-} from 'class-validator';
+import { IsString, IsOptional, IsDateString, IsEmail, IsInt, Min, Max, IsNotEmpty, MaxLength, IsISO31661Alpha2 } from 'class-validator';
 
 import { BaseResponseMapper } from '@common/helper';
 import { InvitationResponse } from '@domains/invitation';
@@ -212,56 +198,6 @@ export class SuspendTenantDto {
     @ApiProperty()
     @IsString()
     reason!: string;
-}
-
-/**
- * The account_verification workflow's report on one verification. Without `verification_id` it applies to the
- * tenant's latest open verification of `verification_type` (a new one is opened when none is).
- */
-export class UpdateVerificationStatusDto {
-    @ApiProperty({ enum: VerificationRecordStatus })
-    @IsEnum(VerificationRecordStatus)
-    status!: VerificationRecordStatus;
-
-    @ApiPropertyOptional({ enum: VerificationType, default: VerificationType.COMPANY })
-    @IsOptional()
-    @IsEnum(VerificationType)
-    verificationType?: VerificationType;
-
-    @ApiPropertyOptional()
-    @IsOptional()
-    @IsString()
-    @Length(26, 26)
-    verificationId?: string;
-
-    @ApiPropertyOptional()
-    @IsOptional()
-    @IsString()
-    @MaxLength(2000)
-    reason?: string;
-
-    @ApiPropertyOptional({ description: 'Operator id or `system` for an automated decision' })
-    @IsOptional()
-    @IsString()
-    @MaxLength(80)
-    reviewedBy?: string;
-
-    @ApiPropertyOptional({ description: 'Temporal workflow id, so a crashed verification can be resumed' })
-    @IsOptional()
-    @IsString()
-    @MaxLength(255)
-    temporalWorkflowId?: string;
-
-    @ApiPropertyOptional()
-    @IsOptional()
-    @IsString()
-    @MaxLength(255)
-    temporalRunId?: string;
-
-    @ApiPropertyOptional({ description: 'References to uploaded documents — never the documents themselves' })
-    @IsOptional()
-    @IsObject()
-    evidence?: Record<string, unknown>;
 }
 
 // ============================================================

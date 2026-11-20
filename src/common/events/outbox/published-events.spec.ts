@@ -29,8 +29,7 @@ import {
     TenantUnlockedEvent,
     TenantUnsuspendedEvent,
     TenantUpdatedEvent,
-    TenantVerificationRequestedEvent,
-    TenantVerificationStatusChangedEvent,
+    TenantVerifiedEvent,
     TenantWidgetSecretRotatedEvent
 } from '@domains/tenant/events/tenant.events';
 import { UserAnonymisedEvent, UserInvitedEvent, UserLoggedInEvent, UserRegisteredEvent, UserRemovedEvent, UserRoleChangedEvent } from '@domains/user';
@@ -56,8 +55,7 @@ const EVENTS: BaseDomainEvent[] = [
     new TenantDeletedEvent(T, T, 'Acme', 'acme'),
     new TenantOwnershipTransferredEvent(T, T, 'u1', 'u2', NOW, 'u1'),
     new TenantDomainVerifiedEvent(T, T, 'refer.acme.io', NOW),
-    new TenantVerificationRequestedEvent(T, T, 'Acme', 'u1', 'v1'),
-    new TenantVerificationStatusChangedEvent(T, T, 'pending', 'verified', undefined, 'system'),
+    new TenantVerifiedEvent(T, T, 'pending_review', 'verified', 'staff:ops-1', NOW, 'Registry extract matches'),
     new TenantWidgetSecretRotatedEvent(T, T, 'kid-2', new Date('2026-11-09T11:00:00Z'), 'u1'),
     new UserRegisteredEvent('u1', T, 'owner'),
     new UserRoleChangedEvent('u2', T, 'viewer', 'admin', 'u1'),
@@ -209,6 +207,17 @@ describe('Published events — the wire contract of every tenant-service event',
         expect(draft!.properties).toMatchObject({ connection_id: 'c1', direction: 'inbound', status: 'active', old_secret_valid_until: ISO });
         expect(draft!.externalId).toBe(`connection.rotated:${rotated.eventId}`);
         expect(JSON.stringify(draft)).not.toMatch(/secret"/);
+    });
+
+    it('publishes tenant.verified with the v5.2 fields, and the decider as the audit actor (Event Model §5.11)', () => {
+        const event = EVENTS.find((e) => e.eventType === 'tenant.verified')!;
+
+        const [draft] = toPublishedEvents(event.eventType, event);
+
+        expect(draft!.properties).toMatchObject({ tenant_id: T, verification_status: 'verified', decided_by: 'staff:ops-1', decided_at: ISO });
+        expect(event.userId).toBe('staff:ops-1');
+        expect(isPublishedEvent('tenant.verification_status_changed')).toBe(false);
+        expect(isPublishedEvent('tenant.verification_requested')).toBe(false);
     });
 
     it('covers every mapper in the registry', () => {

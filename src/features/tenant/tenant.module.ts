@@ -12,7 +12,6 @@ import { DnsModule } from '../dns/dns.module';
 import { AwareTenantController } from './aware/aware-tenant.controller';
 import { AgnosticTenantController } from './agnostic/agnostic-tenant.controller';
 import { AdminTenantController } from './agnostic/admin-tenant.controller';
-import { InternalTenantVerificationController } from './internal-tenant-verification.controller';
 import { InternalWidgetSecretController } from './internal-widget-secret.controller';
 
 // Services
@@ -49,7 +48,6 @@ import { TenantUnlockProcessor } from './processors/tenant-unlock.processor';
         AwareTenantController,
         AgnosticTenantController,
         AdminTenantController,
-        InternalTenantVerificationController,
         InternalWidgetSecretController,
         TenantSettingsController,
         TenantRecordController

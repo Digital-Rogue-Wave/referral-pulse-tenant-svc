@@ -49,6 +49,8 @@ const INTERNAL_ACTIONS: Record<string, (event: EventWithPayload) => Pick<AuditEn
     'user.enabled': (e) => ({ action: 'user.enabled', targetType: 'user', targetId: e.aggregateId }),
     // US1.5.4 F2: every Owner read of the widget-token secret is on the trail.
     'tenant.widget_secret_revealed': (e) => ({ action: 'tenant.widget_secret_revealed', targetType: 'tenant', targetId: e.aggregateId }),
+    // US1.6.4: the Owner opening a KYB session is on the trail (no longer published in v5.2).
+    'tenant.verification_requested': (e) => ({ action: 'tenant.verification_requested', targetType: 'tenant', targetId: e.aggregateId }),
     // v5.2 US1.5.4 AC2: every service read of a connection's outbound credential is on the trail.
     'connection.credential_read': (e) => ({ action: 'connection.credential_read', targetType: 'connection', targetId: e.aggregateId }),
     // US1.8.2 F9: the two plan actions that are not published.
