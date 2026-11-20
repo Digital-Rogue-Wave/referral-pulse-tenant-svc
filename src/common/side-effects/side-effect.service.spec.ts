@@ -5,7 +5,7 @@ import { AppLoggerService } from '@common/logging/app-logger.service';
 import { SnsPublisherService } from '@common/messaging/sns-publisher.service';
 import { SqsProducerService } from '@common/messaging/sqs-producer.service';
 import { TenantContextService } from '@common/tenant-aware/tenant-context.service';
-import { DatabaseService } from '@app/database/database.service';
+import { PrivilegedDatabaseService } from '@app/database/privileged-database.service';
 
 import { SideEffectService } from './side-effect.service';
 
@@ -20,7 +20,7 @@ describe('SideEffectService — critical side effects', () => {
         const context = mock<TenantContextService>();
         context.getTenantId.mockReturnValue(undefined);
         const service = new SideEffectService(
-            mock<DatabaseService>(),
+            mock<PrivilegedDatabaseService>(),
             context,
             mock<AppLoggerService>(),
             mock<SqsProducerService>(),
@@ -58,7 +58,7 @@ describe('SideEffectService — critical side effects', () => {
             }
         };
         const service = new SideEffectService(
-            mock<DatabaseService>(),
+            mock<PrivilegedDatabaseService>(),
             mock<TenantContextService>(),
             mock<AppLoggerService>(),
             mock<SqsProducerService>(),

@@ -5,7 +5,7 @@ import { InvitationStatusEnum } from '@common/enums/invitation.enum';
 import { TenantService } from '../tenant/tenant.service';
 import { Public } from '@common/auth/public.decorator';
 import { StripeWebhookService } from '../billing/stripe-webhook.service';
-import { DatabaseService } from '@app/database/database.service';
+import { PrivilegedDatabaseService } from '@app/database/privileged-database.service';
 import { TransactionEventEmitterService } from '@common/events/transaction-event-emitter.service';
 import { UserLoggedInEvent } from '@domains/user';
 import type { Request } from 'express';
@@ -24,7 +24,7 @@ export class WebhookController {
     constructor(
         private readonly tenantService: TenantService,
         private readonly stripeWebhooks: StripeWebhookService,
-        private readonly prisma: DatabaseService,
+        private readonly prisma: PrivilegedDatabaseService,
         private readonly txEventEmitter: TransactionEventEmitterService
     ) {}
 

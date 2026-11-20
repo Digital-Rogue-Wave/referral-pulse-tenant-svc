@@ -3,6 +3,8 @@ import { ConfigService } from '@nestjs/config';
 import { Prisma } from '@prisma-gen/generated/client';
 
 import { DatabaseService } from '@app/database/database.service';
+import { PrivilegedDatabaseService } from '@app/database/privileged-database.service';
+import { TenantContextService } from '@common/tenant-aware/tenant-context.service';
 import { TenantAwareService } from '@common/tenant-aware/tenant-aware.service';
 import { TransactionEventEmitterService } from '@common/events/transaction-event-emitter.service';
 import { AppLoggerService } from '@common/logging/app-logger.service';
@@ -53,6 +55,8 @@ const LIVE = { not: ConnectionStatus.REVOKED } as const;
 export class ConnectionService {
     constructor(
         private readonly prisma: DatabaseService,
+        private readonly privileged: PrivilegedDatabaseService,
+        private readonly tenantContext: TenantContextService,
         private readonly tenantAware: TenantAwareService,
         private readonly txEventEmitter: TransactionEventEmitterService,
         private readonly cipher: ProviderSecretCipher,
@@ -200,7 +204,8 @@ export class ConnectionService {
      * tenant. Null (the receiver's 404) for an unknown or revoked connection, or one that receives no callbacks.
      */
     async findForReceiver(provider: ConnectionProvider, connectionId: string): Promise<InternalConnectionDto | null> {
-        const row = (await this.prisma.providerConnection.findFirst({
+        // Privileged read: the connection id is what tells us the tenant (v5.2 DB Model §0.8).
+        const row = (await this.privileged.providerConnection.findFirst({
             where: { id: connectionId, provider, status: LIVE }
         })) as ConnectionProps | null;
         if (!row || !receivesCallbacks(row.direction)) {
@@ -222,11 +227,12 @@ export class ConnectionService {
 
     /** Event Ingestion's report of a connection's first verified callback (v5.2 US1.5.2 AC1). Idempotent. */
     async markVerifiedByCallback(connectionId: string, clientId: string): Promise<InternalConnectionVerifiedDto | null> {
-        const row = (await this.prisma.providerConnection.findFirst({ where: { id: connectionId, status: LIVE } })) as ConnectionProps | null;
+        const row = await this.liveById(connectionId);
         if (!row) {
             return null;
         }
-        return { connectionId, status: await this.activate(row, 'callback', `service:${clientId}`) };
+        const status = await this.inTenantOf(row, () => this.activate(row, 'callback', `service:${clientId}`));
+        return { connectionId, status };
     }
 
     /**
@@ -235,17 +241,33 @@ export class ConnectionService {
      * without one (US1.5.4 AC2).
      */
     async credentialFor(connectionId: string, clientId: string): Promise<InternalConnectionCredentialDto | null> {
-        return this.prisma.$transaction(async (tx) => {
-            const row = (await tx.providerConnection.findFirst({ where: { id: connectionId, status: LIVE } })) as ConnectionProps | null;
-            if (!row) {
-                return null;
-            }
-            this.txEventEmitter.emitAfterCommit(
-                ConnectionEvents.CREDENTIAL_READ,
-                new ConnectionCredentialReadEvent(row.id, row.tenantId, `service:${clientId}`)
-            );
-            return { ...facts(row), tenantId: row.tenantId, credentials: this.openOutbound(row), config: configOf(row) };
-        });
+        const found = await this.liveById(connectionId);
+        if (!found) {
+            return null;
+        }
+        return this.inTenantOf(found, () =>
+            this.prisma.$transaction(async (tx) => {
+                const row = (await tx.providerConnection.findFirst({ where: { id: connectionId, status: LIVE } })) as ConnectionProps | null;
+                if (!row) {
+                    return null;
+                }
+                this.txEventEmitter.emitAfterCommit(
+                    ConnectionEvents.CREDENTIAL_READ,
+                    new ConnectionCredentialReadEvent(row.id, row.tenantId, `service:${clientId}`)
+                );
+                return { ...facts(row), tenantId: row.tenantId, credentials: this.openOutbound(row), config: configOf(row) };
+            })
+        );
+    }
+
+    /** A service caller names a connection by id only: the privileged read finds it, and with it the tenant (§0.8). */
+    private async liveById(connectionId: string): Promise<ConnectionProps | null> {
+        return (await this.privileged.providerConnection.findFirst({ where: { id: connectionId, status: LIVE } })) as ConnectionProps | null;
+    }
+
+    /** The write that follows runs as that tenant, so row-level security still binds it. */
+    private inTenantOf<T>(row: ConnectionProps, work: () => Promise<T>): Promise<T> {
+        return this.tenantContext.runWithContext({ tenantId: row.tenantId }, work);
     }
 
     /** Pending → active, once: the conditional update makes concurrent callbacks emit `connection.verified` a single time. */

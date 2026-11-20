@@ -4,7 +4,7 @@ import type { Tenant, Billing } from '@prisma-gen/generated/client';
 import { TenantStatus } from '@domains/tenant/tenant.types';
 import { BillingPlanEnum, LIVE_SUBSCRIPTION_STATUSES, SubscriptionStatusEnum } from '@common/enums/billing.enum';
 
-import { DatabaseService } from '@app/database/database.service';
+import { PrivilegedDatabaseService } from '@app/database/privileged-database.service';
 import { AppLoggerService } from '@common/logging/app-logger.service';
 import { RedisService } from '@common/redis/redis.service';
 import { RedisKeyBuilder } from '@common/redis/redis-key.builder';
@@ -18,7 +18,7 @@ export class TrialLifecycleService {
     private static readonly DEDUP_TTL_SECONDS = 45 * 24 * 60 * 60;
 
     constructor(
-        private readonly prisma: DatabaseService,
+        private readonly prisma: PrivilegedDatabaseService,
         private readonly logger: AppLoggerService,
         private readonly redis: RedisService,
         private readonly keyBuilder: RedisKeyBuilder,

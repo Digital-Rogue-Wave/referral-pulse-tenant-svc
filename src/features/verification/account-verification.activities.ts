@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { ulid } from 'ulid';
 
-import { DatabaseService } from '@app/database/database.service';
+import { PrivilegedDatabaseService } from '@app/database/privileged-database.service';
 import { AppLoggerService } from '@common/logging/app-logger.service';
 import { MetricsService } from '@common/monitoring/metrics.service';
 import { VerificationRecordStatus } from '@domains/tenant/tenant.types';
@@ -14,7 +14,7 @@ const SLA_BREACHED = 'tenant_verification.sla_breached';
 @Injectable()
 export class AccountVerificationActivities implements Activities {
     constructor(
-        private readonly prisma: DatabaseService,
+        private readonly prisma: PrivilegedDatabaseService,
         private readonly metrics: MetricsService,
         private readonly logger: AppLoggerService
     ) {

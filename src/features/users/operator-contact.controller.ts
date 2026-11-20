@@ -4,7 +4,7 @@ import { isEmail } from 'class-validator';
 
 import { ServiceCapability } from '@common/auth/authz/keto-tuples';
 import { AllowServices } from '@common/auth/require-permission.decorator';
-import { DatabaseService } from '@app/database/database.service';
+import { PrivilegedDatabaseService } from '@app/database/privileged-database.service';
 import { ContactQueryDto, OperatorContactResponse, TenantCommunicationProfileResponse } from '@domains/user/contact.dto';
 
 type ContactRow = { id: string; tenantId: string; email: string; name: string | null; role: string };
@@ -20,7 +20,7 @@ const SELECT = { id: true, tenantId: true, email: true, name: true, role: true }
 @ApiBearerAuth()
 @Controller({ path: 'internal/tenants', version: '1' })
 export class OperatorContactController {
-    constructor(private readonly prisma: DatabaseService) {}
+    constructor(private readonly prisma: PrivilegedDatabaseService) {}
 
     @ApiOperation({ summary: 'Contact of one live operator of the tenant' })
     @ApiOkResponse({ type: OperatorContactResponse })

@@ -44,7 +44,7 @@ describe('Plan catalog', () => {
         redis = mock<RedisService>();
         const keys = mock<RedisKeyBuilder>();
         keys.buildGlobalKey.mockReturnValue('billing-plans:public');
-        plans = new PlanService(prisma as unknown as DatabaseService, mock<AppLoggerService>(), redis, keys);
+        plans = new PlanService(prisma as never, mock<AppLoggerService>(), redis, keys);
     });
 
     describe('PlanService', () => {
@@ -113,7 +113,7 @@ describe('Plan catalog', () => {
 
         beforeEach(() => {
             stripe = mock<StripeService>();
-            sync = new PlanStripeSyncService(prisma as unknown as DatabaseService, mock<AppLoggerService>(), stripe, plans);
+            sync = new PlanStripeSyncService(prisma as never, mock<AppLoggerService>(), stripe, plans);
         });
 
         it('upserts a plan per Stripe price that declares limits, and deactivates plans gone from Stripe', async () => {

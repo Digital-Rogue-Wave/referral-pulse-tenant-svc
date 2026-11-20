@@ -40,7 +40,7 @@ describe('TrialLifecycleService', () => {
         const keys = mock<RedisKeyBuilder>();
         keys.buildDedupKey.mockImplementation((k: string) => k);
         events = mock<TransactionEventEmitterService>();
-        service = new TrialLifecycleService(prisma as unknown as DatabaseService, mock<AppLoggerService>(), redis, keys, events);
+        service = new TrialLifecycleService(prisma as never, mock<AppLoggerService>(), redis, keys, events);
     });
 
     it('reminds 3 days and 1 day before the trial ends, once each', async () => {

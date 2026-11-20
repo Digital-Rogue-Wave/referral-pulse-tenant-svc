@@ -27,7 +27,7 @@ describe('Break-glass access', () => {
         findTenant = jest.fn().mockResolvedValue({ id: TENANT });
         audit = jest.fn().mockResolvedValue(undefined);
         const prisma = { tenant: { findFirst: findTenant }, auditLog: { create: audit } } as unknown as DatabaseService;
-        service = new BreakGlassService(prisma, redis, bullJobs, mock<AppLoggerService>());
+        service = new BreakGlassService(prisma as never, redis, bullJobs, mock<AppLoggerService>());
     });
 
     describe('given a Super Admin opens a window with a reason', () => {

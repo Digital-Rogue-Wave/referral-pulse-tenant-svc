@@ -310,7 +310,7 @@ describe('DsrFanOutService — the erasure fan-out', () => {
         operators = mock<OperatorErasureService>();
         operators.erase.mockResolvedValue({ status: 'completed', retained: [], erasedUserIds: ['u9'] } as never);
         txEvents = mock<TransactionEventEmitterService>();
-        service = new DsrFanOutService(prisma, erasure, operators, txEvents, logger());
+        service = new DsrFanOutService(prisma as never, erasure, operators, txEvents, logger());
     });
 
     it('asks every target R-CPL-02 names, and writes one receipt each', async () => {
@@ -506,7 +506,13 @@ describe('ConsentConsumer — reading consent off the bus', () => {
         consent = mock<ConsentService>();
         consent.record.mockResolvedValue('recorded');
         // A message that is not a KYB result (E1 D15) falls through to the consent registry.
-        consumer = new ConsentConsumer(consent, { handle: jest.fn().mockResolvedValue(false) } as never, new JsonService(), logger());
+        consumer = new ConsentConsumer(
+            consent,
+            { handle: jest.fn().mockResolvedValue(false) } as never,
+            { runWithContext: (_: unknown, work: () => Promise<unknown>) => work() } as never,
+            new JsonService(),
+            logger()
+        );
     });
 
     const deliver = (body: unknown) => consumer.handle({ Body: JSON.stringify(body) });

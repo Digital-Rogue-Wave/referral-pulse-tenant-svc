@@ -77,12 +77,13 @@ describe('Company verification (v5.2 API §3.17, US1.6.4, US1.6.1)', () => {
         w = world(tenantStatus);
         redis = { get: jest.fn().mockResolvedValue(null), set: jest.fn().mockResolvedValue('OK'), del: jest.fn().mockResolvedValue(1) };
         service = new CompanyVerificationService(
-            w.prisma as unknown as DatabaseService,
+            w.prisma as never,
             w.statusWriter,
             w.workflows,
             w.events as unknown as TransactionEventEmitterService,
             { getClient: () => redis } as never,
             w.metrics,
+            { runWithContext: (_: unknown, fn: () => Promise<unknown>) => fn() } as never,
             { getOrThrow: () => ({ linkTtlSeconds: 1800 }) } as unknown as ConfigService<never>,
             new FakeKybProvider(),
             mock<AppLoggerService>()
@@ -215,7 +216,7 @@ describe('Super Admin review (US1.6.2)', () => {
 
     beforeEach(() => {
         w = world('pending_review');
-        service = new AdminVerificationService(w.prisma as unknown as DatabaseService, w.statusWriter, w.workflows, mock<AppLoggerService>());
+        service = new AdminVerificationService(w.prisma as never, w.statusWriter, w.workflows, mock<AppLoggerService>());
     });
 
     it('lists the cases under review by default', async () => {
@@ -295,7 +296,7 @@ describe('The 7-day review SLA (US1.6.1 AC3)', () => {
         w.tenantVerification.findFirst.mockResolvedValue(status ? { status } : null);
         w.auditLog.findFirst.mockResolvedValue(alreadyReported ? { id: 'a1' } : null);
         const logger = mock<AppLoggerService>();
-        return { w, logger, activities: new AccountVerificationActivities(w.prisma as unknown as DatabaseService, w.metrics, logger) };
+        return { w, logger, activities: new AccountVerificationActivities(w.prisma as never, w.metrics, logger) };
     };
 
     it('raises the alert for a case still under review: error log, metric and one audit row', async () => {

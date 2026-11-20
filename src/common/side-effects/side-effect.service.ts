@@ -23,7 +23,7 @@ import { AppLoggerService } from '@common/logging/app-logger.service';
 import { SnsPublisherService } from '@common/messaging/sns-publisher.service';
 import { SqsProducerService } from '@common/messaging/sqs-producer.service';
 
-import { DatabaseService } from '@app/database/database.service';
+import { PrivilegedDatabaseService } from '@app/database/privileged-database.service';
 
 /**
  * Options for side effect delivery
@@ -98,7 +98,7 @@ export interface ISideEffectOptions {
 @Injectable()
 export class SideEffectService {
     constructor(
-        private readonly prisma: DatabaseService,
+        private readonly prisma: PrivilegedDatabaseService,
         private readonly tenantContext: TenantContextService,
         private readonly logger: AppLoggerService,
         private readonly sqsProducer: SqsProducerService,

@@ -11,7 +11,7 @@ import { MetricsService } from '@common/monitoring/metrics.service';
 import { TracingService } from '@common/monitoring/tracing.service';
 
 import type { AllConfigType } from '@config/config.type';
-import { DatabaseService } from '@app/database/database.service';
+import { PrivilegedDatabaseService } from '@app/database/privileged-database.service';
 
 const QUEUE = 'idempotency-key-sweeper';
 
@@ -26,7 +26,7 @@ export class IdempotencyKeySweeperWorker extends BaseWorkerService<IBaseJobData>
         tracingService: TracingService,
         tenantContext: TenantContextService,
         dateService: DateService,
-        private readonly prisma: DatabaseService,
+        private readonly prisma: PrivilegedDatabaseService,
         private readonly bullJobs: BullJobsService
     ) {
         super(QUEUE, connectionFactory, configService, logger, metricsService, tracingService, tenantContext, dateService);

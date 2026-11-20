@@ -7,6 +7,8 @@ import { sha256Hex } from '@common/helper/hashing';
 import { RoleEnum } from '@common/enums/role.enum';
 
 import { DatabaseService } from '@app/database/database.service';
+import { PrivilegedDatabaseService } from '@app/database/privileged-database.service';
+import { TenantContextService } from '@common/tenant-aware/tenant-context.service';
 import { TenantAwareService } from '@common/tenant-aware/tenant-aware.service';
 import { TransactionEventEmitterService } from '@common/events/transaction-event-emitter.service';
 import { AppLoggerService } from '@common/logging/app-logger.service';
@@ -45,6 +47,8 @@ export class InvitationService {
 
     constructor(
         private readonly prisma: DatabaseService,
+        private readonly privileged: PrivilegedDatabaseService,
+        private readonly tenantContext: TenantContextService,
         private readonly tenantAware: TenantAwareService,
         private readonly txEventEmitter: TransactionEventEmitterService,
         private readonly usersService: UsersService,
@@ -189,16 +193,19 @@ export class InvitationService {
             throw new BaseException('authorization_error', 'This invitation was issued to a different email address', HttpStatus.FORBIDDEN);
         }
 
-        const member = await this.prisma.$transaction(async (tx) => {
-            const claimed = await tx.invitation.updateMany({
-                where: { id: invitation.id, status: InvitationStatusEnum.PENDING },
-                data: { status: InvitationStatusEnum.ACCEPTED }
-            });
-            if (claimed.count === 0) {
-                throw new BaseException('state_conflict', 'This invitation has already been used', HttpStatus.CONFLICT);
-            }
-            return this.usersService.joinByInvitation(tx, invitation.tenantId, identity, invitation.role as RoleEnum, null);
-        });
+        // The invitee has no tenant yet: the invitation's tenant scopes the join (row-level security).
+        const member = await this.inTenantOf(invitation, () =>
+            this.prisma.$transaction(async (tx) => {
+                const claimed = await tx.invitation.updateMany({
+                    where: { id: invitation.id, status: InvitationStatusEnum.PENDING },
+                    data: { status: InvitationStatusEnum.ACCEPTED }
+                });
+                if (claimed.count === 0) {
+                    throw new BaseException('state_conflict', 'This invitation has already been used', HttpStatus.CONFLICT);
+                }
+                return this.usersService.joinByInvitation(tx, invitation.tenantId, identity, invitation.role as RoleEnum, null);
+            })
+        );
 
         this.logger.log(`Invitation accepted: ${invitation.id}`, { invitationId: invitation.id, userId: member.id, tenantId: invitation.tenantId });
         return userResponseMapper.toResponse(member);
@@ -206,7 +213,8 @@ export class InvitationService {
 
     /** Load a PENDING, non-expired invitation by token (no tenant context); marks it EXPIRED on lapse. */
     private async resolveRedeemable(token: string): Promise<InvitationProps> {
-        const invitation = (await this.prisma.invitation.findUnique({ where: { tokenHash: sha256Hex(token) } })) as InvitationProps | null;
+        // Privileged read: the token is what tells us the tenant (v5.2 DB Model §0.8).
+        const invitation = (await this.privileged.invitation.findUnique({ where: { tokenHash: sha256Hex(token) } })) as InvitationProps | null;
         if (!invitation || invitation.deletedAt) {
             throw new NotFoundException('Invitation not found');
         }
@@ -214,10 +222,16 @@ export class InvitationService {
             throw new BadRequestException(`Invitation is ${invitation.status.toLowerCase()}`);
         }
         if (invitation.expiresAt.getTime() < Date.now()) {
-            await this.prisma.invitation.update({ where: { id: invitation.id }, data: { status: InvitationStatusEnum.EXPIRED } });
+            await this.inTenantOf(invitation, async () => {
+                await this.prisma.invitation.update({ where: { id: invitation.id }, data: { status: InvitationStatusEnum.EXPIRED } });
+            });
             throw new BadRequestException('Invitation has expired');
         }
         return invitation;
+    }
+
+    private inTenantOf<T>(invitation: InvitationProps, work: () => Promise<T>): Promise<T> {
+        return this.tenantContext.runWithContext({ tenantId: invitation.tenantId }, work);
     }
 
     // --- crypto / ttl helpers ---

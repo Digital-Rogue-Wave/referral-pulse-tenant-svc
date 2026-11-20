@@ -199,7 +199,7 @@ describe('Internal endpoints', () => {
     it('tenant status and entitlements are 404 for an unknown tenant', async () => {
         const prisma = { tenant: { findUnique: jest.fn() }, billing: { findUnique: jest.fn().mockResolvedValue(null) } };
         const planLimits = mock<PlanLimitService>();
-        const controller = new InternalTenantStatusController(prisma as unknown as DatabaseService, planLimits);
+        const controller = new InternalTenantStatusController(prisma as never, planLimits);
 
         prisma.tenant.findUnique.mockResolvedValue({ status: 'active', paymentStatus: 'past_due', trialStartedAt: null, trialEndsAt: null });
         await expect(controller.getTenantStatus('t1')).resolves.toMatchObject({
@@ -218,7 +218,7 @@ describe('Internal endpoints', () => {
     describe('operator contacts', () => {
         const row = { id: 'u1', tenantId: 't1', email: 'ada@acme.io', name: 'Ada', role: 'owner' };
         const prisma = { user: { findFirst: jest.fn(), findMany: jest.fn() }, tenant: { findFirst: jest.fn() } };
-        const controller = new OperatorContactController(prisma as unknown as DatabaseService);
+        const controller = new OperatorContactController(prisma as never);
 
         it('returns a live operator’s address, never a removed or erased one', async () => {
             prisma.user.findFirst.mockResolvedValueOnce(row).mockResolvedValueOnce(null);

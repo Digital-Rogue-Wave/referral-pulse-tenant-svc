@@ -18,7 +18,7 @@ import { MetricsService } from '@common/monitoring/metrics.service';
 import { TracingService } from '@common/monitoring/tracing.service';
 
 import type { AllConfigType } from '@config/config.type';
-import { DatabaseService } from '@app/database/database.service';
+import { PrivilegedDatabaseService } from '@app/database/privileged-database.service';
 
 import { OUTBOX_QUEUE } from './side-effect-outbox.type';
 
@@ -47,7 +47,7 @@ export class OutboxWorkerService extends BaseWorkerService<IOutboxJobData> {
         tracingService: TracingService,
         tenantContext: TenantContextService,
         dateService: DateService,
-        private readonly prisma: DatabaseService,
+        private readonly prisma: PrivilegedDatabaseService,
         private readonly sqsProducer: SqsProducerService,
         private readonly snsPublisher: SnsPublisherService,
         private readonly ketoProvisioning: KetoProvisioningService

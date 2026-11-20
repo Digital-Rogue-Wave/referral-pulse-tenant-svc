@@ -49,8 +49,11 @@ const harness = (options: { inboundPublicBaseUrl?: string; testFailure?: string 
     const check = jest.fn().mockResolvedValue(options.testFailure ?? null);
     const redisSet = jest.fn().mockResolvedValue('OK');
 
+    const prisma = { providerConnection: delegate, $transaction: (fn: (tx: unknown) => unknown) => fn({ providerConnection: delegate }) };
     const service = new ConnectionService(
-        { providerConnection: delegate, $transaction: (fn: (tx: unknown) => unknown) => fn({ providerConnection: delegate }) } as never,
+        prisma as never,
+        prisma as never,
+        { runWithContext: (_: unknown, work: () => Promise<unknown>) => work() } as never,
         {
             getRequiredTenantId: () => TENANT_ID,
             forModel: () => ({ findFirst: scopedFindFirst, findMany: jest.fn().mockResolvedValue([]) })

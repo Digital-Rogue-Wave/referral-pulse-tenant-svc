@@ -2,7 +2,7 @@ import { Injectable } from '@nestjs/common';
 
 import { TenantStatus } from '@domains/tenant/tenant.types';
 
-import { DatabaseService } from '@app/database/database.service';
+import { PrivilegedDatabaseService } from '@app/database/privileged-database.service';
 import { AppLoggerService } from '@common/logging/app-logger.service';
 import { TransactionEventEmitterService } from '@common/events/transaction-event-emitter.service';
 
@@ -18,7 +18,7 @@ import { UsageCounterService } from './usage-counter.service';
 @Injectable()
 export class MonthlyUsageResetService {
     constructor(
-        private readonly prisma: DatabaseService,
+        private readonly prisma: PrivilegedDatabaseService,
         private readonly logger: AppLoggerService,
         private readonly counters: UsageCounterService,
         private readonly planLimits: PlanLimitService,

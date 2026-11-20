@@ -3,7 +3,7 @@ import type Stripe from 'stripe';
 
 import { Prisma } from '@prisma-gen/generated/client';
 
-import { DatabaseService } from '@app/database/database.service';
+import { PrivilegedDatabaseService } from '@app/database/privileged-database.service';
 import { canonicalPlanName } from '@common/enums/billing.enum';
 import { AppLoggerService } from '@common/logging/app-logger.service';
 
@@ -14,7 +14,7 @@ import { assertValidPlanLimits, type PlanLimits } from './plan-limits.type';
 @Injectable()
 export class PlanStripeSyncService {
     constructor(
-        private readonly prisma: DatabaseService,
+        private readonly prisma: PrivilegedDatabaseService,
         private readonly logger: AppLoggerService,
         private readonly stripeService: StripeService,
         private readonly planService: PlanService

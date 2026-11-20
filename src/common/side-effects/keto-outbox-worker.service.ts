@@ -14,7 +14,7 @@ import { MetricsService } from '@common/monitoring/metrics.service';
 import { TracingService } from '@common/monitoring/tracing.service';
 
 import type { AllConfigType } from '@config/config.type';
-import { DatabaseService } from '@app/database/database.service';
+import { PrivilegedDatabaseService } from '@app/database/privileged-database.service';
 
 import { OutboxWorkerService } from './outbox-worker.service';
 import { KETO_OUTBOX_QUEUE } from './side-effect-outbox.type';
@@ -35,7 +35,7 @@ export class KetoOutboxWorkerService extends OutboxWorkerService {
         tracingService: TracingService,
         tenantContext: TenantContextService,
         dateService: DateService,
-        prisma: DatabaseService,
+        prisma: PrivilegedDatabaseService,
         sqsProducer: SqsProducerService,
         snsPublisher: SnsPublisherService,
         ketoProvisioning: KetoProvisioningService,

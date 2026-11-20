@@ -29,7 +29,7 @@ describe('TenantService.create — tenant onboarding', () => {
     let prisma: MockProxy<DatabaseService>;
     let users: MockProxy<UsersService>;
     let events: MockProxy<TransactionEventEmitterService>;
-    let tx: { tenant: { create: jest.Mock }; tenantVerification: { create: jest.Mock } };
+    let tx: { tenant: { create: jest.Mock }; tenantVerification: { create: jest.Mock }; $queryRaw: jest.Mock };
     const owner = { identityId: 'kratos-1', email: 'ada@acme.io', name: 'Ada' };
 
     beforeEach(async () => {
@@ -40,7 +40,9 @@ describe('TenantService.create — tenant onboarding', () => {
             tenant: {
                 create: jest.fn(async ({ data }: { data: Record<string, unknown> }) => ({ ...data, createdAt: new Date(), updatedAt: new Date() }))
             },
-            tenantVerification: { create: jest.fn().mockResolvedValue({ id: 'verif-1' }) }
+            tenantVerification: { create: jest.fn().mockResolvedValue({ id: 'verif-1' }) },
+            // Re-scopes the transaction to the new tenant (row-level security, v5.2 DB Model 0.8).
+            $queryRaw: jest.fn().mockResolvedValue([])
         };
         (prisma as unknown as { user: unknown }).user = { findUnique: jest.fn().mockResolvedValue(null) };
         (prisma as unknown as { tenant: unknown }).tenant = { count: jest.fn().mockResolvedValue(0), findUnique: jest.fn() };
@@ -63,7 +65,16 @@ describe('TenantService.create — tenant onboarding', () => {
                 { provide: KratosService, useValue: mock<KratosService>() },
                 { provide: ConfigService, useValue: mock<ConfigService>() },
                 { provide: UsersService, useValue: users },
-                { provide: WidgetSecretVault, useValue: { mint: (createdAt: Date) => ({ raw: 'a'.repeat(64), stored: { kid: 'kid-1', secret_encrypted: 'sealed-secret', created_at: createdAt } }), toColumn: () => [] } }
+                {
+                    provide: WidgetSecretVault,
+                    useValue: {
+                        mint: (createdAt: Date) => ({
+                            raw: 'a'.repeat(64),
+                            stored: { kid: 'kid-1', secret_encrypted: 'sealed-secret', created_at: createdAt }
+                        }),
+                        toColumn: () => []
+                    }
+                }
             ]
         }).compile();
 
@@ -75,6 +86,8 @@ describe('TenantService.create — tenant onboarding', () => {
             const tenant = await service.create({ name: 'Acme' }, owner, { onExisting: 'conflict' });
 
             expect(prisma.$transaction).toHaveBeenCalledTimes(1);
+            // The Owner and the outbox rows that follow belong to the new tenant (row-level security).
+            expect(tx.$queryRaw).toHaveBeenCalled();
             expect(tx.tenant.create).toHaveBeenCalledWith({ data: expect.objectContaining({ name: 'Acme', status: 'active' }) });
             expect(users.createOwner).toHaveBeenCalledWith(tx, tenant.id, owner);
             expect(events.emitAfterCommit).toHaveBeenCalledWith('tenant.created', expect.objectContaining({ tenantId: tenant.id }));

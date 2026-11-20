@@ -9,6 +9,7 @@ import { BaseException } from '@common/exceptions/base.exceptions';
 import { AppLoggerService } from '@common/logging/app-logger.service';
 import { MetricsService } from '@common/monitoring/metrics.service';
 import { RedisService } from '@common/redis/redis.service';
+import { TenantContextService } from '@common/tenant-aware/tenant-context.service';
 import { DatabaseService } from '@app/database/database.service';
 import type { AllConfigType } from '@config/config.type';
 import { TenantEvents, TenantVerificationRequestedEvent } from '@domains/tenant/events/tenant.events';
@@ -48,6 +49,7 @@ export class CompanyVerificationService {
         private readonly txEventEmitter: TransactionEventEmitterService,
         private readonly redis: RedisService,
         private readonly metrics: MetricsService,
+        private readonly tenantContext: TenantContextService,
         private readonly configService: ConfigService<AllConfigType>,
         @Inject(KYB_PROVIDER) private readonly provider: KybProvider,
         private readonly logger: AppLoggerService
@@ -102,6 +104,11 @@ export class CompanyVerificationService {
      * case is still under review, refreshes the evidence. A case a Super Admin already decided is final.
      */
     async applyProviderResult(result: ProviderVerificationResult): Promise<void> {
+        // Off the bus there is no request tenant: the callback's own tenant scopes the work (row-level security).
+        await this.tenantContext.runWithContext({ tenantId: result.tenantId }, () => this.applyInTenant(result));
+    }
+
+    private async applyInTenant(result: ProviderVerificationResult): Promise<void> {
         const opened = await this.prisma.$transaction(async (tx) => {
             const record = await tx.tenantVerification.findFirst({ where: { id: result.verificationId, tenantId: result.tenantId } });
             if (record && record.status !== VerificationRecordStatus.PENDING_REVIEW) {

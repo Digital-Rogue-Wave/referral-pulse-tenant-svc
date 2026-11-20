@@ -261,7 +261,7 @@ describe('RequestIdempotencyInterceptor (API Contract §1, DB Model §0.7)', () 
             switchToHttp: () => ({ getRequest: () => request, getResponse: () => response })
         } as unknown as ExecutionContext;
         const handler = opts.handler ?? { handle: () => of({ id: 'key-1', label: 'ci' }) };
-        return lastValueFrom(new RequestIdempotencyInterceptor(new Reflector(), prisma).intercept(context, handler));
+        return lastValueFrom(new RequestIdempotencyInterceptor(new Reflector(), prisma as never).intercept(context, handler));
     };
 
     it('requires the header from dashboard callers on POST and PATCH', async () => {

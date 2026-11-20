@@ -29,7 +29,7 @@ describe('DailyUsageCalculator', () => {
         planLimits.getPlanLimits.mockResolvedValue({ email_sends: 100 });
         planLimits.usageOf.mockResolvedValue(85);
         events = mock<TransactionEventEmitterService>();
-        calculator = new DailyUsageCalculator(prisma as unknown as DatabaseService, mock<AppLoggerService>(), counters, planLimits, events);
+        calculator = new DailyUsageCalculator(prisma as never, mock<AppLoggerService>(), counters, planLimits, events);
     });
 
     it('records the day’s usage with its limit for the usage history', async () => {

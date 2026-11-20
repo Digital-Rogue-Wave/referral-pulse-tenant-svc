@@ -6,7 +6,7 @@ import { ALL_PERMISSIONS, Permission, splitPermission } from '@common/auth/authz
 import { BaseException } from '@common/exceptions/base.exceptions';
 import { AppLoggerService } from '@common/logging/app-logger.service';
 import { RedisService } from '@common/redis/redis.service';
-import { DatabaseService } from '@app/database/database.service';
+import { PrivilegedDatabaseService } from '@app/database/privileged-database.service';
 import { BreakGlassGrant, BreakGlassResponse, OpenBreakGlassDto } from '@domains/break-glass';
 
 /** One hour (E1 D17). Not in the spec — to discuss. */
@@ -37,7 +37,7 @@ export interface BreakGlassExpiryJob {
 @Injectable()
 export class BreakGlassService {
     constructor(
-        private readonly prisma: DatabaseService,
+        private readonly prisma: PrivilegedDatabaseService,
         private readonly redis: RedisService,
         private readonly bullJobs: BullJobsService,
         private readonly logger: AppLoggerService

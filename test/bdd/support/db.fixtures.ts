@@ -15,7 +15,8 @@ import { PrismaPg } from '@prisma/adapter-pg';
 
 // ─── Singleton client ──────────────────────────────────────────────────────────
 
-const connectionString = process.env.DATABASE_URL ?? 'postgresql://root:root@localhost:5432/tenants';
+// Fixtures seed and inspect every tenant's rows, so they connect as the privileged role (v5.2 DB Model 0.8).
+const connectionString = process.env.DATABASE_PRIVILEGED_URL ?? 'postgresql://root:root@localhost:5432/tenants';
 
 const pool = new pg.Pool({ connectionString });
 const adapter = new PrismaPg(pool);

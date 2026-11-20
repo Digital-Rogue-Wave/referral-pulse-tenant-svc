@@ -8,6 +8,7 @@ import type { BaseDomainEvent } from '@domains/common/events';
 import type { IAuthenticatedUser } from '@app/types';
 
 import { DatabaseService } from '@app/database/database.service';
+import { scopeTransactionToTenant } from '@app/database/scope-transaction';
 import { TenantContextService } from '@common/tenant-aware/tenant-context.service';
 import { TransactionEventEmitterService } from '@common/events/transaction-event-emitter.service';
 import { AppLoggerService } from '@common/logging/app-logger.service';
@@ -274,6 +275,8 @@ export class TenantService {
                 widgetSigningSecrets: this.widgetSecretVault.toColumn([this.widgetSecretVault.mint(new Date()).stored])
             }
         });
+        // Everything the caller writes next in this transaction belongs to the new tenant (row-level security).
+        await scopeTransactionToTenant(tx, created.id);
         // Emitted before the owner's user.registered so the tenant's Keto grants are queued first.
         this.txEventEmitter.emitAfterCommit(
             TenantEvents.CREATED,

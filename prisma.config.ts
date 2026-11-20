@@ -16,7 +16,9 @@ export default defineConfig({
         path: 'src/prisma/migrations',
         seed: 'tsx src/prisma/seed.ts'
     },
+    // Migrations run as the privileged role: the application role (DATABASE_URL) cannot create tables, and row-level
+    // security binds it (v5.2 DB Model §0.8).
     datasource: {
-        url: process.env.DATABASE_URL!
+        url: process.env.DATABASE_PRIVILEGED_URL!
     }
 });

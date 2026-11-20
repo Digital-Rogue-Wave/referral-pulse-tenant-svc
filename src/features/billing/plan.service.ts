@@ -4,7 +4,7 @@ import type { Plan } from '@prisma-gen/generated/client';
 import { Prisma } from '@prisma-gen/generated/client';
 import type { NullableType } from '@app/types';
 
-import { DatabaseService } from '@app/database/database.service';
+import { PrivilegedDatabaseService } from '@app/database/privileged-database.service';
 import { AppLoggerService } from '@common/logging/app-logger.service';
 import { RedisService } from '@common/redis/redis.service';
 import { RedisKeyBuilder } from '@common/redis/redis-key.builder';
@@ -19,7 +19,7 @@ export class PlanService {
     private readonly publicPlansCacheTtlSec = 3600;
 
     constructor(
-        private readonly prisma: DatabaseService,
+        private readonly prisma: PrivilegedDatabaseService,
         private readonly logger: AppLoggerService,
         private readonly redisService: RedisService,
         private readonly keyBuilder: RedisKeyBuilder

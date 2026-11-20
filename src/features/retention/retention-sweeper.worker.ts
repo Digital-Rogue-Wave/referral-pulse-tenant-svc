@@ -13,7 +13,7 @@ import { InvitationStatusEnum } from '@common/enums/invitation.enum';
 import { TenantStatus } from '@domains/tenant/tenant.types';
 
 import type { AllConfigType } from '@config/config.type';
-import { DatabaseService } from '@app/database/database.service';
+import { PrivilegedDatabaseService } from '@app/database/privileged-database.service';
 
 const QUEUE = 'retention-sweeper';
 const DAY_MS = 86_400_000;
@@ -44,7 +44,7 @@ export class RetentionSweeperWorker extends BaseWorkerService<IBaseJobData> {
         tracingService: TracingService,
         tenantContext: TenantContextService,
         dateService: DateService,
-        private readonly prisma: DatabaseService,
+        private readonly prisma: PrivilegedDatabaseService,
         private readonly bullJobs: BullJobsService
     ) {
         super(QUEUE, connectionFactory, configService, logger, metricsService, tracingService, tenantContext, dateService);

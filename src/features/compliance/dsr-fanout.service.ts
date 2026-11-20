@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import type { Prisma } from '@prisma-gen/generated/client';
 
-import { DatabaseService } from '@app/database/database.service';
+import { PrivilegedDatabaseService } from '@app/database/privileged-database.service';
 import { TransactionEventEmitterService } from '@common/events/transaction-event-emitter.service';
 import { AppLoggerService } from '@common/logging/app-logger.service';
 import {
@@ -41,7 +41,7 @@ export interface FanOutOutcome {
 @Injectable()
 export class DsrFanOutService {
     constructor(
-        private readonly prisma: DatabaseService,
+        private readonly prisma: PrivilegedDatabaseService,
         private readonly erasure: ErasureClient,
         private readonly operators: OperatorErasureService,
         private readonly txEventEmitter: TransactionEventEmitterService,

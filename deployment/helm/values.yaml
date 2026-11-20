@@ -321,6 +321,10 @@ envVars:
 
 # -------- Secret (sensitive env) --------
 secretVars:
+  # v5.2 DB Model 0.8: the role that bypasses row-level security, for migrations and the audited cross-tenant paths
+  # (API-key and Connection lookups, outbox relays, sweepers, provider webhooks, the Super Admin console). DATABASE_URL
+  # must be a role without BYPASSRLS. (DATABASE_URL itself is not in this chart yet — pre-existing.)
+  DATABASE_PRIVILEGED_URL: ""
   # Stripe credentials. The price IDs below are public identifiers and live in envVars; these two
   # are not. Supply them per environment (or via a secret store) - billing fails closed without them.
   STRIPE_SECRET_KEY: ""

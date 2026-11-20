@@ -196,7 +196,8 @@ describe('BullJobs', () => {
                 mock<AppLoggerService>(),
                 metrics,
                 mock<TracingService>(),
-                mock<TenantContextService>(),
+                // A job for one tenant runs in that tenant's context (row-level security).
+                { runWithContext: (_: unknown, work: () => Promise<unknown>) => work() } as never,
                 dates
             );
             echo.onModuleInit();

@@ -11,7 +11,7 @@ import { IS_PUBLIC_KEY } from '@app/types';
 
 import { BaseException } from '@common/exceptions/base.exceptions';
 import { sha256Hex } from '@common/helper/hashing';
-import { DatabaseService } from '@app/database/database.service';
+import { PrivilegedDatabaseService } from '@app/database/privileged-database.service';
 
 /** API Contract §1: request-level dedup window. */
 const IDEMPOTENCY_WINDOW_MS = 24 * 60 * 60 * 1000;
@@ -41,7 +41,7 @@ type Claim = { replay: { status: number; body: unknown } } | { claimed: true };
 export class RequestIdempotencyInterceptor implements NestInterceptor {
     constructor(
         private readonly reflector: Reflector,
-        private readonly prisma: DatabaseService
+        private readonly privileged: PrivilegedDatabaseService
     ) {}
 
     intercept(context: ExecutionContext, next: CallHandler): Observable<unknown> {
@@ -102,7 +102,7 @@ export class RequestIdempotencyInterceptor implements NestInterceptor {
     private async claim(scope: string, key: string, fingerprint: string): Promise<Claim> {
         const now = new Date();
         try {
-            await this.prisma.idempotencyKey.create({
+            await this.keysFor(scope).create({
                 data: {
                     tenantId: scope,
                     idempotencyKey: key,
@@ -117,12 +117,12 @@ export class RequestIdempotencyInterceptor implements NestInterceptor {
             }
         }
 
-        const existing = await this.prisma.idempotencyKey.findUnique({
+        const existing = await this.keysFor(scope).findUnique({
             where: { tenantId_idempotencyKey: { tenantId: scope, idempotencyKey: key } }
         });
         if (!existing || existing.expiresAt <= now) {
             // Expired (the sweeper had not removed it yet): start a fresh window.
-            await this.prisma.idempotencyKey.deleteMany({ where: { tenantId: scope, idempotencyKey: key, expiresAt: { lte: now } } });
+            await this.keysFor(scope).deleteMany({ where: { tenantId: scope, idempotencyKey: key, expiresAt: { lte: now } } });
             return this.claim(scope, key, fingerprint);
         }
         if (existing.requestFingerprint !== fingerprint) {
@@ -149,20 +149,29 @@ export class RequestIdempotencyInterceptor implements NestInterceptor {
 
     private async complete(scope: string, key: string, status: number, body: unknown): Promise<void> {
         const targetResourceId = typeof (body as { id?: unknown } | null)?.id === 'string' ? (body as { id: string }).id : null;
-        await this.prisma.idempotencyKey.update({
+        await this.keysFor(scope).update({
             where: { tenantId_idempotencyKey: { tenantId: scope, idempotencyKey: key } },
             data: { responseStatus: status, responseBody: (body ?? Prisma.JsonNull) as Prisma.InputJsonValue, targetResourceId }
         });
     }
 
     private async release(scope: string, key: string): Promise<void> {
-        await this.prisma.idempotencyKey.deleteMany({ where: { tenantId: scope, idempotencyKey: key, responseStatus: null } });
+        await this.keysFor(scope).deleteMany({ where: { tenantId: scope, idempotencyKey: key, responseStatus: null } });
     }
 
     /** The status the route answers with — `@HttpCode` or Nest's default (201 for POST, 200 otherwise). */
     private statusOf(context: ExecutionContext): number {
         const declared = this.reflector.get<number>(HTTP_CODE_METADATA, context.getHandler());
         return declared ?? (context.switchToHttp().getRequest<Request>().method === 'POST' ? HttpStatus.CREATED : HttpStatus.OK);
+    }
+
+    /**
+     * Idempotency keys go through the privileged client (v5.2 DB Model §0.8): this interceptor runs before the request's
+     * tenant is in context, and identities' and services' keys carry a scope (`identity:…`, `service:…`), not a tenant.
+     * Every read and write is still filtered by that scope.
+     */
+    private keysFor(_scope: string) {
+        return this.privileged.idempotencyKey;
     }
 
     private scopeOf(principal: IAuthenticatedUser | undefined): string {

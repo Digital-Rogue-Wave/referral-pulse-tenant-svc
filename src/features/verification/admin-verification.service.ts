@@ -3,7 +3,7 @@ import { ulid } from 'ulid';
 
 import { BaseException } from '@common/exceptions/base.exceptions';
 import { AppLoggerService } from '@common/logging/app-logger.service';
-import { DatabaseService } from '@app/database/database.service';
+import { PrivilegedDatabaseService } from '@app/database/privileged-database.service';
 import { VerificationRecordStatus, VerificationStatus, VerificationType } from '@domains/tenant/tenant.types';
 import { AdminVerificationDetailResponse, AdminVerificationResponse } from '@domains/verification';
 
@@ -36,7 +36,7 @@ type Decision = VerificationRecordStatus.VERIFIED | VerificationRecordStatus.REJ
 @Injectable()
 export class AdminVerificationService {
     constructor(
-        private readonly prisma: DatabaseService,
+        private readonly prisma: PrivilegedDatabaseService,
         private readonly verificationStatus: TenantVerificationStatus,
         private readonly workflows: AccountVerificationGateway,
         private readonly logger: AppLoggerService
