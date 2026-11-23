@@ -17,7 +17,6 @@ import { theCompany } from './billing-plan.steps';
 
 Before({ tags: '@invoice-history' }, function () {
     stripeInvoices.list = [];
-    stripeInvoices.upcoming = null;
 });
 
 const DAY = 86_400;
@@ -48,10 +47,6 @@ Given('Stripe holds a paid invoice of {int} cents in euros for that company', fu
 
 Given('Stripe holds {int} invoices for that company', function (count: number) {
     stripeInvoices.list = Array.from({ length: count }, (_, i) => stripeInvoice(i + 1, 2500, 'paid'));
-});
-
-Given("Stripe's next invoice for that company is {int} cents in euros", function (cents: number) {
-    stripeInvoices.upcoming = { object: 'invoice', amount_due: cents, currency: 'eur', next_payment_attempt: null };
 });
 
 Given('I am a member of that billing company without tenant:billing', function (this: BddWorldInterface) {
@@ -91,10 +86,4 @@ Then('the page holds {int} invoices, has more, and its next cursor is {string}',
     assert.strictEqual(body.data.length, count);
     assert.strictEqual(body.has_more, true);
     assert.strictEqual(body.next_cursor, cursor);
-});
-
-Then('the upcoming invoice is due {int} in {string}', function (this: BddWorldInterface, due: number, currency: string) {
-    const body = this.response?.body as { amount_due: number; currency: string };
-    assert.strictEqual(body.amount_due, due);
-    assert.strictEqual(body.currency, currency);
 });

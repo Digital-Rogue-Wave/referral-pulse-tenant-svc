@@ -29,13 +29,6 @@ Feature: The Owner views the invoice history (US1.8.3)
     Then the response status should be 200
     And the page holds 2 invoices, has more, and its next cursor is "in_bdd_2"
 
-  Scenario: The next invoice is in minor units too (F1)
-    Given that company has a live "Growth" subscription
-    And Stripe's next invoice for that company is 990 cents in euros
-    When I send a GET request to "/api/v1/billing/invoices/upcoming" with that token
-    Then the response status should be 200
-    And the upcoming invoice is due 990 in "eur"
-
   Scenario: A member without tenant:billing cannot see the invoices
     Given I am a member of that billing company without tenant:billing
     When I send a GET request to "/api/v1/billing/invoices" with that token

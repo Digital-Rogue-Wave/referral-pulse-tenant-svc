@@ -85,16 +85,8 @@ describe('Controllers delegate to their services', () => {
         expectDelegation([
             [() => controller.getCurrentSubscription(), service.getCurrentSubscription],
             [() => controller.subscriptionCheckout({ plan: 'Starter' } as never), service.subscriptionCheckout],
-            [() => controller.previewSubscriptionUpgrade({ targetPlan: 'Growth' } as never), service.previewSubscriptionUpgrade],
-            [() => controller.upgradeSubscription({ targetPlan: 'Growth' } as never), service.upgradeSubscription],
-            [() => controller.downgradeSubscription({ targetPlan: 'Starter' } as never), service.downgradeSubscription],
-            [() => controller.cancelPendingDowngrade(), service.cancelPendingDowngrade],
-            [() => controller.cancelSubscription({}), service.cancelSubscription],
-            [() => controller.reactivateSubscription(), service.reactivateSubscription],
             [() => controller.listInvoices({}), service.listInvoices],
-            [() => controller.createPortalSession(), service.createPortalSession],
-            [() => controller.getUpcomingInvoice(), service.getUpcomingInvoice],
-            [() => controller.getUsageSummary(), service.getUsageSummary]
+            [() => controller.createPortalSession(), service.createPortalSession]
         ]);
     });
 

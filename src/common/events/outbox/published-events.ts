@@ -6,8 +6,6 @@ import type {
     SubscriptionCancelledEvent,
     SubscriptionChangedEvent,
     SubscriptionCreatedEvent,
-    SubscriptionDowngradeScheduledEvent,
-    SubscriptionUpgradedEvent,
     PaymentActionRequiredEvent,
     PaymentDisputedEvent,
     PaymentRefundedEvent,
@@ -297,22 +295,6 @@ const MAPPERS: Record<string, Mapper<never>> = {
             externalId: `subscription.cancelled:${e.stripeSubscriptionId ?? e.eventId}`,
             object: { type: 'subscription', id: e.stripeSubscriptionId ?? e.tenantId },
             properties: { tenant_id: e.tenantId, cancelled_at: iso(e.cancelledAt), ends_at: iso(e.cancellationEffectiveAt), reason: e.reason ?? null }
-        }
-    ],
-    'subscription.downgrade-scheduled': (e: SubscriptionDowngradeScheduledEvent) => [
-        {
-            eventType: 'subscription.downgrade_scheduled',
-            externalId: `subscription.downgrade_scheduled:${e.eventId}`,
-            object: tenantObject(e),
-            properties: { tenant_id: e.tenantId, previous_plan: e.previousPlan, target_plan: e.targetPlan, effective_date: iso(e.effectiveDate) }
-        }
-    ],
-    'subscription.upgraded': (e: SubscriptionUpgradedEvent) => [
-        {
-            eventType: 'subscription.upgraded',
-            externalId: `subscription.upgraded:${e.eventId}`,
-            object: tenantObject(e),
-            properties: { tenant_id: e.tenantId, previous_plan: e.previousPlan, new_plan: e.billingPlan, effective_date: iso(e.effectiveDate) }
         }
     ],
     'trial.reminder': (e: TrialReminderEvent) => [

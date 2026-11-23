@@ -5,18 +5,13 @@
  * are signed for real and posted to the public endpoint.
  */
 
-import { Before, Given, Then, When } from '@cucumber/cucumber';
+import { Given, Then, When } from '@cucumber/cucumber';
 import assert from 'assert';
 
-import { BDD_PRICE_BY_PLAN, BDD_STRIPE_WEBHOOK_SECRET, stripeBehaviour, stripeSdk } from '../support/stripe.fake';
+import { BDD_PRICE_BY_PLAN, BDD_STRIPE_WEBHOOK_SECRET, stripeSdk } from '../support/stripe.fake';
 import { fixturesPrisma } from '../support/db.fixtures';
 import type { BddWorldInterface } from '../support/world';
 import { theCompany } from './billing-plan.steps';
-
-Before({ tags: '@billing-plan-change' }, function () {
-    stripeBehaviour.declineNextUpgrade = false;
-    stripeBehaviour.upgradeRequests.length = 0;
-});
 
 const subscriptionOf = (tenantId: string): string => `sub_bdd_${tenantId}`;
 const customerOf = (tenantId: string): string => `cus_bdd_${tenantId}`;
@@ -51,10 +46,6 @@ Given('that company has a live {string} subscription', async function (plan: str
 
 Given("that company's payments are {string}", async function (paymentStatus: string) {
     await fixturesPrisma.tenant.update({ where: { id: theCompany().tenantId }, data: { paymentStatus } });
-});
-
-Given('Stripe will decline the card on the next upgrade', function () {
-    stripeBehaviour.declineNextUpgrade = true;
 });
 
 // ─── When ────────────────────────────────────────────────────────────────────
@@ -105,14 +96,6 @@ Then("that company's billing is on plan {string} with status {string}", async fu
 Then("that company's payments are back to {string}", async function (paymentStatus: string) {
     const tenant = await fixturesPrisma.tenant.findUniqueOrThrow({ where: { id: theCompany().tenantId }, select: { paymentStatus: true } });
     assert.strictEqual(tenant.paymentStatus, paymentStatus);
-});
-
-Then('Stripe was asked to move the subscription to {string}', function (plan: string) {
-    assert.deepStrictEqual(stripeBehaviour.upgradeRequests, [{ stripeSubscriptionId: subscriptionOf(theCompany().tenantId), targetPlan: plan }]);
-});
-
-Then('Stripe was asked for no upgrade', function () {
-    assert.deepStrictEqual(stripeBehaviour.upgradeRequests, []);
 });
 
 Then('the error code is {string}', function (this: BddWorldInterface, code: string) {

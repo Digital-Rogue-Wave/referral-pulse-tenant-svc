@@ -1,3 +1,4 @@
+import { UsageMetricSummaryDto } from './usage-summary.dto';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { BillingPlanEnum, PaymentStatusEnum, SubscriptionStatusEnum } from '@common/enums/billing.enum';
 
@@ -31,6 +32,9 @@ export class SubscriptionStatusDto {
 
     @ApiPropertyOptional({ nullable: true })
     planUsagePercentage!: number | null;
+
+    @ApiProperty({ type: () => UsageMetricSummaryDto, isArray: true, description: 'Usage counters against the plan limits' })
+    usage!: UsageMetricSummaryDto[];
 
     @ApiPropertyOptional({ nullable: true })
     stripeSubscriptionStatus!: string | null;

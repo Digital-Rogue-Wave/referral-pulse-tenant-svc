@@ -15,35 +15,24 @@ import { StripeService } from '../../../src/features/billing/stripe.service';
 
 type FakeStripe = Pick<
     StripeService,
-    | 'createSubscriptionCheckoutSession'
-    | 'previewSubscriptionUpgrade'
-    | 'constructWebhookEvent'
-    | 'resolvePlanFromSubscription'
-    | 'getSubscription'
-    | 'upgradeSubscription'
-    | 'listInvoicesForCustomer'
-    | 'retrieveUpcomingInvoiceForCustomer'
+    'createSubscriptionCheckoutSession' | 'constructWebhookEvent' | 'resolvePlanFromSubscription' | 'getSubscription' | 'listInvoicesForCustomer'
 >;
 
 /** BDD price ids, one per plan, so a subscription event can name the plan it moved to. */
 export const BDD_PRICE_BY_PLAN: Record<string, string> = { Starter: 'price_bdd_starter', Growth: 'price_bdd_growth', Scale: 'price_bdd_scale' };
 
-/** Set by a scenario to make the next upgrade fail the way Stripe refuses a card. Reset before each scenario. */
-export const stripeBehaviour = { declineNextUpgrade: false, upgradeRequests: [] as Array<{ stripeSubscriptionId: string; targetPlan: string }> };
-
 /**
  * Invoices as Stripe's API returns them (amounts in cents). Read by the real `StripeService` mapping below, so
  * the BDD proves our shape, not the fake's. A scenario sets them; reset before each scenario.
  */
-export const stripeInvoices = { list: [] as Array<Record<string, unknown>>, upcoming: null as Record<string, unknown> | null };
+export const stripeInvoices = { list: [] as Array<Record<string, unknown>> };
 
 const offlineStripeSdk = {
     invoices: {
         list: async (params: { limit: number }) => ({
             has_more: stripeInvoices.list.length > params.limit,
             data: stripeInvoices.list.slice(0, params.limit)
-        }),
-        createPreview: async () => stripeInvoices.upcoming
+        })
     }
 };
 const silentLogger = { setContext() {}, log() {}, warn() {}, error() {}, debug() {} };
@@ -60,10 +49,6 @@ export const fakeStripeService: FakeStripe = {
         return { id: 'cs_bdd_test', url: 'https://checkout.stripe.com/pay/cs_bdd_test' };
     },
 
-    async previewSubscriptionUpgrade() {
-        return { amountDueNow: 1234, currency: 'usd', nextInvoiceDate: new Date() };
-    },
-
     constructWebhookEvent(payload: Buffer | string, signature: string) {
         return stripeSdk.webhooks.constructEvent(payload, signature, BDD_STRIPE_WEBHOOK_SECRET);
     },
@@ -78,19 +63,7 @@ export const fakeStripeService: FakeStripe = {
         return { id, object: 'subscription', items: { data: [] } } as unknown as Stripe.Subscription;
     },
 
-    async upgradeSubscription(params) {
-        if (stripeBehaviour.declineNextUpgrade) {
-            stripeBehaviour.declineNextUpgrade = false;
-            throw Stripe.errors.StripeError.generate({ type: 'card_error', code: 'card_declined', message: 'Your card was declined.' } as never);
-        }
-        stripeBehaviour.upgradeRequests.push(params);
-    },
-
     listInvoicesForCustomer(customerId, page) {
         return realInvoiceReads.listInvoicesForCustomer(customerId, page);
-    },
-
-    retrieveUpcomingInvoiceForCustomer(params) {
-        return realInvoiceReads.retrieveUpcomingInvoiceForCustomer(params);
     }
 };

@@ -9,11 +9,13 @@ Feature: The Owner sees the current plan and its limits (US1.8.1)
     And a company has signed itself up for billing
     And I am that billing company's Owner
 
-  Scenario: The current plan is read at the v5.1 path, and the old path is gone
+  Scenario: The current plan is read at the v5.1 path, and the old paths are gone
     When I send a GET request to "/api/v1/billing/plan" with that token
     Then the response status should be 200
     And the response should contain a "plan" field with value "Free"
     When I send a GET request to "/api/v1/billings/subscription" with that token
+    Then the response status should be 404
+    When I send a GET request to "/api/v1/billing/usage" with that token
     Then the response status should be 404
 
   Scenario: All five plans are offered, each with its SDK limit and a price field
@@ -22,8 +24,8 @@ Feature: The Owner sees the current plan and its limits (US1.8.1)
     And the plans offered are "Free, Starter, Growth, Scale, Enterprise"
     And every plan has an "sdk_requests_per_minute" limit and a "price" field
 
-  Scenario: Usage shows every plan limit with its live value, even with no daily snapshot yet
-    When I send a GET request to "/api/v1/billing/usage" with that token
+  Scenario: The plan carries every plan limit as a usage counter with its live value (v5.2 API)
+    When I send a GET request to "/api/v1/billing/plan" with that token
     Then the response status should be 200
     And the usage of "seats" is 1 of 2
     And every limit of the "Free" plan is listed in the usage

@@ -1,7 +1,7 @@
 @billing-plan-change
 Feature: The Owner changes the plan through a Stripe subscription (US1.8.2)
   As an Owner
-  I want to move between plans on Stripe-hosted pages only
+  I want to start my subscription at checkout and change it on Stripe-hosted pages only
   So that I pay for exactly one plan, and my access follows what I paid
 
   Background:
@@ -30,37 +30,33 @@ Feature: The Owner changes the plan through a Stripe subscription (US1.8.2)
       """
     Then the response status should be 400
 
-  Scenario: An upgrade can only go up, so it never skips the downgrade's checks (F3)
+  Scenario: A plan changed in Stripe's portal reaches the company when Stripe confirms it (F10)
     Given that company has a live "Growth" subscription
-    When I send a POST request to "/api/v1/billing/subscription/upgrade" with body:
-      """
-      { "targetPlan": "Starter" }
-      """
-    Then the response status should be 400
-    And Stripe was asked for no upgrade
-
-  Scenario: The plan changes when Stripe confirms the upgrade, not before (F10)
-    Given that company has a live "Growth" subscription
-    When I send a POST request to "/api/v1/billing/subscription/upgrade" with body:
-      """
-      { "targetPlan": "Scale" }
-      """
-    Then the response status should be 202
-    And the response should contain a "plan" field with value "Growth"
-    And Stripe was asked to move the subscription to "Scale"
     When Stripe reports that company's subscription moved to "Scale"
     Then that company's billing is on plan "Scale" with status "active"
 
-  Scenario: A declined card is a 402 with Stripe's message, not a 500 (F5)
-    Given that company has a live "Growth" subscription
-    And Stripe will decline the card on the next upgrade
+  Scenario: Plan changes happen in Stripe's portal only: the plan-change routes are gone (v5.2 API)
+    When I send a POST request to "/api/v1/billing/subscription/upgrade/preview" with body:
+      """
+      { "targetPlan": "Scale" }
+      """
+    Then the response status should be 404
     When I send a POST request to "/api/v1/billing/subscription/upgrade" with body:
       """
       { "targetPlan": "Scale" }
       """
-    Then the response status should be 402
-    And the error code is "card_declined"
-    And that company's billing is on plan "Growth" with status "active"
+    Then the response status should be 404
+    When I send a POST request to "/api/v1/billing/subscription/downgrade" with body:
+      """
+      { "targetPlan": "Starter" }
+      """
+    Then the response status should be 404
+    When I send a POST request to "/api/v1/billing/subscription/downgrade/cancel" with that token
+    Then the response status should be 404
+    When I send a POST request to "/api/v1/billing/subscription/cancel" with that token
+    Then the response status should be 404
+    When I send a POST request to "/api/v1/billing/subscription/reactivate" with that token
+    Then the response status should be 404
 
   Scenario: Paying a late invoice in Stripe's current shape restores the company (F1)
     Given that company has a live "Growth" subscription

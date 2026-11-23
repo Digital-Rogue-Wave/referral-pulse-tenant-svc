@@ -96,7 +96,7 @@ Then('every plan has an {string} limit and a {string} field', function (this: Bd
 });
 
 Then('the usage of {string} is {int} of {int}', function (this: BddWorldInterface, metric: string, used: number, limit: number) {
-    const metrics = body(this)['metrics'] as { metric: string; current_usage: number; limit: number | null }[];
+    const metrics = body(this)['usage'] as { metric: string; current_usage: number; limit: number | null }[];
     const row = metrics.find((m) => m.metric === metric);
     assert.ok(row, `No ${metric} in the usage: ${JSON.stringify(metrics)}`);
     assert.strictEqual(row.current_usage, used);
@@ -105,7 +105,7 @@ Then('the usage of {string} is {int} of {int}', function (this: BddWorldInterfac
 
 Then('every limit of the {string} plan is listed in the usage', async function (this: BddWorldInterface, planName: string) {
     const plan = await fixturesPrisma.plan.findFirstOrThrow({ where: { name: planName, tenantId: null, deletedAt: null } });
-    const listed = new Set((body(this)['metrics'] as { metric: string }[]).map((m) => m.metric));
+    const listed = new Set((body(this)['usage'] as { metric: string }[]).map((m) => m.metric));
     for (const metric of Object.keys(plan.limits as Record<string, number>)) {
         assert.ok(listed.has(metric), `The usage does not list "${metric}"`);
     }

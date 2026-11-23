@@ -29,16 +29,3 @@ Feature: Billing Management
       """
     Then the response status should be 200
     And the response should contain a "checkout_url" field
-
-  Scenario: Get usage summary returns usage metrics
-    When I send a GET request to "/api/v1/billing/usage" with that token
-    Then the response status should be 200
-    And the response should contain a "metrics" field
-
-  @needs-active-subscription
-  Scenario: Preview subscription upgrade returns 200
-    When I send a POST request to "/api/v1/billing/subscription/upgrade/preview" with body:
-      """
-      { "targetPlan": "Growth" }
-      """
-    Then the response status should be 200
