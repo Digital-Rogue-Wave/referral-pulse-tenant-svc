@@ -11,6 +11,7 @@ import type { INestApplication } from '@nestjs/common';
 import type { Response } from 'supertest';
 import supertest from 'supertest';
 import { getTestApp } from './app.bootstrap';
+import type { TenantStateSnapshot } from './db.fixtures';
 
 export interface BddWorldInterface extends IWorld {
     /** The last HTTP response — set by When steps, read by Then steps */
@@ -26,6 +27,9 @@ export interface BddWorldInterface extends IWorld {
     lastApiKeyId: string | null;
     lastRawKey: string | null;
 
+    /** Baseline of the shared tenant, captured before a scenario that mutates it. */
+    defaultTenantState: TenantStateSnapshot | null;
+
     /** Build a supertest agent bound to the test app's HTTP server */
     agent(): supertest.SuperAgentTest;
 }
@@ -36,6 +40,7 @@ export class BddWorld implements BddWorldInterface {
     currentTenantId: string | null = null;
     lastApiKeyId: string | null = null;
     lastRawKey: string | null = null;
+    defaultTenantState: TenantStateSnapshot | null = null;
 
     constructor(options: IWorldOptions) {
         // IWorldOptions are available for future use (parameters, attach, etc.)
