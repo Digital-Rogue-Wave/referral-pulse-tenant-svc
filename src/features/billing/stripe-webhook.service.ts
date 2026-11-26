@@ -2,7 +2,7 @@ import { HttpStatus, Injectable } from '@nestjs/common';
 import type Stripe from 'stripe';
 import type { Billing, Prisma } from '@prisma-gen/generated/client';
 
-import { DatabaseService } from '@app/database/database.service';
+import { PrivilegedDatabaseService } from '@app/database/privileged-database.service';
 import { BillingPlanEnum, PaymentStatusEnum, SubscriptionStatusEnum } from '@common/enums/billing.enum';
 import { TransactionEventEmitterService } from '@common/events/transaction-event-emitter.service';
 import { BaseException } from '@common/exceptions/base.exceptions';
@@ -44,7 +44,7 @@ interface Prepared {
 @Injectable()
 export class StripeWebhookService {
     constructor(
-        private readonly prisma: DatabaseService,
+        private readonly prisma: PrivilegedDatabaseService,
         private readonly stripe: StripeService,
         private readonly txEventEmitter: TransactionEventEmitterService,
         private readonly metrics: MetricsService,

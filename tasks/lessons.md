@@ -17,3 +17,4 @@ Reviewed at session start. Updated after every mistake.
 2026-05-07: Always use ulid() for entity IDs, never uuid(). But for idempotency keys, use business-domain keys.
 2026-05-07: Prisma 7 uses composition pattern — new PrismaClient({ adapter }) with @prisma/adapter-pg.
 2026-05-07: tenant_id must be in every WHERE clause. Enforced by TenantAwareService middleware.
+2026-11-25: When extracting a shared step, preserve imports still required by the remaining story-specific definitions in the source module.

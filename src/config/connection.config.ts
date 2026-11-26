@@ -10,7 +10,7 @@ import { MaybeType } from '@app/types';
  * Grouped in one config block because the spec groups them.
  */
 export type ConnectionConfig = {
-    /** 32 bytes as 64 hex characters, for AES-256-GCM over `provider_connections.signing_secret`. */
+    /** 32 bytes as 64 hex characters, for AES-256-GCM over the `connections` secret and credential columns. */
     providerSecretEncryptionKey?: MaybeType<string>;
     /**
      * The platform's email-tracking token key: notification-service signs `/t/o` and `/t/c` tokens
@@ -24,6 +24,11 @@ export type ConnectionConfig = {
      * receiver URL handed to the Owner is absolute. Optional: without it the URL stays a path, as before.
      */
     inboundPublicBaseUrl?: MaybeType<string>;
+    /**
+     * Local and test runs only: one origin every `POST /v1/connections/{id}/test` probe is sent to instead of the
+     * provider's own API, so the check can run against a stub. Unset in deployed environments.
+     */
+    connectionTestBaseUrl?: MaybeType<string>;
 };
 
 class ConnectionEnvValidator {
@@ -48,6 +53,10 @@ class ConnectionEnvValidator {
     @IsOptional()
     @IsUrl({ require_tld: false, require_protocol: true, protocols: ['http', 'https'] })
     INBOUND_PUBLIC_BASE_URL?: MaybeType<string>;
+
+    @IsOptional()
+    @IsUrl({ require_tld: false, require_protocol: true, protocols: ['http', 'https'] })
+    CONNECTION_TEST_BASE_URL?: MaybeType<string>;
 }
 
 export default registerAs<ConnectionConfig>('connectionConfig', () => {
@@ -56,6 +65,7 @@ export default registerAs<ConnectionConfig>('connectionConfig', () => {
     return {
         providerSecretEncryptionKey: process.env.PROVIDER_SECRET_ENCRYPTION_KEY,
         trackingTokenKey: process.env.TRACKING_TOKEN_KEY,
-        inboundPublicBaseUrl: process.env.INBOUND_PUBLIC_BASE_URL
+        inboundPublicBaseUrl: process.env.INBOUND_PUBLIC_BASE_URL,
+        connectionTestBaseUrl: process.env.CONNECTION_TEST_BASE_URL
     };
 });

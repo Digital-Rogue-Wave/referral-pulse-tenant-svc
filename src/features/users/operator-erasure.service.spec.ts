@@ -42,7 +42,7 @@ describe('OperatorErasureService — identity step of a data-subject erasure', (
         });
         kratos = mock<KratosService>();
         txEvents = mock<TransactionEventEmitterService>();
-        service = new OperatorErasureService(prisma, kratos, txEvents, mock<AppLoggerService>());
+        service = new OperatorErasureService(prisma as never, kratos, txEvents, mock<AppLoggerService>());
     });
 
     it('anonymises the operator in place, deletes their identity and invitations, and returns a completed receipt', async () => {

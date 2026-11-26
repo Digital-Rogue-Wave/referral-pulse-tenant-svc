@@ -17,13 +17,17 @@ import {
     createActiveTenant,
     cleanupTenant,
     setActiveSubscription,
-    clearSubscription,
-    clearInvitations,
+    clearInvitationsByEmails,
     seedPendingInvitation,
     cleanupInvitationFlow,
     disconnectFixturesPrisma,
     ensureMember,
-    clearIdempotencyKeys,
+    clearBddIdempotencyKeys,
+    clearApiKeysByCreator,
+    clearBddStripeEvents,
+    captureTenantState,
+    restoreTenantState,
+    type TenantStateSnapshot,
     FIXTURE_IDS
 } from './db.fixtures';
 import type { BddWorldInterface } from './world';
@@ -33,6 +37,13 @@ setDefaultTimeout(30_000);
 
 // The default tenant the billing.feature Background authenticates as.
 const DEFAULT_TENANT_ID = 'default-tenant';
+const DEFAULT_TENANT_CLEANUP_TAGS = '@api-keys or @tenant-settings or @needs-clean-invitations or @needs-active-subscription or @billing';
+const BDD_INVITATION_EMAILS = ['newteammate@acme.com', 'invitee-bdd@acme.com', 'intruder-bdd@acme.com'];
+const INVITE_TOKEN = 'bdd-invite-token';
+const INVITEE_EMAIL = 'invitee-bdd@acme.com';
+const INVITEE_KRATOS_ID = 'kratos-invitee-bdd';
+
+let suiteTenantState: TenantStateSnapshot | null = null;
 
 // ─── Suite lifecycle ──────────────────────────────────────────────────────────
 
@@ -42,28 +53,47 @@ BeforeAll(async function () {
     await bootstrapTestApp();
     // Every "valid JWT for tenant default-tenant" acts as this Owner.
     await ensureMember({ tenantId: DEFAULT_TENANT_ID, ...BDD_OWNER, role: 'owner' });
-    // Fixed Idempotency-Keys in scenarios must start each run unused.
-    await clearIdempotencyKeys(DEFAULT_TENANT_ID);
+
+    // Remove only artifacts owned by this BDD suite; never the shared tenant's baseline rows.
+    await clearApiKeysByCreator(DEFAULT_TENANT_ID, BDD_OWNER.userId);
+    await clearInvitationsByEmails(DEFAULT_TENANT_ID, BDD_INVITATION_EMAILS);
+    await cleanupInvitationFlow({ tenantId: DEFAULT_TENANT_ID, token: INVITE_TOKEN, kratosIdentityId: INVITEE_KRATOS_ID });
+    await clearBddIdempotencyKeys(DEFAULT_TENANT_ID);
+    await clearBddStripeEvents();
+    suiteTenantState = await captureTenantState(DEFAULT_TENANT_ID, BDD_OWNER.userId);
 });
 
 AfterAll(async function () {
+    await cleanupInvitationFlow({ tenantId: DEFAULT_TENANT_ID, token: INVITE_TOKEN, kratosIdentityId: INVITEE_KRATOS_ID });
+    if (suiteTenantState) {
+        await restoreTenantState(DEFAULT_TENANT_ID, suiteTenantState, BDD_OWNER.userId);
+        suiteTenantState = null;
+    }
     await teardownTestApp();
     teardownNock();
     await disconnectFixturesPrisma();
 });
 
+// ─── Shared-tenant snapshot ───────────────────────────────────────────────────
+
+Before({ tags: DEFAULT_TENANT_CLEANUP_TAGS }, async function (this: BddWorldInterface) {
+    this.defaultTenantState = await captureTenantState(DEFAULT_TENANT_ID, BDD_OWNER.userId);
+});
+
+After({ tags: DEFAULT_TENANT_CLEANUP_TAGS }, async function (this: BddWorldInterface) {
+    if (!this.defaultTenantState) return;
+    await restoreTenantState(DEFAULT_TENANT_ID, this.defaultTenantState, BDD_OWNER.userId);
+    this.defaultTenantState = null;
+});
+
 // ─── Fixture: clean invitations for the default tenant (idempotent re-runs) ──────
 
 Before({ tags: '@needs-clean-invitations' }, async function () {
-    await clearInvitations(DEFAULT_TENANT_ID);
+    await clearInvitationsByEmails(DEFAULT_TENANT_ID, BDD_INVITATION_EMAILS);
 });
 
 // ─── Fixture: a pending invitation for the accept flow ───────────────────────────
 // Token/email/kratos-id are shared with invitation.feature + the invitee-token step.
-const INVITE_TOKEN = 'bdd-invite-token';
-const INVITEE_EMAIL = 'invitee-bdd@acme.com';
-const INVITEE_KRATOS_ID = 'kratos-invitee-bdd';
-
 Before({ tags: '@needs-pending-invitation' }, async function () {
     stubKratosIdentity(INVITEE_KRATOS_ID, INVITEE_EMAIL);
     await cleanupInvitationFlow({ tenantId: DEFAULT_TENANT_ID, token: INVITE_TOKEN, kratosIdentityId: INVITEE_KRATOS_ID });
@@ -106,10 +136,6 @@ After({ tags: '@needs-locked-tenant' }, async function (this: BddWorldInterface)
 
 Before({ tags: '@needs-active-subscription' }, async function () {
     await setActiveSubscription(DEFAULT_TENANT_ID);
-});
-
-After({ tags: '@needs-active-subscription' }, async function () {
-    await clearSubscription(DEFAULT_TENANT_ID);
 });
 
 // ─── Fixture: active tenant ───────────────────────────────────────────────────

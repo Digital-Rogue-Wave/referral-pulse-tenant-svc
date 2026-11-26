@@ -15,7 +15,7 @@ import { DomainMetrics } from '@common/monitoring/domain-metrics.service';
 import { TracingService } from '@common/monitoring/tracing.service';
 
 import type { AllConfigType } from '@config/config.type';
-import { DatabaseService } from '@app/database/database.service';
+import { PrivilegedDatabaseService } from '@app/database/privileged-database.service';
 
 const QUEUE = 'event-outbox-relay';
 const RELAY_EVERY_MS = 2_000;
@@ -46,7 +46,7 @@ export class EventOutboxRelayWorker extends BaseWorkerService<IBaseJobData> {
         tracingService: TracingService,
         tenantContext: TenantContextService,
         dateService: DateService,
-        private readonly prisma: DatabaseService,
+        private readonly prisma: PrivilegedDatabaseService,
         private readonly bullJobs: BullJobsService,
         private readonly sns: SnsPublisherService,
         private readonly domainMetrics: DomainMetrics

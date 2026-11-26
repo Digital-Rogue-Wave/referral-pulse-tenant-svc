@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { Prisma } from '@prisma-gen/generated/client';
 
-import { DatabaseService } from '@app/database/database.service';
+import { PrivilegedDatabaseService } from '@app/database/privileged-database.service';
 import { KratosService } from '@common/auth/kratos.service';
 import { TransactionEventEmitterService } from '@common/events/transaction-event-emitter.service';
 import { AppLoggerService } from '@common/logging/app-logger.service';
@@ -28,7 +28,7 @@ const SWEEP_BATCH = 20;
 @Injectable()
 export class TenantDeletionService {
     constructor(
-        private readonly prisma: DatabaseService,
+        private readonly prisma: PrivilegedDatabaseService,
         private readonly billing: BillingService,
         private readonly kratos: KratosService,
         private readonly txEventEmitter: TransactionEventEmitterService,

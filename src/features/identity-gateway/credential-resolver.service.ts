@@ -10,7 +10,7 @@ import type { IInternalTokenClaims, IJwtPayload } from '@app/types';
 import { AuthorizationService } from '@common/auth/authz/authorization.service';
 import { BaseException } from '@common/exceptions/base.exceptions';
 import { RedisService } from '@common/redis/redis.service';
-import { DatabaseService } from '@app/database/database.service';
+import { PrivilegedDatabaseService } from '@app/database/privileged-database.service';
 import { ApiKeyService } from '@app/features/api-key/api-key.service';
 import { BREAK_GLASS_PERMISSIONS, BreakGlassService } from '@app/features/break-glass/break-glass.service';
 import { ApiKeyType } from '@domains/api-key';
@@ -69,7 +69,7 @@ export class CredentialResolverService {
 
     constructor(
         configService: ConfigService<AllConfigType>,
-        private readonly prisma: DatabaseService,
+        private readonly prisma: PrivilegedDatabaseService,
         private readonly redis: RedisService,
         private readonly apiKeys: ApiKeyService,
         private readonly authorization: AuthorizationService,

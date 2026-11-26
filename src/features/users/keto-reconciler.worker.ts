@@ -24,7 +24,7 @@ import { RedisService } from '@common/redis/redis.service';
 import { TracingService } from '@common/monitoring/tracing.service';
 
 import type { AllConfigType } from '@config/config.type';
-import { DatabaseService } from '@app/database/database.service';
+import { PrivilegedDatabaseService } from '@app/database/privileged-database.service';
 
 const TENANT_PAGE = 100;
 /** Deleted tenants are re-revoked for this long, which bounds the sweep while covering any missed revocation. */
@@ -59,7 +59,7 @@ export class KetoReconcilerWorker extends BaseWorkerService<ReconcileJobData> {
         tracingService: TracingService,
         tenantContext: TenantContextService,
         dateService: DateService,
-        private readonly prisma: DatabaseService,
+        private readonly prisma: PrivilegedDatabaseService,
         private readonly bullJobs: BullJobsService,
         private readonly ketoProvisioning: KetoProvisioningService,
         private readonly redis: RedisService

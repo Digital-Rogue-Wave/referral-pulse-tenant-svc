@@ -2086,3 +2086,25 @@ This changes the default of existing tenants with no country, or a country outsi
 null = no threshold, with a check constraint (migration `20261112130000_tenant_verification_required_above`). Held
 by the tenant, as v5.1 says; reward-svc keeps a copy from `tenant.updated` (its side is D11's second half).
 
+## V5.29 The five v5.2 AC conflicts remain non-creditable (2026-11-25)
+
+The immutable v5.2 catalog (SHA-256
+`646C93E4F4AF98B5999C1ECFCFDF8EB54F3FC96A241D2C8F335104D08F3A4756`) remains authoritative. Five of its
+acceptance-criterion claims cannot be credited. Four claims expose a direct behavior/contract conflict; the
+fifth shares a rejected scenario with two conflicting claims. The corresponding BDD scenarios are regression
+controls tagged `@evidence-conflicting`; they are not approved scenario-map entries and cannot produce owner
+evidence or a verified matrix row.
+
+| AC claim | Frozen v5.2 requirement | Current behavior | Disposition |
+| --- | --- | --- | --- |
+| `AC-US1.1.1-1` | The tenant is created with the required plan, billing country, region, retention and verification defaults. | The defaults are satisfied, but this claim shares one scenario with the conflicting Owner and actor claims, and a conflicting scenario is rejected as a unit. | Not independently creditable until the shared scenario is resolved or split into reviewed evidence scenarios. |
+| `AC-US1.1.1-2` | Provisioning creates the first Owner in invited status. | Provisioning creates a pending Owner invitation and no member. | Blocked pending a product-reviewed implementation change. |
+| `AC-US1.1.1-3` | The provisioning audit actor is `super_admin:{id}`. | The current BDD actor is `staff:kratos-bdd-staff`, not the canonical Super Admin subject. | Blocked pending a product-reviewed implementation change. |
+| `AC-US1.7.3-2` | An out-of-range retention value is rejected with HTTP 422. | The current settings route rejects it with HTTP 400. | Blocked pending a product-reviewed implementation change. |
+| `AC-US1.9.2-2` | No public API endpoint exposes the audit log. | `GET /api/v1/audit-log` is a public Owner-readable endpoint. | Blocked pending the Dashboard-only contract and its owner surfaces. |
+
+`US1.7.3` contributes one AC claim even though its scenario outline has two examples. The count above is therefore
+five AC claims across four conflicting scenarios, not five scenarios. Resolution requires either an implemented
+behavior change with a reviewed passing evidence scenario or a formal tracker amendment from the v5.2 catalog
+owner. Until then, these claims remain explicitly conflicting and are never counted as verified.
+

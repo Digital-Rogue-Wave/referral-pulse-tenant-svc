@@ -1,13 +1,11 @@
 import type { BaseDomainEvent } from '@domains/common/events';
 import type { ApiKeyCreatedEvent, ApiKeyDeletedEvent, ApiKeyRotatedEvent } from '@domains/api-key';
 import type { ComplianceAuditLoggedEvent, ConsentRecordedEvent, DsrRequestedEvent, ErasureCompletedEvent } from '@domains/compliance';
-import type { ConnectionCreatedEvent, ConnectionRevokedEvent } from '@domains/connection';
+import type { ConnectionCreatedEvent, ConnectionRevokedEvent, ConnectionRotatedEvent, ConnectionVerifiedEvent } from '@domains/connection';
 import type {
     SubscriptionCancelledEvent,
     SubscriptionChangedEvent,
     SubscriptionCreatedEvent,
-    SubscriptionDowngradeScheduledEvent,
-    SubscriptionUpgradedEvent,
     PaymentActionRequiredEvent,
     PaymentDisputedEvent,
     PaymentRefundedEvent,
@@ -27,8 +25,7 @@ import type {
     TenantSuspendedEvent,
     TenantUnlockedEvent,
     TenantUpdatedEvent,
-    TenantVerificationRequestedEvent,
-    TenantVerificationStatusChangedEvent,
+    TenantVerifiedEvent,
     TenantWidgetSecretRotatedEvent
 } from '@domains/tenant/events/tenant.events';
 import type {
@@ -81,9 +78,7 @@ const MAPPERS: Record<string, Mapper<never>> = {
                 trial_started_at: iso(e.trialStartedAt),
                 trial_ends_at: iso(e.trialEndsAt),
                 data_region: e.residency?.dataRegion ?? null,
-                retention_months: e.residency?.retentionMonths ?? null,
-                // R-PRT-02's effective channel: event-ingestion keeps a copy for the widget (E1 D10).
-                invitation_channel: e.invitationChannel ?? null
+                retention_months: e.residency?.retentionMonths ?? null
             }
         }
     ],
@@ -96,15 +91,7 @@ const MAPPERS: Record<string, Mapper<never>> = {
                 tenant_id: e.tenantId,
                 changed_fields: Object.keys(e.changes).sort().join(','),
                 // Services applying the tenant's retention window need the new value, not only the field name.
-                ...(e.changes.retentionMonths ? { retention_months: Number(e.changes.retentionMonths.to) } : {}),
-                // Services enforcing R-PRT-02 and the payout verification gate keep a copy (E1 D10, D11).
-                ...(e.effectiveInvitationChannel ? { invitation_channel: e.effectiveInvitationChannel } : {}),
-                ...(e.verificationThreshold
-                    ? {
-                          verification_required_above: e.verificationThreshold.amount,
-                          verification_required_above_currency: e.verificationThreshold.currency
-                      }
-                    : {})
+                ...(e.changes.retentionMonths ? { retention_months: Number(e.changes.retentionMonths.to) } : {})
             }
         }
     ],
@@ -175,29 +162,30 @@ const MAPPERS: Record<string, Mapper<never>> = {
             properties: { tenant_id: e.tenantId, domain: e.domain, verified_at: iso(e.verifiedAt) }
         }
     ],
-    'tenant.verification_requested': (e: TenantVerificationRequestedEvent) => [
-        {
-            eventType: 'tenant.verification_requested',
-            externalId: `tenant.verification_requested:${e.verificationId ?? e.eventId}`,
-            object: tenantObject(e),
-            properties: { tenant_id: e.tenantId, verification_id: e.verificationId ?? null, verification_type: 'company' }
-        }
-    ],
     // US1.5.4 F3: Event Ingestion drops its cached secret on this. No secret travels, only the grace end.
     'tenant.widget_secret_rotated': (e: TenantWidgetSecretRotatedEvent) => [
         {
             eventType: 'tenant.widget_secret_rotated',
             externalId: `tenant.widget_secret_rotated:${e.eventId}`,
             object: tenantObject(e),
-            properties: { tenant_id: e.tenantId, previous_valid_until: iso(e.previousValidUntil) }
+            properties: { tenant_id: e.tenantId, kid: e.kid, previous_valid_until: iso(e.previousValidUntil) }
         }
     ],
-    'tenant.verification_status_changed': (e: TenantVerificationStatusChangedEvent) => [
+    // v5.2 Event Model §5.11: the four spec fields, plus the previous status and the reason (additive: the audit trail
+    // reads before / after from previous_, and the Owner's notice shows a rejection reason).
+    'tenant.verified': (e: TenantVerifiedEvent) => [
         {
-            eventType: 'tenant.verification_status_changed',
-            externalId: `tenant.verification_status_changed:${e.eventId}`,
+            eventType: 'tenant.verified',
+            externalId: `tenant.verified:${e.eventId}`,
             object: tenantObject(e),
-            properties: { tenant_id: e.tenantId, previous_status: e.previousStatus, new_status: e.newStatus, reason: e.reason ?? null }
+            properties: {
+                tenant_id: e.tenantId,
+                verification_status: e.verificationStatus,
+                previous_status: e.previousStatus,
+                decided_by: e.decidedBy,
+                decided_at: iso(e.decidedAt),
+                reason: e.reason
+            }
         }
     ],
 
@@ -277,39 +265,25 @@ const MAPPERS: Record<string, Mapper<never>> = {
         }
     ],
 
-    // ── Provider connections (Product Spec §12 lists `connection.created|revoked` here) ──
-    // Event Ingestion caches connection config and drops its entry on these, so the names are a cache
-    // invalidation contract, not only an audit trail. The secret is never in the payload.
+    // ── Connections (v5.2 Event Model §5.11: connection.created · verified · rotated · revoked) ──
+    // Event Ingestion drops its cached signing secret on each, and reward-service keeps its payout-Connection replica
+    // (gate 2) from them. Credentials never travel on the bus.
     'connection.created': (e: ConnectionCreatedEvent) => [
-        {
-            eventType: 'connection.created',
-            externalId: `connection.created:${e.payload.connectionId}`,
-            object: { type: 'connection', id: e.payload.connectionId },
-            properties: {
-                connection_id: e.payload.connectionId,
-                tenant_id: e.tenantId,
-                provider: e.payload.provider,
-                connection_type: e.payload.connectionType,
-                // US1.5.1 F9: reward-svc keeps a copy of active connections from these two events (Payout gate 2).
-                status: 'active',
-                created_by: e.payload.createdBy
-            }
-        }
+        connectionDraft('connection.created', e.payload.connectionId, e, { created_by: e.payload.createdBy })
+    ],
+    'connection.verified': (e: ConnectionVerifiedEvent) => [
+        connectionDraft('connection.verified', e.payload.connectionId, e, { verified_at: iso(e.payload.verifiedAt), source: e.payload.source })
+    ],
+    // A connection rotates many times, so its key is the event's own id.
+    'connection.rotated': (e: ConnectionRotatedEvent) => [
+        connectionDraft('connection.rotated', e.eventId, e, {
+            rotated_at: iso(e.payload.rotatedAt),
+            old_secret_valid_until: iso(e.payload.oldSecretValidUntil),
+            rotated_by: e.payload.rotatedBy
+        })
     ],
     'connection.revoked': (e: ConnectionRevokedEvent) => [
-        {
-            eventType: 'connection.revoked',
-            externalId: `connection.revoked:${e.payload.connectionId}`,
-            object: { type: 'connection', id: e.payload.connectionId },
-            properties: {
-                connection_id: e.payload.connectionId,
-                tenant_id: e.tenantId,
-                provider: e.payload.provider,
-                connection_type: e.payload.connectionType,
-                status: 'revoked',
-                revoked_by: e.payload.revokedBy
-            }
-        }
+        connectionDraft('connection.revoked', e.payload.connectionId, e, { revoked_by: e.payload.revokedBy })
     ],
 
     // ── Billing (this service's extension) ──
@@ -321,22 +295,6 @@ const MAPPERS: Record<string, Mapper<never>> = {
             externalId: `subscription.cancelled:${e.stripeSubscriptionId ?? e.eventId}`,
             object: { type: 'subscription', id: e.stripeSubscriptionId ?? e.tenantId },
             properties: { tenant_id: e.tenantId, cancelled_at: iso(e.cancelledAt), ends_at: iso(e.cancellationEffectiveAt), reason: e.reason ?? null }
-        }
-    ],
-    'subscription.downgrade-scheduled': (e: SubscriptionDowngradeScheduledEvent) => [
-        {
-            eventType: 'subscription.downgrade_scheduled',
-            externalId: `subscription.downgrade_scheduled:${e.eventId}`,
-            object: tenantObject(e),
-            properties: { tenant_id: e.tenantId, previous_plan: e.previousPlan, target_plan: e.targetPlan, effective_date: iso(e.effectiveDate) }
-        }
-    ],
-    'subscription.upgraded': (e: SubscriptionUpgradedEvent) => [
-        {
-            eventType: 'subscription.upgraded',
-            externalId: `subscription.upgraded:${e.eventId}`,
-            object: tenantObject(e),
-            properties: { tenant_id: e.tenantId, previous_plan: e.previousPlan, new_plan: e.billingPlan, effective_date: iso(e.effectiveDate) }
         }
     ],
     'trial.reminder': (e: TrialReminderEvent) => [
@@ -496,6 +454,25 @@ const MAPPERS: Record<string, Mapper<never>> = {
         }
     ]
 };
+
+type ConnectionEvent = ConnectionCreatedEvent | ConnectionVerifiedEvent | ConnectionRotatedEvent | ConnectionRevokedEvent;
+
+/** Every connection event carries the same facts (v5.2 Event Model §5.11): id, provider, direction, status. */
+function connectionDraft(eventType: string, key: string, e: ConnectionEvent, extra: FlatProperties): PublishedEventDraft {
+    return {
+        eventType,
+        externalId: `${eventType}:${key}`,
+        object: { type: 'connection', id: e.payload.connectionId },
+        properties: {
+            connection_id: e.payload.connectionId,
+            tenant_id: e.tenantId,
+            provider: e.payload.provider,
+            direction: e.payload.direction,
+            status: e.payload.status,
+            ...extra
+        }
+    };
+}
 
 function subscriptionDraft(eventType: string, e: SubscriptionCreatedEvent | SubscriptionChangedEvent): PublishedEventDraft {
     return {

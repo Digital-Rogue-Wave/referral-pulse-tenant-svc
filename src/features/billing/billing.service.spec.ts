@@ -131,31 +131,21 @@ describe('BillingService — the tenant’s subscription', () => {
             await expect(service.getCurrentSubscription()).resolves.toMatchObject({ stripeSubscriptionStatus: null, planUsagePercentage: null });
         });
 
-        it('shows every plan limit with its live use, and keeps the daily snapshots as the 7-day history (US1.8.1 F2)', async () => {
+        it('carries every plan limit with its live use as usage counters (v5.2 API: GET /v1/billing/plan)', async () => {
             planLimits.entitlementsOf.mockResolvedValue({
-                limits: { email_sends: 100, seats: 2 },
-                usage: { email_sends: 45, seats: 2 }
+                limits: { email_sends: 100, seats: 2, webhooks: null },
+                usage: { email_sends: 45, seats: 2, events: 7 }
             } as never);
-            prisma.tenantUsage.findMany!.mockResolvedValue([
-                { metricName: 'email_sends', periodDate: '2026-09-21', currentUsage: 30 },
-                { metricName: 'email_sends', periodDate: '2026-09-22', currentUsage: 40 },
-                { metricName: 'webhooks', periodDate: '2026-09-22', currentUsage: 5 }
-            ]);
 
-            const summary = await service.getUsageSummary();
+            const view = await service.getCurrentSubscription();
 
-            expect(summary.metrics).toEqual([
-                // live, not the snapshot's 40
-                expect.objectContaining({
-                    metric: 'email_sends',
-                    currentUsage: 45,
-                    limit: 100,
-                    percentageUsed: 45,
-                    history: [expect.anything(), expect.anything()]
-                }),
-                // a limit with no snapshot row yet is still shown
-                expect.objectContaining({ metric: 'seats', currentUsage: 2, limit: 2, percentageUsed: 100, history: [] }),
-                expect.objectContaining({ metric: 'webhooks', currentUsage: 5, limit: null, percentageUsed: null })
+            expect(view.usage).toEqual([
+                { metric: 'email_sends', currentUsage: 45, limit: 100, percentageUsed: 45 },
+                // used but not limited by the plan
+                { metric: 'events', currentUsage: 7, limit: null, percentageUsed: null },
+                { metric: 'seats', currentUsage: 2, limit: 2, percentageUsed: 100 },
+                // limited but not used yet
+                { metric: 'webhooks', currentUsage: 0, limit: null, percentageUsed: null }
             ]);
         });
     });
@@ -200,141 +190,6 @@ describe('BillingService — the tenant’s subscription', () => {
 
             prisma.billing.findUnique!.mockResolvedValue(billingRow({ stripeCustomerId: null }));
             await expect(service.listInvoices({})).resolves.toEqual({ data: [], hasMore: false, nextCursor: null, prevCursor: null });
-        });
-
-        it('previews the upcoming invoice only for a subscribed tenant', async () => {
-            await service.getUpcomingInvoice();
-            expect(stripe.retrieveUpcomingInvoiceForCustomer).toHaveBeenCalledWith({ customerId: 'cus_1', subscriptionId: 'sub_1' });
-
-            prisma.billing.findUnique!.mockResolvedValue(billingRow({ stripeSubscriptionId: null }));
-            await expectHttp(service.getUpcomingInvoice(), HttpStatus.BAD_REQUEST);
-        });
-    });
-
-    describe('changing the plan', () => {
-        it('upgrades in Stripe and leaves the plan to Stripe’s webhook (F10)', async () => {
-            stripe.previewSubscriptionUpgrade.mockResolvedValue({ amountDueNow: 1500, currency: 'eur', nextInvoiceDate: FUTURE });
-            await expect(service.previewSubscriptionUpgrade(BillingPlanEnum.SCALE)).resolves.toMatchObject({ amountDueNow: 1500 });
-
-            await expect(service.upgradeSubscription(BillingPlanEnum.SCALE)).resolves.toMatchObject({ plan: BillingPlanEnum.GROWTH });
-
-            expect(stripe.upgradeSubscription).toHaveBeenCalledWith({ stripeSubscriptionId: 'sub_1', targetPlan: BillingPlanEnum.SCALE });
-            expect(prisma.billing.update).not.toHaveBeenCalled();
-            expect(events.emitAfterCommit).toHaveBeenCalledWith(
-                'subscription.upgraded',
-                expect.objectContaining({ billingPlan: BillingPlanEnum.SCALE })
-            );
-        });
-
-        it('lets an upgrade only go up, so it can’t skip the downgrade’s usage check (F3)', async () => {
-            await expectHttp(service.upgradeSubscription(BillingPlanEnum.STARTER), HttpStatus.BAD_REQUEST);
-            await expectHttp(service.upgradeSubscription(BillingPlanEnum.GROWTH), HttpStatus.BAD_REQUEST);
-            await expectHttp(service.previewSubscriptionUpgrade(BillingPlanEnum.FREE), HttpStatus.BAD_REQUEST);
-            await expectHttp(service.upgradeSubscription(BillingPlanEnum.ENTERPRISE), HttpStatus.BAD_REQUEST);
-            expect(stripe.upgradeSubscription).not.toHaveBeenCalled();
-        });
-
-        it('refuses plan changes without a subscription', async () => {
-            prisma.billing.findUnique!.mockResolvedValue(billingRow({ stripeSubscriptionId: null }));
-            await expectHttp(service.previewSubscriptionUpgrade(BillingPlanEnum.ENTERPRISE), HttpStatus.BAD_REQUEST);
-            await expectHttp(service.upgradeSubscription(BillingPlanEnum.ENTERPRISE), HttpStatus.BAD_REQUEST);
-            await expectHttp(service.downgradeSubscription(BillingPlanEnum.STARTER), HttpStatus.BAD_REQUEST);
-            await expectHttp(service.cancelPendingDowngrade(), HttpStatus.BAD_REQUEST);
-            await expectHttp(service.cancelSubscription({}), HttpStatus.BAD_REQUEST);
-            await expectHttp(service.reactivateSubscription(), HttpStatus.BAD_REQUEST);
-        });
-
-        it('schedules a downgrade that fits the target plan', async () => {
-            planLimits.limitsOfPlan.mockResolvedValue({ seats: 5 });
-            planLimits.usageOf.mockResolvedValue(3);
-            stripe.scheduleSubscriptionDowngrade.mockResolvedValue({ effectiveDate: FUTURE });
-
-            await service.downgradeSubscription(BillingPlanEnum.STARTER);
-
-            expect(prisma.billing.update).toHaveBeenCalledWith({
-                where: { id: 'bil_1' },
-                data: { pendingDowngradePlan: 'Starter', downgradeScheduledAt: FUTURE }
-            });
-            expect(events.emitAfterCommit).toHaveBeenCalledWith('subscription.downgrade-scheduled', expect.anything());
-        });
-
-        it('refuses a downgrade while usage exceeds the target plan, naming each metric', async () => {
-            planLimits.limitsOfPlan.mockResolvedValue({ seats: 5, email_sends: 1000 });
-            planLimits.usageOf.mockImplementation(async (_t, metric) => (metric === 'seats' ? 8 : 10));
-
-            const error = await service.downgradeSubscription(BillingPlanEnum.STARTER).catch((e: BaseException) => e);
-
-            expect((error as BaseException).getStatus()).toBe(HttpStatus.CONFLICT);
-            expect((error as BaseException).message).toContain('seats 8/5');
-            expect(stripe.scheduleSubscriptionDowngrade).not.toHaveBeenCalled();
-        });
-
-        it.each([
-            ['the same plan', BillingPlanEnum.GROWTH, {}],
-            ['a higher plan', BillingPlanEnum.ENTERPRISE, {}],
-            ['a second pending downgrade', BillingPlanEnum.STARTER, { pendingDowngradePlan: 'Free' }],
-            ['an unknown current plan', BillingPlanEnum.STARTER, { plan: 'Legacy' }]
-        ])('refuses a downgrade to %s', async (_case, target, overrides) => {
-            prisma.billing.findUnique!.mockResolvedValue(billingRow(overrides));
-            await expectHttp(service.downgradeSubscription(target), HttpStatus.BAD_REQUEST);
-        });
-
-        it('cancels a pending downgrade in Stripe and clears it', async () => {
-            prisma.billing.findUnique!.mockResolvedValue(billingRow({ pendingDowngradePlan: 'Starter' }));
-
-            await service.cancelPendingDowngrade();
-
-            expect(stripe.cancelPendingSubscriptionDowngrade).toHaveBeenCalledWith('sub_1');
-            expect(prisma.billing.update).toHaveBeenCalledWith({
-                where: { id: 'bil_1' },
-                data: { pendingDowngradePlan: null, downgradeScheduledAt: null }
-            });
-            expect(events.emitAfterCommit).toHaveBeenCalledWith(
-                'subscription.downgrade-cancelled',
-                expect.objectContaining({ userId: 'u1', changes: { pendingDowngradePlan: { from: 'Starter', to: null } } })
-            );
-
-            prisma.billing.findUnique!.mockResolvedValue(billingRow());
-            await expectHttp(service.cancelPendingDowngrade(), HttpStatus.BAD_REQUEST);
-        });
-    });
-
-    describe('cancelling', () => {
-        it('schedules the cancellation at period end and announces it', async () => {
-            stripe.scheduleSubscriptionCancellation.mockResolvedValue({ effectiveDate: FUTURE });
-
-            await service.cancelSubscription({ reason: 'too expensive' });
-
-            expect(prisma.billing.update).toHaveBeenCalledWith({
-                where: { id: 'bil_1' },
-                data: expect.objectContaining({ cancellationReason: 'too expensive', cancellationEffectiveAt: FUTURE })
-            });
-            expect(events.emitAfterCommit).toHaveBeenCalledWith('subscription.cancelled', expect.objectContaining({ reason: 'too expensive' }));
-        });
-
-        it('lets a past-due tenant cancel, but not an already cancelled one, nor twice', async () => {
-            stripe.scheduleSubscriptionCancellation.mockResolvedValue({ effectiveDate: null });
-            prisma.billing.findUnique!.mockResolvedValue(billingRow({ status: 'past_due' }));
-            await expect(service.cancelSubscription({})).resolves.toBeDefined();
-
-            prisma.billing.findUnique!.mockResolvedValue(billingRow({ status: 'canceled' }));
-            await expectHttp(service.cancelSubscription({}), HttpStatus.BAD_REQUEST);
-
-            prisma.billing.findUnique!.mockResolvedValue(billingRow({ cancellationRequestedAt: PAST, cancellationEffectiveAt: FUTURE }));
-            await expectHttp(service.cancelSubscription({}), HttpStatus.BAD_REQUEST);
-        });
-
-        it('reactivates a pending cancellation, but not one already in effect', async () => {
-            prisma.billing.findUnique!.mockResolvedValue(billingRow({ cancellationRequestedAt: PAST, cancellationEffectiveAt: FUTURE }));
-            await service.reactivateSubscription();
-            expect(stripe.reactivateSubscription).toHaveBeenCalledWith('sub_1');
-            expect(events.emitAfterCommit).toHaveBeenCalledWith('subscription.reactivated', expect.objectContaining({ userId: 'u1' }));
-
-            prisma.billing.findUnique!.mockResolvedValue(billingRow({ cancellationRequestedAt: PAST, cancellationEffectiveAt: PAST }));
-            await expectHttp(service.reactivateSubscription(), HttpStatus.BAD_REQUEST);
-
-            prisma.billing.findUnique!.mockResolvedValue(billingRow());
-            await expectHttp(service.reactivateSubscription(), HttpStatus.BAD_REQUEST);
         });
     });
 });

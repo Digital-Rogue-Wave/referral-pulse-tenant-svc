@@ -68,7 +68,7 @@ const claims = (overrides: Partial<IInternalTokenClaims> = {}): IInternalTokenCl
     source: 'dashboard',
     key_type: null,
     key_id: null,
-    perms: ['tenants:read'],
+    perms: ['tenant:read'],
     ...overrides
 });
 
@@ -83,7 +83,7 @@ describe('InternalTokenService', () => {
         }) as jwt.JwtPayload;
 
         expect(payload.sub).toBe('user:u1');
-        expect(payload.perms).toEqual(['tenants:read']);
+        expect(payload.perms).toEqual(['tenant:read']);
         expect(jwt.decode(token, { complete: true })!.header.kid).toBe(jwk!.kid);
     });
 
@@ -279,7 +279,7 @@ describe('CredentialResolverService', () => {
         it('then it resolves the member and embeds the Keto permission snapshot', async () => {
             stubHydra({ sub: 'kratos-1' });
             findUser.mockResolvedValue({ id: 'u1', tenantId: 't1', email: 'ada@acme.io' });
-            authorization.resolvePermissions.mockResolvedValue(['tenants:read', 'campaigns:write']);
+            authorization.resolvePermissions.mockResolvedValue(['tenant:read', 'campaigns:write']);
 
             const payload = verify((await resolver.resolve('hydra.jwt.token')).token);
 
@@ -291,7 +291,7 @@ describe('CredentialResolverService', () => {
                 user_id: 'u1',
                 tenant_id: 't1',
                 identity_id: 'kratos-1',
-                perms: ['tenants:read', 'campaigns:write']
+                perms: ['tenant:read', 'campaigns:write']
             });
             expect(payload.sub).toBe('user:u1');
         });

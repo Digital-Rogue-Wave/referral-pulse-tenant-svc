@@ -15,6 +15,9 @@ import type { AllConfigType } from '@config/config.type';
 
 import { BullJobsConnectionFactory } from './bulljobs-connection.factory';
 
+/** The `tenantId` of jobs that span every tenant. */
+const SYSTEM_TENANT = 'system';
+
 /**
  * Base worker class for processing BullMQ jobs
  * Extends this class to create specific job processors
@@ -102,11 +105,16 @@ export abstract class BaseWorkerService<T extends IBaseJobData = IBaseJobData> i
     /**
      * Handle job execution with tracing and tenant context
      */
+    private inJobTenant<R>(job: Job<T>, work: () => Promise<R>): Promise<R> {
+        const tenantId = job.data.tenantId;
+        return tenantId && tenantId !== SYSTEM_TENANT ? this.tenantContext.runWithContext({ tenantId }, work) : work();
+    }
+
     private async handleJob(job: Job<T>): Promise<IJobResult> {
         const startTime = this.dateService.now();
 
-        // Tenant context is set automatically by the ALS middleware
-        // based on the incoming job data
+        // A job for one tenant runs in that tenant's context, so row-level security binds what it writes (v5.2 DB
+        // Model §0.8). Jobs across every tenant ('system') use the privileged connection explicitly instead.
 
         this.logger.debug(`🔄 Processing job ${job.id} from queue ${this.queueName}`, {
             jobId: job.id,
@@ -116,7 +124,7 @@ export abstract class BaseWorkerService<T extends IBaseJobData = IBaseJobData> i
         });
 
         try {
-            const result = await this.processJob(job);
+            const result = await this.inJobTenant(job, () => this.processJob(job));
             const processingTime = this.dateService.now() - startTime;
 
             this.logger.log(`✅ Job ${job.id} completed successfully`, {

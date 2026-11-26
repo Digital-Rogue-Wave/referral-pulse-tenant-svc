@@ -18,7 +18,7 @@ export class VerificationController {
     constructor(private readonly verifications: CompanyVerificationService) {}
 
     @Get()
-    @RequirePermission('tenants:read')
+    @RequirePermission('tenant:read')
     @ApiOperation({ summary: "The company's verification status and latest verification" })
     @ApiOkResponse({ type: CompanyVerificationResponse })
     async status(@CurrentUser() user: IAuthenticatedUser): Promise<CompanyVerificationResponse> {
@@ -27,7 +27,7 @@ export class VerificationController {
 
     @Post()
     @HttpCode(HttpStatus.OK)
-    @RequirePermission('tenants:write')
+    @RequirePermission('tenant:settings')
     @ApiOperation({ summary: "Open the KYB provider's verification session and get its link" })
     @ApiOkResponse({ type: VerificationSessionResponse })
     async open(@CurrentUser() user: IAuthenticatedUser): Promise<VerificationSessionResponse> {

@@ -1,14 +1,6 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { BillingPlanEnum } from '@common/enums/billing.enum';
 
-export class UsageMetricHistoryPointDto {
-    @ApiProperty()
-    periodDate!: string;
-
-    @ApiProperty()
-    usage!: number;
-}
-
+/** One usage counter of `GET /v1/billing/plan` (v5.2 API: current plan, period, usage counters). */
 export class UsageMetricSummaryDto {
     @ApiProperty()
     metric!: string;
@@ -21,15 +13,4 @@ export class UsageMetricSummaryDto {
 
     @ApiPropertyOptional({ nullable: true })
     percentageUsed!: number | null;
-
-    @ApiProperty({ type: () => UsageMetricHistoryPointDto, isArray: true })
-    history!: UsageMetricHistoryPointDto[];
-}
-
-export class UsageSummaryDto {
-    @ApiProperty({ enum: BillingPlanEnum })
-    plan!: BillingPlanEnum;
-
-    @ApiProperty({ type: () => UsageMetricSummaryDto, isArray: true })
-    metrics!: UsageMetricSummaryDto[];
 }

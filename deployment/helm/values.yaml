@@ -312,19 +312,31 @@ envVars:
   SUMSUB_BASE_URL: "https://api.sumsub.com"
   SUMSUB_LEVEL_NAME: ""
   KYB_LINK_TTL_SECONDS: "1800"
+  # v5.2 US1.6.1: the account_verification Temporal workflow. tenant-service's own task queue: sharing another
+  # service's queue would let this worker take that service's tasks. The worker runs in the worker deployment.
+  # Set per environment: the address of the cluster's Temporal frontend (no other service records one yet).
+  TEMPORAL_ADDRESS: ""
+  TEMPORAL_NAMESPACE: "default"
+  TEMPORAL_TASK_QUEUE: "tenant-task-queue"
 
 # -------- Secret (sensitive env) --------
 secretVars:
+  # v5.2 DB Model 0.8: the role that bypasses row-level security, for migrations and the audited cross-tenant paths
+  # (API-key and Connection lookups, outbox relays, sweepers, provider webhooks, the Super Admin console). DATABASE_URL
+  # must be a role without BYPASSRLS. (DATABASE_URL itself is not in this chart yet — pre-existing.)
+  DATABASE_PRIVILEGED_URL: ""
   # Stripe credentials. The price IDs below are public identifiers and live in envVars; these two
   # are not. Supply them per environment (or via a secret store) - billing fails closed without them.
   STRIPE_SECRET_KEY: ""
   STRIPE_WEBHOOK_SECRET: ""
-  # Encrypts provider_connections.signing_secret at rest (AES-256-GCM, 64 hex chars). Without it this
+  # Encrypts the connections secret and credential columns at rest (AES-256-GCM, 64 hex chars). Without it this
   # service boots but refuses to create or resolve a provider connection, rather than storing a secret
   # nothing can read back.
   PROVIDER_SECRET_ENCRYPTION_KEY: ""
   # US1.5.1 F4: public origin of Event Ingestion's /inbound receivers, so receiver_url is absolute.
   INBOUND_PUBLIC_BASE_URL: "https://api.example.com"
+  # CONNECTION_TEST_BASE_URL is for local and test runs only (sends every connection test probe to a stub);
+  # leave it unset here so the probes reach the providers' own APIs.
   # Signs and verifies the /t/o and /t/c email-tracking tokens (64 hex chars). Notification signs with
   # it, ingestion verifies with it, and both read it from this service — so it is one value per
   # environment, and changing it invalidates the tokens in mail already sent.

@@ -6,6 +6,7 @@ import { SqsConsumerEventHandler, SqsMessageHandler } from '@ssut/nestjs-sqs';
 import { TENANT_SVC_FIFO } from '@app/types';
 import { hashEmail } from '@common/helper/hashing';
 import { JsonService } from '@common/helper/json.service';
+import { TenantContextService } from '@common/tenant-aware/tenant-context.service';
 import { AppLoggerService } from '@common/logging/app-logger.service';
 
 import { KybResultHandler } from '@app/features/verification/kyb-result.handler';
@@ -44,6 +45,7 @@ export class ConsentConsumer {
     constructor(
         private readonly consent: ConsentService,
         private readonly kybResults: KybResultHandler,
+        private readonly tenantContext: TenantContextService,
         private readonly json: JsonService,
         private readonly logger: AppLoggerService
     ) {
@@ -60,7 +62,8 @@ export class ConsentConsumer {
         if (!signal) {
             return;
         }
-        const outcome = await this.consent.record(signal);
+        // Off the bus there is no request tenant: the signal's own tenant scopes the write (row-level security).
+        const outcome = await this.tenantContext.runWithContext({ tenantId: signal.tenantId }, () => this.consent.record(signal));
         if (outcome === 'ignored') {
             this.logger.debug('A consent signal named no subject, or no recognised status', { tenantId: signal.tenantId });
         }

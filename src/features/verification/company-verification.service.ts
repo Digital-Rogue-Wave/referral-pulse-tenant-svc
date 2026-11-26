@@ -1,25 +1,24 @@
 import { HttpStatus, Inject, Injectable } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { ulid } from 'ulid';
 
 import type { Prisma } from '@prisma-gen/generated/client';
 
-import { BullJobsService } from '@common/bulljobs';
 import { TransactionEventEmitterService } from '@common/events/transaction-event-emitter.service';
 import { BaseException } from '@common/exceptions/base.exceptions';
 import { AppLoggerService } from '@common/logging/app-logger.service';
+import { MetricsService } from '@common/monitoring/metrics.service';
+import { RedisService } from '@common/redis/redis.service';
+import { TenantContextService } from '@common/tenant-aware/tenant-context.service';
 import { DatabaseService } from '@app/database/database.service';
-import { TenantService } from '@app/features/tenant/tenant.service';
-import { TenantEvents, TenantVerificationRequestedEvent, TenantVerificationStatusChangedEvent } from '@domains/tenant/events/tenant.events';
+import type { AllConfigType } from '@config/config.type';
+import { TenantEvents, TenantVerificationRequestedEvent } from '@domains/tenant/events/tenant.events';
 import { VerificationRecordStatus, VerificationStatus, VerificationType } from '@domains/tenant/tenant.types';
 import { CompanyVerificationResponse, VerificationSessionResponse } from '@domains/verification';
 
+import { AccountVerificationGateway } from './account-verification.gateway';
 import { KYB_PROVIDER, KybProvider } from './kyb-provider';
-
-/** E1 D15: a company verification still open after seven days goes to a Super Admin. */
-export const VERIFICATION_ESCALATION_DAYS = 7;
-export const VERIFICATION_ESCALATION_QUEUE = 'verification-escalation';
-
-const OPEN = [VerificationRecordStatus.PENDING, VerificationRecordStatus.IN_REVIEW];
+import { TenantVerificationStatus } from './tenant-verification-status';
 
 /** The provider's result, as Event Ingestion normalises it (`provider.verification_reviewed`). */
 export interface ProviderVerificationResult {
@@ -33,24 +32,25 @@ export interface ProviderVerificationResult {
     labels: string[];
 }
 
-export interface EscalationJob {
-    tenantId: string;
-    verificationId: string;
-}
+/** The verification id of a session opened but not yet called back, so a second click reuses the same applicant. */
+const sessionKey = (tenantId: string): string => `tenant:kyb-session:${tenantId}`;
 
 /**
- * Company verification through a KYB provider (Product Spec R-INT-02, E1 D15). The Owner opens a session (the tenant
- * moves `unverified | rejected → pending`); the provider's result arrives through Event Ingestion and is applied with
- * `TenantService.applyVerificationReport()`; a result the provider cannot settle, or a case still open after seven days,
- * goes to `in_review` for a Super Admin.
+ * Company verification (v5.2 API §3.17, US1.6.4, US1.6.1). The Owner opens a KYB session; nothing changes until the
+ * provider calls back through Event Ingestion. That callback opens the case in `pending_review` with the provider's
+ * result as evidence (references only) and starts the `account_verification` workflow; a Super Admin then decides.
  */
 @Injectable()
 export class CompanyVerificationService {
     constructor(
         private readonly prisma: DatabaseService,
-        private readonly tenants: TenantService,
+        private readonly verificationStatus: TenantVerificationStatus,
+        private readonly workflows: AccountVerificationGateway,
         private readonly txEventEmitter: TransactionEventEmitterService,
-        private readonly bullJobs: BullJobsService,
+        private readonly redis: RedisService,
+        private readonly metrics: MetricsService,
+        private readonly tenantContext: TenantContextService,
+        private readonly configService: ConfigService<AllConfigType>,
         @Inject(KYB_PROVIDER) private readonly provider: KybProvider,
         private readonly logger: AppLoggerService
     ) {
@@ -60,7 +60,10 @@ export class CompanyVerificationService {
     /** The tenant's verification state and its latest company verification, for the Owner's dashboard. */
     async status(tenantId: string): Promise<CompanyVerificationResponse> {
         const tenant = await this.prisma.tenant.findUniqueOrThrow({ where: { id: tenantId }, select: { verificationStatus: true } });
-        const latest = await this.latest(tenantId);
+        const latest = await this.prisma.tenantVerification.findFirst({
+            where: { tenantId, verificationType: VerificationType.COMPANY },
+            orderBy: { createdAt: 'desc' }
+        });
         return {
             status: tenant.verificationStatus,
             verification: latest
@@ -77,128 +80,109 @@ export class CompanyVerificationService {
     }
 
     /**
-     * Opens (or reopens) the KYB session. With a verification already open, the Owner gets a fresh link to the same case;
-     * otherwise — never verified, or rejected (resubmission) — a new verification starts and the tenant becomes `pending`.
-     * A verified tenant has nothing to submit.
+     * Opens the provider's hosted session (US1.6.4 AC1). The status does not move: `pending_review` begins with the
+     * provider's callback. A verified company, or one already under review, has nothing to submit; a rejected one may
+     * resubmit.
      */
     async open(tenantId: string, actingUserId: string): Promise<VerificationSessionResponse> {
         const tenant = await this.prisma.tenant.findUniqueOrThrow({ where: { id: tenantId }, select: { name: true, verificationStatus: true } });
-        if (tenant.verificationStatus === VerificationStatus.VERIFIED) {
-            throw new BaseException('state_conflict', 'This company is already verified', HttpStatus.CONFLICT);
+        if (tenant.verificationStatus === VerificationStatus.VERIFIED || tenant.verificationStatus === VerificationStatus.PENDING_REVIEW) {
+            throw new BaseException('state_conflict', `This company's verification is ${tenant.verificationStatus}`, HttpStatus.CONFLICT);
         }
-        const open = await this.prisma.tenantVerification.findFirst({
-            where: { tenantId, verificationType: VerificationType.COMPANY, status: { in: OPEN } },
-            orderBy: { createdAt: 'desc' }
-        });
-        const verificationId = open?.id ?? ulid();
+        const verificationId = await this.sessionVerificationId(tenantId);
         const session = await this.provider.openSession(tenantId, verificationId);
-        if (!open) {
-            await this.start(tenantId, verificationId, tenant, actingUserId, {
-                provider: session.provider,
-                external_user_id: session.externalUserId
-            });
-        }
-        return { status: VerificationStatus.PENDING, verificationId, provider: session.provider, providerUrl: session.url };
-    }
-
-    /** The provider's result (through Event Ingestion), applied to the exact verification it names. */
-    async applyProviderResult(result: ProviderVerificationResult): Promise<void> {
-        const record = await this.prisma.tenantVerification.findFirst({ where: { id: result.verificationId, tenantId: result.tenantId } });
-        if (!record) {
-            this.logger.warn('KYB result for an unknown verification; ignored', { tenantId: result.tenantId, verificationId: result.verificationId });
-            return;
-        }
-        if (!OPEN.includes(record.status as VerificationRecordStatus)) {
-            // A provider re-delivery or a late result after a Super Admin decided: the decision stands.
-            this.logger.log('KYB result for a verification already decided; ignored', { verificationId: record.id, status: record.status });
-            return;
-        }
-        await this.tenants.applyVerificationReport(result.tenantId, {
-            verificationId: record.id,
-            verificationType: VerificationType.COMPANY,
-            status: result.outcome as VerificationRecordStatus,
-            reason: result.reason ?? undefined,
-            reviewedBy: `provider:${result.provider}`,
-            evidence: {
-                ...(record.evidence as Record<string, unknown> | null),
-                result: { outcome: result.outcome, reference: result.providerReference, labels: result.labels, retry_allowed: result.retryAllowed }
-            }
-        });
-    }
-
-    /** The seven-day job: still pending → in review for a Super Admin; either way the escalation is on the trail. */
-    async escalate(job: EscalationJob): Promise<void> {
-        const record = await this.prisma.tenantVerification.findFirst({ where: { id: job.verificationId, tenantId: job.tenantId } });
-        if (!record || !OPEN.includes(record.status as VerificationRecordStatus)) {
-            return;
-        }
-        if (record.status === VerificationRecordStatus.PENDING) {
-            await this.tenants.applyVerificationReport(job.tenantId, {
-                verificationId: record.id,
-                verificationType: VerificationType.COMPANY,
-                status: VerificationRecordStatus.IN_REVIEW,
-                reviewedBy: 'system'
-            });
-        }
-        await this.prisma.auditLog.create({
-            data: {
-                id: ulid(),
-                tenantId: job.tenantId,
-                actorUserId: 'system',
-                action: 'tenant_verification.escalated',
-                targetType: 'tenant_verification',
-                targetId: record.id,
-                reason: `Open for ${VERIFICATION_ESCALATION_DAYS} days: sent to Super Admin review`,
-                occurredAt: new Date()
-            }
-        });
-        this.logger.warn('Company verification escalated to Super Admin review', { tenantId: job.tenantId, verificationId: record.id });
-    }
-
-    private async start(
-        tenantId: string,
-        verificationId: string,
-        tenant: { name: string; verificationStatus: string },
-        actingUserId: string,
-        evidence: Record<string, unknown>
-    ): Promise<void> {
-        await this.prisma.$transaction(async (tx) => {
-            await tx.tenantVerification.create({
-                data: { id: verificationId, tenantId, verificationType: VerificationType.COMPANY, evidence: evidence as Prisma.InputJsonValue }
-            });
-            await tx.tenant.update({ where: { id: tenantId }, data: { verificationStatus: VerificationStatus.PENDING } });
-            this.txEventEmitter.emitAfterCommit(
-                TenantEvents.VERIFICATION_REQUESTED,
-                new TenantVerificationRequestedEvent(tenantId, tenantId, tenant.name, actingUserId, verificationId)
-            );
-            this.txEventEmitter.emitAfterCommit(
-                TenantEvents.VERIFICATION_STATUS_CHANGED,
-                new TenantVerificationStatusChangedEvent(
-                    tenantId,
-                    tenantId,
-                    tenant.verificationStatus,
-                    VerificationStatus.PENDING,
-                    undefined,
-                    actingUserId
-                )
-            );
-        });
-        await this.bullJobs.addDelayedJob<EscalationJob & { tenantId: string }>(
-            VERIFICATION_ESCALATION_QUEUE,
-            'escalate',
-            { tenantId, verificationId },
-            VERIFICATION_ESCALATION_DAYS * 86_400_000,
-            { jobId: `verification-escalation-${verificationId}` }
+        this.txEventEmitter.emitAfterCommit(
+            TenantEvents.VERIFICATION_REQUESTED,
+            new TenantVerificationRequestedEvent(tenantId, tenantId, tenant.name, actingUserId, verificationId)
         );
-        this.logger.log('Company verification started', { tenantId, verificationId, provider: this.provider.name });
+        this.logger.log('KYB session opened', { tenantId, verificationId, provider: session.provider });
+        return { status: tenant.verificationStatus, verificationId, provider: session.provider, providerUrl: session.url };
     }
 
-    private latest(tenantId: string) {
-        return this.prisma.tenantVerification.findFirst({
-            where: { tenantId, verificationType: VerificationType.COMPANY },
-            orderBy: { createdAt: 'desc' }
-        });
+    /**
+     * The provider's callback (US1.6.4 AC2): the first one opens the case in `pending_review`; a later one, while the
+     * case is still under review, refreshes the evidence. A case a Super Admin already decided is final.
+     */
+    async applyProviderResult(result: ProviderVerificationResult): Promise<void> {
+        // Off the bus there is no request tenant: the callback's own tenant scopes the work (row-level security).
+        await this.tenantContext.runWithContext({ tenantId: result.tenantId }, () => this.applyInTenant(result));
     }
+
+    private async applyInTenant(result: ProviderVerificationResult): Promise<void> {
+        const opened = await this.prisma.$transaction(async (tx) => {
+            const record = await tx.tenantVerification.findFirst({ where: { id: result.verificationId, tenantId: result.tenantId } });
+            if (record && record.status !== VerificationRecordStatus.PENDING_REVIEW) {
+                this.logger.log('KYB result for a verification already decided; ignored', { verificationId: record.id, status: record.status });
+                return null;
+            }
+            const evidence = { ...((record?.evidence as Record<string, unknown> | null) ?? {}), ...evidenceOf(result) } as Prisma.InputJsonValue;
+            if (record) {
+                await tx.tenantVerification.update({ where: { id: record.id }, data: { evidence } });
+                return record.temporalWorkflowId ? null : record.id;
+            }
+            if (!(await tx.tenant.findUnique({ where: { id: result.tenantId }, select: { id: true } }))) {
+                this.logger.warn('KYB result for an unknown tenant; ignored', { tenantId: result.tenantId });
+                return null;
+            }
+            await tx.tenantVerification.create({
+                data: {
+                    id: result.verificationId,
+                    tenantId: result.tenantId,
+                    verificationType: VerificationType.COMPANY,
+                    status: VerificationRecordStatus.PENDING_REVIEW,
+                    evidence
+                }
+            });
+            await this.verificationStatus.change(tx, result.tenantId, VerificationStatus.PENDING_REVIEW, `provider:${result.provider}`, null);
+            return result.verificationId;
+        });
+        if (opened) {
+            await this.redis.getClient().del(sessionKey(result.tenantId));
+            await this.startWorkflow(result.tenantId, opened);
+        }
+    }
+
+    /**
+     * Starts `account_verification` and stores its ids (US1.6.1 AC2). Temporal being down must not lose the case: the
+     * case is already in `pending_review`, the failure is counted, and the provider's next re-delivery retries the start.
+     */
+    private async startWorkflow(tenantId: string, verificationId: string): Promise<void> {
+        try {
+            const { workflowId, runId } = await this.workflows.start({ tenantId, verificationId });
+            await this.prisma.tenantVerification.update({
+                where: { id: verificationId },
+                data: { temporalWorkflowId: workflowId, temporalRunId: runId }
+            });
+            this.logger.log('account_verification started', { tenantId, verificationId, workflowId });
+        } catch (error) {
+            this.metrics.createCounter('kyb_workflow_start_failures_total').add(1);
+            this.logger.error('Could not start account_verification', error instanceof Error ? error.stack : undefined, { tenantId, verificationId });
+        }
+    }
+
+    private async sessionVerificationId(tenantId: string): Promise<string> {
+        const client = this.redis.getClient();
+        const existing = await client.get(sessionKey(tenantId));
+        if (existing) {
+            return existing;
+        }
+        const verificationId = ulid();
+        await client.set(sessionKey(tenantId), verificationId, 'EX', this.configService.getOrThrow('kyb', { infer: true }).linkTtlSeconds);
+        return verificationId;
+    }
+}
+
+function evidenceOf(result: ProviderVerificationResult): Record<string, unknown> {
+    return {
+        provider: result.provider,
+        result: {
+            outcome: result.outcome,
+            reason: result.reason,
+            reference: result.providerReference,
+            labels: result.labels,
+            retry_allowed: result.retryAllowed
+        }
+    };
 }
 
 function providerOf(evidence: unknown): string | null {

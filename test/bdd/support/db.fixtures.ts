@@ -10,12 +10,13 @@
 
 import { createHash } from 'crypto';
 import pg from 'pg';
-import { PrismaClient } from '../../../src/prisma/generated/client';
+import { Prisma, PrismaClient, type Billing, type TenantSetting } from '../../../src/prisma/generated/client';
 import { PrismaPg } from '@prisma/adapter-pg';
 
 // ─── Singleton client ──────────────────────────────────────────────────────────
 
-const connectionString = process.env.DATABASE_URL ?? 'postgresql://root:root@localhost:5432/tenants';
+// Fixtures seed and inspect every tenant's rows, so they connect as the privileged role (v5.2 DB Model 0.8).
+const connectionString = process.env.DATABASE_PRIVILEGED_URL ?? 'postgresql://root:root@localhost:5432/tenants';
 
 const pool = new pg.Pool({ connectionString });
 const adapter = new PrismaPg(pool);
@@ -30,6 +31,15 @@ export async function purgeAuditRows(tenantIds: string[]): Promise<void> {
     await fixturesPrisma.$transaction(async (tx) => {
         await tx.$executeRaw`SELECT set_config('app.audit_purge', 'on', true)`;
         await tx.auditLog.deleteMany({ where: { tenantId: { in: tenantIds } } });
+    });
+}
+
+/** Delete only the named audit rows, so a shared tenant's pre-existing trail is never removed. */
+export async function purgeAuditRowsByIds(ids: string[]): Promise<void> {
+    if (ids.length === 0) return;
+    await fixturesPrisma.$transaction(async (tx) => {
+        await tx.$executeRaw`SELECT set_config('app.audit_purge', 'on', true)`;
+        await tx.auditLog.deleteMany({ where: { id: { in: ids } } });
     });
 }
 
@@ -132,18 +142,17 @@ export async function setActiveSubscription(tenantId: string): Promise<void> {
     });
 }
 
-/** Reset a tenant's billing back to the default Free / no-subscription state. */
-export async function clearSubscription(tenantId: string): Promise<void> {
-    await fixturesPrisma.billing
-        .updateMany({
-            where: { tenantId },
-            data: { plan: 'Free', status: 'none', stripeCustomerId: null, stripeSubscriptionId: null }
-        })
-        .catch(() => undefined);
+export async function clearInvitationsByEmails(tenantId: string, emails: string[]): Promise<void> {
+    if (emails.length === 0) return;
+    await fixturesPrisma.invitation.deleteMany({ where: { tenantId, email: { in: emails } } });
 }
 
-export async function clearInvitations(tenantId: string): Promise<void> {
-    await fixturesPrisma.invitation.deleteMany({ where: { tenantId } }).catch(() => undefined);
+export async function clearApiKeysByCreator(tenantId: string, createdBy: string): Promise<void> {
+    await fixturesPrisma.apiKey.deleteMany({ where: { tenantId, createdBy } });
+}
+
+export async function clearBddStripeEvents(): Promise<void> {
+    await fixturesPrisma.stripeEvent.deleteMany({ where: { id: { startsWith: 'evt_bdd_' } } });
 }
 
 export async function seedPendingInvitation(params: { tenantId: string; email: string; token: string; role: string }): Promise<void> {
@@ -200,10 +209,283 @@ export async function clearIdempotencyKeys(tenantId: string): Promise<void> {
     await fixturesPrisma.idempotencyKey.deleteMany({ where: { tenantId } });
 }
 
+/** Remove only BDD-owned idempotency keys, never a caller's baseline key. */
+export async function clearBddIdempotencyKeys(tenantId: string): Promise<void> {
+    await fixturesPrisma.idempotencyKey.deleteMany({
+        where: { tenantId, idempotencyKey: { startsWith: 'bdd-' } }
+    });
+}
+
+export interface TenantStateSnapshot {
+    billing: Billing | null;
+    tenantSetting: TenantSetting | null;
+    apiKeyIds: string[];
+    invitationIds: string[];
+    billingEventIds: string[];
+    tenantUsageIds: string[];
+    usageCounterKeys: Array<{ tenantId: string; metric: string; period: string }>;
+    stripeEventIds: string[];
+    auditLogIds: string[];
+    eventOutboxIds: string[];
+    sideEffectOutboxIds: string[];
+    idempotencyKeys: Array<{ tenantId: string; idempotencyKey: string }>;
+}
+
+/** Capture the shared tenant's baseline so a scenario can restore it exactly afterwards. */
+export async function captureTenantState(tenantId: string, apiKeyCreator: string): Promise<TenantStateSnapshot> {
+    const [
+        billing,
+        tenantSetting,
+        apiKeys,
+        invitations,
+        billingEvents,
+        tenantUsages,
+        usageCounters,
+        stripeEvents,
+        auditRows,
+        eventOutbox,
+        sideEffectOutbox,
+        idempotencyKeys
+    ] = await Promise.all([
+        fixturesPrisma.billing.findUnique({ where: { tenantId } }),
+        fixturesPrisma.tenantSetting.findUnique({ where: { tenantId } }),
+        fixturesPrisma.apiKey.findMany({ where: { tenantId, createdBy: apiKeyCreator }, select: { id: true } }),
+        fixturesPrisma.invitation.findMany({ where: { tenantId }, select: { id: true } }),
+        fixturesPrisma.billingEvent.findMany({ where: { tenantId }, select: { id: true } }),
+        fixturesPrisma.tenantUsage.findMany({ where: { tenantId }, select: { id: true } }),
+        fixturesPrisma.usageCounter.findMany({
+            where: { tenantId },
+            select: { tenantId: true, metric: true, period: true }
+        }),
+        fixturesPrisma.stripeEvent.findMany({ where: { id: { startsWith: 'evt_bdd_' } }, select: { id: true } }),
+        fixturesPrisma.auditLog.findMany({ where: { tenantId }, select: { id: true } }),
+        fixturesPrisma.eventOutbox.findMany({ where: { tenantId }, select: { id: true } }),
+        fixturesPrisma.sideEffectOutbox.findMany({ where: { tenantId }, select: { id: true } }),
+        fixturesPrisma.idempotencyKey.findMany({
+            where: { tenantId, idempotencyKey: { startsWith: 'bdd-' } },
+            select: { tenantId: true, idempotencyKey: true }
+        })
+    ]);
+
+    return {
+        billing,
+        tenantSetting,
+        apiKeyIds: apiKeys.map((row) => row.id),
+        invitationIds: invitations.map((row) => row.id),
+        billingEventIds: billingEvents.map((row) => row.id),
+        tenantUsageIds: tenantUsages.map((row) => row.id),
+        usageCounterKeys: usageCounters,
+        stripeEventIds: stripeEvents.map((row) => row.id),
+        auditLogIds: auditRows.map((row) => row.id),
+        eventOutboxIds: eventOutbox.map((row) => row.id),
+        sideEffectOutboxIds: sideEffectOutbox.map((row) => row.id),
+        idempotencyKeys
+    };
+}
+
+async function restoreBilling(tenantId: string, billing: Billing | null): Promise<void> {
+    if (!billing) {
+        await fixturesPrisma.billing.deleteMany({ where: { tenantId } });
+        return;
+    }
+
+    await fixturesPrisma.billing.upsert({
+        where: { tenantId },
+        update: {
+            plan: billing.plan,
+            status: billing.status,
+            stripeCustomerId: billing.stripeCustomerId,
+            stripeSubscriptionId: billing.stripeSubscriptionId,
+            stripeTransactionId: billing.stripeTransactionId,
+            pendingDowngradePlan: billing.pendingDowngradePlan,
+            downgradeScheduledAt: billing.downgradeScheduledAt,
+            cancellationReason: billing.cancellationReason,
+            cancellationRequestedAt: billing.cancellationRequestedAt,
+            cancellationEffectiveAt: billing.cancellationEffectiveAt,
+            lastStripeEventAt: billing.lastStripeEventAt,
+            deletedAt: billing.deletedAt,
+            updatedAt: billing.updatedAt
+        },
+        create: {
+            id: billing.id,
+            tenantId: billing.tenantId,
+            plan: billing.plan,
+            status: billing.status,
+            stripeCustomerId: billing.stripeCustomerId,
+            stripeSubscriptionId: billing.stripeSubscriptionId,
+            stripeTransactionId: billing.stripeTransactionId,
+            pendingDowngradePlan: billing.pendingDowngradePlan,
+            downgradeScheduledAt: billing.downgradeScheduledAt,
+            cancellationReason: billing.cancellationReason,
+            cancellationRequestedAt: billing.cancellationRequestedAt,
+            cancellationEffectiveAt: billing.cancellationEffectiveAt,
+            lastStripeEventAt: billing.lastStripeEventAt,
+            deletedAt: billing.deletedAt,
+            createdAt: billing.createdAt,
+            updatedAt: billing.updatedAt
+        }
+    });
+}
+
+async function restoreTenantSetting(tenantId: string, setting: TenantSetting | null): Promise<void> {
+    if (!setting) {
+        await fixturesPrisma.tenantSetting.deleteMany({ where: { tenantId } });
+        return;
+    }
+
+    await fixturesPrisma.tenantSetting.upsert({
+        where: { tenantId },
+        update: {
+            branding: setting.branding as Prisma.InputJsonValue,
+            notifications: setting.notifications as Prisma.InputJsonValue,
+            general: setting.general as Prisma.InputJsonValue,
+            currencyCode: setting.currencyCode,
+            deletedAt: setting.deletedAt,
+            updatedAt: setting.updatedAt
+        },
+        create: {
+            id: setting.id,
+            tenantId: setting.tenantId,
+            branding: setting.branding as Prisma.InputJsonValue,
+            notifications: setting.notifications as Prisma.InputJsonValue,
+            general: setting.general as Prisma.InputJsonValue,
+            currencyCode: setting.currencyCode,
+            deletedAt: setting.deletedAt,
+            createdAt: setting.createdAt,
+            updatedAt: setting.updatedAt
+        }
+    });
+}
+
+/** Remove rows created by a scenario and restore mutable singleton rows to their captured values. */
+export async function restoreTenantState(tenantId: string, snapshot: TenantStateSnapshot, apiKeyCreator: string): Promise<void> {
+    const [
+        apiKeys,
+        invitations,
+        billingEvents,
+        tenantUsages,
+        usageCounters,
+        stripeEvents,
+        auditRows,
+        eventOutbox,
+        sideEffectOutbox,
+        idempotencyKeys
+    ] = await Promise.all([
+        fixturesPrisma.apiKey.findMany({ where: { tenantId, createdBy: apiKeyCreator }, select: { id: true } }),
+        fixturesPrisma.invitation.findMany({ where: { tenantId }, select: { id: true } }),
+        fixturesPrisma.billingEvent.findMany({ where: { tenantId }, select: { id: true } }),
+        fixturesPrisma.tenantUsage.findMany({ where: { tenantId }, select: { id: true } }),
+        fixturesPrisma.usageCounter.findMany({
+            where: { tenantId },
+            select: { tenantId: true, metric: true, period: true }
+        }),
+        fixturesPrisma.stripeEvent.findMany({ where: { id: { startsWith: 'evt_bdd_' } }, select: { id: true } }),
+        fixturesPrisma.auditLog.findMany({ where: { tenantId }, select: { id: true } }),
+        fixturesPrisma.eventOutbox.findMany({ where: { tenantId }, select: { id: true } }),
+        fixturesPrisma.sideEffectOutbox.findMany({ where: { tenantId }, select: { id: true } }),
+        fixturesPrisma.idempotencyKey.findMany({
+            where: { tenantId, idempotencyKey: { startsWith: 'bdd-' } },
+            select: { tenantId: true, idempotencyKey: true }
+        })
+    ]);
+
+    const added = (current: string[], baseline: string[]): string[] => {
+        const known = new Set(baseline);
+        return current.filter((id) => !known.has(id));
+    };
+    const addedApiKeyIds = added(
+        apiKeys.map((row) => row.id),
+        snapshot.apiKeyIds
+    );
+    const addedInvitationIds = added(
+        invitations.map((row) => row.id),
+        snapshot.invitationIds
+    );
+    const addedBillingEventIds = added(
+        billingEvents.map((row) => row.id),
+        snapshot.billingEventIds
+    );
+    const addedTenantUsageIds = added(
+        tenantUsages.map((row) => row.id),
+        snapshot.tenantUsageIds
+    );
+    const addedStripeEventIds = added(
+        stripeEvents.map((row) => row.id),
+        snapshot.stripeEventIds
+    );
+    const addedAuditRowIds = added(
+        auditRows.map((row) => row.id),
+        snapshot.auditLogIds
+    );
+    const addedEventOutboxIds = added(
+        eventOutbox.map((row) => row.id),
+        snapshot.eventOutboxIds
+    );
+    const addedSideEffectOutboxIds = added(
+        sideEffectOutbox.map((row) => row.id),
+        snapshot.sideEffectOutboxIds
+    );
+
+    const usageCounterKey = (row: { tenantId: string; metric: string; period: string }): string => `${row.tenantId}\0${row.metric}\0${row.period}`;
+    const baselineUsageCounters = new Set(snapshot.usageCounterKeys.map(usageCounterKey));
+    const addedUsageCounters = usageCounters.filter((row) => !baselineUsageCounters.has(usageCounterKey(row)));
+    const idempotencyKey = (row: { tenantId: string; idempotencyKey: string }): string => `${row.tenantId}\0${row.idempotencyKey}`;
+    const baselineIdempotencyKeys = new Set(snapshot.idempotencyKeys.map(idempotencyKey));
+    const addedIdempotencyKeys = idempotencyKeys.filter((row) => !baselineIdempotencyKeys.has(idempotencyKey(row)));
+
+    if (addedApiKeyIds.length) await fixturesPrisma.apiKey.deleteMany({ where: { id: { in: addedApiKeyIds } } });
+    if (addedInvitationIds.length) await fixturesPrisma.invitation.deleteMany({ where: { id: { in: addedInvitationIds } } });
+    if (addedBillingEventIds.length) await fixturesPrisma.billingEvent.deleteMany({ where: { id: { in: addedBillingEventIds } } });
+    if (addedTenantUsageIds.length) await fixturesPrisma.tenantUsage.deleteMany({ where: { id: { in: addedTenantUsageIds } } });
+    if (addedUsageCounters.length) {
+        await fixturesPrisma.usageCounter.deleteMany({
+            where: {
+                OR: addedUsageCounters.map((row) => ({
+                    tenantId: row.tenantId,
+                    metric: row.metric,
+                    period: row.period
+                }))
+            }
+        });
+    }
+    if (addedIdempotencyKeys.length) {
+        await fixturesPrisma.idempotencyKey.deleteMany({
+            where: {
+                OR: addedIdempotencyKeys.map((row) => ({
+                    tenantId: row.tenantId,
+                    idempotencyKey: row.idempotencyKey
+                }))
+            }
+        });
+    }
+    if (addedEventOutboxIds.length) {
+        await fixturesPrisma.eventOutbox.deleteMany({ where: { id: { in: addedEventOutboxIds } } });
+    }
+    if (addedSideEffectOutboxIds.length) {
+        await fixturesPrisma.sideEffectOutbox.deleteMany({ where: { id: { in: addedSideEffectOutboxIds } } });
+    }
+    if (addedStripeEventIds.length) {
+        await fixturesPrisma.stripeEvent.deleteMany({ where: { id: { in: addedStripeEventIds } } });
+    }
+    await purgeAuditRowsByIds(addedAuditRowIds);
+    await restoreTenantSetting(tenantId, snapshot.tenantSetting);
+    await restoreBilling(tenantId, snapshot.billing);
+}
+
 export async function cleanupTenant(id: string): Promise<void> {
-    // Delete billing first (FK constraint)
-    await fixturesPrisma.billing.deleteMany({ where: { tenantId: id } }).catch(() => undefined);
-    await fixturesPrisma.tenant.deleteMany({ where: { id } }).catch(() => undefined);
+    // These tables either have no tenant FK or carry tenant state that must not survive the fixture.
+    await fixturesPrisma.sideEffectOutbox.deleteMany({ where: { tenantId: id } });
+    await fixturesPrisma.eventOutbox.deleteMany({ where: { tenantId: id } });
+    await clearIdempotencyKeys(id);
+    await purgeAuditRows([id]);
+    await fixturesPrisma.billingEvent.deleteMany({ where: { tenantId: id } });
+    await fixturesPrisma.tenantUsage.deleteMany({ where: { tenantId: id } });
+    await fixturesPrisma.usageCounter.deleteMany({ where: { tenantId: id } });
+    await fixturesPrisma.billing.deleteMany({ where: { tenantId: id } });
+    await fixturesPrisma.tenantSetting.deleteMany({ where: { tenantId: id } });
+    await fixturesPrisma.invitation.deleteMany({ where: { tenantId: id } });
+    await fixturesPrisma.apiKey.deleteMany({ where: { tenantId: id } });
+    await fixturesPrisma.tenant.deleteMany({ where: { id } });
 }
 
 export async function disconnectFixturesPrisma(): Promise<void> {

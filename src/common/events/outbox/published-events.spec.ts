@@ -6,8 +6,6 @@ import {
     SubscriptionCancelledEvent,
     SubscriptionChangedEvent,
     SubscriptionCreatedEvent,
-    SubscriptionDowngradeScheduledEvent,
-    SubscriptionUpgradedEvent,
     TenantPaymentStatusChangedEvent,
     TrialExpiredEvent,
     TrialReminderEvent,
@@ -16,7 +14,7 @@ import {
 } from '@domains/billing';
 import { ComplianceAuditLoggedEvent, ConsentRecordedEvent, DsrRequestedEvent, ErasureCompletedEvent } from '@domains/compliance';
 import type { BaseDomainEvent } from '@domains/common/events';
-import { ConnectionCreatedEvent, ConnectionRevokedEvent } from '@domains/connection';
+import { ConnectionCreatedEvent, ConnectionRevokedEvent, ConnectionRotatedEvent, ConnectionVerifiedEvent } from '@domains/connection';
 import {
     TenantCreatedEvent,
     TenantDeletedEvent,
@@ -29,8 +27,7 @@ import {
     TenantUnlockedEvent,
     TenantUnsuspendedEvent,
     TenantUpdatedEvent,
-    TenantVerificationRequestedEvent,
-    TenantVerificationStatusChangedEvent,
+    TenantVerifiedEvent,
     TenantWidgetSecretRotatedEvent
 } from '@domains/tenant/events/tenant.events';
 import { UserAnonymisedEvent, UserInvitedEvent, UserLoggedInEvent, UserRegisteredEvent, UserRemovedEvent, UserRoleChangedEvent } from '@domains/user';
@@ -45,7 +42,7 @@ const HASH = 'a'.repeat(64);
 
 /** One representative of every published in-process event. */
 const EVENTS: BaseDomainEvent[] = [
-    new TenantCreatedEvent(T, T, 'Acme', 'acme', 'k1', NOW, NOW, 'u1', { dataRegion: 'eu-central-1', retentionMonths: 24 }, 'forbidden'),
+    new TenantCreatedEvent(T, T, 'Acme', 'acme', 'k1', NOW, NOW, 'u1', { dataRegion: 'eu-central-1', retentionMonths: 24 }),
     new TenantUpdatedEvent(T, T, { retentionMonths: { from: 24, to: 12 } }, 'u1'),
     new TenantSuspendedEvent(T, T, 'fraud', NOW),
     new TenantUnsuspendedEvent(T, T, NOW),
@@ -56,9 +53,8 @@ const EVENTS: BaseDomainEvent[] = [
     new TenantDeletedEvent(T, T, 'Acme', 'acme'),
     new TenantOwnershipTransferredEvent(T, T, 'u1', 'u2', NOW, 'u1'),
     new TenantDomainVerifiedEvent(T, T, 'refer.acme.io', NOW),
-    new TenantVerificationRequestedEvent(T, T, 'Acme', 'u1', 'v1'),
-    new TenantVerificationStatusChangedEvent(T, T, 'pending', 'verified', undefined, 'system'),
-    new TenantWidgetSecretRotatedEvent(T, T, new Date('2026-11-09T11:00:00Z'), 'u1'),
+    new TenantVerifiedEvent(T, T, 'pending_review', 'verified', 'staff:ops-1', NOW, 'Registry extract matches'),
+    new TenantWidgetSecretRotatedEvent(T, T, 'kid-2', new Date('2026-11-09T11:00:00Z'), 'u1'),
     new UserRegisteredEvent('u1', T, 'owner'),
     new UserRoleChangedEvent('u2', T, 'viewer', 'admin', 'u1'),
     new UserRemovedEvent('u2', T, 'operator', 'u1'),
@@ -81,8 +77,6 @@ const EVENTS: BaseDomainEvent[] = [
     new SubscriptionCreatedEvent('b1', T, 'Growth', 'active', 'sub1', 'cus1', NOW, NOW, 'evt1', 'u1'),
     new SubscriptionChangedEvent('b1', T, 'Starter', 'past_due', 'sub1', 'cus1', NOW, NOW, 'evt2'),
     new SubscriptionCancelledEvent('b1', T, ISO, ISO, 'sub1', 'Free', 'tenant_deleted'),
-    new SubscriptionDowngradeScheduledEvent('b1', T, 'Growth', 'Starter', ISO, 'u1'),
-    new SubscriptionUpgradedEvent('b1', T, 'Starter', 'Growth', ISO, 'u1'),
     new TrialReminderEvent(T, T, ISO, 3, ISO),
     new TrialExpiredEvent(T, T, ISO, ISO),
     new TenantPaymentStatusChangedEvent(T, T, 'active', 'past_due', ISO),
@@ -91,8 +85,33 @@ const EVENTS: BaseDomainEvent[] = [
     new PaymentRefundedEvent('b1', T, 'evt5', 'ch1', 4900, 'eur', true),
     new UsageThresholdCrossedEvent(T, T, 'email_sends', 80, 80, 100, 80, '2026-09', ISO),
     new UsageMonthlySummaryEvent(T, T, 'email_sends', '2026-08', 90, 100, '2026-08-31', ISO),
-    new ConnectionCreatedEvent('c1', T, { connectionId: 'c1', provider: 'stripe', connectionType: 'billing', createdBy: 'u1' }, 'u1'),
-    new ConnectionRevokedEvent('c1', T, { connectionId: 'c1', provider: 'stripe', connectionType: 'billing', revokedBy: 'u1' }, 'u1'),
+    new ConnectionCreatedEvent(
+        'c1',
+        T,
+        { connectionId: 'c1', provider: 'stripe', direction: 'inbound', status: 'pending_verification', createdBy: 'u1' },
+        'u1'
+    ),
+    new ConnectionVerifiedEvent(
+        'c1',
+        T,
+        { connectionId: 'c1', provider: 'stripe', direction: 'inbound', status: 'active', verifiedAt: new Date(ISO), source: 'callback' },
+        'service:ingestion-svc'
+    ),
+    new ConnectionRotatedEvent(
+        'c1',
+        T,
+        {
+            connectionId: 'c1',
+            provider: 'stripe',
+            direction: 'inbound',
+            status: 'active',
+            rotatedAt: new Date(ISO),
+            oldSecretValidUntil: new Date(ISO),
+            rotatedBy: 'u1'
+        },
+        'u1'
+    ),
+    new ConnectionRevokedEvent('c1', T, { connectionId: 'c1', provider: 'stripe', direction: 'inbound', status: 'revoked', revokedBy: 'u1' }, 'u1'),
     new ConsentRecordedEvent('cs1', T, {
         subjectEmailHash: HASH,
         subjectExternalId: 'cust-9',
@@ -151,26 +170,16 @@ describe('Published events — the wire contract of every tenant-service event',
         expect(draft!.properties).not.toHaveProperty('dsr_id');
     });
 
-    it("tells consumers a new tenant's effective invitation channel, so they can keep a copy (E1 D10)", () => {
+    it('carries no invitation channel: v5.2 has no invitation setting (Appendix A #79)', () => {
         const event = EVENTS.find((e) => e.eventType === 'tenant.created')!;
 
         const [draft] = toPublishedEvents(event.eventType, event);
 
-        expect(draft!.properties).toMatchObject({ tenant_id: T, invitation_channel: 'forbidden' });
+        expect(draft!.properties).toMatchObject({ tenant_id: T });
+        expect(draft!.properties).not.toHaveProperty('invitation_channel');
     });
 
-    it('tells consumers the whole verification threshold when only its amount changed, currency included (E1 D11)', () => {
-        const event = new TenantUpdatedEvent(T, T, { verificationRequiredAbove: { from: 25_000, to: 100_000 } }, 'u1', undefined, {
-            amount: 100_000,
-            currency: 'EUR'
-        });
-
-        const [draft] = toPublishedEvents(event.eventType, event);
-
-        expect(draft!.properties).toMatchObject({ verification_required_above: 100_000, verification_required_above_currency: 'EUR' });
-    });
-
-    it('leaves the threshold out when an update did not touch it, so consumers keep their copy', () => {
+    it('carries no verification threshold: v5.2 moved it to the Program (API §3.1)', () => {
         const event = EVENTS.find((e) => e.eventType === 'tenant.updated')!;
 
         const [draft] = toPublishedEvents(event.eventType, event);
@@ -184,6 +193,27 @@ describe('Published events — the wire contract of every tenant-service event',
         const [draft] = toPublishedEvents(event.eventType, event);
 
         expect(draft).toMatchObject({ eventType: 'api_key.revoked', properties: expect.objectContaining({ tenant_id: T }) });
+    });
+
+    it('gives every connection event its direction and status, and the rotation its 24-hour end (v5.2 Event Model §5.11)', () => {
+        const rotated = EVENTS.find((e) => e.eventType === 'connection.rotated')!;
+
+        const [draft] = toPublishedEvents(rotated.eventType, rotated);
+
+        expect(draft!.properties).toMatchObject({ connection_id: 'c1', direction: 'inbound', status: 'active', old_secret_valid_until: ISO });
+        expect(draft!.externalId).toBe(`connection.rotated:${rotated.eventId}`);
+        expect(JSON.stringify(draft)).not.toMatch(/secret"/);
+    });
+
+    it('publishes tenant.verified with the v5.2 fields, and the decider as the audit actor (Event Model §5.11)', () => {
+        const event = EVENTS.find((e) => e.eventType === 'tenant.verified')!;
+
+        const [draft] = toPublishedEvents(event.eventType, event);
+
+        expect(draft!.properties).toMatchObject({ tenant_id: T, verification_status: 'verified', decided_by: 'staff:ops-1', decided_at: ISO });
+        expect(event.userId).toBe('staff:ops-1');
+        expect(isPublishedEvent('tenant.verification_status_changed')).toBe(false);
+        expect(isPublishedEvent('tenant.verification_requested')).toBe(false);
     });
 
     it('covers every mapper in the registry', () => {

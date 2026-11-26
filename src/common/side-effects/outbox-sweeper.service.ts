@@ -11,7 +11,7 @@ import { MetricsService } from '@common/monitoring/metrics.service';
 import { TracingService } from '@common/monitoring/tracing.service';
 
 import type { AllConfigType } from '@config/config.type';
-import { DatabaseService } from '@app/database/database.service';
+import { PrivilegedDatabaseService } from '@app/database/privileged-database.service';
 
 import { outboxQueueFor } from './side-effect-outbox.type';
 
@@ -38,7 +38,7 @@ export class OutboxSweeperService extends BaseWorkerService<IBaseJobData> {
         tracingService: TracingService,
         tenantContext: TenantContextService,
         dateService: DateService,
-        private readonly prisma: DatabaseService,
+        private readonly prisma: PrivilegedDatabaseService,
         private readonly bullJobs: BullJobsService
     ) {
         super(SWEEPER_QUEUE, connectionFactory, configService, logger, metricsService, tracingService, tenantContext, dateService);

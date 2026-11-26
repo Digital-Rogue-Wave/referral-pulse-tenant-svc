@@ -16,7 +16,7 @@ export class AuditLogController {
 
     @ApiOperation({ summary: 'List operator actions, newest first' })
     @ApiOkResponse({ type: CursorPage })
-    @RequirePermission('audit:read')
+    @RequirePermission('tenant:read')
     @HttpCode(HttpStatus.OK)
     @Get()
     async list(@Query() query: AuditLogQueryDto): Promise<CursorPage<AuditLogResponse>> {

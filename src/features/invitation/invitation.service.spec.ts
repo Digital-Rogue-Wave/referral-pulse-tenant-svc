@@ -3,6 +3,8 @@ import { mock, MockProxy } from 'jest-mock-extended';
 import { ConflictException, BadRequestException, HttpStatus, NotFoundException } from '@nestjs/common';
 
 import { DatabaseService } from '@app/database/database.service';
+import { PrivilegedDatabaseService } from '@app/database/privileged-database.service';
+import { TenantContextService } from '@common/tenant-aware/tenant-context.service';
 import { TenantAwareService } from '@common/tenant-aware/tenant-aware.service';
 import { TransactionEventEmitterService } from '@common/events/transaction-event-emitter.service';
 import { AppLoggerService } from '@common/logging/app-logger.service';
@@ -63,6 +65,9 @@ describe('InvitationService', () => {
             providers: [
                 InvitationService,
                 { provide: DatabaseService, useValue: prisma },
+                // The token lookup is privileged (row-level security); one mock stands for both connections here.
+                { provide: PrivilegedDatabaseService, useValue: prisma },
+                { provide: TenantContextService, useValue: { runWithContext: (_: unknown, work: () => Promise<unknown>) => work() } },
                 { provide: TenantAwareService, useValue: tenantAware },
                 { provide: TransactionEventEmitterService, useValue: txEventEmitter },
                 { provide: UsersService, useValue: usersService },

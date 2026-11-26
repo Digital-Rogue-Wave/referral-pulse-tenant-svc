@@ -8,6 +8,7 @@ import type { BaseDomainEvent } from '@domains/common/events';
 import type { IAuthenticatedUser } from '@app/types';
 
 import { DatabaseService } from '@app/database/database.service';
+import { scopeTransactionToTenant } from '@app/database/scope-transaction';
 import { TenantContextService } from '@common/tenant-aware/tenant-context.service';
 import { TransactionEventEmitterService } from '@common/events/transaction-event-emitter.service';
 import { AppLoggerService } from '@common/logging/app-logger.service';
@@ -20,6 +21,7 @@ import { DnsVerificationService } from '../dns/dns-verification.service';
 import { FilesService } from '../files/files.service';
 import { UsersService, MemberIdentity } from '../users/users.service';
 import { WidgetSecretVault } from './widget-secret.vault';
+import { BillingPlanEnum } from '@common/enums/billing.enum';
 
 import {
     CreateTenantDto,
@@ -36,14 +38,10 @@ import {
     DeletionScheduledResponse,
     tenantResponseMapper,
     TenantStatus,
-    UpdateVerificationStatusDto,
-    VerificationRecordStatus,
     VerificationStatus,
-    VerificationType,
     UpdateTenantSettingsDto,
     TenantSettingsResponse,
-    invitationChannelSource,
-    effectiveInvitationChannel,
+    TenantRecordResponse,
     type TenantProps
 } from '@domains/tenant';
 
@@ -59,7 +57,6 @@ import {
     TenantDeletionCancelledEvent,
     TenantOwnershipTransferredEvent,
     TenantDomainVerifiedEvent,
-    TenantVerificationStatusChangedEvent,
     TenantEvents
 } from '@domains/tenant/events/tenant.events';
 
@@ -68,33 +65,6 @@ const TRIAL_PERIOD_DAYS = 14;
 
 /** Default days until deletion after scheduling */
 const DEFAULT_DELETION_DAYS = 30;
-
-/** E1 D15: where each verification state may go. A decided verification is final; resubmission opens a new one. */
-const VERIFICATION_TRANSITIONS: Readonly<Record<VerificationRecordStatus, readonly VerificationRecordStatus[]>> = {
-    [VerificationRecordStatus.PENDING]: [
-        VerificationRecordStatus.PENDING,
-        VerificationRecordStatus.IN_REVIEW,
-        VerificationRecordStatus.VERIFIED,
-        VerificationRecordStatus.REJECTED
-    ],
-    [VerificationRecordStatus.IN_REVIEW]: [VerificationRecordStatus.IN_REVIEW, VerificationRecordStatus.VERIFIED, VerificationRecordStatus.REJECTED],
-    [VerificationRecordStatus.VERIFIED]: [],
-    [VerificationRecordStatus.REJECTED]: []
-};
-
-function assertVerificationTransition(from: VerificationRecordStatus, to: VerificationRecordStatus): void {
-    if (!VERIFICATION_TRANSITIONS[from]?.includes(to)) {
-        throw new BaseException('state_conflict', `A verification that is ${from} cannot become ${to}`, HttpStatus.CONFLICT);
-    }
-}
-
-/** A company verification's state as the tenant shows it: an open one (pending or in review) is `pending`. */
-const toTenantVerificationStatus = (status: VerificationRecordStatus): VerificationStatus =>
-    status === VerificationRecordStatus.VERIFIED
-        ? VerificationStatus.VERIFIED
-        : status === VerificationRecordStatus.REJECTED
-          ? VerificationStatus.REJECTED
-          : VerificationStatus.PENDING;
 
 @Injectable()
 export class TenantService {
@@ -147,6 +117,29 @@ export class TenantService {
         const tenantId = this.tenantContext.getTenantId()!;
         const tenant = await this.findOneOrFail(tenantId);
         return tenantResponseMapper.toResponse(tenant) as TenantProfileResponse;
+    }
+
+    /** `GET /v1/tenant` (v5.2 API §3.17): the tenant record, with the plan from its billing row (Free until it has one). */
+    async getRecord(): Promise<TenantRecordResponse> {
+        const tenantId = this.tenantContext.getTenantId()!;
+        const tenant = await this.prisma.tenant.findFirst({
+            where: { id: tenantId, deletedAt: null },
+            select: {
+                id: true,
+                name: true,
+                slug: true,
+                verificationStatus: true,
+                billingCountry: true,
+                retentionMonths: true,
+                dataRegion: true,
+                billing: { select: { plan: true } }
+            }
+        });
+        if (!tenant) {
+            throw new NotFoundException(`Tenant ${tenantId} not found`);
+        }
+        const { billing, ...record } = tenant;
+        return { ...record, plan: billing?.plan ?? BillingPlanEnum.FREE };
     }
 
     /**
@@ -278,10 +271,12 @@ export class TenantService {
                 // Ingestion verifies them with (API Contract §4.1). Set here rather than as a
                 // column default so rotation has one home in application code, and set at
                 // creation because ingestion fails closed: a tenant without one has a widget
-                // that silently never renders (NOTE.md §V5.22). Sealed at rest (US1.5.4 F5).
-                widgetTokenSecret: this.widgetSecretVault.generate().sealed
+                // that silently never renders (NOTE.md §V5.22). Sealed at rest (US1.5.4 F5); one `kid` (v5.2 US1.5.5).
+                widgetSigningSecrets: this.widgetSecretVault.toColumn([this.widgetSecretVault.mint(new Date()).stored])
             }
         });
+        // Everything the caller writes next in this transaction belongs to the new tenant (row-level security).
+        await scopeTransactionToTenant(tx, created.id);
         // Emitted before the owner's user.registered so the tenant's Keto grants are queued first.
         this.txEventEmitter.emitAfterCommit(
             TenantEvents.CREATED,
@@ -297,8 +292,7 @@ export class TenantService {
                 {
                     dataRegion: created.dataRegion,
                     retentionMonths: created.retentionMonths
-                },
-                effectiveInvitationChannel(created)
+                }
             )
         );
         return { tenant: created };
@@ -323,73 +317,6 @@ export class TenantService {
             this.logger.warn('Failed to upload tenant logo, continuing without image', { error: err instanceof Error ? err.message : String(err) });
             return undefined;
         }
-    }
-
-    /**
-     * Records a verification report — the KYB provider's result, a Super Admin's decision, or the internal route's — in
-     * `tenant_verifications` and, for a company verification, moves `tenants.verification_status` with it, in one
-     * transaction. A verification moves `pending → in_review → verified | rejected` (`pending` may also be decided
-     * directly); a decided one never moves again — a rejected company resubmits, which opens a new row (E1 D15). Any other
-     * move is a 409, and a rejection needs a reason.
-     */
-    async applyVerificationReport(tenantId: string, dto: UpdateVerificationStatusDto): Promise<TenantResponse> {
-        const existing = await this.prisma.tenant.findUnique({ where: { id: tenantId } });
-        if (!existing) {
-            throw new NotFoundException(`Tenant with ID ${tenantId} not found`);
-        }
-        if (dto.status === VerificationRecordStatus.REJECTED && !dto.reason?.trim()) {
-            throw new BaseException('missing_required_field', 'A rejection needs a reason', HttpStatus.BAD_REQUEST, 'reason');
-        }
-        const type = dto.verificationType ?? VerificationType.COMPANY;
-        const decided = dto.status === VerificationRecordStatus.VERIFIED || dto.status === VerificationRecordStatus.REJECTED;
-        const tenantStatus = type === VerificationType.COMPANY ? toTenantVerificationStatus(dto.status) : existing.verificationStatus;
-
-        const updated = await this.prisma.$transaction(async (tx) => {
-            const record = await this.openVerification(tx, tenantId, type, dto.verificationId);
-            if (record) {
-                assertVerificationTransition(record.status as VerificationRecordStatus, dto.status);
-            } else if (type === VerificationType.COMPANY) {
-                throw new BaseException('state_conflict', 'No company verification is in progress', HttpStatus.CONFLICT);
-            }
-            const data = {
-                status: dto.status,
-                reason: dto.reason ?? null,
-                reviewedBy: dto.reviewedBy ?? null,
-                reviewedAt: decided ? new Date() : null,
-                ...(dto.temporalWorkflowId ? { temporalWorkflowId: dto.temporalWorkflowId } : {}),
-                ...(dto.temporalRunId ? { temporalRunId: dto.temporalRunId } : {}),
-                ...(dto.evidence ? { evidence: dto.evidence as Prisma.InputJsonValue } : {})
-            };
-            await (record
-                ? tx.tenantVerification.update({ where: { id: record.id }, data })
-                : tx.tenantVerification.create({ data: { tenantId, verificationType: type, ...data } }));
-            if (tenantStatus === existing.verificationStatus) {
-                return existing;
-            }
-            this.txEventEmitter.emitAfterCommit(
-                TenantEvents.VERIFICATION_STATUS_CHANGED,
-                new TenantVerificationStatusChangedEvent(tenantId, tenantId, existing.verificationStatus, tenantStatus, dto.reason, dto.reviewedBy)
-            );
-            return tx.tenant.update({ where: { id: tenantId }, data: { verificationStatus: tenantStatus } });
-        });
-
-        this.logger.log('Tenant verification report applied', { tenantId, verificationType: type, status: dto.status });
-        return tenantResponseMapper.toResponse(updated);
-    }
-
-    /** The verification a report is about: the named one, else the latest still open of that type. */
-    private async openVerification(tx: Prisma.TransactionClient, tenantId: string, type: VerificationType, verificationId?: string) {
-        if (verificationId) {
-            const named = await tx.tenantVerification.findFirst({ where: { id: verificationId, tenantId } });
-            if (!named) {
-                throw new BaseException('resource_not_found', `Verification ${verificationId} not found`, HttpStatus.NOT_FOUND, 'verification_id');
-            }
-            return named;
-        }
-        return tx.tenantVerification.findFirst({
-            where: { tenantId, verificationType: type, status: { in: [VerificationRecordStatus.PENDING, VerificationRecordStatus.IN_REVIEW] } },
-            orderBy: { createdAt: 'desc' }
-        });
     }
 
     // =========================================================
@@ -445,7 +372,7 @@ export class TenantService {
 
         const updated = await this.applyChange(tenantId, updateData, (row) => [
             TenantEvents.UPDATED,
-            new TenantUpdatedEvent(row.id, row.id, changes, user.userId, changes.billingCountry ? effectiveInvitationChannel(row) : undefined)
+            new TenantUpdatedEvent(row.id, row.id, changes, user.userId)
         ]);
 
         this.logger.log(`Tenant updated: ${tenantId}`, { tenantId, changes: Object.keys(changes) });
@@ -462,48 +389,26 @@ export class TenantService {
     }
 
     /**
-     * The three Owner settings in one audited change: the invitation channel (null = back to the platform
-     * default), the raw-data retention window and the payout verification threshold (null = none).
-     * `tenant.updated` carries the new values, so the services that enforce them keep a copy.
+     * The Owner settings in one audited change: the raw-data retention window. `tenant.updated` carries the new value,
+     * so the services that apply it keep a copy. The payout verification threshold is a Program setting (v5.2 API §3.1).
      */
     async updateSettings(dto: UpdateTenantSettingsDto, user: IAuthenticatedUser): Promise<TenantSettingsResponse> {
         const tenantId = this.tenantContext.getTenantId()!;
         const tenant = await this.findOneOrFail(tenantId);
         const changes: Record<string, { from: unknown; to: unknown }> = {};
-        const set = (
-            field: 'invitationChannel' | 'retentionMonths' | 'verificationRequiredAbove' | 'verificationRequiredAboveCurrency',
-            to: unknown
-        ): void => {
+        const set = (field: 'retentionMonths', to: unknown): void => {
             if (to !== undefined && to !== (tenant[field] ?? null)) {
                 changes[field] = { from: tenant[field] ?? null, to };
             }
         };
-        set('invitationChannel', dto.invitationChannel);
         set('retentionMonths', dto.retentionMonths);
-        if (dto.verificationRequiredAbove !== undefined) {
-            const currency = dto.verificationRequiredAbove === null ? null : dto.verificationRequiredAboveCurrency!.toUpperCase();
-            set('verificationRequiredAbove', dto.verificationRequiredAbove);
-            set('verificationRequiredAboveCurrency', currency);
-            if (changes.verificationRequiredAboveCurrency && !changes.verificationRequiredAbove) {
-                changes.verificationRequiredAbove = { from: tenant.verificationRequiredAbove ?? null, to: dto.verificationRequiredAbove };
-            }
-        }
         if (Object.keys(changes).length === 0) {
             return toTenantSettings(tenant);
         }
         const updateData = Object.fromEntries(Object.entries(changes).map(([field, change]) => [field, change.to]));
         const updated = await this.applyChange(tenantId, updateData, (row) => [
             TenantEvents.UPDATED,
-            new TenantUpdatedEvent(
-                row.id,
-                row.id,
-                changes,
-                user.userId,
-                changes.invitationChannel ? effectiveInvitationChannel(row) : undefined,
-                changes.verificationRequiredAbove || changes.verificationRequiredAboveCurrency
-                    ? { amount: row.verificationRequiredAbove, currency: row.verificationRequiredAboveCurrency }
-                    : undefined
-            )
+            new TenantUpdatedEvent(row.id, row.id, changes, user.userId)
         ]);
         this.logger.log(`Tenant settings updated: ${tenantId}`, { tenantId, changes: Object.keys(changes) });
         return toTenantSettings(updated);
@@ -788,10 +693,6 @@ export class TenantService {
 
 function toTenantSettings(tenant: TenantProps): TenantSettingsResponse {
     return Object.assign(new TenantSettingsResponse(), {
-        invitationChannel: effectiveInvitationChannel(tenant),
-        invitationChannelSource: invitationChannelSource(tenant),
-        retentionMonths: tenant.retentionMonths,
-        verificationRequiredAbove: tenant.verificationRequiredAbove ?? null,
-        verificationRequiredAboveCurrency: tenant.verificationRequiredAboveCurrency ?? null
+        retentionMonths: tenant.retentionMonths
     });
 }

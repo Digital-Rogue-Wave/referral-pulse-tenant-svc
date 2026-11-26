@@ -1,8 +1,9 @@
 # BDD Test Suite — referral-pulse-tenant-svc
 
 **Stack:** `@cucumber/cucumber` v11 · TypeScript · supertest · nock  
-**Scenarios:** 17 across 3 feature files  
-**Coverage:** Authentication, Billing, Tenant Status Guards
+**Scenarios:** 115 across 33 feature files
+
+**Coverage:** Story-owned v5.2 evidence, extension/legacy regression controls, Authentication, Billing, Tenant Status Guards
 
 ---
 
@@ -11,14 +12,13 @@
 ```
 test/bdd/
 ├── features/
-│   ├── auth.feature
-│   ├── billing.feature
-│   └── tenant-guards.feature
+│   ├── usX.Y.Z/           — story-owned feature files
+│   ├── extensions/        — explicitly non-evidence regression controls
+│   └── legacy/            — explicitly non-evidence legacy controls
 ├── step-definitions/
-│   ├── common.steps.ts
-│   ├── auth.steps.ts
-│   ├── billing.steps.ts
-│   └── tenant-guards.steps.ts
+│   ├── common/            — shared steps
+│   ├── usX.Y.Z/           — story-owned steps
+│   └── extensions/        — extension-only steps
 └── support/
     ├── world.ts           — shared scenario state (token, response, tenantId)
     ├── app.bootstrap.ts   — NestJS TestingModule, single boot per suite
@@ -141,18 +141,17 @@ Run alone: `pnpm test:bdd --tags @billing-plan-change`.
 
 ---
 
-### `invoice-history.feature` (5 scenarios) `@invoice-history` — US1.8.3
+### `invoice-history.feature` (4 scenarios) `@invoice-history` — US1.8.3
 
 > Each scenario signs a fresh company up (reusing the `@billing-plan` steps and clean-up). Stripe's invoices are
 > set in Stripe's own shape (cents) in `stripe.fake.ts` and read through the **real** `StripeService` mapping over
 > an offline SDK, so the amounts and links checked are the ones the Owner receives.
 
 ```gherkin
-Scenario: A company that has never paid has no invoices, and Stripe is not asked → 200, empty page
-Scenario: Amounts are integers in minor units, as the API contract requires        → amount_due 4950, eur, PDF + hosted links
-Scenario: The list is paged with Stripe's cursors                                  → 2 of 3, has_more, next_cursor in_bdd_2
-Scenario: The next invoice is in minor units too                                   → amount_due 990, eur
-Scenario: A member without billing:read cannot see the invoices                    → 403
+Scenario: A company that has never paid has no invoices       → Owner: 200, empty page; member without tenant:billing: 403
+Scenario: Amounts are integers in minor units, as the API contract requires → amount_due 4950, eur, PDF + hosted links
+Scenario: The list is paged with Stripe's cursors             → 2 of 3, has_more, next_cursor in_bdd_2
+Scenario: A member without tenant:billing cannot see the invoices → 403
 ```
 
 Run alone: `pnpm test:bdd --tags @invoice-history`.

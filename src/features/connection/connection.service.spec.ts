@@ -2,17 +2,16 @@ import { HttpStatus } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { Prisma } from '@prisma-gen/generated/client';
 
-import { ConnectionProvider, ConnectionType, receiverPath } from '@domains/connection';
+import { ConnectionProvider, ConnectionStatus, receiverPath } from '@domains/connection';
 
 import { ConnectionService } from './connection.service';
 import { ProviderSecretCipher } from './provider-secret.cipher';
 
 const TENANT_ID = '01HQZX000000000000000TEN';
 const CONNECTION_ID = '01HQZX000000000000000CON';
-const KEY_HEX = 'a'.repeat(64);
+const STRIPE_SECRET = 'whsec_live_abcdefghijklmnop';
 
-const cipherWith = (keyHex: string | undefined): ProviderSecretCipher =>
-    new ProviderSecretCipher({ get: () => keyHex } as unknown as ConfigService<never>);
+const cipher = new ProviderSecretCipher({ get: () => 'a'.repeat(64) } as unknown as ConfigService<never>);
 
 const uniqueViolation = (): Prisma.PrismaClientKnownRequestError =>
     new Prisma.PrismaClientKnownRequestError('duplicate', { code: 'P2002', clientVersion: '7.4.0' });
@@ -21,262 +20,325 @@ const row = (overrides: Record<string, unknown> = {}) => ({
     id: CONNECTION_ID,
     tenantId: TENANT_ID,
     provider: ConnectionProvider.STRIPE,
-    connectionType: ConnectionType.BILLING,
-    name: 'Stripe live',
-    signingSecret: null,
+    direction: 'inbound',
+    status: ConnectionStatus.PENDING_VERIFICATION,
+    name: null,
+    credentialsEncrypted: null,
+    signingSecretEncrypted: cipher.encrypt(STRIPE_SECRET),
+    previousSigningSecretEncrypted: null,
+    previousSecretValidUntil: null,
     config: {},
-    enabled: true,
+    lastVerifiedAt: null,
+    lastSyncAt: null,
     createdBy: 'user-1',
-    createdAt: new Date('2026-10-19T10:00:00Z'),
-    updatedAt: new Date('2026-10-19T10:00:00Z'),
+    createdAt: new Date('2026-11-19T10:00:00Z'),
+    updatedAt: new Date('2026-11-19T10:00:00Z'),
     revokedAt: null,
     ...overrides
 });
 
-interface Harness {
-    service: ConnectionService;
-    create: jest.Mock;
-    update: jest.Mock;
-    findFirst: jest.Mock;
-    scopedFindFirst: jest.Mock;
-    emitted: { name: string; event: unknown }[];
-    redisSet: jest.Mock;
-}
-
-const harness = (
-    cipher: ProviderSecretCipher = cipherWith(KEY_HEX),
-    redisSet = jest.fn().mockResolvedValue('OK'),
-    inboundPublicBaseUrl?: string
-): Harness => {
-    const create = jest.fn().mockResolvedValue(row());
-    const update = jest.fn().mockResolvedValue(row({ revokedAt: new Date() }));
-    const findFirst = jest.fn();
-    const scopedFindFirst = jest.fn();
-    const emitted: { name: string; event: unknown }[] = [];
-
-    const delegate = { create, update, findFirst };
-    const prisma = {
-        providerConnection: delegate,
-        $transaction: (fn: (tx: unknown) => unknown) => fn({ providerConnection: delegate })
+const harness = (options: { inboundPublicBaseUrl?: string; testFailure?: string | null } = {}) => {
+    const delegate = {
+        create: jest.fn().mockImplementation(({ data }) => Promise.resolve(row(data))),
+        update: jest.fn().mockImplementation(({ data }) => Promise.resolve(row(data))),
+        updateMany: jest.fn().mockResolvedValue({ count: 1 }),
+        findFirst: jest.fn()
     };
+    const scopedFindFirst = jest.fn();
+    const emitted: { name: string; event: { payload?: Record<string, unknown>; userId?: string } }[] = [];
+    const check = jest.fn().mockResolvedValue(options.testFailure ?? null);
+    const redisSet = jest.fn().mockResolvedValue('OK');
 
+    const prisma = { providerConnection: delegate, $transaction: (fn: (tx: unknown) => unknown) => fn({ providerConnection: delegate }) };
     const service = new ConnectionService(
         prisma as never,
+        prisma as never,
+        { runWithContext: (_: unknown, work: () => Promise<unknown>) => work() } as never,
         {
             getRequiredTenantId: () => TENANT_ID,
             forModel: () => ({ findFirst: scopedFindFirst, findMany: jest.fn().mockResolvedValue([]) })
         } as never,
-        { emitAfterCommit: (name: string, event: unknown) => emitted.push({ name, event }) } as never,
+        { emitAfterCommit: (name: string, event: never) => emitted.push({ name, event }) } as never,
         cipher,
+        { check } as never,
         { setContext: jest.fn(), log: jest.fn(), warn: jest.fn() } as never,
         { getClient: () => ({ set: redisSet }) } as never,
-        { get: () => inboundPublicBaseUrl } as never
+        { get: () => options.inboundPublicBaseUrl } as never
     );
-
-    return { service, create, update, findFirst, scopedFindFirst, emitted, redisSet };
+    return { service, delegate, scopedFindFirst, emitted, check, redisSet };
 };
 
-describe('Provider connections', () => {
-    describe('given a new Stripe connection', () => {
-        it('then the secret is stored encrypted, never in the clear', async () => {
-            const { service, create } = harness();
+const expectBadRequest = async (promise: Promise<unknown>, param: string): Promise<void> => {
+    await expect(promise).rejects.toMatchObject({ status: HttpStatus.BAD_REQUEST, param });
+};
+
+describe('Connections (v5.2 API §3.16)', () => {
+    describe('when the Owner creates one', () => {
+        it('then a Stripe connection is inbound, pending verification, with its inbound URL and a sealed secret', async () => {
+            const { service, delegate, emitted } = harness({ inboundPublicBaseUrl: 'https://api.refrev.io/' });
+
+            const response = await service.create('user-1', { provider: ConnectionProvider.STRIPE, credentials: { signingSecret: STRIPE_SECRET } });
+
+            const data = delegate.create.mock.calls[0][0].data;
+            expect(data).toMatchObject({ direction: 'inbound', credentialsEncrypted: null });
+            expect(cipher.decrypt(data.signingSecretEncrypted)).toBe(STRIPE_SECRET);
+            expect(response).toMatchObject({
+                status: 'pending_verification',
+                inboundUrl: `https://api.refrev.io${receiverPath('stripe', CONNECTION_ID)}`
+            });
+            expect(JSON.stringify(response)).not.toContain(STRIPE_SECRET);
+            expect(emitted[0]).toMatchObject({
+                name: 'connection.created',
+                event: { payload: { direction: 'inbound', status: 'pending_verification' } }
+            });
+        });
+
+        it('then a Zapier connection is outbound, stores nothing and has no inbound URL', async () => {
+            const { service, delegate } = harness();
+
+            const response = await service.create('user-1', { provider: ConnectionProvider.ZAPIER });
+
+            expect(delegate.create.mock.calls[0][0].data).toMatchObject({
+                direction: 'outbound',
+                signingSecretEncrypted: null,
+                credentialsEncrypted: null
+            });
+            expect(JSON.parse(JSON.stringify(response))).not.toHaveProperty('inboundUrl');
+        });
+
+        it('then a Chargebee connection keeps its basic-auth pair as the secret its callbacks are checked with', async () => {
+            const { service, delegate } = harness();
 
             await service.create('user-1', {
-                provider: ConnectionProvider.STRIPE,
-                connectionType: ConnectionType.BILLING,
-                signingSecret: 'whsec_live_abcdefghijklmnop'
+                provider: ConnectionProvider.CHARGEBEE,
+                credentials: { basicAuthUser: 'cb', basicAuthPassword: 'pa55word!' }
             });
 
-            const stored = create.mock.calls[0][0].data.signingSecret as string;
-            expect(stored).not.toContain('whsec_live_abcdefghijklmnop');
-            expect(cipherWith(KEY_HEX).decrypt(stored)).toBe('whsec_live_abcdefghijklmnop');
+            expect(cipher.decrypt(delegate.create.mock.calls[0][0].data.signingSecretEncrypted)).toBe('cb:pa55word!');
         });
 
-        it('then the response carries the receiver URL and not the secret', async () => {
-            const { service } = harness();
-
-            const response = await service.create('user-1', {
-                provider: ConnectionProvider.STRIPE,
-                connectionType: ConnectionType.BILLING,
-                signingSecret: 'whsec_live_abcdefghijklmnop'
-            });
-
-            expect(response.receiverUrl).toBe(`/inbound/stripe/${CONNECTION_ID}`);
-            expect(JSON.stringify(response)).not.toContain('whsec_live');
-        });
-
-        it('then `connection.created` is emitted for the ingestion cache, without the secret', async () => {
-            const { service, emitted } = harness();
+        it('then a PayPal connection is both ways: the webhook secret and the outbound credential are sealed apart', async () => {
+            const { service, delegate } = harness();
 
             await service.create('user-1', {
-                provider: ConnectionProvider.STRIPE,
-                connectionType: ConnectionType.BILLING,
-                signingSecret: 'whsec_live_abcdefghijklmnop'
+                provider: ConnectionProvider.PAYPAL,
+                credentials: { signingSecret: 'paypal-app-secret-0001', apiKey: 'paypal-api-key-0001' }
             });
 
-            expect(emitted).toHaveLength(1);
-            expect(emitted[0]!.name).toBe('connection.created');
-            expect(JSON.stringify(emitted[0]!.event)).not.toContain('whsec_live');
+            const data = delegate.create.mock.calls[0][0].data;
+            expect(data.direction).toBe('both');
+            expect(JSON.parse(cipher.decrypt(data.credentialsEncrypted))).toEqual({ apiKey: 'paypal-api-key-0001' });
         });
-    });
 
-    describe('given a tenant that already has a live Stripe connection', () => {
-        it("then a second one is a 409, so it cannot take over the first one's callbacks", async () => {
-            const { service, create } = harness();
-            create.mockRejectedValue(uniqueViolation());
+        it.each([
+            [
+                'a direction other than the matrix',
+                { provider: ConnectionProvider.STRIPE, direction: 'outbound', credentials: { signingSecret: STRIPE_SECRET } },
+                'direction'
+            ],
+            ['no signing secret for Stripe', { provider: ConnectionProvider.STRIPE, credentials: {} }, 'credentials.signing_secret'],
+            [
+                'an api key on an inbound-only provider',
+                { provider: ConnectionProvider.PADDLE, credentials: { signingSecret: STRIPE_SECRET, apiKey: 'k-0000000001' } },
+                'credentials.api_key'
+            ],
+            ['no outbound credential for Wise', { provider: ConnectionProvider.WISE, credentials: {} }, 'credentials.api_key'],
+            ['credentials on Zapier', { provider: ConnectionProvider.ZAPIER, credentials: { apiKey: 'k-0000000001' } }, 'credentials'],
+            [
+                'half a Chargebee pair',
+                { provider: ConnectionProvider.CHARGEBEE, credentials: { basicAuthUser: 'cb' } },
+                'credentials.basic_auth_password'
+            ]
+        ])('then %s is a 400 naming the field', async (_, dto, param) => {
+            await expectBadRequest(harness().service.create('user-1', dto as never), param);
+        });
+
+        it('then a second live connection for the same provider is a 409', async () => {
+            const { service, delegate } = harness();
+            delegate.create.mockRejectedValue(uniqueViolation());
 
             await expect(
-                service.create('user-1', {
-                    provider: ConnectionProvider.STRIPE,
-                    connectionType: ConnectionType.BILLING,
-                    signingSecret: 'whsec_live_abcdefghijklmnop'
-                })
-            ).rejects.toMatchObject({ status: HttpStatus.CONFLICT });
+                service.create('user-1', { provider: ConnectionProvider.STRIPE, credentials: { signingSecret: STRIPE_SECRET } })
+            ).rejects.toMatchObject({
+                status: HttpStatus.CONFLICT
+            });
         });
     });
 
-    describe('given no encryption key configured', () => {
-        it('then creating a connection fails loudly rather than storing an unreadable secret', async () => {
-            const { service, create } = harness(cipherWith(undefined));
+    describe('when the Owner rotates the signing secret', () => {
+        it('then the old secret is kept for 24 hours and connection.rotated says until when', async () => {
+            const { service, delegate, scopedFindFirst, emitted } = harness();
+            const before = row({ status: 'active' });
+            scopedFindFirst.mockResolvedValue(before);
 
-            await expect(
-                service.create('user-1', {
-                    provider: ConnectionProvider.STRIPE,
-                    connectionType: ConnectionType.BILLING,
-                    signingSecret: 'whsec_live_abcdefghijklmnop'
-                })
-            ).rejects.toThrow('PROVIDER_SECRET_ENCRYPTION_KEY');
-            expect(create).not.toHaveBeenCalled();
-        });
-    });
+            await service.rotate(CONNECTION_ID, 'user-1', { credentials: { signingSecret: 'whsec_new_secret_000001' } });
 
-    describe('given the receiver resolving a callback', () => {
-        it('then the secret comes back decrypted, because verification needs the raw value', async () => {
-            const { service, findFirst } = harness();
-            findFirst.mockResolvedValue(row({ signingSecret: cipherWith(KEY_HEX).encrypt('whsec_live_abcdefghijklmnop') }));
-
-            const resolved = await service.findForReceiver(ConnectionProvider.STRIPE, CONNECTION_ID);
-
-            expect(resolved?.signingSecret).toBe('whsec_live_abcdefghijklmnop');
-            expect(resolved?.tenantId).toBe(TENANT_ID);
+            const data = delegate.update.mock.calls[0][0].data;
+            expect(cipher.decrypt(data.signingSecretEncrypted)).toBe('whsec_new_secret_000001');
+            expect(data.previousSigningSecretEncrypted).toBe(before.signingSecretEncrypted);
+            const hours = (data.previousSecretValidUntil.getTime() - Date.now()) / 3_600_000;
+            expect(hours).toBeGreaterThan(23.9);
+            expect(hours).toBeLessThanOrEqual(24);
+            expect(emitted[0]).toMatchObject({
+                name: 'connection.rotated',
+                event: { payload: { oldSecretValidUntil: data.previousSecretValidUntil } }
+            });
         });
 
-        it('then a revoked or disabled connection is not resolvable — the 404 the provider is owed', async () => {
-            const { service, findFirst } = harness();
-            findFirst.mockResolvedValue(null);
+        it('then an outbound-only rotation replaces the credential with no grace period', async () => {
+            const { service, delegate, scopedFindFirst, emitted } = harness();
+            scopedFindFirst.mockResolvedValue(row({ provider: 'wise', direction: 'both', signingSecretEncrypted: null }));
 
-            await expect(service.findForReceiver(ConnectionProvider.STRIPE, CONNECTION_ID)).resolves.toBeNull();
-            expect(findFirst.mock.calls[0]![0].where).toMatchObject({ enabled: true, revokedAt: null });
+            await service.rotate(CONNECTION_ID, 'user-1', { credentials: { apiKey: 'wise-key-000000002' } });
+
+            expect(delegate.update.mock.calls[0][0].data).not.toHaveProperty('previousSigningSecretEncrypted');
+            expect(emitted[0]!.event.payload).toMatchObject({ oldSecretValidUntil: null });
         });
 
-        it('then it looks up across tenants, because a provider callback carries no tenant context', async () => {
-            const { service, findFirst, scopedFindFirst } = harness();
-            findFirst.mockResolvedValue(row());
-
-            await service.findForReceiver(ConnectionProvider.STRIPE, CONNECTION_ID);
-
-            expect(findFirst).toHaveBeenCalled();
-            expect(scopedFindFirst).not.toHaveBeenCalled();
-        });
-    });
-
-    describe('given the provider decides the type (US1.5.1 F5, F7)', () => {
-        it('then a Tremendous connection is a gift-card connection without the client saying so', async () => {
-            const { service, create } = harness();
-
-            await service.create('user-1', { provider: ConnectionProvider.TREMENDOUS, signingSecret: 'tremendous_secret_0123456789' });
-
-            expect(create.mock.calls[0][0].data.connectionType).toBe(ConnectionType.GIFT_CARD);
-        });
-
-        it('then a wrong pair is refused with 400 before anything is stored', async () => {
-            const { service, create } = harness();
-
-            await expect(
-                service.create('user-1', {
-                    provider: ConnectionProvider.PADDLE,
-                    connectionType: ConnectionType.CRM,
-                    signingSecret: 'pdl_ntfset_0123456789abcdef'
-                })
-            ).rejects.toMatchObject({ status: HttpStatus.BAD_REQUEST });
-            expect(create).not.toHaveBeenCalled();
-        });
-    });
-
-    describe('given a public base URL for the receivers (US1.5.1 F4)', () => {
-        it('then the receiver URL is absolute, ready to paste into the provider console', async () => {
-            const { service } = harness(cipherWith(KEY_HEX), jest.fn(), 'https://in.example.com/');
-
-            const response = await service.create('user-1', { provider: ConnectionProvider.STRIPE, signingSecret: 'whsec_live_abcdefghijklmnop' });
-
-            expect(response.receiverUrl).toBe(`https://in.example.com/inbound/stripe/${CONNECTION_ID}`);
-        });
-    });
-
-    describe('given a revocation', () => {
-        it('then the row is kept and disabled, so sent receipts stay attributable', async () => {
-            const { service, update, scopedFindFirst, emitted } = harness();
-            scopedFindFirst.mockResolvedValue(row());
-
-            await service.revoke(CONNECTION_ID, 'user-2');
-
-            expect(update.mock.calls[0][0].data).toMatchObject({ enabled: false });
-            expect(update.mock.calls[0][0].data.revokedAt).toBeInstanceOf(Date);
-            expect(emitted.map((e) => e.name)).toEqual(['connection.revoked']);
-        });
-
-        it('then Event Ingestion is told at once through the shared Redis marker (F2)', async () => {
-            const { service, scopedFindFirst, redisSet } = harness();
-            scopedFindFirst.mockResolvedValue(row());
-
-            await service.revoke(CONNECTION_ID, 'user-2');
-
-            expect(redisSet).toHaveBeenCalledWith(`connection-revoked:${CONNECTION_ID}`, '1', 'EX', 3600);
-        });
-
-        it('then a failed marker write does not undo or fail the committed revoke', async () => {
-            const { service, scopedFindFirst, update, emitted } = harness(cipherWith(KEY_HEX), jest.fn().mockRejectedValue(new Error('redis down')));
-            scopedFindFirst.mockResolvedValue(row());
-
-            await expect(service.revoke(CONNECTION_ID, 'user-2')).resolves.toBeUndefined();
-
-            expect(update).toHaveBeenCalled();
-            expect(emitted.map((e) => e.name)).toEqual(['connection.revoked']);
-        });
-
-        it('then revoking an unknown connection is a 404', async () => {
+        it('then an empty rotation is a 400 and a revoked connection a 404', async () => {
             const { service, scopedFindFirst } = harness();
-            scopedFindFirst.mockResolvedValue(null);
+            scopedFindFirst.mockResolvedValueOnce(row());
+            await expectBadRequest(service.rotate(CONNECTION_ID, 'user-1', { credentials: {} }), 'credentials');
 
-            await expect(service.revoke(CONNECTION_ID, 'user-2')).rejects.toMatchObject({ status: HttpStatus.NOT_FOUND });
+            scopedFindFirst.mockResolvedValueOnce(null);
+            await expect(service.rotate(CONNECTION_ID, 'user-1', { credentials: { signingSecret: STRIPE_SECRET } })).rejects.toMatchObject({
+                status: HttpStatus.NOT_FOUND
+            });
         });
     });
 
-    describe('given the receiver path', () => {
-        it('then it is the path Event Ingestion hosts (API Contract §6.5)', () => {
-            expect(receiverPath('paddle', CONNECTION_ID)).toBe(`/inbound/paddle/${CONNECTION_ID}`);
+    describe('when the Owner tests a connection', () => {
+        it('then a passing outbound check activates a pending connection once', async () => {
+            const { service, scopedFindFirst, check, emitted } = harness();
+            scopedFindFirst.mockResolvedValue(
+                row({ provider: 'wise', direction: 'both', credentialsEncrypted: cipher.encrypt('{"apiKey":"wise-key-1"}') })
+            );
+
+            const result = await service.test(CONNECTION_ID, 'user-1');
+
+            expect(check).toHaveBeenCalledWith('wise', { apiKey: 'wise-key-1' }, {});
+            expect(result).toMatchObject({ ok: true, status: 'active', failure: null });
+            expect(emitted[0]).toMatchObject({ name: 'connection.verified', event: { payload: { source: 'test', status: 'active' } } });
+        });
+
+        it('then a failing check reports why and leaves the status alone', async () => {
+            const { service, scopedFindFirst, emitted } = harness({ testFailure: 'provider answered HTTP 401' });
+            scopedFindFirst.mockResolvedValue(row({ provider: 'wise', direction: 'both' }));
+
+            await expect(service.test(CONNECTION_ID, 'user-1')).resolves.toMatchObject({
+                ok: false,
+                failure: 'provider answered HTTP 401',
+                status: 'pending_verification'
+            });
+            expect(emitted).toHaveLength(0);
+        });
+
+        it('then an inbound-only connection is a 409: it activates on its first verified callback', async () => {
+            const { service, scopedFindFirst } = harness();
+            scopedFindFirst.mockResolvedValue(row());
+
+            await expect(service.test(CONNECTION_ID, 'user-1')).rejects.toMatchObject({ status: HttpStatus.CONFLICT });
         });
     });
-});
 
-describe('The provider secret cipher', () => {
-    describe('given a secret', () => {
-        it('then each encryption differs, because the IV is fresh', () => {
-            const cipher = cipherWith(KEY_HEX);
+    describe('when Event Ingestion reports the first verified callback', () => {
+        it('then the connection turns active and connection.verified names the ingestion service', async () => {
+            const { service, delegate, emitted } = harness();
+            delegate.findFirst.mockResolvedValue(row());
 
-            expect(cipher.encrypt('same-secret')).not.toBe(cipher.encrypt('same-secret'));
+            await expect(service.markVerifiedByCallback(CONNECTION_ID, 'ingestion-svc')).resolves.toEqual({
+                connectionId: CONNECTION_ID,
+                status: 'active'
+            });
+            expect(emitted[0]).toMatchObject({
+                name: 'connection.verified',
+                event: { userId: 'service:ingestion-svc', payload: { source: 'callback' } }
+            });
         });
 
-        it('then a tampered ciphertext is refused rather than returning garbage', () => {
-            const cipher = cipherWith(KEY_HEX);
-            const stored = Buffer.from(cipher.encrypt('whsec_live_abcdefghijklmnop'), 'base64');
-            stored[stored.length - 1] = stored[stored.length - 1]! ^ 0xff;
+        it('then a later report changes nothing and announces nothing', async () => {
+            const { service, delegate, emitted } = harness();
+            delegate.findFirst.mockResolvedValue(row({ status: 'active' }));
+            delegate.updateMany.mockResolvedValueOnce({ count: 0 });
 
-            expect(() => cipher.decrypt(stored.toString('base64'))).toThrow();
+            await expect(service.markVerifiedByCallback(CONNECTION_ID, 'ingestion-svc')).resolves.toEqual({
+                connectionId: CONNECTION_ID,
+                status: 'active'
+            });
+            expect(emitted).toHaveLength(0);
+        });
+    });
+
+    describe('when Event Ingestion resolves a connection', () => {
+        it('then it gets the signing secret and, within 24 hours of a rotation, the previous one', async () => {
+            const { service, delegate } = harness();
+            const until = new Date(Date.now() + 3_600_000);
+            delegate.findFirst.mockResolvedValue(
+                row({ previousSigningSecretEncrypted: cipher.encrypt('whsec_old_0000000001'), previousSecretValidUntil: until })
+            );
+
+            await expect(service.findForReceiver(ConnectionProvider.STRIPE, CONNECTION_ID)).resolves.toMatchObject({
+                signingSecret: STRIPE_SECRET,
+                previousSigningSecret: 'whsec_old_0000000001',
+                previousSecretValidUntil: until,
+                direction: 'inbound'
+            });
         });
 
-        it('then a key of the wrong length is refused', () => {
-            expect(() => cipherWith('abcd').encrypt('secret')).toThrow('PROVIDER_SECRET_ENCRYPTION_KEY');
+        it('then a previous secret past its 24 hours is not handed out', async () => {
+            const { service, delegate } = harness();
+            delegate.findFirst.mockResolvedValue(
+                row({ previousSigningSecretEncrypted: cipher.encrypt('whsec_old'), previousSecretValidUntil: new Date(Date.now() - 1000) })
+            );
+
+            await expect(service.findForReceiver(ConnectionProvider.STRIPE, CONNECTION_ID)).resolves.toMatchObject({ previousSigningSecret: null });
+        });
+
+        it('then an outbound-only connection is unknown to the receiver, and nothing outbound is ever in the answer', async () => {
+            const { service, delegate } = harness();
+            delegate.findFirst.mockResolvedValueOnce(row({ provider: 'zapier', direction: 'outbound' }));
+            await expect(service.findForReceiver(ConnectionProvider.ZAPIER, CONNECTION_ID)).resolves.toBeNull();
+
+            delegate.findFirst.mockResolvedValueOnce(
+                row({ provider: 'wise', direction: 'both', credentialsEncrypted: cipher.encrypt('{"apiKey":"wise-key-1"}') })
+            );
+            expect(JSON.stringify(await service.findForReceiver(ConnectionProvider.WISE, CONNECTION_ID))).not.toContain('wise-key-1');
+        });
+    });
+
+    describe('when reward- or notification-service reads a credential', () => {
+        it('then it gets the outbound credential and the read is audited under the calling service', async () => {
+            const { service, delegate, emitted } = harness();
+            delegate.findFirst.mockResolvedValue(
+                row({ provider: 'wise', direction: 'both', status: 'active', credentialsEncrypted: cipher.encrypt('{"apiKey":"wise-key-1"}') })
+            );
+
+            await expect(service.credentialFor(CONNECTION_ID, 'payout-worker')).resolves.toMatchObject({
+                credentials: { apiKey: 'wise-key-1' },
+                status: 'active'
+            });
+            expect(emitted[0]).toMatchObject({ name: 'connection.credential_read', event: { userId: 'service:payout-worker' } });
+        });
+
+        it('then a revoked connection is unknown and nothing is audited', async () => {
+            const { service, delegate, emitted } = harness();
+            delegate.findFirst.mockResolvedValue(null);
+
+            await expect(service.credentialFor(CONNECTION_ID, 'payout-worker')).resolves.toBeNull();
+            expect(emitted).toHaveLength(0);
+        });
+    });
+
+    describe('when the Owner revokes one', () => {
+        it('then it is marked revoked, announced, and Event Ingestion is told through the shared Redis', async () => {
+            const { service, delegate, scopedFindFirst, emitted, redisSet } = harness();
+            scopedFindFirst.mockResolvedValue(row());
+
+            await service.revoke(CONNECTION_ID, 'user-1');
+
+            expect(delegate.update.mock.calls[0][0].data).toMatchObject({ status: 'revoked', revokedAt: expect.any(Date) });
+            expect(emitted[0]).toMatchObject({ name: 'connection.revoked', event: { payload: { status: 'revoked', direction: 'inbound' } } });
+            expect(redisSet).toHaveBeenCalledWith(`connection-revoked:${CONNECTION_ID}`, '1', 'EX', 3600);
         });
     });
 });

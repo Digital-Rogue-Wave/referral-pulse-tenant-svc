@@ -2,7 +2,7 @@ import { Injectable } from '@nestjs/common';
 
 import { TenantStatus } from '@domains/tenant/tenant.types';
 
-import { DatabaseService } from '@app/database/database.service';
+import { PrivilegedDatabaseService } from '@app/database/privileged-database.service';
 import { AppLoggerService } from '@common/logging/app-logger.service';
 import { TransactionEventEmitterService } from '@common/events/transaction-event-emitter.service';
 
@@ -22,7 +22,7 @@ export const USAGE_THRESHOLDS = [80, 100] as const;
 @Injectable()
 export class DailyUsageCalculator {
     constructor(
-        private readonly prisma: DatabaseService,
+        private readonly prisma: PrivilegedDatabaseService,
         private readonly logger: AppLoggerService,
         private readonly counters: UsageCounterService,
         private readonly planLimits: PlanLimitService,

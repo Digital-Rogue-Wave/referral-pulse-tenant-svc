@@ -1,0 +1,52 @@
+@guards
+Feature: Tenant Status Guards extension
+  As the platform
+  I want to enforce tenant status restrictions on protected endpoints
+  So that suspended or locked tenants cannot access resources
+
+  Background:
+    Given the application is running
+
+  @needs-suspended-tenant
+@extension
+  Scenario: Suspended tenant is blocked from billing endpoints
+    Given I have a valid JWT for the current fixture tenant
+    When I send a GET request to "/api/v1/billing/plan" with that token
+    Then the response status should be 403
+    And the response should contain errorCode "tenant_suspended"
+    And the response error should contain a "message" field
+
+  @needs-locked-tenant
+@extension
+  Scenario: Locked tenant is blocked from billing endpoints
+    Given I have a valid JWT for the current fixture tenant
+    When I send a GET request to "/api/v1/billing/plan" with that token
+    Then the response status should be 403
+    And the response should contain errorCode "tenant_locked"
+
+  @needs-locked-tenant
+@extension
+  Scenario: Locked tenant error response has the correct shape
+    Given I have a valid JWT for the current fixture tenant
+    When I send a GET request to "/api/v1/billing/plan" with that token
+    Then the response status should be 403
+    And the response error should contain a "type" field
+    And the response error should contain a "code" field
+    And the response error should contain a "message" field
+    And the response error should contain a "request_id" field
+    And the response error should contain a "doc_url" field
+    And the response should carry the header "X-Request-Id"
+    And the error request_id should match the X-Request-Id header
+
+  @needs-active-tenant
+@extension
+  Scenario: Active tenant passes the tenant status guard
+    Given I have a valid JWT for the current fixture tenant
+    When I send a GET request to "/api/v1/billing/plan" with that token
+    Then the response status is not 403
+
+  @public-endpoint
+@extension
+  Scenario: Public endpoint bypasses tenant status guard entirely
+    When I send a GET request to "/api/v1/billing/plans" without any token
+    Then the response status should be 200

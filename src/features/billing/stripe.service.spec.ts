@@ -98,16 +98,6 @@ describe('StripeService', () => {
         });
     });
 
-    it('scopes the upgrade key to the subscription, so a retried upgrade never invoices twice', async () => {
-        await service.upgradeSubscription({ stripeSubscriptionId: 'sub_1', targetPlan: BillingPlanEnum.GROWTH });
-
-        expect(stripe.subscriptions.update).toHaveBeenCalledWith(
-            'sub_1',
-            expect.objectContaining({ items: [{ id: 'si_1', price: 'price_growth' }], proration_behavior: 'always_invoice' }),
-            { idempotencyKey: 'upgrade:sub_1:req-key-1' }
-        );
-    });
-
     it('does not cancel a subscription that already ended', async () => {
         stripe.subscriptions.retrieve.mockResolvedValue({ status: 'canceled' });
 

@@ -4,7 +4,7 @@ model TenantVerification {
   id                 String    @id @default(ulid()) @db.VarChar(26)
   tenantId           String    @map("tenant_id") @db.VarChar(26)
   verificationType   String    @default("company") @map("verification_type") @db.VarChar(20)
-  status             String    @default("pending") @db.VarChar(20)
+  status             String    @default("pending_review") @db.VarChar(20)
   // References to uploaded documents, never the documents themselves.
   evidence           Json?
   temporalWorkflowId String?   @map("temporal_workflow_id") @db.VarChar(255)

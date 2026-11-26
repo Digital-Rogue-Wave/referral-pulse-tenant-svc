@@ -121,6 +121,8 @@ export type EventAction =
     | 'verification_status_changed'
     | 'widget_secret_revealed'
     | 'widget_secret_rotated'
+    | 'verified'
+    | 'credential_read'
     // Compliance
     | 'recorded'
     | 'requested'
@@ -386,7 +388,7 @@ export type TenantEventType =
     | 'tenant.restored'
     | 'tenant.payment-status-changed'
     | 'tenant.verification_requested'
-    | 'tenant.verification_status_changed'
+    | 'tenant.verified'
     | 'tenant.widget_secret_revealed'
     | 'tenant.widget_secret_rotated';
 

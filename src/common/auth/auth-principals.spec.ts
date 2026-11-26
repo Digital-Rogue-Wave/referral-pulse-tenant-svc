@@ -42,10 +42,10 @@ describe('JwtStrategy — which tokens become which principals', () => {
             source: 'dashboard',
             key_type: null,
             key_id: null,
-            perms: ['tenants:read']
+            perms: ['tenant:read']
         } as unknown as IJwtPayload);
 
-        expect(principal).toMatchObject({ userId: 'u1', tenantId: 't1', identityId: 'kratos-1', source: 'dashboard', perms: ['tenants:read'] });
+        expect(principal).toMatchObject({ userId: 'u1', tenantId: 't1', identityId: 'kratos-1', source: 'dashboard', perms: ['tenant:read'] });
         expect(principal.isServiceToken).toBeUndefined();
     });
 

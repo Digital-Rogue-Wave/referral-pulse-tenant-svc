@@ -70,7 +70,7 @@ describe('StripeWebhookService', () => {
         events = mock<TransactionEventEmitterService>();
         const metrics = mock<MetricsService>();
         metrics.createCounter.mockReturnValue({ add: jest.fn() } as never);
-        service = new StripeWebhookService(prisma, stripe, events, metrics, mock<AppLoggerService>());
+        service = new StripeWebhookService(prisma as never, stripe, events, metrics, mock<AppLoggerService>());
     });
 
     describe('delivery guarantees', () => {

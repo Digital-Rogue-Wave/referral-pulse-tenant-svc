@@ -19,18 +19,9 @@ import { TenantStatsService } from '@app/features/tenant/aware/tenant-stats.serv
 import {
     SubscriptionCheckoutResponseDto,
     SubscriptionStatusDto,
-    SubscriptionUpgradePreviewResponseDto,
-    SubscriptionCancelRequestDto,
     InvoiceDto,
-    UpcomingInvoiceDto,
-    UsageSummaryDto,
     UsageMetricSummaryDto,
-    UsageMetricHistoryPointDto,
-    SubscriptionUpgradedEvent,
-    SubscriptionDowngradeScheduledEvent,
     SubscriptionCancelledEvent,
-    SubscriptionDowngradeCancelledEvent,
-    SubscriptionReactivatedEvent,
     BillingEvents
 } from '@domains/billing';
 
@@ -39,15 +30,6 @@ import { CursorPage, DEFAULT_PAGE_LIMIT, ListQueryDto } from '@common/http-contr
 import { StripeService } from './stripe.service';
 import { subscriptionPeriod } from './stripe-objects';
 import { PlanLimitService } from './plan-limit.service';
-
-/** DB Model §3 order: free, starter, growth, scale, enterprise. */
-const PLAN_ORDER: readonly BillingPlanEnum[] = [
-    BillingPlanEnum.FREE,
-    BillingPlanEnum.STARTER,
-    BillingPlanEnum.GROWTH,
-    BillingPlanEnum.SCALE,
-    BillingPlanEnum.ENTERPRISE
-];
 
 @Injectable()
 export class BillingService {
@@ -84,96 +66,15 @@ export class BillingService {
         return billing;
     }
 
-    async getUsageSummary(): Promise<UsageSummaryDto> {
-        const billing = await this.getOrCreateBillingForCurrentTenant();
-        const tenantId = billing.tenantId;
-
-        // US1.8.1 F2: limits and current use are live (`entitlementsOf`, the same view other services get);
-        // the daily `tenant_usages` snapshot only feeds the 7-day history.
-        const entitlements = await this.planLimitService.entitlementsOf(tenantId);
-        const limits: Record<string, number | null> = entitlements?.limits ?? {};
-        const liveUsage: Record<string, number> = entitlements?.usage ?? {};
-
-        const today = this.dateService.nowMoment();
-        const todayStr = this.dateService.format(today, 'YYYY-MM-DD');
-
-        const periodDates: string[] = [];
-        for (let i = 0; i < 7; i++) {
-            const d = this.dateService.subtract(today, i, 'day');
-            periodDates.push(this.dateService.format(d, 'YYYY-MM-DD'));
-        }
-
-        const rows = await this.prisma.tenantUsage.findMany({
-            where: {
-                tenantId,
-                periodDate: { in: periodDates }
-            }
-        });
-
-        const metricsMap = new Map<
-            string,
-            {
-                currentUsage: number;
-                history: UsageMetricHistoryPointDto[];
-            }
-        >();
-
-        for (const metricName of new Set([...Object.keys(limits), ...Object.keys(liveUsage)])) {
-            metricsMap.set(metricName, { currentUsage: liveUsage[metricName] ?? 0, history: [] });
-        }
-
-        for (const row of rows) {
-            let entry = metricsMap.get(row.metricName);
-            if (!entry) {
-                entry = {
-                    currentUsage: 0,
-                    history: []
-                };
-                metricsMap.set(row.metricName, entry);
-            }
-
-            entry.history.push({
-                periodDate: row.periodDate,
-                usage: row.currentUsage
-            });
-
-            if (row.periodDate === todayStr && liveUsage[row.metricName] === undefined) {
-                entry.currentUsage = row.currentUsage;
-            }
-        }
-
-        const metrics: UsageMetricSummaryDto[] = [];
-
-        for (const [metricName, value] of metricsMap.entries()) {
-            const limit: number | null = limits[metricName] ?? null;
-            const percentageUsed: number | null = limit !== null && limit > 0 ? Math.min((value.currentUsage / limit) * 100, 100) : null;
-
-            const history = [...value.history].sort((a, b) => a.periodDate.localeCompare(b.periodDate));
-
-            metrics.push({
-                metric: metricName,
-                currentUsage: value.currentUsage,
-                limit,
-                percentageUsed,
-                history
-            });
-        }
-
-        metrics.sort((a, b) => a.metric.localeCompare(b.metric));
-
-        return {
-            plan: billing.plan as BillingPlanEnum,
-            metrics
-        };
-    }
-
     private async getOrCreateBillingForCurrentTenant(): Promise<Billing> {
         return this.createBillingForTenant();
     }
 
     /**
      * Opens a Stripe Checkout for a tenant with no live subscription (US1.8.2 F2): a second checkout would
-     * start a second subscription and charge twice. Moving between paid plans goes through upgrade/downgrade.
+     * start a second subscription and charge twice. Every later change (plan, cancellation) goes through the
+     * Stripe-hosted portal (v5.2 API: `POST /v1/billing/portal-session`); the portal cannot start the first one.
+     * Not in the v5.2 route list: kept as the only way from trial to paid (E1 P8 decision, 2026-11-23).
      */
     async subscriptionCheckout(plan: BillingPlanEnum, couponCode?: string): Promise<SubscriptionCheckoutResponseDto> {
         this.assertSelfServicePlan(plan);
@@ -181,7 +82,7 @@ export class BillingService {
         if (billing.stripeSubscriptionId && LIVE_SUBSCRIPTION_STATUSES.includes(billing.status)) {
             throw new BaseException(
                 'state_conflict',
-                `This company already has a ${billing.plan} subscription; change it with /v1/billing/subscription/upgrade or /downgrade`,
+                `This company already has a ${billing.plan} subscription; change it in the billing portal (POST /v1/billing/portal-session)`,
                 HttpStatus.CONFLICT
             );
         }
@@ -234,6 +135,9 @@ export class BillingService {
             this.logger.error(`Failed to load tenant trial info for tenant ${tenantId}`, err instanceof Error ? err.stack : String(err));
         }
 
+        // v5.2 API: the plan answer carries the usage counters (live limits and current use, as other services see them).
+        const usage = await this.usageCounters(tenantId);
+
         let planUsagePercentage: number | null = null;
         try {
             const stats = await this.tenantStatsService.getStats();
@@ -279,6 +183,7 @@ export class BillingService {
             trialEndsAt,
             trialDaysRemaining,
             planUsagePercentage,
+            usage,
             stripeSubscriptionStatus,
             stripeCurrentPeriodEnd,
             stripePeriodDaysRemaining,
@@ -291,63 +196,17 @@ export class BillingService {
         };
     }
 
-    async previewSubscriptionUpgrade(targetPlan: BillingPlanEnum): Promise<SubscriptionUpgradePreviewResponseDto> {
-        const billing = await this.getOrCreateBillingForCurrentTenant();
-
-        if (!billing.stripeSubscriptionId) {
-            throw new HttpException('No active subscription to upgrade for this tenant', HttpStatus.BAD_REQUEST);
-        }
-        this.assertPlanDirection(billing.plan, targetPlan, 'up');
-        this.assertSelfServicePlan(targetPlan);
-
-        const preview = await this.stripeService.previewSubscriptionUpgrade({
-            stripeSubscriptionId: billing.stripeSubscriptionId,
-            targetPlan
+    /** One counter per metric the plan limits or the tenant uses: current use, the plan's limit, and the share used. */
+    private async usageCounters(tenantId: string): Promise<UsageMetricSummaryDto[]> {
+        const entitlements = await this.planLimitService.entitlementsOf(tenantId);
+        const limits: Record<string, number | null> = entitlements?.limits ?? {};
+        const used: Record<string, number> = entitlements?.usage ?? {};
+        return [...new Set([...Object.keys(limits), ...Object.keys(used)])].sort().map((metric) => {
+            const currentUsage = used[metric] ?? 0;
+            const limit = limits[metric] ?? null;
+            const percentageUsed = limit !== null && limit > 0 ? Math.min((currentUsage / limit) * 100, 100) : null;
+            return { metric, currentUsage, limit, percentageUsed };
         });
-
-        return {
-            targetPlan,
-            amountDueNow: preview.amountDueNow,
-            currency: preview.currency,
-            nextInvoiceDate: preview.nextInvoiceDate
-        };
-    }
-
-    /**
-     * Moves the subscription up at Stripe; the proration is invoiced at once and Stripe refuses the change if
-     * that payment fails. The plan itself is written only by the `customer.subscription.updated` webhook
-     * (US1.8.2 F10), so the database never shows a plan Stripe did not apply: the answer (202) still shows
-     * the current plan.
-     */
-    async upgradeSubscription(targetPlan: BillingPlanEnum): Promise<SubscriptionStatusDto> {
-        const billing = await this.getOrCreateBillingForCurrentTenant();
-
-        if (!billing.stripeSubscriptionId) {
-            throw new HttpException('No active subscription to upgrade for this tenant', HttpStatus.BAD_REQUEST);
-        }
-        this.assertPlanDirection(billing.plan, targetPlan, 'up');
-        this.assertSelfServicePlan(targetPlan);
-
-        const previousPlan = billing.plan;
-        const userId = this.tenantContext.getUserId();
-
-        await this.stripeService.upgradeSubscription({
-            stripeSubscriptionId: billing.stripeSubscriptionId,
-            targetPlan
-        });
-
-        this.txEventEmitter.emitAfterCommit(
-            BillingEvents.SUBSCRIPTION_UPGRADED,
-            new SubscriptionUpgradedEvent(billing.id, billing.tenantId, previousPlan, targetPlan, this.dateService.nowISO(), userId ?? undefined)
-        );
-
-        this.logger.log(`Subscription upgrade from ${previousPlan} to ${targetPlan} accepted by Stripe`, {
-            tenantId: billing.tenantId,
-            previousPlan,
-            newPlan: targetPlan
-        });
-
-        return await this.getCurrentSubscription();
     }
 
     /**
@@ -358,31 +217,13 @@ export class BillingService {
         if (plan === BillingPlanEnum.FREE) {
             throw new BaseException(
                 'invalid_request',
-                'Free needs no checkout; to leave a paid plan, cancel the subscription',
+                'Free needs no checkout; to leave a paid plan, cancel it in the billing portal (POST /v1/billing/portal-session)',
                 HttpStatus.BAD_REQUEST,
                 'plan'
             );
         }
         if (plan === BillingPlanEnum.ENTERPRISE) {
             throw new BaseException('invalid_request', 'Enterprise is sold by our sales team; contact sales', HttpStatus.BAD_REQUEST, 'plan');
-        }
-    }
-
-    /** US1.8.2 F3: an upgrade must go up and a downgrade down, so neither skips the other's checks. */
-    private assertPlanDirection(currentPlan: string, targetPlan: BillingPlanEnum, direction: 'up' | 'down'): void {
-        if (currentPlan === targetPlan) {
-            throw new HttpException('Target plan must be different from current plan', HttpStatus.BAD_REQUEST);
-        }
-        const currentIndex = PLAN_ORDER.indexOf(currentPlan as BillingPlanEnum);
-        const targetIndex = PLAN_ORDER.indexOf(targetPlan);
-        if (currentIndex === -1 || targetIndex === -1) {
-            throw new HttpException(`Unsupported billing plan for ${direction === 'up' ? 'upgrade' : 'downgrade'}`, HttpStatus.BAD_REQUEST);
-        }
-        if (direction === 'up' && targetIndex < currentIndex) {
-            throw new HttpException('Target plan must be higher than current plan for upgrade', HttpStatus.BAD_REQUEST);
-        }
-        if (direction === 'down' && targetIndex > currentIndex) {
-            throw new HttpException('Target plan must be lower than current plan for downgrade', HttpStatus.BAD_REQUEST);
         }
     }
 
@@ -417,246 +258,6 @@ export class BillingService {
             throw new HttpException(NO_STRIPE_CUSTOMER_ERROR, HttpStatus.BAD_REQUEST);
         }
         return { url: await this.stripeService.createPortalSession(billing.stripeCustomerId) };
-    }
-
-    async getUpcomingInvoice(): Promise<UpcomingInvoiceDto> {
-        const billing = await this.getOrCreateBillingForCurrentTenant();
-
-        if (!billing.stripeCustomerId || !billing.stripeSubscriptionId) {
-            throw new HttpException('No active subscription to preview upcoming invoice for this tenant', HttpStatus.BAD_REQUEST);
-        }
-
-        return await this.stripeService.retrieveUpcomingInvoiceForCustomer({
-            customerId: billing.stripeCustomerId,
-            subscriptionId: billing.stripeSubscriptionId
-        });
-    }
-
-    async cancelSubscription(dto: SubscriptionCancelRequestDto): Promise<SubscriptionStatusDto> {
-        const billing = await this.getOrCreateBillingForCurrentTenant();
-
-        if (!billing.stripeSubscriptionId) {
-            throw new HttpException('No active subscription to cancel for this tenant', HttpStatus.BAD_REQUEST);
-        }
-
-        if (!LIVE_SUBSCRIPTION_STATUSES.includes(billing.status)) {
-            throw new HttpException('Only a current subscription can be cancelled', HttpStatus.BAD_REQUEST);
-        }
-
-        const now = new Date();
-
-        if (billing.cancellationRequestedAt && billing.cancellationEffectiveAt && billing.cancellationEffectiveAt > now) {
-            throw new HttpException('Subscription cancellation is already scheduled', HttpStatus.BAD_REQUEST);
-        }
-
-        const userId = this.tenantContext.getUserId();
-
-        const schedule = await this.stripeService.scheduleSubscriptionCancellation(billing.stripeSubscriptionId);
-
-        await this.prisma.$transaction(async (tx) => {
-            await tx.billing.update({
-                where: { id: billing.id },
-                data: {
-                    cancellationReason: dto.reason ?? null,
-                    cancellationRequestedAt: now,
-                    cancellationEffectiveAt: schedule.effectiveDate ?? null
-                }
-            });
-            this.txEventEmitter.emitAfterCommit(
-                BillingEvents.SUBSCRIPTION_CANCELLED,
-                new SubscriptionCancelledEvent(
-                    billing.id,
-                    billing.tenantId,
-                    this.dateService.toISO(now),
-                    schedule.effectiveDate ? this.dateService.toISO(schedule.effectiveDate) : this.dateService.toISO(now),
-                    billing.stripeSubscriptionId ?? undefined,
-                    billing.plan,
-                    dto.reason ?? undefined,
-                    userId ?? undefined
-                )
-            );
-        });
-
-        this.logger.log(`Subscription cancellation scheduled`, {
-            tenantId: billing.tenantId,
-            effectiveDate: schedule.effectiveDate,
-            reason: dto.reason
-        });
-
-        return await this.getCurrentSubscription();
-    }
-
-    async reactivateSubscription(): Promise<SubscriptionStatusDto> {
-        const billing = await this.getOrCreateBillingForCurrentTenant();
-
-        if (!billing.stripeSubscriptionId) {
-            throw new HttpException('No active subscription to reactivate for this tenant', HttpStatus.BAD_REQUEST);
-        }
-
-        const now = new Date();
-
-        if (!billing.cancellationRequestedAt || !billing.cancellationEffectiveAt) {
-            throw new HttpException('No pending cancellation to reactivate', HttpStatus.BAD_REQUEST);
-        }
-
-        if (billing.cancellationEffectiveAt <= now) {
-            throw new HttpException('Cancellation is already effective and cannot be reactivated', HttpStatus.BAD_REQUEST);
-        }
-        const withdrawnEffectiveAt = this.dateService.toISO(billing.cancellationEffectiveAt);
-
-        await this.stripeService.reactivateSubscription(billing.stripeSubscriptionId);
-
-        const userId = this.tenantContext.getUserId();
-        await this.prisma.$transaction(async (tx) => {
-            await tx.billing.update({
-                where: { id: billing.id },
-                data: {
-                    cancellationReason: null,
-                    cancellationRequestedAt: null,
-                    cancellationEffectiveAt: null
-                }
-            });
-            this.txEventEmitter.emitAfterCommit(
-                BillingEvents.SUBSCRIPTION_REACTIVATED,
-                new SubscriptionReactivatedEvent(
-                    billing.id,
-                    billing.tenantId,
-                    { cancellationEffectiveAt: { from: withdrawnEffectiveAt, to: null } },
-                    userId ?? undefined
-                )
-            );
-        });
-
-        this.logger.log(`Subscription cancellation was reactivated`, {
-            tenantId: billing.tenantId
-        });
-
-        return await this.getCurrentSubscription();
-    }
-
-    /**
-     * A downgrade is refused while the tenant uses more than the target plan allows (seats, gauges such as
-     * live campaigns, and this month's metered usage), listing each metric over the limit.
-     */
-    private async validateDowngradeUsageOrThrow(targetPlan: BillingPlanEnum): Promise<void> {
-        const tenantId = this.tenantContext.getTenantId()!;
-        const limits = (await this.planLimitService.limitsOfPlan(targetPlan)) ?? {};
-        const overLimit: Array<{ metric: string; usage: number; limit: number }> = [];
-        for (const [metric, limit] of Object.entries(limits)) {
-            if (typeof limit !== 'number') {
-                continue;
-            }
-            const usage = await this.planLimitService.usageOf(tenantId, metric);
-            if (usage > limit) {
-                overLimit.push({ metric, usage, limit });
-            }
-        }
-        if (overLimit.length > 0) {
-            throw new BaseException(
-                'state_conflict',
-                `Current usage exceeds the ${targetPlan} plan: ${overLimit.map((o) => `${o.metric} ${o.usage}/${o.limit}`).join(', ')}`,
-                HttpStatus.CONFLICT,
-                undefined,
-                { overLimit }
-            );
-        }
-    }
-
-    async downgradeSubscription(targetPlan: BillingPlanEnum): Promise<SubscriptionStatusDto> {
-        const billing = await this.getOrCreateBillingForCurrentTenant();
-
-        if (!billing.stripeSubscriptionId) {
-            throw new HttpException('No active subscription to downgrade for this tenant', HttpStatus.BAD_REQUEST);
-        }
-
-        this.assertPlanDirection(billing.plan, targetPlan, 'down');
-
-        if (billing.pendingDowngradePlan) {
-            throw new HttpException('There is already a pending downgrade scheduled for this subscription', HttpStatus.BAD_REQUEST);
-        }
-
-        await this.validateDowngradeUsageOrThrow(targetPlan);
-
-        const previousPlan = billing.plan;
-        const userId = this.tenantContext.getUserId();
-
-        const schedule = await this.stripeService.scheduleSubscriptionDowngrade({
-            stripeSubscriptionId: billing.stripeSubscriptionId,
-            targetPlan
-        });
-
-        await this.prisma.$transaction(async (tx) => {
-            await tx.billing.update({
-                where: { id: billing.id },
-                data: {
-                    pendingDowngradePlan: targetPlan,
-                    downgradeScheduledAt: schedule.effectiveDate ?? null
-                }
-            });
-            this.txEventEmitter.emitAfterCommit(
-                BillingEvents.SUBSCRIPTION_DOWNGRADE_SCHEDULED,
-                new SubscriptionDowngradeScheduledEvent(
-                    billing.id,
-                    billing.tenantId,
-                    previousPlan,
-                    targetPlan,
-                    schedule.effectiveDate ? this.dateService.toISO(schedule.effectiveDate) : this.dateService.nowISO(),
-                    userId ?? undefined
-                )
-            );
-        });
-
-        this.logger.log(`Subscription downgrade scheduled from ${previousPlan} to ${targetPlan}`, {
-            tenantId: billing.tenantId,
-            previousPlan,
-            targetPlan,
-            effectiveDate: schedule.effectiveDate
-        });
-
-        return await this.getCurrentSubscription();
-    }
-
-    async cancelPendingDowngrade(): Promise<SubscriptionStatusDto> {
-        const billing = await this.getOrCreateBillingForCurrentTenant();
-
-        if (!billing.stripeSubscriptionId) {
-            throw new HttpException('No active subscription to cancel downgrade for this tenant', HttpStatus.BAD_REQUEST);
-        }
-
-        if (!billing.pendingDowngradePlan) {
-            throw new HttpException('No pending downgrade to cancel for this subscription', HttpStatus.BAD_REQUEST);
-        }
-
-        await this.stripeService.cancelPendingSubscriptionDowngrade(billing.stripeSubscriptionId);
-
-        const previousPendingPlan = billing.pendingDowngradePlan;
-        const previousScheduledAt = billing.downgradeScheduledAt;
-
-        const userId = this.tenantContext.getUserId();
-        await this.prisma.$transaction(async (tx) => {
-            await tx.billing.update({
-                where: { id: billing.id },
-                data: {
-                    pendingDowngradePlan: null,
-                    downgradeScheduledAt: null
-                }
-            });
-            this.txEventEmitter.emitAfterCommit(
-                BillingEvents.SUBSCRIPTION_DOWNGRADE_CANCELLED,
-                new SubscriptionDowngradeCancelledEvent(
-                    billing.id,
-                    billing.tenantId,
-                    { pendingDowngradePlan: { from: previousPendingPlan, to: null } },
-                    userId ?? undefined
-                )
-            );
-        });
-
-        this.logger.log(`Pending subscription downgrade to plan ${previousPendingPlan} scheduled at ${previousScheduledAt} was cancelled`, {
-            tenantId: billing.tenantId
-        });
-
-        return await this.getCurrentSubscription();
     }
 
     /**

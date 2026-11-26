@@ -1,46 +1,37 @@
-/// A tenant's billing, payout or CRM provider connection, with the secret its callbacks are
-/// verified against.
+/// A tenant's credentialed link to an external provider (v5.2 API §3.16, DB Model §3 `connections`): billing
+/// (inbound webhooks), payout (outbound + status callbacks), CRM (both), Zapier (outbound via webhook subscriptions).
 ///
-/// Architecture §2.1 assigns this service "provider connection config and secrets (billing, payout,
-/// CRM; webhook signing secrets; tracking-token key) exposed to Event Ingestion through a cache",
-/// and the §2.4 addendum has ingestion verifying "the provider's signature scheme ... against the
-/// connection secret cached from tenant-service". DB Model §3 provides no table, so the shape is
-/// derived from the prose that assigns the responsibility (NOTE.md §V5.12).
-///
-/// The row's `id` is the `{connection_id}` in ingestion's `/inbound/{provider}/{connection_id}`:
-/// the path names the tenant and the secret, so no callback is attributed by anything the caller
-/// asserts. That is the property worth preserving when the receivers move (D4).
+/// The row's `id` is the `{connection_id}` in ingestion's `/inbound/{provider}/{connection_id}`: the path names the
+/// tenant and the secret, so no callback is attributed by anything the caller asserts.
 model ProviderConnection {
   id       String @id @default(ulid()) @db.VarChar(26)
   tenantId String @map("tenant_id") @db.VarChar(26)
 
-  /// The real provider (US1.5.1 F7): stripe, paddle, chargebee, paypal, wise, tremendous, hubspot, salesforce.
-  /// Same list as event-svc's `inbound_webhook_receipts.provider`; `crm` survives only on revoked rows.
-  provider String @db.VarChar(20)
-  /// `billing` | `payout` | `gift_card` | `crm`, derived from the provider (US1.5.1 F7).
-  connectionType String @map("connection_type") @db.VarChar(20)
-  name           String? @db.VarChar(100)
+  /// stripe, paddle, chargebee, paypal, wise, tremendous, hubspot, salesforce, zapier (`crm` survives only on revoked rows).
+  provider  String @db.VarChar(20)
+  /// inbound | outbound | both, fixed by the provider matrix.
+  direction String @db.VarChar(10)
+  /// pending_verification → active (first verified callback or successful outbound test) → revoked.
+  status    String @default("pending_verification") @db.VarChar(24)
+  /// Operator-facing label; not in the v5.2 contract, kept from v5.1.
+  name      String? @db.VarChar(100)
 
-  /// The provider's webhook secret, encrypted at rest with AES-256-GCM — the same handling
-  /// notification-service already uses for the identical value, so moving the receivers to
-  /// ingestion (D4) is a move rather than a re-architecture.
-  ///
-  /// A reference to a secret manager would be stronger than an encrypted column, and is a
-  /// one-column change if the security review asks for it. Flagged rather than assumed:
-  /// NOTE.md §V5.12 records this as wanting a look before it holds live credentials.
-  signingSecret String? @map("signing_secret") @db.Text
+  /// Outbound credentials (`api_key` / `oauth_code`) as sealed JSON. AES-256-GCM with the provider-secret key until
+  /// the KMS envelope lands (US1.5.4); never returned by the API, opened only for the test and the audited credential route.
+  credentialsEncrypted           String?   @map("credentials_encrypted") @db.Text
+  /// The inbound webhook secret (Chargebee: `user:password`), sealed the same way.
+  signingSecretEncrypted         String?   @map("signing_secret_encrypted") @db.Text
+  /// The rotated-out signing secret, honoured until `previous_secret_valid_until` (24 h, v5.2 API §3.16).
+  previousSigningSecretEncrypted String?   @map("previous_signing_secret_encrypted") @db.Text
+  previousSecretValidUntil       DateTime? @map("previous_secret_valid_until") @db.Timestamptz
 
-  /// Provider settings that are not secrets — PayPal `clientId`/`webhookId`/`environment`,
-  /// Chargebee `allowedIps`. camelCase inside, snake_case on the wire.
+  /// Provider settings that are not secrets — PayPal `clientId`/`webhookId`/`environment`, Chargebee `allowedIps`.
   config Json @default("{}")
 
-  enabled Boolean @default(true)
+  lastVerifiedAt DateTime? @map("last_verified_at") @db.Timestamptz
+  lastSyncAt     DateTime? @map("last_sync_at") @db.Timestamptz
 
-  /// No `last_received_at` here on purpose. Event Ingestion is what receives the callbacks and it holds
-  /// no RDS, so stamping this column would mean a write to this service on every verified callback —
-  /// the hot-path dependency the connection cache exists to avoid. "Last received" is already a
-  /// `(provider, received_at desc)` read over the receipt audit (DB Model §10 `idx_inbound_provider`).
-  createdBy String? @map("created_by") @db.VarChar(26)
+  createdBy String?   @map("created_by") @db.VarChar(26)
   createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz
   updatedAt DateTime  @updatedAt @map("updated_at") @db.Timestamptz
   /// Soft delete per DB Model §0.4: a revoked connection's receipts must stay attributable.
@@ -48,9 +39,8 @@ model ProviderConnection {
 
   tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
-  /// One live connection per tenant per provider; the partial uniqueness is in the migration SQL,
-  /// because a revoked row must not block a replacement.
-  @@index([tenantId], map: "idx_provider_conn_tenant")
-  @@index([tenantId, provider], map: "idx_provider_conn_provider")
-  @@map("provider_connections")
+  /// One live connection per tenant per provider; the partial uniqueness is in the migration SQL
+  /// (`idx_connections_live`), because a revoked row must not block a replacement.
+  @@index([tenantId, provider, status], map: "idx_connections_tenant_provider")
+  @@map("connections")
 }

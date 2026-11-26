@@ -1,7 +1,7 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { IsEnum, IsOptional, IsString, MaxLength, MinLength } from 'class-validator';
 
-import { VerificationRecordStatus } from '@domains/tenant/tenant.types';
+import { VerificationRecordStatus, VerificationStatus } from '@domains/tenant/tenant.types';
 
 /** One company verification, as the Owner sees it (`GET /v1/verification`, E1 D15). No reviewer id: internal. */
 export class CompanyVerificationSummary {
@@ -25,16 +25,19 @@ export class CompanyVerificationSummary {
 }
 
 export class CompanyVerificationResponse {
-    @ApiProperty({ enum: ['unverified', 'pending', 'verified', 'rejected'], description: "The tenant's verification status" })
+    @ApiProperty({ enum: VerificationStatus, description: "The tenant's verification status" })
     status!: string;
 
     @ApiPropertyOptional({ type: CompanyVerificationSummary, nullable: true, description: 'The latest company verification, if any' })
     verification!: CompanyVerificationSummary | null;
 }
 
-/** `POST /v1/verification`: where the Owner completes the provider's check. */
+/** `POST /v1/verification`: where the Owner completes the provider's check. The status moves only on the provider's callback. */
 export class VerificationSessionResponse {
-    @ApiProperty({ enum: ['pending'] })
+    @ApiProperty({
+        enum: [VerificationStatus.UNVERIFIED, VerificationStatus.REJECTED],
+        description: "The tenant's status, unchanged by opening a session"
+    })
     status!: string;
 
     @ApiProperty()
@@ -81,13 +84,14 @@ export class AdminVerificationDetailResponse extends AdminVerificationResponse {
 }
 
 export class AdminVerificationQueryDto {
-    @ApiPropertyOptional({ enum: VerificationRecordStatus, default: VerificationRecordStatus.IN_REVIEW })
+    @ApiPropertyOptional({ enum: VerificationRecordStatus, default: VerificationRecordStatus.PENDING_REVIEW })
     @IsOptional()
     @IsEnum(VerificationRecordStatus)
     status?: VerificationRecordStatus;
 }
 
-export class RejectVerificationDto {
+/** US1.6.2 AC1: verify and reject both need a reason, which goes on the audit trail (and to the Owner when rejected). */
+export class VerificationDecisionDto {
     @ApiProperty({ minLength: 3, maxLength: 1000 })
     @IsString()
     @MinLength(3)

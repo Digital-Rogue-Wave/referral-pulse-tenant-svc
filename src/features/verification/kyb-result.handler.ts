@@ -7,7 +7,7 @@ import { AppLoggerService } from '@common/logging/app-logger.service';
 
 import { CompanyVerificationService, ProviderVerificationResult } from './company-verification.service';
 
-/** The normalised KYB result Event Ingestion publishes on `ingestion-events.fifo` (E1 D15). */
+/** The normalised KYB result Event Ingestion publishes on `ingestion-events.fifo` (E1 D15). Every outcome opens the case for review. */
 export const KYB_RESULT_EVENT = 'provider.verification_reviewed';
 const OUTCOMES = new Set(['verified', 'rejected', 'in_review']);
 

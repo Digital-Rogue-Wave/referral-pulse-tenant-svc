@@ -306,18 +306,22 @@ service AND — per the project decision — also owns **client billing** (see d
 (OAuth2), Ory Keto (permissions) are the credential/permission authorities; `oauth2_clients` and
 `sessions` are delegated to Ory (no local tables — intentional, recorded in `NOTE.md`).
 
-**Owns (billing — intentional extension):** plans, billings, billing_events, tenant_usages, plus Stripe
-subscription/checkout/upgrade/downgrade, Stripe webhooks, usage metering, and payment-status escalation.
+**Owns (billing):** plans, billings, billing_events, tenant_usages, plus the Stripe subscription checkout
+(trial → paid), Stripe webhooks, usage metering, and payment-status escalation.
 
 **Not this service's concern (per spec):** participant identity, programs/campaigns, referrals, rewards,
 payouts, event ingestion. Don't add those here.
 
-### Intentional deviation — billing is kept
+### Billing routes follow spec v5.2 (E1 P8, 2026-11-23)
 
-The canonical specs scope billing OUT of this service (payout → reward service; Stripe-webhook relay →
-referral-workflow service; client subscriptions = later phase). Per the project decision, billing is
-**retained** here as a sanctioned extension. Nothing billing is removed. This is the one place this
-service knowingly diverges from the responsibility contract — see `NOTE.md` for the full record.
+Platform billing lives here (v5.2 Identity & Access: Stripe Billing with its hosted portal). The tenant
+routes are the spec's three — `GET /v1/billing/plan` (plan, period and the usage counters),
+`POST /v1/billing/portal-session`, `GET /v1/billing/invoices` — plus `POST /v1/billing/subscription/checkout`,
+kept by decision because the spec does not cover trial → paid and Stripe's portal cannot start a first
+subscription. Every plan change, cancellation and reactivation happens in the Stripe-hosted portal and
+reaches this service through the Stripe webhooks; the former upgrade/downgrade/cancel/reactivate,
+`/usage` and `/invoices/upcoming` routes were removed. The old "nothing billing is removed" deviation is
+superseded — see `user-stories-verification/E1-Identity-access-tenant/E1-v5.2-fixlog.md` P8.
 
 ## Events
 

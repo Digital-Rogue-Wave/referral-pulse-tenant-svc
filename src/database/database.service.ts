@@ -3,12 +3,10 @@ import { Injectable, OnModuleInit, Inject, forwardRef } from '@nestjs/common';
 import { Prisma, PrismaClient } from '@prisma-gen/generated/client';
 import { ConfigType } from '@nestjs/config';
 import { PrismaPg } from '@prisma/adapter-pg';
-import pg from 'pg';
-
 import databaseConfig from '@config/database.config';
 import { TransactionEventEmitterService } from '@common/events/transaction-event-emitter.service';
 
-const { Pool } = pg;
+import { TenantScopedPool } from './tenant-scoped-pool';
 
 /** Transaction options matching Prisma's interactive transaction API */
 type TransactionOptions = {
@@ -26,8 +24,9 @@ export class DatabaseService extends PrismaClient implements OnModuleInit {
         private readonly dbConfig: ConfigType<typeof databaseConfig>
     ) {
         // In Prisma 7.x, the datasources option was removed.
-        // Use the @prisma/adapter-pg adapter with a PostgreSQL connection pool.
-        const pool = new Pool({
+        // Use the @prisma/adapter-pg adapter with a PostgreSQL connection pool — tenant-scoped, so row-level security
+        // sees the request's tenant on every statement (v5.2 DB Model §0.8).
+        const pool = new TenantScopedPool({
             connectionString: dbConfig.url,
             max: dbConfig.maxConnections
         });

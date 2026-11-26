@@ -21,13 +21,11 @@ import {
     CancelDeletionDto,
     LockTenantDto,
     UnlockTenantDto,
-    TenantStatsDto,
-    WidgetSecretResponse
+    TenantStatsDto
 } from '@domains/tenant';
 
 import { TenantService } from '../tenant.service';
 import { TenantStatsService } from './tenant-stats.service';
-import { WidgetSecretService } from '../widget-secret.service';
 
 @ApiTags('Aware Tenants')
 @ApiBearerAuth()
@@ -35,11 +33,10 @@ import { WidgetSecretService } from '../widget-secret.service';
 export class AwareTenantController {
     constructor(
         private readonly tenantService: TenantService,
-        private readonly statsService: TenantStatsService,
-        private readonly widgetSecrets: WidgetSecretService
+        private readonly statsService: TenantStatsService
     ) {}
 
-    @RequirePermission('tenants:read')
+    @RequirePermission('tenant:read')
     @Get('subdomain/check')
     @ApiOkResponse({
         description: 'Check if subdomain is available',
@@ -50,7 +47,7 @@ export class AwareTenantController {
         return await this.tenantService.checkSubdomainAvailability(subdomain);
     }
 
-    @RequirePermission('tenants:read')
+    @RequirePermission('tenant:read')
     @Get('stats')
     @ApiOkResponse({
         description: 'Get dashboard stats for current tenant',
@@ -61,7 +58,7 @@ export class AwareTenantController {
         return await this.statsService.getStats();
     }
 
-    @RequirePermission('tenants:read')
+    @RequirePermission('tenant:read')
     @Get('custom-domain/status')
     @ApiOkResponse({
         description: 'Get custom domain verification status',
@@ -72,33 +69,12 @@ export class AwareTenantController {
         return await this.tenantService.getDomainStatus();
     }
 
-    @RequirePermission('tenants:read')
+    @RequirePermission('tenant:read')
     @Get('profile')
     @ApiOkResponse({ type: TenantProfileResponse })
     @HttpCode(HttpStatus.OK)
     async getProfile(): Promise<TenantProfileResponse> {
         return await this.tenantService.getProfile();
-    }
-
-    /**
-     * The secret the tenant's backend signs widget user JWTs with (US1.5.4 F2). A credential of the same kind
-     * as an API key, so the same relation gates it: Owner only, checked live; every read is audit-logged.
-     */
-    @RequirePermission('api_keys:manage')
-    @Get('widget-secret')
-    @ApiOkResponse({ type: WidgetSecretResponse })
-    @HttpCode(HttpStatus.OK)
-    async getWidgetSecret(@CurrentUser() user: IAuthenticatedUser): Promise<WidgetSecretResponse> {
-        return await this.widgetSecrets.reveal(user.tenantId, user.userId);
-    }
-
-    /** Replaces the secret (US1.5.4 F3); the previous one keeps working for an hour. */
-    @RequirePermission('api_keys:manage')
-    @Post('widget-secret/rotate')
-    @ApiOkResponse({ type: WidgetSecretResponse })
-    @HttpCode(HttpStatus.OK)
-    async rotateWidgetSecret(@CurrentUser() user: IAuthenticatedUser): Promise<WidgetSecretResponse> {
-        return await this.widgetSecrets.rotate(user.tenantId, user.userId);
     }
 
     @Put()
@@ -119,7 +95,7 @@ export class AwareTenantController {
         }
     })
     @ApiOkResponse({ type: TenantResponse })
-    @RequirePermission('tenants:write')
+    @RequirePermission('tenant:settings')
     @UseInterceptors(FileInterceptor('file', FILE_UPLOAD_OPTIONS))
     @HttpCode(HttpStatus.OK)
     async update(
@@ -135,7 +111,7 @@ export class AwareTenantController {
         description: 'Domain verified successfully',
         type: TenantResponse
     })
-    @RequirePermission('tenants:write')
+    @RequirePermission('tenant:settings')
     @HttpCode(HttpStatus.OK)
     async verifyCustomDomain(): Promise<TenantResponse> {
         return await this.tenantService.verifyCustomDomain();
@@ -144,7 +120,7 @@ export class AwareTenantController {
     @Put('transfer-ownership')
     @ApiBody({ type: TransferOwnershipDto })
     @ApiOkResponse({ description: 'Ownership transferred successfully' })
-    @RequirePermission('users:write')
+    @RequirePermission('users:manage')
     @HttpCode(HttpStatus.OK)
     async transferOwnership(@Body() dto: TransferOwnershipDto, @CurrentUser() user: IAuthenticatedUser): Promise<void> {
         return await this.tenantService.transferOwnership(dto, user);
@@ -156,7 +132,7 @@ export class AwareTenantController {
         description: 'Deletion scheduled successfully',
         type: DeletionScheduledResponse
     })
-    @RequirePermission('tenants:delete')
+    @RequirePermission('tenant:settings')
     @HttpCode(HttpStatus.OK)
     async scheduleDeletion(@Body() dto: ScheduleDeletionDto, @CurrentUser() user: IAuthenticatedUser): Promise<DeletionScheduledResponse> {
         return await this.tenantService.scheduleDeletion(dto, user);
@@ -165,7 +141,7 @@ export class AwareTenantController {
     @Put('cancel-deletion')
     @ApiBody({ type: CancelDeletionDto })
     @ApiOkResponse({ description: 'Deletion cancelled successfully' })
-    @RequirePermission('tenants:delete')
+    @RequirePermission('tenant:settings')
     @HttpCode(HttpStatus.OK)
     async cancelDeletion(@Body() dto: CancelDeletionDto, @CurrentUser() user: IAuthenticatedUser): Promise<void> {
         return await this.tenantService.cancelDeletion(dto, user);
@@ -174,7 +150,7 @@ export class AwareTenantController {
     @Put('lock')
     @ApiBody({ type: LockTenantDto })
     @ApiOkResponse({ type: TenantResponse })
-    @RequirePermission('tenants:write')
+    @RequirePermission('tenant:settings')
     @HttpCode(HttpStatus.OK)
     async lock(@Body() dto: LockTenantDto, @CurrentUser() user: IAuthenticatedUser): Promise<TenantResponse> {
         return await this.tenantService.lock(dto, user);
@@ -183,7 +159,7 @@ export class AwareTenantController {
     @Put('unlock')
     @ApiBody({ type: UnlockTenantDto })
     @ApiOkResponse({ type: TenantResponse })
-    @RequirePermission('tenants:write')
+    @RequirePermission('tenant:settings')
     @AllowLockedTenant()
     @HttpCode(HttpStatus.OK)
     async unlock(@Body() dto: UnlockTenantDto, @CurrentUser() user: IAuthenticatedUser): Promise<TenantResponse> {

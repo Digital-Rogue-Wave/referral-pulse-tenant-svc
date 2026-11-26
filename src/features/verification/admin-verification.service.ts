@@ -2,10 +2,13 @@ import { HttpStatus, Injectable } from '@nestjs/common';
 import { ulid } from 'ulid';
 
 import { BaseException } from '@common/exceptions/base.exceptions';
-import { DatabaseService } from '@app/database/database.service';
-import { TenantService } from '@app/features/tenant/tenant.service';
-import { VerificationRecordStatus, VerificationType } from '@domains/tenant/tenant.types';
+import { AppLoggerService } from '@common/logging/app-logger.service';
+import { PrivilegedDatabaseService } from '@app/database/privileged-database.service';
+import { VerificationRecordStatus, VerificationStatus, VerificationType } from '@domains/tenant/tenant.types';
 import { AdminVerificationDetailResponse, AdminVerificationResponse } from '@domains/verification';
+
+import { AccountVerificationGateway } from './account-verification.gateway';
+import { TenantVerificationStatus } from './tenant-verification-status';
 
 const REVIEW_LIST_LIMIT = 100;
 
@@ -18,23 +21,30 @@ type VerificationRow = {
     reviewedAt: Date | null;
     reviewedBy: string | null;
     evidence: unknown;
+    temporalWorkflowId: string | null;
     tenant: { name: string };
 };
 
+type Decision = VerificationRecordStatus.VERIFIED | VerificationRecordStatus.REJECTED;
+
 /**
- * Super Admin review of company verifications the provider could not settle (US1.6.2, E1 D15). Decisions go through
- * `TenantService.applyVerificationReport()` — one path writes the row, the tenant's status and the event, and the event
- * puts the decision on the audit trail. Reading a verification's evidence is tenant-data access by staff, so each read
- * is written to that tenant's audit log (Product Spec R-ACT-02).
+ * The Super Admin's review (US1.6.2): every company verification is decided by a person on the platform console, with a
+ * reason. The decision is written first — the case, the tenant's status and `tenant.verified`, whose audit row names the
+ * staff member and the reason — then the `account_verification` workflow is signalled. Reading a verification's evidence
+ * is tenant-data access by staff, so each read goes to that tenant's audit log (Product Spec R-ACT-02).
  */
 @Injectable()
 export class AdminVerificationService {
     constructor(
-        private readonly prisma: DatabaseService,
-        private readonly tenants: TenantService
-    ) {}
+        private readonly prisma: PrivilegedDatabaseService,
+        private readonly verificationStatus: TenantVerificationStatus,
+        private readonly workflows: AccountVerificationGateway,
+        private readonly logger: AppLoggerService
+    ) {
+        this.logger.setContext(AdminVerificationService.name);
+    }
 
-    async list(status: VerificationRecordStatus = VerificationRecordStatus.IN_REVIEW): Promise<AdminVerificationResponse[]> {
+    async list(status: VerificationRecordStatus = VerificationRecordStatus.PENDING_REVIEW): Promise<AdminVerificationResponse[]> {
         const rows = await this.prisma.tenantVerification.findMany({
             where: { verificationType: VerificationType.COMPANY, status },
             orderBy: { createdAt: 'asc' },
@@ -60,24 +70,40 @@ export class AdminVerificationService {
         return { ...toResponse(row), evidence: (row.evidence as Record<string, unknown> | null) ?? null };
     }
 
-    async approve(id: string, staffActor: string): Promise<AdminVerificationResponse> {
-        return this.decide(id, staffActor, VerificationRecordStatus.VERIFIED);
+    async approve(id: string, staffActor: string, reason: string): Promise<AdminVerificationResponse> {
+        return this.decide(id, staffActor, VerificationRecordStatus.VERIFIED, reason);
     }
 
     async reject(id: string, staffActor: string, reason: string): Promise<AdminVerificationResponse> {
         return this.decide(id, staffActor, VerificationRecordStatus.REJECTED, reason);
     }
 
-    private async decide(id: string, staffActor: string, status: VerificationRecordStatus, reason?: string): Promise<AdminVerificationResponse> {
+    private async decide(id: string, staffActor: string, status: Decision, reason: string): Promise<AdminVerificationResponse> {
         const row = await this.find(id);
-        await this.tenants.applyVerificationReport(row.tenantId, {
-            verificationId: row.id,
-            verificationType: VerificationType.COMPANY,
-            status,
-            reason,
-            reviewedBy: staffActor
+        if (row.status !== VerificationRecordStatus.PENDING_REVIEW) {
+            throw new BaseException('state_conflict', `This verification is already ${row.status}`, HttpStatus.CONFLICT);
+        }
+        await this.prisma.$transaction(async (tx) => {
+            await tx.tenantVerification.update({ where: { id }, data: { status, reason, reviewedBy: staffActor, reviewedAt: new Date() } });
+            await this.verificationStatus.change(tx, row.tenantId, status as string as VerificationStatus, staffActor, reason);
         });
+        await this.signal(row, status);
         return toResponse(await this.find(id));
+    }
+
+    /** Best effort: the decision stands without it, and the workflow's SLA activity checks the case before alerting. */
+    private async signal(row: VerificationRow, status: Decision): Promise<void> {
+        if (!row.temporalWorkflowId) {
+            return;
+        }
+        try {
+            await this.workflows.signalDecided(row.temporalWorkflowId, status);
+        } catch (error) {
+            this.logger.warn('Could not signal account_verification; the decision stands', {
+                verificationId: row.id,
+                error: error instanceof Error ? error.message : String(error)
+            });
+        }
     }
 
     private async find(id: string): Promise<VerificationRow> {

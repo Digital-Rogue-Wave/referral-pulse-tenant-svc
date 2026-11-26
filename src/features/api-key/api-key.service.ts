@@ -4,6 +4,7 @@ import { Prisma } from '@prisma-gen/generated/client';
 import { createHmac, randomBytes } from 'crypto';
 
 import { DatabaseService } from '@app/database/database.service';
+import { PrivilegedDatabaseService } from '@app/database/privileged-database.service';
 import { TenantAwareService } from '@common/tenant-aware/tenant-aware.service';
 import { TransactionEventEmitterService } from '@common/events/transaction-event-emitter.service';
 import { AppLoggerService } from '@common/logging/app-logger.service';
@@ -56,6 +57,7 @@ export class ApiKeyService {
 
     constructor(
         private readonly prisma: DatabaseService,
+        private readonly privileged: PrivilegedDatabaseService,
         private readonly tenantAware: TenantAwareService,
         private readonly txEventEmitter: TransactionEventEmitterService,
         private readonly redis: RedisService,
@@ -235,7 +237,8 @@ export class ApiKeyService {
     }
 
     private async loadActive(keyHash: string, cacheKey: string): Promise<(ResolvedApiKey & { expiresAt: string | null }) | null> {
-        const row = await this.prisma.apiKey.findUnique({
+        // Privileged read: the key is what tells us the tenant (v5.2 DB Model §0.8).
+        const row = await this.privileged.apiKey.findUnique({
             where: { keyHash },
             select: { id: true, tenantId: true, keyType: true, expiresAt: true, revokedAt: true, deletedAt: true }
         });
@@ -251,7 +254,7 @@ export class ApiKeyService {
     private async touch(id: string): Promise<void> {
         const due = await this.redis.setNx(`apikey:last-used:${id}`, '1', LAST_USED_WRITE_INTERVAL_SECONDS);
         if (due) {
-            await this.prisma.apiKey.update({ where: { id }, data: { lastUsedAt: new Date() } }).catch((error: unknown) => {
+            await this.privileged.apiKey.update({ where: { id }, data: { lastUsedAt: new Date() } }).catch((error: unknown) => {
                 this.logger.warn('Could not record API key use', { apiKeyId: id, reason: error instanceof Error ? error.message : 'unknown' });
             });
         }

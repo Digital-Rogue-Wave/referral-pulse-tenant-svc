@@ -15,7 +15,6 @@ describe('response mappers — explicit field lists', () => {
             verificationStatus: 'pending',
             paymentStatus: 'active',
             billingCountry: 'DE',
-            invitationChannel: null,
             dataRegion: 'eu-central-1',
             retentionMonths: 24,
             createdAt: now,
@@ -26,7 +25,7 @@ describe('response mappers — explicit field lists', () => {
         const response = tenantResponseMapper.toResponse(row);
 
         expect(response).not.toHaveProperty('widgetTokenSecret');
-        expect(response).toMatchObject({ id: 't1', slug: 'acme', billingCountry: 'DE', invitationChannel: null, retentionMonths: 24 });
+        expect(response).toMatchObject({ id: 't1', slug: 'acme', billingCountry: 'DE', retentionMonths: 24 });
     });
 
     it('a plan answer carries the display price the Stripe sync stored (US1.8.1 F5), or null before any sync', () => {

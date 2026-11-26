@@ -6,7 +6,7 @@ import { ServiceCapability } from '@common/auth/authz/keto-tuples';
 import { BillingPlanEnum, PaymentStatusEnum, SubscriptionStatusEnum } from '@common/enums/billing.enum';
 import { TenantStatus } from '@domains/tenant/tenant.types';
 
-import { DatabaseService } from '@app/database/database.service';
+import { PrivilegedDatabaseService } from '@app/database/privileged-database.service';
 import { InternalTenantBillingStatusDto, TenantEntitlementsDto } from '@domains/billing';
 
 import { PlanLimitService } from './plan-limit.service';
@@ -16,7 +16,7 @@ import { PlanLimitService } from './plan-limit.service';
 @Controller('internal/tenants')
 export class InternalTenantStatusController {
     constructor(
-        private readonly prisma: DatabaseService,
+        private readonly prisma: PrivilegedDatabaseService,
         private readonly planLimits: PlanLimitService
     ) {}
 

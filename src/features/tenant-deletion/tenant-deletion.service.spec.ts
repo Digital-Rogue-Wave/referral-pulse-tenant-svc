@@ -56,7 +56,7 @@ describe('TenantDeletionService — the deletion saga', () => {
         kratos = mock<KratosService>();
         kratos.deleteIdentity.mockImplementation(() => (order.push('identity deleted'), Promise.resolve()));
         txEvents = mock<TransactionEventEmitterService>();
-        service = new TenantDeletionService(prisma, billing, kratos, txEvents, mock<AppLoggerService>());
+        service = new TenantDeletionService(prisma as never, billing, kratos, txEvents, mock<AppLoggerService>());
     });
 
     it('stops billing first, then deletes identities, then purges and closes the tenant in one transaction', async () => {

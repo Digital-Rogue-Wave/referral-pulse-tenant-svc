@@ -9,8 +9,8 @@ import { KetoProvisioningService } from './keto-provisioning.service';
 import { membershipTuple, roleObject, tenantGrantTuples, ServiceCapability } from './keto-tuples';
 import { ALL_PERMISSIONS, LIVE_CHECK_PERMISSIONS, PERMISSION_CATALOG, RETIRED_NAMESPACES, ROLE_GRANTS } from './permission-catalog';
 
-describe('Permission catalog (Product Spec v5.1 §4)', () => {
-    it('holds the eleven v5.1 namespaces with their relations, plus the four tenant-service resources', () => {
+describe('Permission catalog (Product Spec v5.2 §4)', () => {
+    it('holds exactly the thirteen v5.2 namespaces with their relations', () => {
         expect(PERMISSION_CATALOG).toEqual({
             programs: ['read', 'write', 'archive'],
             campaigns: ['read', 'write', 'activate', 'pause', 'complete'],
@@ -20,18 +20,16 @@ describe('Permission catalog (Product Spec v5.1 §4)', () => {
             referrals: ['read', 'reject'],
             rewards: ['read', 'approve', 'reject', 'clawback', 'adjust', 'resend_email'],
             payouts: ['read', 'write', 'confirm', 'cancel'],
-            analytics: ['read', 'write', 'query'],
+            analytics: ['read', 'query'],
             webhooks: ['read', 'write', 'delete'],
             api_keys: ['manage'],
-            tenants: ['read', 'write', 'delete'],
-            users: ['read', 'write'],
-            billing: ['read', 'write'],
-            audit: ['read']
+            users: ['read', 'manage'],
+            tenant: ['read', 'settings', 'billing']
         });
     });
 
     /** v5.1: no form of "referrer" anywhere; the Keto namespace is participants. */
-    it('has no referrers namespace, nor the retired dsr and connections ones', () => {
+    it('has none of the retired namespaces (referrers, dsr, connections, tenants, billing, audit)', () => {
         for (const retired of RETIRED_NAMESPACES) {
             expect(Object.keys(PERMISSION_CATALOG)).not.toContain(retired);
         }
@@ -46,7 +44,7 @@ describe('Permission catalog (Product Spec v5.1 §4)', () => {
         expect(Object.keys(ROLE_GRANTS).sort()).toEqual(['operator', 'owner', 'support', 'viewer']);
     });
 
-    it('matches the spec Operator row (plus reading their own tenant)', () => {
+    it('matches the v5.2 Campaign Manager row exactly', () => {
         expect([...ROLE_GRANTS[RoleEnum.OPERATOR]].sort()).toEqual(
             [
                 'analytics:read',
@@ -56,7 +54,6 @@ describe('Permission catalog (Product Spec v5.1 §4)', () => {
                 'campaigns:read',
                 'campaigns:write',
                 'analytics:query',
-                'analytics:write',
                 'participants:block',
                 'participants:read',
                 'participants:review',
@@ -72,9 +69,9 @@ describe('Permission catalog (Product Spec v5.1 §4)', () => {
                 'rewards:reject',
                 'segments:read',
                 'segments:write',
-                'tenants:read',
                 'variants:read',
-                'variants:write'
+                'variants:write',
+                'webhooks:read'
             ].sort()
         );
         // Banning and cancelling a payout are the Owner's alone.
@@ -84,16 +81,14 @@ describe('Permission catalog (Product Spec v5.1 §4)', () => {
         expect(ROLE_GRANTS[RoleEnum.OPERATOR]).not.toContain('rewards:adjust');
     });
 
-    it('matches the spec Viewer row (plus reading their own tenant)', () => {
+    it('matches the v5.2 Analyst row exactly — never analytics:query', () => {
         expect([...ROLE_GRANTS[RoleEnum.VIEWER]].sort()).toEqual([
-            'analytics:query',
             'analytics:read',
             'campaigns:read',
             'payouts:read',
             'programs:read',
             'referrals:read',
             'rewards:read',
-            'tenants:read',
             'variants:read'
         ]);
     });
@@ -107,8 +102,7 @@ describe('Permission catalog (Product Spec v5.1 §4)', () => {
             'referrals:read',
             'rewards:adjust',
             'rewards:read',
-            'rewards:resend_email',
-            'tenants:read'
+            'rewards:resend_email'
         ]);
         // v5: "Read on referrers/referrals/rewards; limited write". No approvals, no money movement.
         for (const denied of ['rewards:approve', 'rewards:clawback', 'payouts:write', 'campaigns:write'] as const) {
@@ -139,8 +133,9 @@ describe('Permission catalog (Product Spec v5.1 §4)', () => {
             'rewards:clawback',
             'payouts:confirm',
             'api_keys:manage',
-            'users:write',
-            'billing:write',
+            'users:manage',
+            'tenant:settings',
+            'tenant:billing',
             // v5 marks the Support Agent's three writes "all live Keto + audit trail": a resent
             // reward email or a support note must not be authorized by a token issued before the
             // agent's access was revoked.
@@ -222,8 +217,8 @@ describe('AuthorizationService', () => {
 
     it('caches denials too', async () => {
         keto.check.mockResolvedValue(false);
-        await service.userHas('u1', 't1', 'billing:write');
-        expect(await service.userHas('u1', 't1', 'billing:write')).toBe(false);
+        await service.userHas('u1', 't1', 'tenant:billing');
+        expect(await service.userHas('u1', 't1', 'tenant:billing')).toBe(false);
         expect(keto.check).toHaveBeenCalledTimes(1);
     });
 
@@ -303,13 +298,16 @@ describe('KetoProvisioningService', () => {
         expect(patches.filter((p) => p.action === 'insert')).toHaveLength(tenantGrantTuples('t1').length);
     });
 
-    it('retires the referrers, dsr and connections namespaces, and survives one already gone from Keto', async () => {
+    it('retires the referrers, dsr, connections, tenants, billing and audit namespaces, and survives one already gone from Keto', async () => {
         keto.deleteTuples.mockRejectedValueOnce(new Error('unknown namespace')).mockResolvedValue(undefined);
         await provisioning.retireNamespaces();
         expect(keto.deleteTuples.mock.calls.map(([query]) => query)).toEqual([
             { namespace: 'referrers' },
             { namespace: 'dsr' },
-            { namespace: 'connections' }
+            { namespace: 'connections' },
+            { namespace: 'tenants' },
+            { namespace: 'billing' },
+            { namespace: 'audit' }
         ]);
     });
 });

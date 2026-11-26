@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 
-import { DatabaseService } from '@app/database/database.service';
+import { PrivilegedDatabaseService } from '@app/database/privileged-database.service';
 import { KratosService } from '@common/auth/kratos.service';
 import { RoleEnum } from '@common/enums/role.enum';
 import { TransactionEventEmitterService } from '@common/events/transaction-event-emitter.service';
@@ -28,7 +28,7 @@ type Member = { id: string; tenantId: string; role: string; email: string; krato
 @Injectable()
 export class OperatorErasureService {
     constructor(
-        private readonly prisma: DatabaseService,
+        private readonly prisma: PrivilegedDatabaseService,
         private readonly kratos: KratosService,
         private readonly txEventEmitter: TransactionEventEmitterService,
         private readonly logger: AppLoggerService

@@ -36,7 +36,9 @@ import { AppModule } from '../../../src/app.module';
 import { requestIdMiddleware } from '../../../src/common/http-contract/request-id.middleware';
 import { validationExceptionFactory } from '../../../src/common/http-contract/validation-exception.factory';
 import { StripeService } from '../../../src/features/billing/stripe.service';
+import { AccountVerificationGateway } from '../../../src/features/verification/account-verification.gateway';
 import { fakeStripeService } from './stripe.fake';
+import { fakeAccountVerificationGateway } from './temporal.fake';
 
 let app: INestApplication | null = null;
 
@@ -49,6 +51,9 @@ export async function bootstrapTestApp(): Promise<INestApplication> {
         // Stripe is an external dependency reached over the network — override with a fake.
         .overrideProvider(StripeService)
         .useValue(fakeStripeService)
+        // Temporal (account_verification) is a separate server: the fake records starts and signals instead.
+        .overrideProvider(AccountVerificationGateway)
+        .useValue(fakeAccountVerificationGateway)
         .compile();
 
     // rawBody as in main.ts: Stripe signs the exact bytes it sent.

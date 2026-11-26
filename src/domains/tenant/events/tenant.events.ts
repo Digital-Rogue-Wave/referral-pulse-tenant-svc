@@ -18,9 +18,7 @@ export class TenantCreatedEvent extends BaseDomainEvent {
         public readonly trialEndsAt: Date,
         public readonly userId?: string,
         /** Residency and raw-data retention (API §8.3) — services holding event data apply them. */
-        public readonly residency?: { dataRegion: string; retentionMonths: number },
-        /** R-PRT-02's effective channel at creation, for the services that keep a copy (E1 D10). */
-        public readonly invitationChannel?: string
+        public readonly residency?: { dataRegion: string; retentionMonths: number }
     ) {
         super();
     }
@@ -33,14 +31,7 @@ export class TenantUpdatedEvent extends BaseDomainEvent {
         public readonly aggregateId: string,
         public readonly tenantId: string,
         public readonly changes: Record<string, { from: unknown; to: unknown }>,
-        public readonly userId?: string,
-        /** The invitation channel that now applies, when the change could move it (E1 D8/D10). */
-        public readonly effectiveInvitationChannel?: string,
-        /**
-         * The payout verification threshold that now applies, when the change touched it (E1 D11). Sent whole:
-         * `changes` drops an unchanged currency, and reward-service needs both to keep its copy.
-         */
-        public readonly verificationThreshold?: { amount: number | null; currency: string | null }
+        public readonly userId?: string
     ) {
         super();
     }
@@ -174,8 +165,8 @@ export class TenantDomainVerifiedEvent extends BaseDomainEvent {
 }
 
 /**
- * Emitted when company verification is requested (at signup). Consumed by the workflow
- * service to start the `account_verification` Temporal workflow. snake_case wire contract.
+ * The Owner opened a KYB session (`POST /v1/verification`). In-process only, for the audit trail: v5.2 publishes the
+ * verification only as `tenant.verified`, when the status changes.
  */
 export class TenantVerificationRequestedEvent extends BaseDomainEvent {
     readonly eventType = 'tenant.verification_requested' as const;
@@ -192,18 +183,23 @@ export class TenantVerificationRequestedEvent extends BaseDomainEvent {
 }
 
 /**
- * Emitted when verification_status changes (e.g. the workflow service's decision is applied).
+ * v5.2 Event Model §5.11 `tenant.verified`, on every `verification_status` change (Payout Model §5 gate 1):
+ * `pending_review` when the KYB provider calls back, `verified` or `rejected` on the Super Admin's decision.
+ * `decidedBy` is `provider:{name}` or `staff:{identity}`.
  */
-export class TenantVerificationStatusChangedEvent extends BaseDomainEvent {
-    readonly eventType = 'tenant.verification_status_changed' as const;
+export class TenantVerifiedEvent extends BaseDomainEvent {
+    readonly eventType = 'tenant.verified' as const;
 
     constructor(
         public readonly aggregateId: string,
         public readonly tenantId: string,
         public readonly previousStatus: string,
-        public readonly newStatus: string,
-        public readonly reason?: string,
-        public readonly userId?: string
+        public readonly verificationStatus: string,
+        public readonly decidedBy: string,
+        public readonly decidedAt: Date,
+        public readonly reason: string | null,
+        /** The audit trail's actor: the same decider. */
+        public readonly userId: string = decidedBy
     ) {
         super();
     }
@@ -236,6 +232,7 @@ export class TenantWidgetSecretRotatedEvent extends BaseDomainEvent {
     constructor(
         public readonly aggregateId: string,
         public readonly tenantId: string,
+        public readonly kid: string,
         public readonly previousValidUntil: Date,
         public readonly userId: string
     ) {
@@ -256,7 +253,7 @@ export const TenantEvents = {
     OWNERSHIP_TRANSFERRED: 'tenant.ownership-transferred',
     DOMAIN_VERIFIED: 'tenant.domain-verified',
     VERIFICATION_REQUESTED: 'tenant.verification_requested',
-    VERIFICATION_STATUS_CHANGED: 'tenant.verification_status_changed',
+    VERIFIED: 'tenant.verified',
     WIDGET_SECRET_REVEALED: 'tenant.widget_secret_revealed',
     WIDGET_SECRET_ROTATED: 'tenant.widget_secret_rotated'
 } as const;

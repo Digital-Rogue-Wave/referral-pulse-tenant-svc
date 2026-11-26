@@ -67,7 +67,9 @@ describe('StripeService — Stripe operations', () => {
 
     it('refuses a plan with no configured price', async () => {
         config['stripeConfig'] = {};
-        await expect(service.upgradeSubscription({ stripeSubscriptionId: 'sub_1', targetPlan: BillingPlanEnum.STARTER })).rejects.toBeInstanceOf(
+        config['stripeConfig.successUrl'] = 'https://app.example/billing/success';
+        config['stripeConfig.cancelUrl'] = 'https://app.example/billing/cancel';
+        await expect(service.createSubscriptionCheckoutSession({ tenantId: 't1', plan: BillingPlanEnum.STARTER })).rejects.toBeInstanceOf(
             HttpException
         );
     });
@@ -76,80 +78,6 @@ describe('StripeService — Stripe operations', () => {
         Object.assign(service, { client: null });
         config['stripeConfig.secretKey'] = undefined;
         await expect(service.getSubscription('sub_1')).rejects.toThrow('Stripe secret key is not configured');
-    });
-
-    it('previews an upgrade with the new price on the existing item', async () => {
-        (stripe.invoices!.createPreview as jest.Mock).mockResolvedValue({ amount_due: 1500, currency: 'eur', next_payment_attempt: PERIOD_END });
-
-        const preview = await service.previewSubscriptionUpgrade({ stripeSubscriptionId: 'sub_1', targetPlan: BillingPlanEnum.ENTERPRISE });
-
-        expect(stripe.invoices!.createPreview).toHaveBeenCalledWith(
-            expect.objectContaining({ customer: 'cus_1', subscription_details: { items: [{ id: 'si_1', price: 'price_ent' }] } })
-        );
-        expect(preview).toEqual({ amountDueNow: 1500, currency: 'eur', nextInvoiceDate: new Date(PERIOD_END * 1000) });
-    });
-
-    it('refuses an upgrade preview for a subscription without customer or items', async () => {
-        (stripe.subscriptions!.retrieve as jest.Mock).mockResolvedValueOnce(subscription({ customer: null }));
-        await expect(
-            service.previewSubscriptionUpgrade({ stripeSubscriptionId: 'sub_1', targetPlan: BillingPlanEnum.GROWTH })
-        ).rejects.toBeInstanceOf(HttpException);
-        (stripe.subscriptions!.retrieve as jest.Mock).mockResolvedValueOnce(subscription({ items: { data: [] } }));
-        await expect(
-            service.previewSubscriptionUpgrade({ stripeSubscriptionId: 'sub_1', targetPlan: BillingPlanEnum.GROWTH })
-        ).rejects.toBeInstanceOf(HttpException);
-    });
-
-    it('schedules a downgrade as a second schedule phase starting at period end', async () => {
-        const result = await service.scheduleSubscriptionDowngrade({ stripeSubscriptionId: 'sub_1', targetPlan: BillingPlanEnum.STARTER });
-
-        expect(stripe.subscriptionSchedules!.create).toHaveBeenCalledWith({ from_subscription: 'sub_1' }, undefined);
-        const [, params] = (stripe.subscriptionSchedules!.update as jest.Mock).mock.calls[0]!;
-        expect(params.phases[1]).toEqual({ start_date: PERIOD_END, items: [{ price: 'price_starter', quantity: 1 }] });
-        expect(result.effectiveDate).toEqual(new Date(PERIOD_END * 1000));
-    });
-
-    it('reuses an existing schedule, and skips scheduling without a period end', async () => {
-        (stripe.subscriptions!.retrieve as jest.Mock).mockResolvedValueOnce(subscription({ schedule: 'sched_1' }));
-        await service.scheduleSubscriptionDowngrade({ stripeSubscriptionId: 'sub_1', targetPlan: BillingPlanEnum.STARTER });
-        expect(stripe.subscriptionSchedules!.retrieve).toHaveBeenCalledWith('sched_1');
-
-        (stripe.subscriptions!.retrieve as jest.Mock).mockResolvedValueOnce(subscription({ items: { data: [{ id: 'si_1' }] } }));
-        await expect(service.scheduleSubscriptionDowngrade({ stripeSubscriptionId: 'sub_1', targetPlan: BillingPlanEnum.STARTER })).resolves.toEqual({
-            effectiveDate: null
-        });
-    });
-
-    it('applies a scheduled downgrade without proration', async () => {
-        await service.applyScheduledDowngrade({ stripeSubscriptionId: 'sub_1', targetPlan: BillingPlanEnum.STARTER });
-        expect(stripe.subscriptions!.update).toHaveBeenCalledWith(
-            'sub_1',
-            expect.objectContaining({ items: [{ id: 'si_1', price: 'price_starter' }], proration_behavior: 'none' })
-        );
-        (stripe.subscriptions!.retrieve as jest.Mock).mockResolvedValueOnce(subscription({ items: { data: [] } }));
-        await expect(service.applyScheduledDowngrade({ stripeSubscriptionId: 'sub_1', targetPlan: BillingPlanEnum.STARTER })).rejects.toBeInstanceOf(
-            HttpException
-        );
-    });
-
-    it('releases a pending downgrade schedule, and does nothing without one', async () => {
-        (stripe.subscriptions!.retrieve as jest.Mock).mockResolvedValueOnce(subscription({ schedule: { id: 'sched_2' } }));
-        await service.cancelPendingSubscriptionDowngrade('sub_1');
-        expect(stripe.subscriptionSchedules!.release).toHaveBeenCalledWith('sched_2', {}, undefined);
-
-        (stripe.subscriptionSchedules!.release as jest.Mock).mockClear();
-        await service.cancelPendingSubscriptionDowngrade('sub_1');
-        expect(stripe.subscriptionSchedules!.release).not.toHaveBeenCalled();
-    });
-
-    it('cancels at period end after releasing any schedule, and can reactivate', async () => {
-        (stripe.subscriptions!.retrieve as jest.Mock).mockResolvedValueOnce(subscription({ schedule: 'sched_3' }));
-        await expect(service.scheduleSubscriptionCancellation('sub_1')).resolves.toEqual({ effectiveDate: new Date(PERIOD_END * 1000) });
-        expect(stripe.subscriptionSchedules!.release).toHaveBeenCalledWith('sched_3', {}, undefined);
-        expect(stripe.subscriptions!.update).toHaveBeenCalledWith('sub_1', { cancel_at_period_end: true }, undefined);
-
-        await service.reactivateSubscription('sub_1');
-        expect(stripe.subscriptions!.update).toHaveBeenLastCalledWith('sub_1', { cancel_at_period_end: false }, undefined);
     });
 
     it('lists every active recurring price across pages', async () => {
@@ -174,7 +102,7 @@ describe('StripeService — Stripe operations', () => {
         await expect(service.getChargeCustomerId('ch_2')).resolves.toBe('cus_2');
     });
 
-    it('maps invoices and the upcoming invoice to our shape (amounts stay in minor units, as Stripe sends them)', async () => {
+    it('maps invoices to our shape (amounts stay in minor units, as Stripe sends them)', async () => {
         (stripe.invoices!.list as jest.Mock).mockResolvedValue({
             has_more: false,
             data: [
@@ -200,13 +128,6 @@ describe('StripeService — Stripe operations', () => {
             createdAt: new Date(PERIOD_END * 1000)
         });
         expect(stripe.invoices!.list).toHaveBeenCalledWith({ customer: 'cus_1', limit: 10, ending_before: 'in_0' });
-
-        (stripe.invoices!.createPreview as jest.Mock).mockResolvedValue({ amount_due: 990, currency: 'eur', next_payment_attempt: null });
-        await expect(service.retrieveUpcomingInvoiceForCustomer({ customerId: 'cus_1', subscriptionId: 'sub_1' })).resolves.toMatchObject({
-            amountDue: 990,
-            currency: 'eur',
-            nextPaymentAttempt: null
-        });
     });
 
     it('maps a real first subscription invoice: cents kept, period taken from its lines, not from the invoice', async () => {
@@ -226,22 +147,6 @@ describe('StripeService — Stripe operations', () => {
             periodEnd: new Date(1796841000 * 1000),
             hostedInvoiceUrl: realInvoice.invoice.hosted_invoice_url,
             invoicePdfUrl: realInvoice.invoice.invoice_pdf
-        });
-    });
-
-    it("previews the next invoice's billed period from its lines", async () => {
-        (stripe.invoices!.createPreview as jest.Mock).mockResolvedValue({
-            amount_due: 1000,
-            currency: 'eur',
-            next_payment_attempt: 1796844600,
-            period_start: 1794249000,
-            period_end: 1796841000,
-            lines: { data: [{ period: { start: 1796841000, end: 1799519400 } }] }
-        });
-
-        await expect(service.retrieveUpcomingInvoiceForCustomer({ customerId: 'cus_1', subscriptionId: 'sub_1' })).resolves.toMatchObject({
-            periodStart: new Date(1796841000 * 1000),
-            periodEnd: new Date(1799519400 * 1000)
         });
     });
 });

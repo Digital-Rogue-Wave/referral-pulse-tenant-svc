@@ -36,7 +36,7 @@ describe('RetentionSweeperWorker', () => {
             mock<TracingService>(),
             mock<TenantContextService>(),
             mock<DateService>(),
-            prisma,
+            prisma as never,
             mock<BullJobsService>()
         );
     });

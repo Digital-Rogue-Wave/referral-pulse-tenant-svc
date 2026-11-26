@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
 import { TenantSettingsController } from './aware/tenant-settings.controller';
+import { TenantRecordController } from './aware/tenant-record.controller';
 
 // Modules
 import { FilesModule } from '../files/files.module';
@@ -11,9 +12,7 @@ import { DnsModule } from '../dns/dns.module';
 import { AwareTenantController } from './aware/aware-tenant.controller';
 import { AgnosticTenantController } from './agnostic/agnostic-tenant.controller';
 import { AdminTenantController } from './agnostic/admin-tenant.controller';
-import { InternalTenantVerificationController } from './internal-tenant-verification.controller';
 import { InternalWidgetSecretController } from './internal-widget-secret.controller';
-import { InternalInvitationChannelController } from './internal-invitation-channel.controller';
 
 // Services
 import { TenantService } from './tenant.service';
@@ -49,10 +48,9 @@ import { TenantUnlockProcessor } from './processors/tenant-unlock.processor';
         AwareTenantController,
         AgnosticTenantController,
         AdminTenantController,
-        InternalTenantVerificationController,
         InternalWidgetSecretController,
-        InternalInvitationChannelController,
-        TenantSettingsController
+        TenantSettingsController,
+        TenantRecordController
     ],
     providers: [
         // Core Services

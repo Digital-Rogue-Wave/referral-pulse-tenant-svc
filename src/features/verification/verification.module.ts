@@ -12,7 +12,10 @@ import { FakeKybProvider } from './fake-kyb.provider';
 import { KYB_PROVIDER } from './kyb-provider';
 import { KybResultHandler } from './kyb-result.handler';
 import { SumsubKybProvider } from './sumsub-kyb.provider';
-import { VerificationEscalationWorker } from './verification-escalation.worker';
+import { AccountVerificationActivities } from './account-verification.activities';
+import { AccountVerificationGateway } from './account-verification.gateway';
+import { AccountVerificationWorker } from './account-verification.worker';
+import { TenantVerificationStatus } from './tenant-verification-status';
 import { VerificationController } from './verification.controller';
 
 /** Company verification through a KYB provider, and its Super Admin review (Product Spec R-INT-02, E1 D15). */
@@ -23,7 +26,10 @@ import { VerificationController } from './verification.controller';
         CompanyVerificationService,
         AdminVerificationService,
         KybResultHandler,
-        VerificationEscalationWorker,
+        TenantVerificationStatus,
+        AccountVerificationGateway,
+        AccountVerificationActivities,
+        AccountVerificationWorker,
         SumsubKybProvider,
         FakeKybProvider,
         {

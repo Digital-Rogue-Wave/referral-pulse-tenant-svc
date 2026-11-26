@@ -23,8 +23,15 @@ module.exports = {
     format: [
       '@cucumber/pretty-formatter',
       'json:test/bdd/reports/cucumber-report.json',
+      'html:test/bdd/reports/cucumber-report.html',
+      'junit:test/bdd/reports/cucumber-report.xml',
+      'message:test/bdd/reports/cucumber-report.ndjson',
     ],
     formatOptions: { snippetInterface: 'async-await' },
+    // Evidence runs are serial, single-attempt, and strict until fixture cleanup is proven.
+    parallel: 0,
+    retry: 0,
+    strict: true,
     timeout: 30000,
   },
 };

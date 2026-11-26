@@ -1,21 +1,5 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import {
-    IsString,
-    IsOptional,
-    IsEnum,
-    IsDateString,
-    IsEmail,
-    IsInt,
-    Min,
-    Max,
-    IsNotEmpty,
-    IsObject,
-    Length,
-    MaxLength,
-    IsISO31661Alpha2,
-    ValidateIf,
-    IsISO4217CurrencyCode
-} from 'class-validator';
+import { IsString, IsOptional, IsDateString, IsEmail, IsInt, Min, Max, IsNotEmpty, MaxLength, IsISO31661Alpha2 } from 'class-validator';
 
 import { BaseResponseMapper } from '@common/helper';
 import { InvitationResponse } from '@domains/invitation';
@@ -24,17 +8,8 @@ import { InvitationResponse } from '@domains/invitation';
 // Enums (canonical definition lives in tenant.types.ts)
 // ============================================================
 
-import {
-    InvitationChannel,
-    TenantStatus,
-    VerificationRecordStatus,
-    VerificationStatus,
-    VerificationType,
-    type InvitationChannelSource
-} from './tenant.types';
-export { InvitationChannel, TenantStatus, VerificationRecordStatus, VerificationStatus, VerificationType };
-export { defaultInvitationChannel, effectiveInvitationChannel, invitationChannelSource } from './tenant.types';
-export type { InvitationChannelSource } from './tenant.types';
+import { TenantStatus, VerificationRecordStatus, VerificationStatus, VerificationType } from './tenant.types';
+export { TenantStatus, VerificationRecordStatus, VerificationStatus, VerificationType };
 
 // ============================================================
 // Props (shape of the Prisma model)
@@ -62,11 +37,8 @@ export interface TenantProps {
     domainVerificationStatus?: string | null;
     domainVerificationToken?: string | null;
     billingCountry?: string | null;
-    invitationChannel?: string | null;
     dataRegion: string;
     retentionMonths: number;
-    verificationRequiredAbove?: number | null;
-    verificationRequiredAboveCurrency?: string | null;
     metadata?: unknown;
     createdAt: Date;
     updatedAt: Date;
@@ -103,64 +75,28 @@ export class UpdateTenantDto {
     @IsISO31661Alpha2()
     billingCountry?: string;
 
-    // The Owner settings (invitation channel, retention, verification threshold) moved to
+    // The Owner settings (retention, verification threshold) moved to
     // PATCH /v1/tenant/settings (E1 decision D8); sent here they are refused as unknown fields.
 }
 
 /**
  * `PATCH /v1/tenant/settings` (v5.1 API surface; E1 decision D8): the Owner settings, in JSON, through the
- * global validation pipe. Every field is optional; `null` resets `invitation_channel` to the platform default
- * and clears the verification threshold.
+ * global validation pipe. Every field is optional. There is no invitation setting (v5.2 R-PRT-02, Appendix A #79),
+ * and the payout verification threshold is a Program setting in campaign-service (v5.2 API §3.1).
  */
 export class UpdateTenantSettingsDto {
-    @ApiPropertyOptional({
-        enum: InvitationChannel,
-        nullable: true,
-        description: 'R-PRT-02: allowed | forbidden; null = back to the platform default'
-    })
-    @IsOptional()
-    @IsEnum(InvitationChannel)
-    invitationChannel?: InvitationChannel | null;
-
     @ApiPropertyOptional({ minimum: 6, maximum: 36, description: 'Raw-data retention window in months (API §8.3)' })
     @IsOptional()
     @IsInt()
     @Min(6)
     @Max(36)
     retentionMonths?: number;
-
-    @ApiPropertyOptional({
-        nullable: true,
-        minimum: 0,
-        description: 'Monthly payout amount above which the participant must verify, in minor units; null = none'
-    })
-    @IsOptional()
-    @IsInt()
-    @Min(0)
-    verificationRequiredAbove?: number | null;
-
-    @ApiPropertyOptional({ example: 'EUR', description: 'ISO 4217 currency of verification_required_above; required with it' })
-    @ValidateIf((dto: UpdateTenantSettingsDto) => dto.verificationRequiredAbove !== undefined && dto.verificationRequiredAbove !== null)
-    @IsISO4217CurrencyCode()
-    verificationRequiredAboveCurrency?: string;
 }
 
-/** `GET /v1/tenant/settings`: what applies, and whether the invitation channel is the Owner's or the default. */
+/** `GET /v1/tenant/settings`: the Owner settings that apply. */
 export class TenantSettingsResponse {
-    @ApiProperty({ enum: InvitationChannel, enumName: 'InvitationChannel' })
-    invitationChannel!: InvitationChannel;
-
-    @ApiProperty({ enum: ['explicit', 'default'] })
-    invitationChannelSource!: InvitationChannelSource;
-
     @ApiProperty({ minimum: 6, maximum: 36 })
     retentionMonths!: number;
-
-    @ApiPropertyOptional({ nullable: true, description: 'Minor units; null = no threshold' })
-    verificationRequiredAbove!: number | null;
-
-    @ApiPropertyOptional({ nullable: true })
-    verificationRequiredAboveCurrency!: string | null;
 }
 
 export class TransferOwnershipDto {
@@ -264,56 +200,6 @@ export class SuspendTenantDto {
     reason!: string;
 }
 
-/**
- * The account_verification workflow's report on one verification. Without `verification_id` it applies to the
- * tenant's latest open verification of `verification_type` (a new one is opened when none is).
- */
-export class UpdateVerificationStatusDto {
-    @ApiProperty({ enum: VerificationRecordStatus })
-    @IsEnum(VerificationRecordStatus)
-    status!: VerificationRecordStatus;
-
-    @ApiPropertyOptional({ enum: VerificationType, default: VerificationType.COMPANY })
-    @IsOptional()
-    @IsEnum(VerificationType)
-    verificationType?: VerificationType;
-
-    @ApiPropertyOptional()
-    @IsOptional()
-    @IsString()
-    @Length(26, 26)
-    verificationId?: string;
-
-    @ApiPropertyOptional()
-    @IsOptional()
-    @IsString()
-    @MaxLength(2000)
-    reason?: string;
-
-    @ApiPropertyOptional({ description: 'Operator id or `system` for an automated decision' })
-    @IsOptional()
-    @IsString()
-    @MaxLength(80)
-    reviewedBy?: string;
-
-    @ApiPropertyOptional({ description: 'Temporal workflow id, so a crashed verification can be resumed' })
-    @IsOptional()
-    @IsString()
-    @MaxLength(255)
-    temporalWorkflowId?: string;
-
-    @ApiPropertyOptional()
-    @IsOptional()
-    @IsString()
-    @MaxLength(255)
-    temporalRunId?: string;
-
-    @ApiPropertyOptional({ description: 'References to uploaded documents — never the documents themselves' })
-    @IsOptional()
-    @IsObject()
-    evidence?: Record<string, unknown>;
-}
-
 // ============================================================
 // Responses
 // ============================================================
@@ -381,9 +267,6 @@ export class TenantResponse {
 
     @ApiPropertyOptional({ description: 'ISO 3166-1 alpha-2 billing country' })
     billingCountry?: string | null;
-
-    @ApiPropertyOptional({ description: 'R-PRT-02 setting; null = no explicit choice (the platform default applies)' })
-    invitationChannel?: string | null;
 
     @ApiProperty({ example: 'eu-central-1' })
     dataRegion!: string;
@@ -475,8 +358,8 @@ class TenantResponseMapper extends BaseResponseMapper<TenantProps, TenantRespons
     }
 
     /**
-     * Explicit field list, as for API keys (NOTE.md K6): `widget_token_secret` is never part of a response
-     * (it goes only to a service holding `widget_secret.read`), and a new column stays private until listed here.
+     * Explicit field list, as for API keys (NOTE.md K6): `widget_signing_secrets` is never part of a response
+     * (only the widget-secret routes serve it), and a new column stays private until listed here.
      */
     override toResponse(entity: TenantProps): TenantResponse {
         return Object.assign(new TenantResponse(), {
@@ -501,7 +384,6 @@ class TenantResponseMapper extends BaseResponseMapper<TenantProps, TenantRespons
             domainVerificationStatus: entity.domainVerificationStatus ?? null,
             domainVerificationToken: entity.domainVerificationToken ?? null,
             billingCountry: entity.billingCountry ?? null,
-            invitationChannel: entity.invitationChannel ?? null,
             dataRegion: entity.dataRegion,
             retentionMonths: entity.retentionMonths,
             metadata: entity.metadata ?? null,
@@ -523,38 +405,55 @@ export class AdminTenantCreatedResponse {
     ownerInvitation!: InvitationResponse;
 }
 
-/**
- * API Contract §4.1's "shared secret" for widget identity tokens, as a service holding `widget_secret.read`
- * receives it (see `internal-widget-secret.controller.ts`). Within an hour of a rotation the replaced
- * secret comes too, so tokens signed just before the switch still verify.
- */
-export class WidgetTokenSecretDto {
-    @ApiProperty({ description: '32 bytes as 64 hex characters' })
+/** One active widget signing secret (v5.2 API §3.17, US1.5.5). */
+export class WidgetSigningSecretResponse {
+    @ApiProperty({ description: 'Put it in the widget token header: it selects this secret' })
+    kid!: string;
+
+    @ApiProperty({ description: '32 bytes as 64 hex characters: sign the widget token (HS256, 1-hour expiry) with it' })
     secret!: string;
 
-    @ApiPropertyOptional({ description: 'The replaced secret, still accepted until previous_valid_until' })
-    previousSecret?: string;
-
-    @ApiPropertyOptional()
-    previousValidUntil?: Date;
-}
-
-/** R-PRT-02's tenant-level envelope as a service holding `tenant_invitation_channel.read` receives it. */
-export class TenantInvitationChannelDto {
     @ApiProperty()
-    tenantId!: string;
+    createdAt!: Date;
 
-    @ApiProperty({ enum: InvitationChannel, enumName: 'InvitationChannel', description: "The Owner's choice, or the billing country's default" })
-    invitationChannel!: InvitationChannel;
+    @ApiProperty({ type: Date, nullable: true, description: 'Null for the newest secret; the previous one verifies until 7 days after a rotation' })
+    expiresAt!: Date | null;
 }
 
-/** The secret as the Owner reads or receives it after a rotation (US1.5.4 F2/F3). */
-export class WidgetSecretResponse {
-    @ApiProperty({ description: '32 bytes as 64 hex characters: sign the widget user JWT (HS256, 1-hour expiry) with it' })
-    secret!: string;
+/**
+ * `GET /v1/tenant/widget-secret` and its rotation (Owner), and Event Ingestion's service read: the one or two
+ * active secrets, newest first. Shown in full: they are the client backend's signing material.
+ */
+export class WidgetSigningSecretsResponse {
+    @ApiProperty({ type: () => [WidgetSigningSecretResponse] })
+    secrets!: WidgetSigningSecretResponse[];
+}
 
-    @ApiPropertyOptional({ description: 'Set after a rotation: until then, tokens signed with the previous secret still work' })
-    previousValidUntil?: Date | null;
+/** `GET /v1/tenant` (v5.2 API §3.17, US1.7.3): the tenant record. */
+export class TenantRecordResponse {
+    @ApiProperty()
+    id!: string;
+
+    @ApiProperty()
+    name!: string;
+
+    @ApiProperty()
+    slug!: string;
+
+    @ApiProperty({ description: 'The platform plan (Stripe Billing is the store of record)' })
+    plan!: string;
+
+    @ApiProperty({ enum: ['unverified', 'pending_review', 'verified', 'rejected'] })
+    verificationStatus!: string;
+
+    @ApiProperty({ type: String, nullable: true, description: 'ISO 3166-1 alpha-2' })
+    billingCountry!: string | null;
+
+    @ApiProperty({ minimum: 6, maximum: 36 })
+    retentionMonths!: number;
+
+    @ApiProperty()
+    dataRegion!: string;
 }
 
 // Re-export events for convenience

@@ -85,16 +85,8 @@ describe('Controllers delegate to their services', () => {
         expectDelegation([
             [() => controller.getCurrentSubscription(), service.getCurrentSubscription],
             [() => controller.subscriptionCheckout({ plan: 'Starter' } as never), service.subscriptionCheckout],
-            [() => controller.previewSubscriptionUpgrade({ targetPlan: 'Growth' } as never), service.previewSubscriptionUpgrade],
-            [() => controller.upgradeSubscription({ targetPlan: 'Growth' } as never), service.upgradeSubscription],
-            [() => controller.downgradeSubscription({ targetPlan: 'Starter' } as never), service.downgradeSubscription],
-            [() => controller.cancelPendingDowngrade(), service.cancelPendingDowngrade],
-            [() => controller.cancelSubscription({}), service.cancelSubscription],
-            [() => controller.reactivateSubscription(), service.reactivateSubscription],
             [() => controller.listInvoices({}), service.listInvoices],
-            [() => controller.createPortalSession(), service.createPortalSession],
-            [() => controller.getUpcomingInvoice(), service.getUpcomingInvoice],
-            [() => controller.getUsageSummary(), service.getUsageSummary]
+            [() => controller.createPortalSession(), service.createPortalSession]
         ]);
     });
 
@@ -199,7 +191,7 @@ describe('Internal endpoints', () => {
     it('tenant status and entitlements are 404 for an unknown tenant', async () => {
         const prisma = { tenant: { findUnique: jest.fn() }, billing: { findUnique: jest.fn().mockResolvedValue(null) } };
         const planLimits = mock<PlanLimitService>();
-        const controller = new InternalTenantStatusController(prisma as unknown as DatabaseService, planLimits);
+        const controller = new InternalTenantStatusController(prisma as never, planLimits);
 
         prisma.tenant.findUnique.mockResolvedValue({ status: 'active', paymentStatus: 'past_due', trialStartedAt: null, trialEndsAt: null });
         await expect(controller.getTenantStatus('t1')).resolves.toMatchObject({
@@ -218,7 +210,7 @@ describe('Internal endpoints', () => {
     describe('operator contacts', () => {
         const row = { id: 'u1', tenantId: 't1', email: 'ada@acme.io', name: 'Ada', role: 'owner' };
         const prisma = { user: { findFirst: jest.fn(), findMany: jest.fn() }, tenant: { findFirst: jest.fn() } };
-        const controller = new OperatorContactController(prisma as unknown as DatabaseService);
+        const controller = new OperatorContactController(prisma as never);
 
         it('returns a live operator’s address, never a removed or erased one', async () => {
             prisma.user.findFirst.mockResolvedValueOnce(row).mockResolvedValueOnce(null);
@@ -247,16 +239,12 @@ describe('Internal endpoints', () => {
                     id: 't1',
                     name: 'Acme',
                     status: 'active',
-                    billingCountry: 'FR',
-                    invitationChannel: null,
                     setting: { general: { locale: 'de-DE', appUrl: 'https://app.acme.io/referrals', supportEmail: 'help@acme.io' } }
                 })
                 .mockResolvedValueOnce({
                     id: 't1',
                     name: 'Acme',
                     status: 'active',
-                    billingCountry: 'DE',
-                    invitationChannel: null,
                     setting: { general: { locale: 'klingon!', appUrl: 'http://app.acme.io' } }
                 })
                 .mockResolvedValueOnce(null);
@@ -267,17 +255,9 @@ describe('Internal endpoints', () => {
                 status: 'active',
                 locale: 'de-DE',
                 appUrl: 'https://app.acme.io/referrals',
-                replyTo: 'help@acme.io',
-                invitationChannel: 'allowed'
+                replyTo: 'help@acme.io'
             });
-            // The same read carries R-PRT-02's effective value, so a consumer never re-derives the
-            // jurisdiction rule: this tenant bills in Germany and made no choice.
-            await expect(controller.profileOf('t1')).resolves.toMatchObject({
-                locale: null,
-                appUrl: null,
-                replyTo: null,
-                invitationChannel: 'forbidden'
-            });
+            await expect(controller.profileOf('t1')).resolves.toMatchObject({ locale: null, appUrl: null, replyTo: null });
             await expect(controller.profileOf('gone')).rejects.toBeInstanceOf(NotFoundException);
         });
     });

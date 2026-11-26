@@ -10,7 +10,6 @@ import { DatabaseService } from '@app/database/database.service';
 import { ApiKeyDeletedEvent } from '@domains/api-key';
 import { TenantDeletedEvent, TenantUpdatedEvent } from '@domains/tenant/events/tenant.events';
 import { TenantSettingUpdatedEvent } from '@domains/tenant-setting';
-import { SubscriptionDowngradeCancelledEvent, SubscriptionReactivatedEvent } from '@domains/billing';
 import { UserLoggedInEvent, UserRoleChangedEvent } from '@domains/user';
 
 import { auditActor, toAuditEntry } from './audited-actions';
@@ -48,19 +47,6 @@ describe('Audited actions', () => {
             'u1'
         );
         expect(toAuditEntry(event)).toMatchObject({ action: 'tenant_setting.updated', targetId: 's1', after: { currencyCode: 'USD' } });
-    });
-
-    it('records the Owner withdrawing a downgrade or a cancellation (US1.8.2 F9)', () => {
-        const withdrawn = new SubscriptionDowngradeCancelledEvent('b1', 't1', { pendingDowngradePlan: { from: 'Starter', to: null } }, 'u1');
-        expect(toAuditEntry(withdrawn)).toMatchObject({
-            action: 'subscription.downgrade_cancelled',
-            targetType: 'subscription',
-            targetId: 'b1',
-            before: { pendingDowngradePlan: 'Starter' },
-            after: { pendingDowngradePlan: null }
-        });
-        const kept = new SubscriptionReactivatedEvent('b1', 't1', { cancellationEffectiveAt: { from: '2026-12-01T00:00:00.000Z', to: null } }, 'u1');
-        expect(toAuditEntry(kept)).toMatchObject({ action: 'subscription.reactivated', targetId: 'b1' });
     });
 
     it('puts the replaced value of a published change in before, and the new one in after (F7)', () => {

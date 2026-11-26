@@ -4,6 +4,7 @@ import { ExecutionContext } from '@nestjs/common';
 import { mock, MockProxy } from 'jest-mock-extended';
 
 import { DatabaseService } from '@app/database/database.service';
+import { PrivilegedDatabaseService } from '@app/database/privileged-database.service';
 import { TransactionEventEmitterService } from '@common/events/transaction-event-emitter.service';
 import { BaseException } from '@common/exceptions/base.exceptions';
 import { TenantService } from '../tenant/tenant.service';
@@ -31,7 +32,7 @@ describe('Ory web hooks', () => {
                 WebhookController,
                 { provide: TenantService, useValue: tenantService },
                 { provide: StripeWebhookService, useValue: mock<StripeWebhookService>() },
-                { provide: DatabaseService, useValue: prisma },
+                { provide: PrivilegedDatabaseService, useValue: prisma },
                 { provide: TransactionEventEmitterService, useValue: txEventEmitter }
             ]
         })

@@ -1,7 +1,7 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { IsEnum, IsObject, IsOptional, IsString, Length, MaxLength } from 'class-validator';
+import { Type } from 'class-transformer';
+import { IsEnum, IsObject, IsOptional, IsString, Length, MaxLength, ValidateNested } from 'class-validator';
 
-import { BaseResponseMapper } from '@common/helper';
 import { BaseDomainEvent } from '@domains/common/events';
 
 // ============================================================
@@ -9,11 +9,9 @@ import { BaseDomainEvent } from '@domains/common/events';
 // ============================================================
 
 /**
- * The providers a connection may be for: real vendors, not categories (US1.5.1 F7, v5.1). The platform calls
- * each provider's own API for payouts and gift cards (Payout Model R-PAY-01/03, R-RWD-07), so it must know which
- * one it is. Mirrored by event-svc's `InboundProvider` and the CHECK on its `inbound_webhook_receipts.provider`,
- * so a connection and the receipt its callback produces cannot disagree about who sent it.
- * Replaced the categories `gift_card` (→ `tremendous`) and `crm` (→ `hubspot` | `salesforce`) on 2026-11-10.
+ * The providers a Connection may be for (v5.2 API §3.16, DB §3 `connections.provider`). Real vendors, not categories:
+ * the platform calls each provider's own API, so it must know which one it is. The eight that send callbacks are
+ * mirrored by event-svc's `InboundProvider`; `zapier` has no receiver (it is outbound through webhook subscriptions).
  */
 export enum ConnectionProvider {
     STRIPE = 'stripe',
@@ -23,30 +21,47 @@ export enum ConnectionProvider {
     WISE = 'wise',
     TREMENDOUS = 'tremendous',
     HUBSPOT = 'hubspot',
-    SALESFORCE = 'salesforce'
+    SALESFORCE = 'salesforce',
+    ZAPIER = 'zapier'
 }
 
-/** What a connection is for (US1.5.1 F7): billing, payout, gift card or CRM. Derived from the provider. */
-export enum ConnectionType {
-    BILLING = 'billing',
-    PAYOUT = 'payout',
-    GIFT_CARD = 'gift_card',
-    CRM = 'crm'
+/** v5.2 API §3.16: inbound (provider → platform webhooks), outbound (platform → provider calls) or both. */
+export enum ConnectionDirection {
+    INBOUND = 'inbound',
+    OUTBOUND = 'outbound',
+    BOTH = 'both'
 }
 
-/** Each provider belongs to exactly one type (US1.5.1 F5), so a client can't pair Paddle with CRM. */
-export const CONNECTION_TYPE_OF: Readonly<Record<ConnectionProvider, ConnectionType>> = {
-    [ConnectionProvider.STRIPE]: ConnectionType.BILLING,
-    [ConnectionProvider.PADDLE]: ConnectionType.BILLING,
-    [ConnectionProvider.CHARGEBEE]: ConnectionType.BILLING,
-    [ConnectionProvider.PAYPAL]: ConnectionType.PAYOUT,
-    [ConnectionProvider.WISE]: ConnectionType.PAYOUT,
-    [ConnectionProvider.TREMENDOUS]: ConnectionType.GIFT_CARD,
-    [ConnectionProvider.HUBSPOT]: ConnectionType.CRM,
-    [ConnectionProvider.SALESFORCE]: ConnectionType.CRM
+/** v5.2 DB §3 `connections.status`: pending until the first verified callback or a successful outbound test. */
+export enum ConnectionStatus {
+    PENDING_VERIFICATION = 'pending_verification',
+    ACTIVE = 'active',
+    REVOKED = 'revoked'
+}
+
+/**
+ * The provider matrix fixes the direction (v5.2 tracker US1.5.1 AC3, API §3.16): billing providers send webhooks;
+ * payout providers are called and send status callbacks; CRMs send contacts and receive leads; Zapier only receives,
+ * through `POST /v1/webhooks`.
+ */
+export const DIRECTION_OF: Readonly<Record<ConnectionProvider, ConnectionDirection>> = {
+    [ConnectionProvider.STRIPE]: ConnectionDirection.INBOUND,
+    [ConnectionProvider.PADDLE]: ConnectionDirection.INBOUND,
+    [ConnectionProvider.CHARGEBEE]: ConnectionDirection.INBOUND,
+    [ConnectionProvider.PAYPAL]: ConnectionDirection.BOTH,
+    [ConnectionProvider.WISE]: ConnectionDirection.BOTH,
+    [ConnectionProvider.TREMENDOUS]: ConnectionDirection.BOTH,
+    [ConnectionProvider.HUBSPOT]: ConnectionDirection.BOTH,
+    [ConnectionProvider.SALESFORCE]: ConnectionDirection.BOTH,
+    [ConnectionProvider.ZAPIER]: ConnectionDirection.OUTBOUND
 };
 
 export const isConnectionProvider = (value: string): value is ConnectionProvider => (Object.values(ConnectionProvider) as string[]).includes(value);
+
+export const receivesCallbacks = (direction: string): boolean => direction === ConnectionDirection.INBOUND || direction === ConnectionDirection.BOTH;
+
+/** v5.2 API §3.16: "old secret honoured for 24 h" after a rotation. */
+export const PREVIOUS_SIGNING_SECRET_GRACE_MS = 24 * 60 * 60 * 1000;
 
 // ============================================================
 // Props (shape of the Prisma model)
@@ -56,15 +71,26 @@ export interface ConnectionProps {
     id: string;
     tenantId: string;
     provider: string;
-    connectionType: string;
+    direction: string;
+    status: string;
     name?: string | null;
-    signingSecret?: string | null;
+    credentialsEncrypted?: string | null;
+    signingSecretEncrypted?: string | null;
+    previousSigningSecretEncrypted?: string | null;
+    previousSecretValidUntil?: Date | null;
     config: unknown;
-    enabled: boolean;
+    lastVerifiedAt?: Date | null;
+    lastSyncAt?: Date | null;
     createdBy?: string | null;
     createdAt: Date;
     updatedAt: Date;
     revokedAt?: Date | null;
+}
+
+/** What `credentials_encrypted` holds once opened: the outbound credentials, never the inbound signing secret. */
+export interface OutboundCredentials {
+    apiKey?: string;
+    oauthCode?: string;
 }
 
 // ============================================================
@@ -72,45 +98,86 @@ export interface ConnectionProps {
 // ============================================================
 
 /**
- * `POST /v1/connections` is named by API Contract §6.5 but its body is marked "to author in §3.1", so
- * this shape is this service's proposal rather than a contract being implemented (NOTE.md §V5.13).
+ * v5.2 API §3.16 `credentials`: write-only, never returned. Which fields a provider takes:
+ * - `signing_secret`: the inbound webhook secret (Stripe, Paddle, Tremendous; the CRM bearer token; the PayPal app
+ *   secret its verify API needs);
+ * - `basic_auth_user` + `basic_auth_password`: Chargebee (with the provider IP allowlist in `config.allowed_ips`);
+ * - `api_key` or `oauth_code`: the outbound credential of a payout provider or a CRM.
  */
+export class ConnectionCredentialsDto {
+    @ApiPropertyOptional({ minLength: 16, maxLength: 500 })
+    @IsOptional()
+    @IsString()
+    @Length(16, 500)
+    signingSecret?: string;
+
+    @ApiPropertyOptional({ maxLength: 200 })
+    @IsOptional()
+    @IsString()
+    @Length(1, 200)
+    basicAuthUser?: string;
+
+    @ApiPropertyOptional({ maxLength: 200 })
+    @IsOptional()
+    @IsString()
+    @Length(8, 200)
+    basicAuthPassword?: string;
+
+    @ApiPropertyOptional({ maxLength: 2000 })
+    @IsOptional()
+    @IsString()
+    @Length(8, 2000)
+    apiKey?: string;
+
+    @ApiPropertyOptional({ maxLength: 2000 })
+    @IsOptional()
+    @IsString()
+    @Length(8, 2000)
+    oauthCode?: string;
+}
+
+/** v5.2 API §3.16 `POST /v1/connections`. */
 export class CreateConnectionDto {
     @ApiProperty({ enum: ConnectionProvider })
     @IsEnum(ConnectionProvider)
     provider!: ConnectionProvider;
 
     @ApiPropertyOptional({
-        enum: ConnectionType,
-        description: 'Derived from the provider; when sent it must match it (US1.5.1 F5), otherwise 400'
+        enum: ConnectionDirection,
+        description: 'Fixed by the provider matrix; when sent it must match it, otherwise 400'
     })
     @IsOptional()
-    @IsEnum(ConnectionType)
-    connectionType?: ConnectionType;
+    @IsEnum(ConnectionDirection)
+    direction?: ConnectionDirection;
 
-    @ApiPropertyOptional({ maxLength: 100, description: 'Operator-facing label' })
+    @ApiPropertyOptional({ maxLength: 100, description: 'Operator-facing label (not in the v5.2 contract)' })
     @IsOptional()
     @IsString()
     @MaxLength(100)
     name?: string;
 
-    @ApiProperty({
-        description: 'The secret the provider signs its callbacks with. Stored encrypted and never returned by any read endpoint.',
-        minLength: 16,
-        maxLength: 500
-    })
-    @IsString()
-    @Length(16, 500)
-    signingSecret!: string;
+    @ApiPropertyOptional({ type: ConnectionCredentialsDto, description: 'Write-only; required except for Zapier' })
+    @IsOptional()
+    @ValidateNested()
+    @Type(() => ConnectionCredentialsDto)
+    credentials?: ConnectionCredentialsDto;
 
     @ApiPropertyOptional({
-        description: 'Provider settings that are not secrets — e.g. PayPal webhookId, Chargebee allowedIps',
+        description: 'Provider settings that are not secrets — e.g. PayPal client_id / webhook_id, Chargebee allowed_ips',
         type: 'object',
         additionalProperties: true
     })
     @IsOptional()
     @IsObject()
     config?: Record<string, unknown>;
+}
+
+/** v5.2 API §3.16 `POST /v1/connections/{id}/rotate`: the replacement credentials, any subset the provider takes. */
+export class RotateConnectionDto {
+    @ApiProperty({ type: ConnectionCredentialsDto })
+    @ValidateNested()
+    @Type(() => ConnectionCredentialsDto)
+    credentials!: ConnectionCredentialsDto;
 }
 
 // ============================================================
@@ -127,31 +194,64 @@ export class ConnectionResponse {
     @ApiProperty({ enum: ConnectionProvider })
     provider!: string;
 
-    @ApiProperty({ enum: ConnectionType })
-    connectionType!: string;
+    @ApiProperty({ enum: ConnectionDirection })
+    direction!: string;
+
+    @ApiProperty({ enum: ConnectionStatus })
+    status!: string;
 
     @ApiPropertyOptional()
     name?: string | null;
 
-    @ApiProperty({
-        description: 'Where the provider sends its callbacks: absolute when INBOUND_PUBLIC_BASE_URL is set, so the Owner can paste it as is'
+    @ApiPropertyOptional({
+        description: 'Inbound and both only: where the provider sends its callbacks; absolute when INBOUND_PUBLIC_BASE_URL is set'
     })
-    receiverUrl!: string;
+    inboundUrl?: string;
 
     @ApiProperty({ type: 'object', additionalProperties: true })
     config!: Record<string, unknown>;
 
-    @ApiProperty()
-    enabled!: boolean;
+    @ApiPropertyOptional({ nullable: true })
+    lastVerifiedAt?: Date | null;
+
+    @ApiPropertyOptional({ nullable: true })
+    lastSyncAt?: Date | null;
+
+    @ApiPropertyOptional({ nullable: true, description: 'Set while a rotated signing secret is still honoured' })
+    previousSecretValidUntil?: Date | null;
 
     @ApiProperty()
     createdAt!: Date;
 
-    @ApiPropertyOptional({ description: 'Set when the connection is revoked (null = live)' })
+    @ApiProperty()
+    updatedAt!: Date;
+
+    @ApiPropertyOptional({ nullable: true, description: 'Set when the connection is revoked' })
     revokedAt?: Date | null;
 }
 
-/** What Event Ingestion caches to verify a provider callback (Product Spec §12: "connection config … cache from Identity & Access"). */
+/** `POST /v1/connections/{id}/test`: the outbound check's outcome. */
+export class ConnectionTestResponse {
+    @ApiProperty()
+    connectionId!: string;
+
+    @ApiProperty()
+    ok!: boolean;
+
+    @ApiPropertyOptional({ nullable: true, description: 'Why the check failed (provider status, missing setting); never a credential' })
+    failure?: string | null;
+
+    @ApiProperty({ enum: ConnectionStatus })
+    status!: string;
+
+    @ApiProperty()
+    checkedAt!: Date;
+}
+
+/**
+ * What Event Ingestion caches to verify a provider callback: the inbound signing secret only — never an outbound
+ * credential (v5.2 US1.5.4 AC1). The previous secret is present only while its 24 hours last.
+ */
 export class InternalConnectionDto {
     @ApiProperty()
     connectionId!: string;
@@ -162,17 +262,56 @@ export class InternalConnectionDto {
     @ApiProperty({ enum: ConnectionProvider })
     provider!: string;
 
-    @ApiProperty({ enum: ConnectionType })
-    connectionType!: string;
+    @ApiProperty({ enum: ConnectionDirection })
+    direction!: string;
 
-    @ApiProperty({ nullable: true, description: 'Decrypted signing secret — the only endpoint that returns it' })
+    @ApiProperty({ enum: ConnectionStatus })
+    status!: string;
+
+    @ApiProperty({ nullable: true, description: 'Decrypted inbound signing secret' })
     signingSecret!: string | null;
+
+    @ApiProperty({ nullable: true, description: 'The rotated-out secret, while it is still honoured' })
+    previousSigningSecret!: string | null;
+
+    @ApiProperty({ nullable: true })
+    previousSecretValidUntil!: Date | null;
 
     @ApiProperty({ type: 'object', additionalProperties: true })
     config!: Record<string, unknown>;
+}
+
+/** `GET /internal/connections/{id}/credential` (v5.2 API §3.16): one call's worth of the outbound credential. */
+export class InternalConnectionCredentialDto {
+    @ApiProperty()
+    connectionId!: string;
 
     @ApiProperty()
-    enabled!: boolean;
+    tenantId!: string;
+
+    @ApiProperty({ enum: ConnectionProvider })
+    provider!: string;
+
+    @ApiProperty({ enum: ConnectionDirection })
+    direction!: string;
+
+    @ApiProperty({ enum: ConnectionStatus })
+    status!: string;
+
+    @ApiProperty({ description: 'Decrypted outbound credentials (`api_key` and/or `oauth_code`)', type: 'object', additionalProperties: true })
+    credentials!: OutboundCredentials;
+
+    @ApiProperty({ type: 'object', additionalProperties: true })
+    config!: Record<string, unknown>;
+}
+
+/** `POST /internal/connections/{id}/verified`: what Event Ingestion learns back. */
+export class InternalConnectionVerifiedDto {
+    @ApiProperty()
+    connectionId!: string;
+
+    @ApiProperty({ enum: ConnectionStatus })
+    status!: string;
 }
 
 /** The key `/t/o` and `/t/c` tokens are signed and verified with (Architecture §2.1). */
@@ -185,45 +324,75 @@ export class TrackingTokenKeyDto {
 // Mapper
 // ============================================================
 
-class ConnectionResponseMapper extends BaseResponseMapper<ConnectionProps, ConnectionResponse> {
-    constructor() {
-        super(ConnectionResponse);
-    }
-
-    /** Explicit field list: `signingSecret` is never part of a response. */
-    override toResponse(entity: ConnectionProps): ConnectionResponse {
-        return Object.assign(new ConnectionResponse(), {
-            id: entity.id,
-            tenantId: entity.tenantId,
-            provider: entity.provider,
-            connectionType: entity.connectionType,
-            name: entity.name ?? null,
-            receiverUrl: receiverPath(entity.provider, entity.id),
-            config: (entity.config ?? {}) as Record<string, unknown>,
-            enabled: entity.enabled,
-            createdAt: entity.createdAt,
-            revokedAt: entity.revokedAt ?? null
-        });
-    }
+/** Explicit field list: no secret or credential column is ever part of a response. */
+export function toConnectionResponse(entity: ConnectionProps): ConnectionResponse {
+    return Object.assign(new ConnectionResponse(), {
+        id: entity.id,
+        tenantId: entity.tenantId,
+        provider: entity.provider,
+        direction: entity.direction,
+        status: entity.status,
+        name: entity.name ?? null,
+        ...(receivesCallbacks(entity.direction) ? { inboundUrl: receiverPath(entity.provider, entity.id) } : {}),
+        config: (entity.config ?? {}) as Record<string, unknown>,
+        lastVerifiedAt: entity.lastVerifiedAt ?? null,
+        lastSyncAt: entity.lastSyncAt ?? null,
+        previousSecretValidUntil: entity.previousSecretValidUntil ?? null,
+        createdAt: entity.createdAt,
+        updatedAt: entity.updatedAt,
+        revokedAt: entity.revokedAt ?? null
+    });
 }
 
-export const connectionResponseMapper = new ConnectionResponseMapper();
-
-/** API Contract §6.5 / Architecture §2.4 — the path Event Ingestion hosts, not this service. */
+/** API §6.5 — the path Event Ingestion hosts, not this service. */
 export const receiverPath = (provider: string, connectionId: string): string => `/inbound/${provider}/${connectionId}`;
 
 // ============================================================
-// Domain Events
+// Domain Events (v5.2 Event Model §5.11: connection.created · verified · rotated · revoked; credentials never travel)
 // ============================================================
 
-/** Product Spec §12 lists `connection.created|revoked` among Identity & Access's published events. */
+interface ConnectionFacts {
+    connectionId: string;
+    provider: string;
+    direction: string;
+    status: string;
+}
+
 export class ConnectionCreatedEvent extends BaseDomainEvent {
     readonly eventType = 'connection.created' as const;
 
     constructor(
         public readonly aggregateId: string,
         public readonly tenantId: string,
-        public readonly payload: { connectionId: string; provider: string; connectionType: string; createdBy: string },
+        public readonly payload: ConnectionFacts & { createdBy: string },
+        public readonly userId?: string
+    ) {
+        super();
+    }
+}
+
+/** The connection turned active: its first verified callback (`source: callback`) or a successful test (`test`). */
+export class ConnectionVerifiedEvent extends BaseDomainEvent {
+    readonly eventType = 'connection.verified' as const;
+
+    constructor(
+        public readonly aggregateId: string,
+        public readonly tenantId: string,
+        public readonly payload: ConnectionFacts & { verifiedAt: Date; source: 'callback' | 'test' },
+        public readonly userId?: string
+    ) {
+        super();
+    }
+}
+
+/** `oldSecretValidUntil` is null when only the outbound credential changed (there is no old signing secret to honour). */
+export class ConnectionRotatedEvent extends BaseDomainEvent {
+    readonly eventType = 'connection.rotated' as const;
+
+    constructor(
+        public readonly aggregateId: string,
+        public readonly tenantId: string,
+        public readonly payload: ConnectionFacts & { rotatedAt: Date; oldSecretValidUntil: Date | null; rotatedBy: string },
         public readonly userId?: string
     ) {
         super();
@@ -236,8 +405,22 @@ export class ConnectionRevokedEvent extends BaseDomainEvent {
     constructor(
         public readonly aggregateId: string,
         public readonly tenantId: string,
-        public readonly payload: { connectionId: string; provider: string; connectionType: string; revokedBy: string },
+        public readonly payload: ConnectionFacts & { revokedBy: string },
         public readonly userId?: string
+    ) {
+        super();
+    }
+}
+
+/** In-process only: each `GET /internal/connections/{id}/credential` call is an audit row (v5.2 US1.5.4 AC2). */
+export class ConnectionCredentialReadEvent extends BaseDomainEvent {
+    readonly eventType = 'connection.credential_read' as const;
+
+    constructor(
+        public readonly aggregateId: string,
+        public readonly tenantId: string,
+        /** `service:{client_id}` of the caller. */
+        public readonly userId: string
     ) {
         super();
     }
@@ -245,7 +428,10 @@ export class ConnectionRevokedEvent extends BaseDomainEvent {
 
 export const ConnectionEvents = {
     CREATED: 'connection.created',
-    REVOKED: 'connection.revoked'
+    VERIFIED: 'connection.verified',
+    ROTATED: 'connection.rotated',
+    REVOKED: 'connection.revoked',
+    CREDENTIAL_READ: 'connection.credential_read'
 } as const;
 
 /**
